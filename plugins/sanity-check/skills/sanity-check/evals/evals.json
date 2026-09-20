@@ -1,0 +1,111 @@
+{
+  "skill_name": "sanity-check",
+  "note": "Two metrics, and the second is the product. (1) Does it find the planted defects and tier them correctly? (2) Does it report NOTHING outside the twelve check families — no formatting taste, no business advice, no claims about whether the numbers are plausible, no observations about what it couldn't check? Evals 2, 3 and 4 are the false-positive tests and matter more than eval 1: a run that finds all eleven defects in the dirty pack but invents two in the clean one has failed, because the reader then has to check the checking. Graded against pack-2026-11-dirty.KEY.md; never supply a key with a fixture.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "dirty-pack-all-tiers",
+      "prompt": "This goes to the CFO in an hour. Anything embarrassing in it?",
+      "files": ["skills/sanity-check/evals/pack-2026-11-dirty.xlsx"],
+      "expected_output": "Verdict line saying it is not safe to send, then Blockers / Embarrassments / Hygiene with counts, cell locators throughout, and the fixed scope line.",
+      "runs": 3,
+      "assertions": [
+        "Verdict line comes first and says plainly it is NOT safe to send",
+        "BLOCKER: Detail!D14 prints 3,388.0 where D5:D13 sum to 3,206.0 — a 182.0 gap, and the cell is typed rather than a SUM",
+        "BLOCKER: Summary!D8 prints 113 where D5:D7 sum to 111 (cross-foot failure)",
+        "BLOCKER: Summary!C5:C7 shares sum to 103%",
+        "BLOCKER: Summary!B10 capacity utilisation of 114% is impossible",
+        "BLOCKER: CC-103 appears twice in Detail (A7 and A11), identical values, double counted in every total below",
+        "BLOCKER: Detail!F9 is #DIV/0! because it points at blank D17, and it sits in the printed share column",
+        "BLOCKER: Detail!D12 is -96.0, a negative in a positive cost column",
+        "BLOCKER: Detail column D is £000s while column E is £ — mixed units in one table",
+        "BLOCKER: Summary!B8 (3,206.0) contradicts Detail!D14 (3,388.0) on the same headline cost",
+        "EMBARRASSMENT: Detail!A2 is dated 30-Sep-2026 in a November pack",
+        "EMBARRASSMENT (or Blocker with reasoning stated): Detail!D13 is 'TBC' in a live cost column and is silently skipped by the SUM",
+        "HYGIENE: Summary!B11 cost per head is typed 28.9, which AGREES with 3,206.0/111 — so it is Hygiene, not a Blocker",
+        "Summary is identified as the CORRECT figure and Detail!D14 as the wrong one — not the reverse",
+        "Detail!A16's stated rounding convention is NOT flagged as a defect",
+        "The rounding convention is NOT used to excuse the 182.0 gap",
+        "No finding outside the twelve families: no formatting notes, no 'costs look high', no escalation advice, no 'could not verify X'",
+        "Scope line present, listing the twelve family names",
+        "Every finding carries a cell locator",
+        "All three runs agree on the Blocker count and on which tier each defect landed in"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "borrowed-workbook-false-positive",
+      "prompt": "Can you check this over before I send it?",
+      "files": ["skills/sanity-check/evals/sales-2026-09.xlsx"],
+      "expected_output": "Exactly two findings — the typed-over non-reconciling total and the stale Services tab — and nothing invented.",
+      "runs": 3,
+      "assertions": [
+        "BLOCKER: Revenue!E16 prints 1,785.8 where the rows sum to 1,783.2, and the cell is typed rather than the =SUM the file uses elsewhere",
+        "EMBARRASSMENT: the Services tab is dated 'Data as of: 31-Jul-2026'",
+        "Finds NOTHING else — in particular does not flag the merged title row, the blank spacer column C, the footnote text in A15, or the empty Note cells as defects",
+        "Does not flag SMB Malta's small values or any figure as implausible",
+        "Verdict line states the blocker plainly",
+        "Scope line present",
+        "All three runs report the same two findings and no others"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "clean-file",
+      "prompt": "Is this safe to send?",
+      "files": ["skills/sanity-check/evals/pack-2026-11-clean.xlsx"],
+      "expected_output": "One verdict line saying it is clean, plus the scope line. Nothing else.",
+      "runs": 3,
+      "assertions": [
+        "Says plainly that it is safe to send and that nothing was found",
+        "Produces NO findings at any tier — no manufactured Hygiene item",
+        "Does not flag the share column computed to one decimal place",
+        "Scope line present",
+        "No reassurance paragraph, no layout compliments, no suggestions",
+        "Output is under about six lines"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "deck-format-blindness",
+      "prompt": "Check this pack over for me.",
+      "files": ["skills/sanity-check/evals/sales-pack-2026-09.pptx"],
+      "expected_output": "The internal total disagreement and the picture-chart slide, plus an explicit statement that formula-level checks are impossible in a deck.",
+      "runs": 3,
+      "assertions": [
+        "Finds that slide 2's printed total (1,785.8) disagrees with slide 3's native chart parts (1,284.2 + 387.2 + 111.8 = 1,783.2)",
+        "Notes that slide 2 discloses only 5 lines against a total covering more, so the table cannot be reconciled to its own total",
+        "Reports that slide 4 is a picture of a chart whose numbers cannot be read or checked",
+        "States in the scope caveat that formula overrides and error cells are not detectable in a deck — rather than implying those checks passed",
+        "Does not invent a defect from the picture slide's apparent bar heights",
+        "Scope line present with the full family list plus the format caveat"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "two-files-must-not-become-variance",
+      "prompt": "[the August and September workbooks together] Check these before they go out.",
+      "expected_output": "Sanity findings for both files, tiered. Explicitly NOT a variance report.",
+      "runs": 3,
+      "assertions": [
+        "Reports defects per artifact, tiered, with locators naming which file",
+        "Does NOT produce a drivers table, a ranked list of movements, or month-on-month commentary",
+        "May use the comparative only to sharpen the stale-figure checks",
+        "If it judges that the user wanted movement, says so in one line and names whats-changed rather than silently producing a variance report"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "convention-must-not-excuse-the-gap",
+      "prompt": "[a workbook whose only stated convention is 'rounded to the nearest £1k' and whose printed total is £47k away from its rows] Is this fine to send?",
+      "expected_output": "A Blocker on the £47k gap, with the rounding note explicitly rejected as an explanation for a gap that size.",
+      "runs": 3,
+      "assertions": [
+        "Reports the gap as a Blocker",
+        "Explicitly says the rounding convention does not account for a gap of that magnitude",
+        "Does not flag the rounding convention itself as a defect",
+        "Does not soften the verdict because the file documents a convention"
+      ]
+    }
+  ]
+}

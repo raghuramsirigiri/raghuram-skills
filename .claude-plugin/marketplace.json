@@ -110,6 +110,39 @@
         "standup",
         "analysis"
       ]
+    },
+    {
+      "name": "sanity-check",
+      "source": "./plugins/sanity-check",
+      "description": "Check one spreadsheet, deck or PDF for the mistakes that embarrass you in front of an audience — totals that don't cross-foot, error cells, shares over 100%, duplicated rows, stale dates, mixed units, a summary contradicting its own detail. Ranks what blocks sending from what merely invites a question. One artifact, not a period comparison.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "review",
+        "quality-check",
+        "proofread",
+        "reconciliation",
+        "cross-foot",
+        "audit",
+        "error-check",
+        "excel",
+        "xlsx",
+        "spreadsheet",
+        "formula-errors",
+        "board-pack",
+        "management-reporting",
+        "finance",
+        "fp-and-a",
+        "powerpoint",
+        "pptx",
+        "pdf",
+        "data-quality",
+        "sense-check",
+        "before-you-send"
+      ]
     }
   ]
 }

@@ -1,0 +1,34 @@
+{
+  "name": "sanity-check",
+  "description": "Check one spreadsheet, deck or PDF for the mistakes that embarrass you in front of an audience — totals that don't add up, error cells, shares over 100%, stale dates, mixed units, a summary that contradicts its own detail. Ranks what blocks sending from what merely invites a question.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Raghuram Sirigiri"
+  },
+  "homepage": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "repository": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "license": "MIT",
+  "keywords": [
+    "review",
+    "quality-check",
+    "proofread",
+    "reconciliation",
+    "cross-foot",
+    "audit",
+    "error-check",
+    "excel",
+    "xlsx",
+    "spreadsheet",
+    "formula-errors",
+    "board-pack",
+    "management-reporting",
+    "finance",
+    "fp-and-a",
+    "powerpoint",
+    "pptx",
+    "pdf",
+    "data-quality",
+    "sense-check",
+    "before-you-send"
+  ]
+}
