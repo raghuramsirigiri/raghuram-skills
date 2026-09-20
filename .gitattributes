@@ -1,0 +1,27 @@
+# Text files: normalise to LF in the repo, let git convert on checkout.
+* text=auto
+
+# Binary fixtures and assets — never touch line endings.
+# A reportlab-generated PDF contains no NUL bytes, so git's auto-detection calls
+# it text and core.autocrlf would rewrite its line endings on checkout, corrupting
+# the file. Every binary format a plugin ships is pinned explicitly here.
+*.pdf   binary
+*.pptx  binary
+*.potx  binary
+*.xlsx  binary
+*.xlsm  binary
+*.xltx  binary
+*.docx  binary
+*.dotx  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip   binary
+*.mp4   binary
