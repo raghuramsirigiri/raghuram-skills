@@ -14,7 +14,7 @@ node_modules/
 chart-dashboard-workspace/
 
 # Evals
-evals/
+/evals/
 
 # Temporary files (often created during testing)
 temp/
