@@ -62,6 +62,16 @@ pasted numbers, metrics, notes, or a topic with figures in it.
   that genuinely leads, not to whatever panel was written first.
 - A line chart needs an ordered x. Named categories — and bare month names like
   `'Jan'` — render an error panel; write `'Jan 2025'` or use a column chart.
+- `assets/charts-lib/` is a **vendored copy** of a library that lives in another
+  repo (`svg-charts`). Never fix a library bug here — a future sync would wipe
+  it, and the two copies would disagree in the meantime. Write the fix up in
+  [`CHARTS-LIB-UPSTREAM.md`](CHARTS-LIB-UPSTREAM.md) instead, as a diff against
+  the upstream engine file, and leave the copy alone; see *Recording a new
+  change* there. Patch the copy only when the skill cannot work without it, and
+  then say so in the same note. `node --test
+  skills/chart-dashboard/tests/upstream-notes.test.js` checks the copy against
+  what the note claims. Docs under `references/` are the skill's own — when the
+  library behaves surprisingly, saying so there is the fix to make here.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.

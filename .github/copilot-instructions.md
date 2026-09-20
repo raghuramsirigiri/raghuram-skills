@@ -19,6 +19,11 @@ Before writing chart code, consult:
 - `skills/chart-dashboard/references/theming.md` — brand recolour and the generator scripts
 - `skills/chart-dashboard/references/editable.md` — only when an editable page was asked for
 
+`skills/chart-dashboard/assets/charts-lib/` is a vendored copy of a library
+maintained in another repo. Do not fix library bugs there — the next sync
+removes your fix. Write the change up in `CHARTS-LIB-UPSTREAM.md` so it can be
+applied upstream, and document the current behaviour in `references/`.
+
 Non-negotiables:
 
 - Load `theme.js` before `charts.js`.
