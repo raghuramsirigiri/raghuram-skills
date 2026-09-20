@@ -57,7 +57,9 @@ total moved because units moved or because the per-unit figure moved is the most
 thing this skill can say, and it is pure arithmetic.
 
 Reconcile before reporting: **the sum of the rows is the truth**, not a total the source
-prints. If they disagree, the gap is a flag.
+prints. If they disagree, the gap is a flag. If the source is truncated and there is no
+complete set of rows to sum, `materiality.md` ranks the candidate totals by how checkable they
+are — a printed total comes last.
 
 ### 4. Rank, and drop what doesn't qualify
 
@@ -67,7 +69,7 @@ gates aggregates into one `all other movements` row, never silently dropped, so 
 arithmetic still closes.
 
 The reference also carries the refuse-to-say table, the rulings for new and gone rows,
-renames, sign flips and unit changes, and the closed nine-item list of what earns a flag.
+renames, sign flips and unit changes, and the closed ten-item list of what earns a flag.
 Those cases are the skill; do not improvise them.
 
 ### 5. Write it and stop
@@ -96,12 +98,16 @@ The deck rounds to £0.1k, so smaller movements aren't visible.
 - `Legacy monitoring` has gone; it was £5.4k last month. It may have been absorbed into
   `Observability`, but nothing in either source says so.
 
-## Flags (2)
-- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted — `E22` is a
-  typed-in number, not part of the column formula.
+## Flags (3)
+- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted.
+- `E22` is a typed-in number, not part of the column formula — which is why that total
+  doesn't reconcile.
 - Slide 6 carries the regional split as a picture, not a chart. Those numbers weren't
   readable; the underlying file is needed if that split matters.
 ```
+
+Note the first two flags: one typed-over cell fires two triggers — the total not reconciling,
+and the hardcoded cell — so it earns **two lines, not one.** Count triggers, not defects.
 
 `% of total move` is signed against the total's direction, so an offsetting line shows
 negative. That is information, not a bug — which is why the column is not called `% share`.
@@ -118,15 +124,21 @@ negative. That is information, not a bug — which is why the column is not call
   true and useful. Never manufacture drivers to fill the table.
 - **Say less than you were asked for when the source can't support more.** A coarse PDF
   against a fine workbook yields a thin report; that is the honest output.
-- **No percentage on a new row, a gone row, or a move across zero.** Write `new`, `gone`, or
-  describe the flip in words. Never `∞`, never `340%` on a £40 base, never `n/a%`.
-- **The rows are the truth.** Never repeat a printed total that its own rows contradict.
+- **No growth rate on a new row, a gone row, or a move across zero** — there is no
+  denominator. Write `new`, `gone`, or describe the flip in words; never `∞`, never `340%` on
+  a £40 base, never `n/a%`. `% of total move` is a different quantity and **does** apply to
+  those rows; it is what makes the table's arithmetic close.
+- **The rows are the truth.** Never repeat a printed total that its own rows contradict. When
+  a source is truncated and there are no complete rows to sum, prefer a total you can derive
+  and cross-check — a segment chart's parts, say — over the printed one, say which you used,
+  and flag the disagreement. A printed total is a claim, not evidence, however prominent.
 - **Cite a locator** for every figure whenever either source is not a spreadsheet.
   `Revenue!E7`, `slide 6, table row 3`, `p.12 Table 4`. Nobody can eyeball a diff of two
   PDFs.
-- **Flags are a closed list.** Only the nine triggers in the reference earn a line. Risks,
-  opinions and things that merely seemed notable are commentary. Omit the section when
-  nothing qualifies.
+- **Flags are a closed list.** Only the ten triggers in the reference earn a line, one line
+  per trigger **even when two triggers share one root cause** — a typed-over total cell is two
+  flags, not one. Risks, opinions, things that merely seemed notable, and limitations of your
+  own analysis are commentary. Omit the section when nothing qualifies.
 - **Stop and flag on a unit or currency mismatch** between the two sources. Every number
   would otherwise be wrong by 1000×. This is the one case worth refusing to report on.
 - **Output lands in chat** as copyable markdown. Write a file only if asked. Don't offer to

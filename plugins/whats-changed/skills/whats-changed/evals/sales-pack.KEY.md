@@ -52,6 +52,14 @@ The gap is **£389.7k across 6 undisclosed lines**. This is the whole point of t
   distinction needs the workbook. Calling it gone on this evidence is over-claiming, though
   it is a **tolerated variance** if explicitly hedged.
 
+**Which total is the truth here.** September's slide 2 prints `Total (all lines) 1,785.8`;
+slide 3's segment chart sums to `1,783.2`. The chart wins, because its parts can be added and
+checked while the printed figure is only a claim — so the correct headline is a **£59.0k**
+fall to **£1,783.2k**, and the £2.6k disagreement is a flag. A run that takes 1,785.8 as the
+current total reports **£56.4k** and is wrong, even though it flagged the gap: flagging a
+disagreement is not a substitute for resolving it. "I preferred neither" leaves the reader
+holding two totals, which is the problem they arrived with.
+
 **Slide 3, native charts** — segment totals, and these must be read exactly:
 
 | Segment | Aug | Sep | Change |

@@ -88,8 +88,11 @@ A deck often shows only the top few lines. If the current source shows 5 rows wh
 showed 12, the missing 7 are **not disclosed** — they are not gone. Reporting them as gone
 rows invents a collapse that never happened.
 
-Detect it: the printed total minus the sum of shown rows is the undisclosed remainder. Report
-that remainder explicitly, and say the ranking only explains what was shown.
+Detect it by subtracting the sum of shown rows from the period's total. **Which total** matters
+here: use the most checkable one available, per `materiality.md`'s ruling — a segment or
+subtotal chart you can add up beats the figure printed under the table. Those two often
+disagree, and taking the printed one silently changes the headline. Report the remainder
+explicitly, and say the ranking only explains what was shown.
 
 ## 4. Units live away from the numbers
 
@@ -136,7 +139,8 @@ disagreeing.
 A single file with a prior and a current column is common. Work from it directly — refusing
 would be a bug. Identify the two period columns from their headers, and watch for a third
 `Variance` or `Δ` column already present: **read it as a check on your own arithmetic, not as
-a source.** If it disagrees with prior-minus-current, that disagreement is a flag.
+a source.** If it disagrees with current-minus-prior, that is flag trigger 10 in
+`materiality.md` — name the cells that disagree and both figures.
 
 ## 8. State the fidelity once
 

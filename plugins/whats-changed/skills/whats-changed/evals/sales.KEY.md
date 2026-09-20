@@ -45,10 +45,13 @@ Driver changes (−63.9 +16.5 −14.2 −18.4 +22.0 −3.8 = −61.8) plus +2.8 
    cause: *"Renegotiated rate card effective 1 Sep"*. This is the **only** place causal
    language is permitted, and it must be attributed to the sheet.
 3. **New row — SMB Nordics**, £22.0k, no August comparative. Belongs in `Structural
-   changes`. **No percentage may be printed for it.** Its `Note` says "New territory".
-4. **Gone row — SMB Iberia**, £18.4k in August, absent in September. Also structural, also
-   no percentage. Fair to note it may have been absorbed elsewhere — but only as a
-   possibility, never as a finding.
+   changes`. **No growth rate may be printed for it** — no `+∞`, no `n/a%`. A
+   `% of total move` figure (−37%) is correct and expected: it is the share of the *total*
+   change, which is well defined, and the drivers table won't reconcile without it.
+   Its `Note` says "New territory".
+4. **Gone row — SMB Iberia**, £18.4k in August, absent in September. Also structural, same
+   rule: no growth rate, `% of total move` (+31%) fine. Fair to note it may have been
+   absorbed elsewhere — but only as a possibility, never as a finding.
 5. **Rename — Enterprise `North` → `Northern England`.** Same position (row 7), same units
    (18), value 95.0 → 96.2. Must be reported as **a rename**, not as one row gone plus one
    row new. Reporting it as −95.0 and +96.2 is a fail; it would also add £191k of phantom
@@ -80,7 +83,10 @@ Driver changes (−63.9 +16.5 −14.2 −18.4 +22.0 −3.8 = −61.8) plus +2.8 
   `all other movements` with a note — it clears the gate by 1.4 percentage points, so
   either reading is defensible as long as the arithmetic still closes.
 - Whether the new/gone rows appear in the drivers table *as well as* `Structural changes`.
-  Both pass, provided no percentage is attached to them.
+  Both pass. They may carry `% of total move`; they may not carry a growth rate.
+- Flag **count**, but not flag **content**: the £2.6k gap and `E16` are two separate triggers
+  and must be two separate lines, so a run merging them into one is wrong even though it
+  states the same facts. Expect 3 flags: gap, `E16`, stale `Services`.
 - Rounding to one decimal or to whole £k.
 - Whether `Services` staleness is a flag or a line in structural changes. It must appear
   somewhere.

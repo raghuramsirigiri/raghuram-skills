@@ -85,9 +85,22 @@ finding, and never extend it to a line it wasn't written about.
 ## 5. Hard cases, and the ruling for each
 
 - **Row appears** → `Structural changes`, described as `new`. Its value still counts toward
-  the total movement, and it may appear in the drivers table, but **with no percentage**.
+  the total movement, and it may also appear in the drivers table.
 - **Row disappears** → same, as `gone`. Naming where it might have gone is allowed only as a
   possibility, explicitly unsourced.
+- **Which percentages a new or gone row may carry.** Not a blanket ban — the two kinds of
+  percentage behave differently:
+  - **`% of total move` is fine, and belongs there.** It is the line's change divided by the
+    *total* change, which is perfectly well defined for a row that appeared or vanished. It
+    is also what makes the table's arithmetic close: leave it out and the drivers no longer
+    sum to the total.
+  - **A growth rate is not.** `current/prior − 1` has no denominator for a new row. Write
+    `new` or `gone` in the `Note`, never `340%`, never `∞`, never `n/a%`.
+- **An explicit zero is not an absent row.** A source printing `0.0` has disclosed that line;
+  a source with no such row has not. Treat `0.0 → 6.8` as a line that *grew from zero* — it
+  belongs in the drivers table, it goes in `Structural changes` only if you say "started
+  this month from nil" rather than "no prior comparative", and it still gets no growth rate.
+  And in a rounded source, `0.0` may not even be zero — see `extraction.md` on precision.
 - **Row renamed** (`North` → `North America`) → match on position and value proximity,
   report **as a rename** under `Structural changes`. Reporting one gone plus one new
   invents movement equal to twice the line's value. If confidence is low, say so.
@@ -96,6 +109,19 @@ finding, and never extend it to a line it wasn't written about.
 - **From zero, or divide by zero** → `new` or `n/a`. Never `∞`, never `—%`.
 - **Printed total doesn't reconcile** → the rows are the truth. Flag the gap, and in a
   spreadsheet name the offending cell.
+- **No complete set of rows to sum** — a truncated deck table, a PDF showing only the top
+  few lines — so "the rows are the truth" has nothing to bite on. **Rank the candidate
+  totals by how checkable they are, and take the most checkable one:**
+  1. a complete set of line rows you summed yourself;
+  2. a **derived** total you can cross-check from a second disclosure in the same source —
+     most often a segment or subtotal chart whose parts you can add;
+  3. a printed total, which is a claim and nothing more.
+
+  A printed total is the **last** resort, never the default just because it is the most
+  prominent number on the slide. When (2) and (3) disagree, use (2), state the figure you
+  used, and raise trigger 1 — do not split the difference and do not decline to choose. "I
+  preferred neither" leaves the reader holding two totals, which is the problem they came
+  with.
 - **Units or currency differ between sources** (`£000s` → `£`, `£` → `€`) → **stop.** Flag
   it and do not produce a numeric report. Every figure would be wrong by a factor. This is
   the only case worth refusing outright.
@@ -107,10 +133,10 @@ finding, and never extend it to a line it wasn't written about.
 - **Nothing clears a gate** → say so in one line and stop. *"Revenue is flat within 1%; no
   line moved more than £3k."*
 
-## 6. Flags — a closed list of nine
+## 6. Flags — a closed list of ten
 
 One line per flag, count in the heading, section omitted entirely when nothing qualifies.
-**Only these nine trigger a flag:**
+**Only these ten trigger a flag:**
 
 1. **Non-reconciling total** — printed total ≠ sum of rows.
 2. **Stale date** — a tab, page or slide carrying the same as-of date in both periods.
@@ -121,25 +147,55 @@ One line per flag, count in the heading, section omitted entirely when nothing q
 7. **OCR was needed** — digits unverified.
 8. **Precision mismatch** hiding movements below the coarser source's rounding step.
 9. **Undisclosed lines** — a source showed a subset, so part of the total is unexplained.
+10. **A stated variance disagrees with the arithmetic** — a `Variance`, `Δ` or `MoM` column,
+    or a printed movement, that doesn't equal current minus prior.
 
 Risks, opinions, business concerns, "worth watching", and anything that merely seemed
-notable are **commentary, not flags.** They do not appear.
+notable are **commentary, not flags.** They do not appear. Neither does an observation about
+what you *couldn't* compute — "no unit counts, so no rate/volume split" belongs in a `Note`
+or nowhere, not in `Flags`.
 
-**One line per trigger, one trigger per line.** Two triggers on the same row get two lines;
-one trigger spanning three rows gets one line naming all three. Walk the closed list in
-order, emit a line for each trigger that fired, count them, stop.
+### Enumerating them
+
+Walk the closed list **in order**, emit one line for each trigger that fired, count them,
+stop.
+
+**One line per trigger — even when two triggers share a single root cause.** This is the rule
+that decides the common ambiguity, so it has no exception:
+
+> A typed-over total cell fires **trigger 1** (the total doesn't reconcile) *and* **trigger
+> 4** (a hardcoded cell in a formula column). That is **two lines**, not one, even though one
+> mistake in one cell caused both — because a reader who only cares about the £2.6k needs the
+> first, and a reader who has to fix the workbook needs the second.
+
+The mirror case, so neither reading drifts:
+
+> **One trigger spanning several rows is one line**, naming them together. Three lines each
+> carrying a stale July date is one stale-date flag listing all three, not three flags.
+
+So: count triggers, not defects, and not rows.
 
 Worked example of the section done right:
 
 ```markdown
-## Flags (3)
-- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted — `E22` is a
-  typed-in number, not part of the column formula.
-- `Depreciation` is dated 30-Jun in both packs. Likely stale, not unchanged.
-- The September deck shows 5 of 12 lines, so £389.7k of the total is undisclosed and the
-  ranking below only explains what was shown.
+## Flags (4)
+- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted.       ← trigger 1
+- `E22` is a typed-in number, not part of the column formula.                     ← trigger 4
+- `Depreciation` and `Amortisation` are both dated 30-Jun in both packs. Likely   ← trigger 2
+  stale, not unchanged.
+- The September deck shows 5 of 12 lines, so £389.7k of the total is undisclosed  ← trigger 9
+  and the ranking below only explains what was shown.
 ```
 
-Wrong, for contrast: *"Hosting costs are growing fast and may need attention"* — an opinion,
-not one of the nine. *"Two rows have no owner and the file was last edited by Finance"* —
-neither is a trigger.
+(The trigger annotations are there to show the mapping; don't print them.)
+
+Both rules are visible in that example. The £2.6k gap and `E22` are **one defect, two
+triggers, two lines.** The two stale rows are **one trigger, two rows, one line.**
+
+Wrong, for contrast:
+
+- *"Hosting costs are growing fast and may need attention"* — an opinion, not a trigger.
+- *"August gives no unit counts, so no rate/volume split is possible"* — a limitation of the
+  analysis. It belongs in a `Note` or in the fidelity line, never in `Flags`.
+- *"The file was last edited by Finance"* — not a trigger.
+- Merging the £2.6k gap and `E22` into a single line — right facts, wrong count.
