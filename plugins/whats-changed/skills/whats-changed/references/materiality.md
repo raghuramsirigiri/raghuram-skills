@@ -103,7 +103,13 @@ finding, and never extend it to a line it wasn't written about.
   And in a rounded source, `0.0` may not even be zero — see `extraction.md` on precision.
 - **Row renamed** (`North` → `North America`) → match on position and value proximity,
   report **as a rename** under `Structural changes`. Reporting one gone plus one new
-  invents movement equal to twice the line's value. If confidence is low, say so.
+  invents movement equal to twice the line's value. If confidence is low, say so **and raise
+  flag trigger 5**.
+- **A rename you suspect but won't assert** — the labels differ, one side gives no figure to
+  match on, or a source is truncated so the counterpart simply isn't shown. Say in
+  `Structural changes` that the two may be related and that nothing in either source
+  establishes it. **This is not a flag**: trigger 5 covers a hedged claim, not a declined one.
+  Both are correct outcomes; what matters is that the flag count follows the choice.
 - **Sign flip** (+£4k → −£1k) → report the absolute movement and describe the flip in words.
   A percentage across zero is meaningless.
 - **From zero, or divide by zero** → `new` or `n/a`. Never `∞`, never `—%`.
@@ -142,7 +148,10 @@ One line per flag, count in the heading, section omitted entirely when nothing q
 2. **Stale date** — a tab, page or slide carrying the same as-of date in both periods.
 3. **Unit or currency mismatch** between the two sources.
 4. **Hardcoded cell in a formula column** — spreadsheets only.
-5. **Low-confidence rename** — matched, but not certainly.
+5. **Low-confidence rename** — you **did** report a rename, but aren't certain of it. If you
+   considered two lines and **declined** to match them, no flag fires: say so in
+   `Structural changes` instead. The trigger is a claim you've made and hedged, never a
+   claim you decided not to make.
 6. **Figures present only as a chart image.**
 7. **OCR was needed** — digits unverified.
 8. **Precision mismatch** hiding movements below the coarser source's rounding step.

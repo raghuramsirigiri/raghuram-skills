@@ -63,7 +63,8 @@
         "Any cause language is quoted from a slide 5 commentary bullet and attributed to it",
         "Cites slide-level locators for figures",
         "Does not treat SMB Iberia as definitively gone on deck evidence alone without hedging",
-        "Headline uses a total it can cross-check — the slide 3 segment chart summing to 1,783.2 — NOT slide 2's printed 1,785.8, and says which it used"
+        "Headline uses a total it can cross-check — the slide 3 segment chart summing to 1,783.2 — NOT slide 2's printed 1,785.8, and says which it used",
+        "Flag count is 3 — the printed-vs-checkable total, the undisclosed lines, and the picture slide. The North/Nordics relationship is DECLINED in Structural changes rather than asserted, so trigger 5 does not fire and adds no 4th flag"
       ]
     },
     {

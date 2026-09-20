@@ -74,6 +74,20 @@ the September table is truncated. A strong pass notices that the *chart* total (
 and the *table* total (1,785.8) disagree by £2.6k and flags it — that's the hardcoded cell
 from the workbook, surfacing in a second format.
 
+**The `North` / `Nordics` question, and the flag count it determines.** August discloses
+`Enterprise — North` at £95.0k; September's table doesn't show it, and September's commentary
+says "Nordics opened as a new territory". September gives **no figure** for either, so there is
+nothing to match on and the correct outcome is to **decline the match**: note in `Structural
+changes` that the two may be related and that neither pack establishes it. Per trigger 5's
+condition, a declined match is **not** a flag — so **eval 3's expected flag count is 3**:
+
+1. slide 2's printed £1,785.8k against slide 3's checkable £1,783.2k;
+2. 5 of 11 lines disclosed, £387.1k unexplained;
+3. slide 4 is a picture, so its numbers weren't readable.
+
+A run that instead *asserts* the rename and hedges it earns a 4th flag legitimately — but on
+this fixture that is the weaker reading, because no September figure supports the match.
+
 **Slide 4 is a picture.** No values, no data labels, deliberately unlabelled axis ticks.
 Any figure attributed to slide 4 is a fabrication. A pass flags the slide and moves on.
 
