@@ -36,7 +36,12 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 3. Start from a template in `skills/chart-dashboard/templates/`: `dashboard.html`,
    `report.html`, `slides.html` (a deck), or `dashboard-editable.html` (only when
    an editable page was asked for).
-4. Stage the library beside your output while you build and verify it, then
+4. When you want a worked reference, read one of the finished pages in
+   `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),
+   `coffee-pricing-deck/` (deck with the full spine), `ev-retrospective/`
+   (report). Read the templates and references first; the examples show how one
+   finished page turned out, not what every page should look like.
+5. Stage the library beside your output while you build and verify it, then
    fold it in and ship one file:
    ```bash
    node skills/chart-dashboard/scripts/finalize.js index.html --stage   # verify against this
@@ -74,20 +79,31 @@ Copy the skill folder into the target project and point your agent at it:
 cp -r skills/chart-dashboard /path/to/your-project/.agent-skills/chart-dashboard
 ```
 
-Then add to that project's `AGENTS.md` (or `GEMINI.md`, `CLAUDE.md`,
-`.github/copilot-instructions.md` — whichever your tool reads):
+Then add this block to whichever file that project's agent reads at startup:
 
 ```markdown
-## Dashboards
-When asked to build a dashboard, analytics page, or data report, follow
-`.agent-skills/chart-dashboard/SKILL.md`.
+## Dashboards, reports and decks
+When asked to build a dashboard, analytics page, data report or slide deck,
+follow `.agent-skills/chart-dashboard/SKILL.md`.
 ```
+
+| Tool | File |
+|:--|:--|
+| OpenAI Codex, Cursor, Zed, Aider, Jules, opencode | `AGENTS.md` |
+| Gemini CLI, Gemini Code Assist | `GEMINI.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+| Windsurf | `.windsurf/rules/chart-dashboard.md` |
+| Cline / Roo Code | `.clinerules/chart-dashboard.md` |
+| Claude Code / Desktop / claude.ai | install as a skill, or `CLAUDE.md` |
+
+Agents that discover skills from a manifest can read `.agents/skills.json`
+instead, which points at `skills/` and needs no instruction file.
 
 ## Repo layout
 
 ```
 skills/chart-dashboard/   the skill: SKILL.md, references/, templates/, assets/, scripts/
-examples/                 two finished outputs, open index.html directly
+examples/                 four finished outputs (dashboard, deck, report, bento dashboard)
 docs/                     GitHub Pages landing page
 .claude-plugin/           Claude Code plugin manifests (ignore for other tools)
 ```

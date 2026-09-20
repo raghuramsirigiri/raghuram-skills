@@ -1,6 +1,6 @@
 {
   "name": "chart-dashboard",
-  "description": "Turn any data \u2014 a table, CSV, metrics, or notes \u2014 into a self-contained HTML dashboard, report or slide deck with interactive SVG charts. Zero dependencies, no CDN, no build step, works offline.",
+  "description": "Turn any data — a table, CSV, metrics, or notes — into a self-contained HTML dashboard, report or slide deck with interactive SVG charts. Zero dependencies, no CDN, no build step, works offline.",
   "version": "1.0.0",
   "author": {
     "name": "Raghuram Sirigiri"
@@ -26,6 +26,16 @@
     "data-analysis",
     "visualization",
     "offline",
-    "zero-dependency"
+    "zero-dependency",
+    "slides",
+    "slide-deck",
+    "presentation",
+    "deck",
+    "pdf",
+    "sankey",
+    "waterfall",
+    "geofacet",
+    "report-generator",
+    "ai-dashboard-generator"
   ]
 }
