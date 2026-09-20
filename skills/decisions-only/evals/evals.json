@@ -1,0 +1,81 @@
+{
+  "skill_name": "decisions-only",
+  "note": "Precision, not recall, is the metric. A run that finds every real decision but also reports one thing that was not a decision is a FAIL — a false positive destroys trust in the omission, which is the product. Eval 1 is graded against transcript-quarterly-review.KEY.md; never supply the key with the transcript.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "quarterly-review-full",
+      "prompt": "Here's the transcript from Tuesday's ops review. What did we actually decide?",
+      "files": ["skills/decisions-only/evals/transcript-quarterly-review.md"],
+      "expected_output": "Two tables and a flag list. Exactly 4 decisions and 3 commitments (4 accepted if the steering-call invite is counted separately — see the key's tolerated variance). None of the 4 planted near-misses present. No summary prose.",
+      "runs": 3,
+      "assertions": [
+        "Decision: Northbeam chosen over Calyx",
+        "Decision: launch moved to January, reported in its final state only, with a note that it reverses the earlier call to hold December",
+        "Decision: second analyst req frozen until Q1, marked inferred (decided by silence)",
+        "Decision: steering call moves to fortnightly, with Marcus attached as owner of the invite",
+        "Commitment: Priya, revised cost model to Sarah, Thu 17 Sep (resolved from 'Thursday' against the 15 Sep meeting date)",
+        "Commitment: booking the Northbeam kickoff, owner shown as unassigned and NOT attributed to Elena, Sarah or Priya",
+        "Commitment: Tom, revised delivery plan with the January date, end of month",
+        "EXCLUDES the legacy reporting stack remark (opinion)",
+        "EXCLUDES the contractor suggestion (proposal left hanging)",
+        "EXCLUDES the analyst reporting line (deferred offline)",
+        "EXCLUDES the customer churn alignment (three assents, no option closed)",
+        "Needs chasing flags both the unowned kickoff and the decision made by silence",
+        "No summary paragraph, attendee list, key themes or closing line anywhere in the output",
+        "All three runs agree on the decision and commitment counts"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "nothing-was-decided",
+      "prompt": "Can you pull the decisions out of this? [paste a pure status-update meeting: each person reports progress, nobody chooses anything, nobody takes an action]",
+      "expected_output": "One line stating that nothing was decided and nobody committed to anything. No tables, no padding.",
+      "runs": 3,
+      "assertions": [
+        "Output is a single short line",
+        "Does not invent a decision from a status update",
+        "Does not substitute a summary of what was discussed",
+        "Does not apologise for the empty result or offer to summarise instead unless asked"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "no-speaker-labels",
+      "prompt": "[the quarterly-review transcript with every speaker name stripped] What came out of this?",
+      "expected_output": "One clarifying question about attribution, then the normal output with owners unassigned.",
+      "runs": 3,
+      "assertions": [
+        "Asks at most one question, about who was in the room",
+        "Still finds the 4 decisions after the answer",
+        "Shows owners as unassigned rather than guessing from speaker order",
+        "Does not ask about format, length, tone or audience"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "very-short-thread",
+      "prompt": "quick one — six-line Teams thread where a lead says 'going with option A, I'll raise the PR today' and two people say ok. What was decided?",
+      "expected_output": "One decision, one commitment, no flags. Proportionate to the input.",
+      "runs": 3,
+      "assertions": [
+        "Exactly one decision and one commitment",
+        "Does not inflate two acknowledgements into separate decisions",
+        "No Needs chasing section when there is nothing to chase",
+        "Output is shorter than the input"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "false-consensus-trap",
+      "prompt": "[a transcript whose only candidate is a run of agreement about a principle — 'we're all aligned that quality matters', 'totally', 'agreed' — with no option ever closed] What did we decide?",
+      "expected_output": "Nothing decided. The agreement run must not be reported as a decision.",
+      "runs": 3,
+      "assertions": [
+        "Reports no decisions",
+        "Does not treat sequential assent as consensus on a course of action",
+        "May note under Needs chasing that a principle was agreed but no action attached"
+      ]
+    }
+  ]
+}
