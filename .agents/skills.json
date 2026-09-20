@@ -1,5 +1,10 @@
 {
   "entries": [
-    { "path": "../skills" }
+    {
+      "path": "../plugins/chart-dashboard/skills"
+    },
+    {
+      "path": "../plugins/decisions-only/skills"
+    }
   ]
 }

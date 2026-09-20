@@ -6,15 +6,15 @@ no CDN, no npm install, no build step.
 
 Instructions are shared across all AI tools and live in
 [`AGENTS.md`](AGENTS.md), which routes to the canonical
-[`skills/chart-dashboard/SKILL.md`](skills/chart-dashboard/SKILL.md).
+[`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md).
 
-**Read `AGENTS.md` first, then `skills/chart-dashboard/SKILL.md`, and follow
+**Read `AGENTS.md` first, then `plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`, and follow
 that workflow** whenever the user asks for a dashboard, analytics page, KPI
 view, chart deck, or illustrated data report.
 
 Five rules that break the output if missed:
 
-0. Never fix a library bug in `skills/chart-dashboard/assets/charts-lib/` — it
+0. Never fix a library bug in `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/` — it
    is a vendored copy of another repo's library and a re-sync would drop the
    fix. Write it up in `CHARTS-LIB-UPSTREAM.md` instead.
 1. `theme.js` must load before `charts.js`.

@@ -1,4 +1,4 @@
-// node --test skills/chart-dashboard/tests/upstream-notes.test.js
+// node --test plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-notes.test.js
 //
 // The skill ships a copy of charts-lib built from another repo (svg-charts),
 // so a library bug must never be fixed only here — the next sync would drop
@@ -15,7 +15,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(__dirname, '..', '..', '..');
+// repo root: tests/ -> skills/chart-dashboard -> skills -> plugins/chart-dashboard -> plugins -> repo
+const ROOT = path.join(__dirname, '..', '..', '..', '..', '..');
 const LIB = path.join(__dirname, '..', 'assets', 'charts-lib');
 const NOTE_PATH = path.join(ROOT, 'CHARTS-LIB-UPSTREAM.md');
 const NOTE = fs.readFileSync(NOTE_PATH, 'utf8');

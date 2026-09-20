@@ -264,17 +264,17 @@
 
   <h3>Claude Code — manual</h3>
 <pre><code>git clone https://github.com/raghuramsirigiri/raghuram-skills.git
-cp -r raghuram-skills/skills/chart-dashboard ~/.claude/skills/</code></pre>
+cp -r raghuram-skills/plugins/chart-dashboard/skills/chart-dashboard ~/.claude/skills/</code></pre>
 
   <h3>claude.ai, Claude Desktop, and the API</h3>
-<pre><code>cd raghuram-skills/skills &amp;&amp; zip -r chart-dashboard.zip chart-dashboard</code></pre>
+<pre><code>cd raghuram-skills/plugins/chart-dashboard/skills &amp;&amp; zip -r chart-dashboard.zip chart-dashboard</code></pre>
   <p>Then upload it under <strong>Settings → Capabilities → Skills</strong>.</p>
 
   <h3>Gemini CLI, OpenAI Codex, GitHub Copilot, Cursor and other AI tools</h3>
   <p>Nothing in the skill is Claude-specific — it is Markdown instructions plus a
     dependency-free JavaScript library. Copy it into your project:</p>
 <pre><code>git clone https://github.com/raghuramsirigiri/raghuram-skills.git
-cp -r raghuram-skills/skills/chart-dashboard ./.agent-skills/chart-dashboard</code></pre>
+cp -r raghuram-skills/plugins/chart-dashboard/skills/chart-dashboard ./.agent-skills/chart-dashboard</code></pre>
   <p>Then add this block to whichever instruction file your tool reads at startup:</p>
 <pre><code>## Dashboards, reports and decks
 When asked to build a dashboard, analytics page, data report or slide deck,

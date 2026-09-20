@@ -10,7 +10,7 @@ dashboard, report or slide deck with interactive SVG charts.** No CDN, no npm in
 build step, no runtime dependencies.
 
 The canonical instructions live in
-[`skills/chart-dashboard/SKILL.md`](skills/chart-dashboard/SKILL.md). That file
+[`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md). That file
 is the source of truth — this one only routes you to it.
 
 ## When to use it
@@ -21,19 +21,19 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 
 ## How to use it
 
-1. Read [`skills/chart-dashboard/SKILL.md`](skills/chart-dashboard/SKILL.md) and
+1. Read [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md) and
    follow its workflow.
 2. Read these before writing chart code — do not guess option names:
-   - [`references/chart-api.md`](skills/chart-dashboard/references/chart-api.md) — every factory and option
-   - [`references/chart-selection.md`](skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
-   - [`references/layout.md`](skills/chart-dashboard/references/layout.md) — deriving the grid from the findings; spans and page structure
-   - [`references/annotation.md`](skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
-   - [`references/narrative.md`](skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
-   - [`references/controls.md`](skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
-   - [`references/theming.md`](skills/chart-dashboard/references/theming.md) — brand recolour, and the two scripts under `scripts/` that generate it
-   - [`references/editable.md`](skills/chart-dashboard/references/editable.md) — only when the user asked for an editable page
-   - [`assets/charts-lib/charts.manifest.json`](skills/chart-dashboard/assets/charts-lib/charts.manifest.json) — quick per-engine facts (data shape, refusals, sizing)
-3. Start from a template in `skills/chart-dashboard/templates/`: `dashboard.html`,
+   - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — every factory and option
+   - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
+   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — deriving the grid from the findings; spans and page structure
+   - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
+   - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
+   - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
+   - [`references/theming.md`](plugins/chart-dashboard/skills/chart-dashboard/references/theming.md) — brand recolour, and the two scripts under `scripts/` that generate it
+   - [`references/editable.md`](plugins/chart-dashboard/skills/chart-dashboard/references/editable.md) — only when the user asked for an editable page
+   - [`assets/charts-lib/charts.manifest.json`](plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.manifest.json) — quick per-engine facts (data shape, refusals, sizing)
+3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
    `report.html`, `slides.html` (a deck), or `dashboard-editable.html` (only when
    an editable page was asked for).
 4. When you want a worked reference, read one of the finished pages in
@@ -44,8 +44,8 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 5. Stage the library beside your output while you build and verify it, then
    fold it in and ship one file:
    ```bash
-   node skills/chart-dashboard/scripts/finalize.js index.html --stage   # verify against this
-   node skills/chart-dashboard/scripts/finalize.js index.html           # inline, clean up, gate
+   node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html --stage   # verify against this
+   node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html           # inline, clean up, gate
    ```
 
 ## Non-negotiables
@@ -74,7 +74,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
   the upstream engine file, and leave the copy alone; see *Recording a new
   change* there. Patch the copy only when the skill cannot work without it, and
   then say so in the same note. `node --test
-  skills/chart-dashboard/tests/upstream-notes.test.js` checks the copy against
+  plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-notes.test.js` checks the copy against
   what the note claims. Docs under `references/` are the skill's own — when the
   library behaves surprisingly, saying so there is the fix to make here.
 - If the page has a control, wire it completely: filter the data, redraw every
@@ -86,7 +86,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 Copy the skill folder into the target project and point your agent at it:
 
 ```bash
-cp -r skills/chart-dashboard /path/to/your-project/.agent-skills/chart-dashboard
+cp -r plugins/chart-dashboard/skills/chart-dashboard /path/to/your-project/.agent-skills/chart-dashboard
 ```
 
 Then add this block to whichever file that project's agent reads at startup:
@@ -111,12 +111,24 @@ instead, which points at `skills/` and needs no instruction file.
 
 ## Repo layout
 
+This repo is a **marketplace of independent plugins**, one directory each. Every plugin
+owns its own `.claude-plugin/plugin.json`, its own version, and its own `skills/`, so a
+plugin can be installed on its own without dragging the others along.
+
 ```
-skills/chart-dashboard/   the skill: SKILL.md, references/, templates/, assets/, scripts/
-examples/                 four finished outputs (dashboard, deck, report, bento dashboard)
-docs/                     GitHub Pages landing page
-.claude-plugin/           Claude Code plugin manifests (ignore for other tools)
+plugins/chart-dashboard/
+  .claude-plugin/plugin.json
+  skills/chart-dashboard/   the skill: SKILL.md, references/, templates/, assets/, scripts/
+plugins/decisions-only/
+  .claude-plugin/plugin.json
+  skills/decisions-only/    SKILL.md, references/, evals/
+examples/                   four finished outputs (dashboard, deck, report, bento dashboard)
+docs/                       GitHub Pages landing page
+.claude-plugin/             the marketplace manifest listing every plugin
 ```
+
+`examples/` and `docs/` sit **outside** every plugin on purpose: they are browsable on
+GitHub but are not shipped to anyone who installs a plugin.
 
 ## Contributing
 

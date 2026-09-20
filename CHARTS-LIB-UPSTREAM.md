@@ -1,7 +1,7 @@
 # charts-lib: changes to apply upstream
 
 The skill ships a copy of `charts-lib` in
-`skills/chart-dashboard/assets/charts-lib/`, built from
+`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/`, built from
 `svg-charts/charts-lib`. That copy currently carries a change the upstream
 library doesn't have yet. Apply each one in `svg-charts`, rebuild, and re-sync
 the copy, so that syncing the library again doesn't silently remove behaviour
@@ -16,7 +16,7 @@ the skill depends on.
 written up here as *proposed* and left unapplied, or — when the skill cannot
 work without it — applied to the copy *and* written up here so the next sync
 doesn't silently drop it. Each section carries a machine-readable `check`
-comment, and `skills/chart-dashboard/tests/upstream-notes.test.js` verifies the
+comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-notes.test.js` verifies the
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
@@ -86,7 +86,7 @@ points (`[name, value]`) have no colour and keep today's behaviour.
    overrides the size gradient (one series) or the series colour (several)*.
 5. Re-sync the skill's copy and confirm it matches:
    ```bash
-   cp svg-charts/charts-lib/charts.js claude-chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js
+   cp svg-charts/charts-lib/charts.js claude-chart-dashboard/plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js
    ```
    After that, `diff -rq` between the two `charts-lib` folders should report
    only the files that exist upstream alone (README, engines, tests, and so
@@ -95,7 +95,7 @@ points (`[name, value]`) have no colour and keep today's behaviour.
 
 ### Current state
 
-- **Skill copy** (`skills/chart-dashboard/assets/charts-lib/charts.js`):
+- **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
   includes the change, committed on `feat/editable-pages` as `7582126`.
 - **`svg-charts`**: unchanged. Rebuilding there and copying `charts.js` into
   the skill before applying this change would remove per-bubble colours.
@@ -188,7 +188,7 @@ generated upstream, so it has to change there, not in the skill's copy.
 
 ### Current state
 
-- **Skill copy** (`skills/chart-dashboard/assets/charts-lib/charts.js`):
+- **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
   unchanged — the bare string still prints the ring total.
 - **`svg-charts`**: unchanged.
 - **Skill docs**: `references/chart-api.md` warns callers to always use the
@@ -199,7 +199,7 @@ generated upstream, so it has to change there, not in the skill's copy.
 
 ## Recording a new change
 
-When you change anything under `skills/chart-dashboard/assets/charts-lib/`:
+When you change anything under `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/`:
 
 Default to *proposed*: write it up, leave the copy alone. Apply it to the copy
 only when the skill is broken without it, and say so in the section.
@@ -215,7 +215,7 @@ only when the skill is broken without it, and say so in the section.
    `applied` asserts the needle is present in that file under
    `assets/charts-lib/`; `proposed` asserts it is absent. Pick a needle that
    appears only in this change.
-3. Run `node --test skills/chart-dashboard/tests/upstream-notes.test.js`.
+3. Run `node --test plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-notes.test.js`.
 
 Reference docs under `references/` and the skill's own tests are the skill's,
 not the library's — change them freely, and only note them in a section when

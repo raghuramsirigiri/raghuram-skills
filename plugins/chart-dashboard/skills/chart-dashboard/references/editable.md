@@ -468,7 +468,7 @@ chart's callouts.
 `markColour`. Each takes
 a config and returns a new one.
 
-Tests: `node --test skills/chart-dashboard/tests/chart-convert.test.js`. Every
+Tests: `node --test plugins/chart-dashboard/skills/chart-dashboard/tests/chart-convert.test.js`. Every
 switch offered for every chart type must produce a config the library's
 validator accepts, with the same categories and numbers.
 

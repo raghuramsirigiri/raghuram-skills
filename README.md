@@ -100,6 +100,14 @@ Four judgment calls it makes that a library can't:
 /plugin install chart-dashboard@raghuram-skills
 ```
 
+The `raghuram-skills` marketplace holds **independent plugins** — installing one never
+pulls in the others:
+
+| Plugin | What it does |
+| --- | --- |
+| `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report or deck. |
+| `decisions-only` | A meeting transcript → the decisions and commitments, and nothing else. |
+
 ### Claude Code — manual install
 
 ```bash
@@ -107,7 +115,7 @@ git clone https://github.com/raghuramsirigiri/raghuram-skills.git
 ```
 
 ```bash
-cp -r raghuram-skills/skills/chart-dashboard ~/.claude/skills/
+cp -r raghuram-skills/plugins/chart-dashboard/skills/chart-dashboard ~/.claude/skills/
 ```
 
 To scope the skill to one project instead of every project, copy it into
@@ -118,7 +126,7 @@ To scope the skill to one project instead of every project, copy it into
 Zip the skill folder, then upload it under **Settings → Capabilities → Skills**:
 
 ```bash
-cd raghuram-skills/skills && zip -r chart-dashboard.zip chart-dashboard
+cd raghuram-skills/plugins/chart-dashboard/skills && zip -r chart-dashboard.zip chart-dashboard
 ```
 
 ### Gemini CLI, OpenAI Codex, GitHub Copilot, Cursor, and other AI tools
@@ -135,7 +143,7 @@ git clone https://github.com/raghuramsirigiri/raghuram-skills.git
 ```
 
 ```bash
-cp -r raghuram-skills/skills/chart-dashboard ./.agent-skills/chart-dashboard
+cp -r raghuram-skills/plugins/chart-dashboard/skills/chart-dashboard ./.agent-skills/chart-dashboard
 ```
 
 **2. Point your tool at it** by adding this to whichever instruction file your
@@ -315,7 +323,7 @@ half, though the type scale and spacing are best left alone.
 The default is a cream-and-ink print theme. In practice you don't write this
 yourself — ask for "a dark dashboard" or "use our brand colors, #FF6B35 primary"
 and Claude sets the tokens. The full list is in
-[`references/chart-api.md`](skills/chart-dashboard/references/chart-api.md).
+[`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md).
 
 Two bundled scripts build that block for you, both running the same OKLCH recipe —
 paper, a greyscale ink ramp, a seven-step series ramp, and separate `accent` /
@@ -324,18 +332,18 @@ paper, a greyscale ink ramp, a seven-step series ramp, and separate `accent` /
 ```bash
 # Point it at a brand's stylesheet or a saved page: harvests canvas, series hue,
 # and any colour already reserved for a utility role
-node skills/chart-dashboard/scripts/extract-theme.js their-site.css
+node plugins/chart-dashboard/skills/chart-dashboard/scripts/extract-theme.js their-site.css
 ```
 
 ```bash
 # Only have one hex? Same recipe, nothing observed
-node skills/chart-dashboard/scripts/generate-theme.js '#2323FF'
+node plugins/chart-dashboard/skills/chart-dashboard/scripts/generate-theme.js '#2323FF'
 ```
 
 Colour is the only thing a brand changes. Type scale, spacing, stroke widths and
 legend position stay fixed, because those proportions are what make ten chart
 types read as one family. Method and rationale in
-[`references/theming.md`](skills/chart-dashboard/references/theming.md).
+[`references/theming.md`](plugins/chart-dashboard/skills/chart-dashboard/references/theming.md).
 
 ## FAQ
 
@@ -440,7 +448,7 @@ written to avoid.
 ## What's in the box
 
 ```
-skills/chart-dashboard/
+plugins/chart-dashboard/skills/chart-dashboard/
 ├── SKILL.md                        # workflow and output rules
 ├── assets/charts-lib/              # the chart library (charts.js, theme.js, charts.css)
 ├── assets/page-runtime.js          # draws an editable page's charts; window.Page for the editor
@@ -507,7 +515,7 @@ Questions, bug reports, and feature requests are best filed as
 ## Contributing
 
 Issues and pull requests are welcome. If you're adding a chart type, it needs an
-entry in [`references/chart-selection.md`](skills/chart-dashboard/references/chart-selection.md)
+entry in [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md)
 — when to use it and when not to — alongside the engine code. The selection guidance
 is what makes the output good, not the renderer.
 

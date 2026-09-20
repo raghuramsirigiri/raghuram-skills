@@ -1,4 +1,4 @@
-// node --test skills/chart-dashboard/tests/chart-convert.test.js
+// node --test plugins/chart-dashboard/skills/chart-dashboard/tests/chart-convert.test.js
 //
 // Every switch chart-convert offers must produce a config the library accepts,
 // carry the numbers across unchanged, and survive a round trip back.
