@@ -59,10 +59,17 @@ to consensus. Nothing was chosen.
 Also not decisions, if they show up: "Northbeam has [done logistics]" (fact), "It's not
 nine weeks" (analysis), "Everything changes the board pack" (joke).
 
-## Needs chasing — expect 2
+## Needs chasing — expect 4
 
-1. C2 has no owner.
-2. D3 rested on silence rather than assent — worth confirming in writing.
+Under the closed four-trigger rule in `references/what-counts.md`:
+
+1. **C2** — no owner, and also undated. **One line naming both**, not two lines.
+2. **C3** — "end of the month" was never pinned.
+3. **D3** — rested on silence rather than assent.
+4. **D2** — reversed a decision made earlier in the same meeting.
+
+Exactly 4 lines. Five is a fail (C2 split across its two triggers, or a risk/concern
+flagged as commentary); three is a fail (two flagged rows merged into one line).
 
 ## Scoring
 
@@ -74,6 +81,7 @@ nine weeks" (analysis), "Everything changes the board pack" (joke).
 | Silence | D3 present, marked `inferred` |
 | Ownership | C2 shows unassigned, no guessed name |
 | Discipline | No summary paragraph, no attendee list, no "key themes" |
+| Flags | Exactly the 4 above — no more, no fewer |
 
 A run that scores 4/4 and 3/3 but includes even one near-miss is a **fail**. Precision is
 the product; see the brief.

@@ -100,3 +100,49 @@ plus any topic that consumed real airtime and produced neither a decision nor a 
 The boundary: **this** skill reports flaws in what *was* decided (unowned, undated, decided
 by silence). **That** skill reports what was never decided at all. An item belongs to
 exactly one of them.
+
+---
+
+## What earns a "Needs chasing" flag
+
+The tables have an admission rule; this section needs one too, or it drifts into
+commentary. **Four triggers, and nothing else:**
+
+1. **A commitment with no owner.** Nobody is going to do it.
+2. **A commitment with no date**, or only a loose phrase ("soon", "end of the month").
+3. **A decision made by silence** rather than assent.
+4. **A decision that reversed an earlier one in the same meeting** — whoever dropped off
+   early is still working to the old one.
+
+### How to count and lay it out
+
+**One line per flagged item — never one line per trigger.** Walk the two tables in order,
+row by row. Any row hitting one or more triggers gets exactly one line, which names the
+row by number and says what is wrong with it; a row hitting two triggers names both in
+that same line. The number in the heading is the number of *rows* needing attention, which
+is the number of things a reader has to chase.
+
+Worked example. Commitments 2 and 3 and decisions 2 and 3 are flagged; commitment 2 is
+both unowned and undated:
+
+```
+## Needs chasing (4)
+- Commitment 2 has no owner and no fixed date — nobody is booking the kickoff and the
+  held slot lapses at month end.
+- Commitment 3's date is "end of the month" — never pinned to a day.
+- Decision 3 rested on silence, not assent. Worth confirming in writing.
+- Decision 2 reversed an earlier call in the same meeting; anyone who left early still
+  believes December holds.
+```
+
+Write the lines first and count them last — the heading number is the number of lines you
+actually wrote, not the number you expected to write.
+
+Four flagged rows, four lines. Not five (commitment 2 split across its two triggers), and
+not three (two rows merged into one line because they read well together).
+
+If no row qualifies, omit the section entirely rather than printing an empty heading.
+
+This is a closed list. Risks, concerns, disagreements, things that sounded expensive, and
+anything you merely found interesting are **not** flags — they are the commentary this
+skill exists to throw away. If it isn't one of the four triggers, it doesn't appear.

@@ -35,8 +35,9 @@ Read `references/what-counts.md` and apply it. Two questions per exchange: did a
 get **closed** (decision), and did a named person go **on the hook** (commitment)? Anything
 answering no to both is discussion — discard it.
 
-The reference carries the refusal table and the rulings for reversals, decisions made by
-silence, unowned actions and vague dates. Those cases are the skill; do not improvise them.
+The reference carries the refusal table, the rulings for reversals, decisions made by
+silence, unowned actions and vague dates, and the closed four-item list of what earns a
+*Needs chasing* flag. Those cases are the skill; do not improvise them.
 
 ### 3. Write the tables and stop
 
@@ -58,10 +59,15 @@ Two tables, then the flag list. Nothing before, nothing after.
 | 1 | Priya | Revised cost model to Sarah | Thu 17 Sep |
 | 2 | — unassigned | Book the Northbeam kickoff | before end of month |
 
-## Needs chasing (2)
-- Commitment 2 has no owner — someone has to claim it.
+## Needs chasing (4)
+- Commitment 2 has no owner — someone has to claim it before the slot lapses.
+- Commitment 3's date is "end of the month" — never pinned.
 - Decision 3 rested on silence, not assent. Worth confirming in writing.
+- Decision 2 reversed an earlier call in the same meeting; anyone who left early still
+  believes December holds.
 ```
+
+(Rows trimmed above for length — a real run lists every item the counts claim.)
 
 Counts in the headings are deliberate: `## Decisions (0)` is information, a blank section
 looks like a bug.
@@ -83,6 +89,10 @@ Output lands in chat as copyable markdown. Write a file only if asked.
   chasing it.
 - **Never invent a date.** Resolve against the meeting date, or keep the phrase verbatim.
 - **Reversals collapse to their final state**, with a clause noting the change.
+- **Flags are a closed list.** Only the four triggers in the reference earn a *Needs
+  chasing* line — unowned commitment, undated commitment, decision by silence, in-meeting
+  reversal. Risks, concerns and things that merely seemed notable are commentary. Omit the
+  section entirely when nothing qualifies.
 - **Quote on request.** Don't carry a quote column — it doubles the width and dilutes the
   brevity. If the user asks where an item came from, cite the line verbatim.
 

@@ -21,9 +21,9 @@
         "EXCLUDES the contractor suggestion (proposal left hanging)",
         "EXCLUDES the analyst reporting line (deferred offline)",
         "EXCLUDES the customer churn alignment (three assents, no option closed)",
-        "Needs chasing flags both the unowned kickoff and the decision made by silence",
+        "Needs chasing carries exactly 4 flags: the unowned kickoff, Tom's unpinned end-of-month date, the decision made by silence, and the in-meeting reversal — no fifth flag for risks or concerns",
         "No summary paragraph, attendee list, key themes or closing line anywhere in the output",
-        "All three runs agree on the decision and commitment counts"
+        "All three runs agree on the decision, commitment and flag counts"
       ]
     },
     {
@@ -74,7 +74,7 @@
       "assertions": [
         "Reports no decisions",
         "Does not treat sequential assent as consensus on a course of action",
-        "May note under Needs chasing that a principle was agreed but no action attached"
+        "Does not emit a Needs chasing section — an agreed principle with no action is not one of the four flag triggers"
       ]
     }
   ]
