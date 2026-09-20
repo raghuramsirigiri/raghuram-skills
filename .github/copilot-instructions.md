@@ -19,6 +19,9 @@ Before writing chart code, consult:
 - `skills/chart-dashboard/references/theming.md` — brand recolour and the generator scripts
 - `skills/chart-dashboard/references/editable.md` — only when an editable page was asked for
 
+Worked references: `examples/logistics-network-dashboard/` (dashboard),
+`examples/coffee-pricing-deck/` (slide deck), `examples/ev-retrospective/` (report).
+
 `skills/chart-dashboard/assets/charts-lib/` is a vendored copy of a library
 maintained in another repo. Do not fix library bugs there — the next sync
 removes your fix. Write the change up in `CHARTS-LIB-UPSTREAM.md` so it can be

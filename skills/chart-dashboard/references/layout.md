@@ -57,6 +57,19 @@ Two rules constrain whatever you build:
   because composition is the second thing the reader needs — not because the
   hero left a `w4` hole and a donut fits a `w4` hole.
 
+- **Every row adds up to twelve.** A row whose spans fall short leaves a hole
+  that reads as a missing panel, and the last row is where it happens: one `w8`
+  panel alone at the end wants to be `w12`, and a lone `w4` wants a partner or a
+  wider span. The same goes for a content-sized `.bento.flow` row — a table with
+  nothing beside it takes the full width rather than sitting in a `w8` with an
+  empty quarter. (Narrow screens are handled for you: below 1100px every cell is
+  half the grid, and a trailing odd cell takes the whole row so it can't strand
+  itself.)
+- **A soft `.note` card is for text that belongs to no panel, and it earns its
+  cell the same way a chart does.** A caveat that is really a footnote belongs in
+  the page footer with the sources and definitions; a note dropped into the grid
+  to fill a gap reads as a panel that failed to load.
+
 Reading order is top-to-bottom, so sequence panels by how the reader thinks:
 whatever leads → what it's made of → what drove it → who it happened to →
 operational detail → summary. The *content* of that sequence changes completely

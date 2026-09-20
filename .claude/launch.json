@@ -4,8 +4,28 @@
     {
       "name": "q1-dashboard",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server", "chart-dashboard-workspace/iteration-1/eval-6/with_skill/outputs", "-p", "8811", "-c-1"],
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "chart-dashboard-workspace/iteration-1/eval-6/with_skill/outputs",
+        "-p",
+        "8811",
+        "-c-1"
+      ],
       "port": 8811
+    },
+    {
+      "name": "examples",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        "examples",
+        "-p",
+        "8822",
+        "-c-1"
+      ],
+      "port": 8822
     }
   ]
 }

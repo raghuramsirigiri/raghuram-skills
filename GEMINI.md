@@ -26,6 +26,10 @@ Five rules that break the output if missed:
 5. Build the grid from the shape of the analysis rather than reusing a layout;
    the dashboard template ships without a starter arrangement on purpose.
 
+Finished pages to read when you want a worked example:
+`examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`
+(slide deck), `examples/ev-retrospective/` (report).
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
