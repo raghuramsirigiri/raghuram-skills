@@ -86,7 +86,10 @@
     font-size:12px; color:var(--muted); line-height:1.6; }
   footer.notes b { color:var(--ink); }
 
-  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1} }
+  /* Two-up: every cell is half the grid, so an odd number of cells would strand
+     the last one beside a hole. It takes the whole row instead. */
+  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1}
+    .bento > *:last-child:nth-child(odd){grid-column:span 12} }
   @media (max-width:700px){ .w4,.w6,.w8,.w12{grid-column:span 12} .page{padding:16px} }
 </style>
 </head>
@@ -129,16 +132,16 @@
   </div>
 
   <div class="bento flow">
-    <div class="cell w8"><div class="chart" id="c-lanes"></div></div>
-    <div class="note w4"><b>Data quality</b>Depot scan data was unavailable for the
-      week of May 18 after the scanner firmware rollback. That week is left as a gap
-      rather than filled, so the on-time trend is drawn unsmoothed across the hole.</div>
+    <div class="cell w12"><div class="chart" id="c-lanes"></div></div>
   </div>
 
   <footer class="notes">
     <b>Sources.</b> Depot scan events, carrier settlement files, and the FY26 operating
     plan. &nbsp;&middot;&nbsp; <b>Definitions.</b> On-time = delivered on or before the
     promised date; cost per parcel is fully loaded linehaul plus last mile.
+    &nbsp;&middot;&nbsp; <b>Gaps.</b> Depot scan data was unavailable for the week of
+    May 18 after the scanner firmware rollback; that week is left as a gap rather than
+    filled, so the on-time trend is drawn unsmoothed across the hole.
     &nbsp;&middot;&nbsp; Every figure on this page is illustrative sample data built to
     demonstrate the chart-dashboard skill, not a measurement of a real network.
   </footer>
