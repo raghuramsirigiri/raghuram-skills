@@ -76,6 +76,40 @@
         "productivity",
         "summarization"
       ]
+    },
+    {
+      "name": "whats-changed",
+      "source": "./plugins/whats-changed",
+      "description": "Compare this period's numbers against last period's and say what moved, by how much, and which two or three lines explain the total. Reads workbooks, CSVs, PowerPoint decks, PDFs and Word docs — the pack as it actually arrives. Ranks the drivers, splits rate from volume, and refuses to invent a cause the source doesn't state.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "variance",
+        "variance-analysis",
+        "month-on-month",
+        "mom",
+        "period-comparison",
+        "drivers",
+        "commentary",
+        "management-reporting",
+        "finance",
+        "fp-and-a",
+        "kpi",
+        "excel",
+        "xlsx",
+        "csv",
+        "powerpoint",
+        "pptx",
+        "pdf",
+        "reconciliation",
+        "diff",
+        "reporting-pack",
+        "standup",
+        "analysis"
+      ]
     }
   ]
 }

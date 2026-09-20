@@ -1,0 +1,35 @@
+{
+  "name": "whats-changed",
+  "description": "Compare this period's numbers against last period's and say what moved, by how much, and which two or three lines explain the total. Reads workbooks, CSVs, PowerPoint decks, PDFs and Word docs. Ranks the drivers, splits rate from volume, and refuses to invent a cause the source doesn't state.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Raghuram Sirigiri"
+  },
+  "homepage": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "repository": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "license": "MIT",
+  "keywords": [
+    "variance",
+    "variance-analysis",
+    "month-on-month",
+    "mom",
+    "period-comparison",
+    "drivers",
+    "commentary",
+    "management-reporting",
+    "finance",
+    "fp-and-a",
+    "kpi",
+    "excel",
+    "xlsx",
+    "csv",
+    "powerpoint",
+    "pptx",
+    "pdf",
+    "reconciliation",
+    "diff",
+    "reporting-pack",
+    "standup",
+    "analysis"
+  ]
+}

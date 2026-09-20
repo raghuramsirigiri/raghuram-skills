@@ -1,0 +1,145 @@
+# What earns a line, and what must never be said
+
+The judgment half of `whats-changed`. Read it before ranking anything.
+
+Every example here uses invented numbers unrelated to the eval fixtures.
+
+---
+
+## 1. The two gates
+
+A row is **reportable** if it clears *either* gate. Both are numeric, because a section
+without a mechanical admission rule drifts from run to run while the arithmetic stays
+identical.
+
+- **Absolute gate** — its change is **≥ 5% of the total change** in its measure.
+- **Relative gate** — its own value moved **≥ 20%**, **and** it is **≥ 1% of the measure's
+  total**.
+
+The relative gate's `and` is load-bearing. Without it, a £40 line going to £120 leads the
+report on a 200% move. With it, that line is correctly invisible.
+
+**Worked example.** Total revenue falls £80k. The 5% absolute gate is therefore £4k.
+
+| Line | Prior | Current | Change | % of move | Own move | Share of total | Gate |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Wholesale | 900 | 820 | −80 | 100% | −8.9% | 24% | **yes** — absolute |
+| Retail | 60 | 44 | −16 | 20% | −26.7% | 1.3% | **yes** — both |
+| Trials | 2 | 7 | +5 | −6% | +250% | 0.2% | **yes** — absolute only |
+| Kiosks | 1.0 | 3.2 | +2.2 | −3% | +220% | 0.1% | **no** — fails both |
+| Direct | 400 | 397 | −3 | 4% | −0.8% | 12% | **no** — fails both |
+
+`Trials` clears the absolute gate on £5k against a £4k bar, so it is reportable despite
+being tiny — report it with the rate in words (`+250% on a £2k base`), never as a bare
+percentage that implies significance. `Kiosks` moved more in percentage terms and is
+correctly excluded: 0.1% of the total is not a driver of anything.
+
+## 2. `all other movements`
+
+Every row failing both gates is aggregated into **one** row at the foot of the drivers
+table, with its row count: `all other movements (7 rows)`. Sum their prior, current and
+change.
+
+Never silently drop a row. The test of a correct table is that **the drivers' changes plus
+`all other movements` equal the stated total movement.** If they don't, something was lost.
+
+## 3. Rate versus volume
+
+Where a source carries both a count and a value for a line, decompose it. This is the most
+useful thing the skill can say and it needs no domain knowledge:
+
+```
+unit value = value / count
+```
+
+- count moved, unit value flat → **volume-driven**: `units −11%, price flat`
+- count flat, unit value moved → **rate-driven**: `price −16%, units flat`
+- both moved → say both, larger contributor first
+
+Report the split in the `Note` column in words. Do **not** add a raw `% change` column —
+that is the column that prints `340%` on a small base and makes the table lie.
+
+If the source carries no count, say nothing about rate or volume. Deriving units from a
+value is invention.
+
+## 4. What must never be said
+
+These are what make every naive version of this untrustworthy.
+
+| Tempting output | Why it's wrong |
+| --- | --- |
+| "Revenue fell on seasonal softness in EMEA" | A cause the source does not contain. Invented. |
+| "Margin improved" when only cost moved | A derived claim about a metric the source never states. |
+| "North grew 340%" | New row — absent before, not small. Not a growth rate. |
+| "12 lines changed, here they are" | A diff, not an explanation. Unranked means unread. |
+| "Total variance −£82k" when the rows sum to −£79k | Repeats a broken printed total. Reconcile first. |
+| "UK was about £550k" read off a bar chart image | A measurement of a picture. Fabrication with a decimal point on it. |
+| "Revenue fell £16.8k" from `£1.8m` vs `£1,783.2k` | Pure rounding artefact. Nothing moved. |
+| "EMEA is gone" when the deck showed only its top 5 | Not disclosed ≠ not there. |
+
+**The one permitted cause.** If the source itself states a reason — a note column, a
+footnote, a variance-reason field, a deck's commentary bullet — quote it and attribute it:
+`"new MSA rate from 1 Oct" per slide 4's note`. Quote it; never paraphrase it into your own
+finding, and never extend it to a line it wasn't written about.
+
+## 5. Hard cases, and the ruling for each
+
+- **Row appears** → `Structural changes`, described as `new`. Its value still counts toward
+  the total movement, and it may appear in the drivers table, but **with no percentage**.
+- **Row disappears** → same, as `gone`. Naming where it might have gone is allowed only as a
+  possibility, explicitly unsourced.
+- **Row renamed** (`North` → `North America`) → match on position and value proximity,
+  report **as a rename** under `Structural changes`. Reporting one gone plus one new
+  invents movement equal to twice the line's value. If confidence is low, say so.
+- **Sign flip** (+£4k → −£1k) → report the absolute movement and describe the flip in words.
+  A percentage across zero is meaningless.
+- **From zero, or divide by zero** → `new` or `n/a`. Never `∞`, never `—%`.
+- **Printed total doesn't reconcile** → the rows are the truth. Flag the gap, and in a
+  spreadsheet name the offending cell.
+- **Units or currency differ between sources** (`£000s` → `£`, `£` → `€`) → **stop.** Flag
+  it and do not produce a numeric report. Every figure would be wrong by a factor. This is
+  the only case worth refusing outright.
+- **The two sources disagree on the same period beyond rounding** → report both, name both
+  locators, pick neither. Which of the company's own numbers is right is not this skill's
+  call.
+- **A number appears only in prose** ("closed just under £1.8m") → quote the sentence; do
+  not parse it into the table.
+- **Nothing clears a gate** → say so in one line and stop. *"Revenue is flat within 1%; no
+  line moved more than £3k."*
+
+## 6. Flags — a closed list of nine
+
+One line per flag, count in the heading, section omitted entirely when nothing qualifies.
+**Only these nine trigger a flag:**
+
+1. **Non-reconciling total** — printed total ≠ sum of rows.
+2. **Stale date** — a tab, page or slide carrying the same as-of date in both periods.
+3. **Unit or currency mismatch** between the two sources.
+4. **Hardcoded cell in a formula column** — spreadsheets only.
+5. **Low-confidence rename** — matched, but not certainly.
+6. **Figures present only as a chart image.**
+7. **OCR was needed** — digits unverified.
+8. **Precision mismatch** hiding movements below the coarser source's rounding step.
+9. **Undisclosed lines** — a source showed a subset, so part of the total is unexplained.
+
+Risks, opinions, business concerns, "worth watching", and anything that merely seemed
+notable are **commentary, not flags.** They do not appear.
+
+**One line per trigger, one trigger per line.** Two triggers on the same row get two lines;
+one trigger spanning three rows gets one line naming all three. Walk the closed list in
+order, emit a line for each trigger that fired, count them, stop.
+
+Worked example of the section done right:
+
+```markdown
+## Flags (3)
+- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted — `E22` is a
+  typed-in number, not part of the column formula.
+- `Depreciation` is dated 30-Jun in both packs. Likely stale, not unchanged.
+- The September deck shows 5 of 12 lines, so £389.7k of the total is undisclosed and the
+  ranking below only explains what was shown.
+```
+
+Wrong, for contrast: *"Hosting costs are growing fast and may need attention"* — an opinion,
+not one of the nine. *"Two rows have no owner and the file was last edited by Finance"* —
+neither is a trigger.
