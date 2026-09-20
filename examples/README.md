@@ -4,12 +4,14 @@ Finished output from the [chart-dashboard Claude Skill](../README.md). Every fol
 is fully self-contained: download `index.html`, double-click it, and it renders —
 no server, no network, no build step, no npm install.
 
-Each example shows one of the three formats the skill produces, and between them
-they cover every chart family in the bundled `charts-lib` renderer.
+Each example shows one of the three formats the skill produces, across most of the
+chart families in the bundled `charts-lib` renderer. The full list of families —
+including radar, scatter, bubble and the `panels` compositor — is in the
+[main README](../README.md#which-chart-types-are-supported).
 
 | Example | Format | Charts it uses | Preview |
 |:--|:--|:--|:--|
-| [`logistics-network-dashboard/`](logistics-network-dashboard/) | **Dashboard** (single file) | Geofacet tile map, bar list, waterfall bridge, Sankey flow, line with a real gap and a callout, histogram, waffle, dumbbell, radar, 100% stacked column, donut, bar insight table | [screenshot](logistics-network-dashboard/screenshot.png) |
+| [`logistics-network-dashboard/`](logistics-network-dashboard/) | **Dashboard** (single file) | Geofacet tile map, bar list, waterfall bridge, Sankey flow, line with a real gap and a callout, histogram, waffle, dumbbell, 100% stacked column, donut, bar insight table | [screenshot](logistics-network-dashboard/screenshot.png) |
 | [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |

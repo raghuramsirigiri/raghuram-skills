@@ -125,10 +125,9 @@
     <div class="cell w4"><div class="chart" id="c-waffle"></div></div>
 
     <div class="cell w8"><div class="chart" id="c-hubs"></div></div>
-    <div class="cell w4"><div class="chart" id="c-scorecard"></div></div>
-
-    <div class="cell w8"><div class="chart" id="c-mix"></div></div>
     <div class="cell w4"><div class="chart" id="c-carriers"></div></div>
+
+    <div class="cell w12"><div class="chart" id="c-mix"></div></div>
   </div>
 
   <div class="bento flow">
@@ -14476,20 +14475,6 @@ Charts.dumbbell('c-hubs', {
   series: [
     { name: 'Q1', data: [14.2, 12.8, 13.6, 11.9, 18.4, 12.2, 10.8] },
     { name: 'Q2', data: [ 9.6,  9.9, 10.4,  9.8, 11.1, 11.0, 13.4] }
-  ]
-});
-
-/* The profile of one depot across measures that share a single 0-10 index. */
-Charts.radar('c-scorecard', {
-  title: 'Phoenix closed its throughput gap but still trails on returns',
-  subtitle: 'Operating scorecard · index 0–10, network best = 10',
-  xAxis: { categories: ['Throughput','Dwell time','Damage rate','Returns handling',
-    'Staffing cover','Scan accuracy'] },
-  yAxis: { max: 10 },
-  plotOptions: { radar: { fillOpacity: 0.16 } },
-  series: [
-    { name: 'Phoenix Q1', data: [4, 3, 6, 4, 5, 7], fillOpacity: 0 },
-    { name: 'Phoenix Q2', data: [8, 7, 7, 5, 7, 8] }
   ]
 });
 
