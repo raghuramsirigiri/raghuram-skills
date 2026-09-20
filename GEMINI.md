@@ -14,6 +14,9 @@ view, chart deck, or illustrated data report.
 
 Five rules that break the output if missed:
 
+0. Never fix a library bug in `skills/chart-dashboard/assets/charts-lib/` — it
+   is a vendored copy of another repo's library and a re-sync would drop the
+   fix. Write it up in `CHARTS-LIB-UPSTREAM.md` instead.
 1. `theme.js` must load before `charts.js`.
 2. Donut and pie options go under `plotOptions.pie`, never at the top level.
 3. Never invent numbers that read as real measurements — label illustrative
