@@ -70,7 +70,10 @@
     font-size:12px; color:var(--muted); line-height:1.6; }
   footer.notes b { color:var(--ink); }
 
-  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1} }
+  /* Two-up: every cell becomes half the grid, so an odd number of cells would
+     strand the last one beside an empty half. It takes the whole row instead. */
+  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1}
+    .bento > *:last-child:nth-child(odd){grid-column:span 12} }
   @media (max-width:700px){ .w4,.w6,.w8,.w12{grid-column:span 12} .page{padding:16px} }
 </style>
 </head>

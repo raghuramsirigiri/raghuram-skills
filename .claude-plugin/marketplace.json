@@ -4,7 +4,7 @@
     "name": "Raghuram Sirigiri"
   },
   "metadata": {
-    "description": "Build HTML dashboards, KPI reports, and data visualizations from any data — powered by a zero-dependency SVG chart library.",
+    "description": "Build HTML dashboards, KPI reports and 16:9 slide decks from any data — powered by a zero-dependency SVG chart library.",
     "version": "1.0.0"
   },
   "plugins": [
@@ -35,7 +35,17 @@
         "data-analysis",
         "visualization",
         "offline",
-        "zero-dependency"
+        "zero-dependency",
+        "slides",
+        "slide-deck",
+        "presentation",
+        "deck",
+        "pdf",
+        "sankey",
+        "waterfall",
+        "geofacet",
+        "report-generator",
+        "ai-dashboard-generator"
       ]
     }
   ]
