@@ -145,11 +145,14 @@ check does not fire.
 
 **The tier is a property of the check, not of your impression of it.** Read it off this table;
 do not promote a finding because it feels serious or demote one because the file is otherwise
-good. Two documented exceptions, both mechanical:
+good. Two documented rules, both mechanical:
 
 - **Check 6 splits on the arithmetic**, as above.
-- **A placeholder that breaks a `SUM`** may be argued up to Blocker, because the printed total
-  is then wrong — but state the reasoning in the finding when you do.
+- **A finding that trips several checks takes the highest tier among them.** A placeholder
+  (check 9, Embarrassment) that makes a cell return `#VALUE!` (check 5, Blocker) is a
+  **Blocker**: the page now prints an error. A placeholder that is merely skipped by a `SUM`,
+  with no error cell and no printed total that disagrees with another, stays an
+  Embarrassment — say in the finding that the total silently excludes it.
 
 ### Enumerating findings
 
@@ -166,6 +169,7 @@ Worked, because this is where counting drifts:
 
 > A cell holds `TBD`, which also makes the share cell beside it return `#VALUE!`. Checks 9 and
 > 5. **One finding** — the placeholder is the defect, the error cell is its symptom. Say both.
+> It is a **Blocker**, because check 5 is the highest tier it trips.
 
 The mirror, so neither reading drifts:
 

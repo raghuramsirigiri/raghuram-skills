@@ -1,6 +1,6 @@
 {
   "skill_name": "sanity-check",
-  "note": "Two metrics, and the second is the product. (1) Does it find the planted defects and tier them correctly? (2) Does it report NOTHING outside the twelve check families — no formatting taste, no business advice, no claims about whether the numbers are plausible, no observations about what it merely didn't find? Evals 2 and 3 are the false-positive tests and matter more than eval 1: a run that finds every defect in the dirty pack but invents two in the clean one has failed, because the reader then has to check the checking. Eval 1's counts are determinate at 8/2/1 under the enumeration rule — see pack-2026-11-dirty.KEY.md, revised after round 1. Never supply a key with a fixture.",
+  "note": "Two metrics, and the second is the product. (1) Does it find the planted defects and tier them correctly? (2) Does it report NOTHING outside the twelve check families — no formatting taste, no business advice, no claims about whether the numbers are plausible, no observations about what it merely didn't find? Evals 2 and 3 are the false-positive tests and matter more than eval 1: a run that finds every defect in the dirty pack but invents two in the clean one has failed, because the reader then has to check the checking. Eval 1's counts are determinate at 9/1/1 under the enumeration rule — see pack-2026-11-dirty.KEY.md, revised after round 1. Never supply a key with a fixture.",
   "evals": [
     {
       "id": 1,
@@ -22,17 +22,17 @@
         "BLOCKER: Detail!D12 is -96.0, a negative in a positive cost column",
         "BLOCKER: Detail column D is £000s while column E is £ — mixed units in one table",
         "EMBARRASSMENT: Detail!A2 is dated 30-Sep-2026 in a November pack",
-        "EMBARRASSMENT (or Blocker with reasoning stated): Detail!D13 is 'TBC' in a live cost column and is silently skipped by the SUM",
+        "BLOCKER: Detail!D13 is 'TBC' in a live cost column, silently skipped by the SUM, and makes F13 return #VALUE! — Blocker because the finding trips check 5",
         "Summary is identified as the CORRECT figure and Detail!D14 as the wrong one — not the reverse",
         "Detail!A16's stated rounding convention is NOT flagged as a defect",
         "The rounding convention is NOT used to excuse the 182.0 gap",
         "No finding outside the twelve families: no formatting notes, no 'costs look high', no escalation advice, no 'could not verify X'",
         "Scope line present, listing the twelve family names",
         "Every finding carries a cell locator",
-        "Counts are exactly 8 Blockers / 2 Embarrassments / 1 Hygiene — Detail!D14 is ONE finding naming checks 1, 6 and 11 together, and the TBC at D13 is ONE finding naming the #VALUE! it causes at F13",
+        "Counts are exactly 9 Blockers / 1 Embarrassment / 1 Hygiene — Detail!D14 is ONE finding naming checks 1, 6 and 11 together, and the TBC at D13 is ONE finding naming the #VALUE! it causes at F13",
         "HYGIENE: Summary!F8 is typed 56.0 in a formula column (F5:F7 are =B-E) and agrees exactly, so it is reported at Hygiene — not omitted, not a Blocker",
         "Scope line carries NO caveat clause for a family that was checked and found nothing",
-        "All three runs agree on the tier counts (8/2/1) and on which tier each defect landed in"
+        "All three runs agree on the tier counts (9/1/1) and on which tier each defect landed in"
       ]
     },
     {

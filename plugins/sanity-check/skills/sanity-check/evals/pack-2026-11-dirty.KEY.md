@@ -32,7 +32,7 @@ Note the subtlety: **`Summary` is right and `Detail`'s printed total is wrong.**
 | 10 | Mixed units | `Detail!D4` vs `Detail!E4` | `Cost (£000s)` beside `Recharge (£)` — 42000 in E5 is £42k, not £42m | **Blocker** |
 | 11 | Same figure differs | `Summary!B8` (3,206.0) vs `Detail!D14` (3,388.0) | The pack contradicts itself on its headline cost | **Blocker** |
 | 8 | Stale date | `Detail!A2` | "Data as at: 30-Sep-2026" in a November pack | **Embarrassment** |
-| 9 | Placeholder | `Detail!D13` | `TBC` in a live cost column — also silently excluded from the `SUM` | **Embarrassment** |
+| 9 | Placeholder | `Detail!D13` | `TBC` in a live cost column — also silently excluded from the `SUM` | **Blocker** (with 5b) |
 | 5b | Error value | `Detail!F13` | `=D13/$D$14` over the text `TBC` → `#VALUE!`, in the same printed share column | folded into 9 |
 | 6b | Hardcoded, agreeing | `Summary!F8` | `Var to plan` typed 56.0 in a formula column (F5:F7 are `=B−E`); 26 + 42 − 12 = 56, so it agrees **exactly** | **Hygiene** |
 
@@ -66,17 +66,19 @@ one finding, naming each*), the counts are **determinate**:
 
 | Tier | Count | Findings |
 | --- | --- | --- |
-| **Blockers** | **8** | 1 cross-foot `D8` · 2 shares 103% · 3 utilisation 114% · 4 duplicate `CC-103` · 5 `#DIV/0!` at `F9` · **6a+1+11 as ONE finding** (`Detail!D14` typed, 182 adrift, contradicting `Summary!B8`) · 7 sign at `D12` · 10 mixed units `D` vs `E` |
-| **Embarrassments** | **2** | 8 stale September date · **9+5b as ONE finding** (`TBC` at `D13` plus the `#VALUE!` it causes at `F13`) |
+| **Blockers** | **9** | 1 cross-foot `D8` · 2 shares 103% · 3 utilisation 114% · 4 duplicate `CC-103` · 5 `#DIV/0!` at `F9` · **6a+1+11 as ONE finding** (`Detail!D14` typed, 182 adrift, contradicting `Summary!B8`) · 7 sign at `D12` · 10 mixed units `D` vs `E` · **9+5b as ONE finding** (`TBC` at `D13` plus the `#VALUE!` it causes at `F13` — Blocker because a finding takes the highest tier it trips) |
+| **Embarrassments** | **1** | 8 stale September date |
 | **Hygiene** | **1** | 6b `Summary!F8` typed but agreeing |
 
 Round 1 came out 9 / 8 / 9 Blockers precisely because this was undetermined: runs split on
 whether `F13` was its own finding and whether the `Summary!B8` contradiction was its own line.
-Both questions now have answers, so **8 / 2 / 1 is the target.**
+Both questions now have answers, and the round-3 tracing runs settled the third — whether
+`TBC`+`#VALUE!` is an Embarrassment or a Blocker — by making tiering mechanical (highest tier
+tripped). **9 / 1 / 1 is the target.**
 
 ## What a pass looks like
 
-1. **All 8 Blockers found**, each at Blocker tier. Missing the `D14` finding is a hard fail —
+1. **All 9 Blockers found**, each at Blocker tier. Missing the `D14` finding is a hard fail —
    it is the one that puts a wrong number in front of a board.
 2. **Verdict line first**, saying plainly it is not safe to send.
 3. **6a is a Blocker and 6b is Hygiene.** This is the one computable severity distinction in
@@ -94,9 +96,6 @@ Both questions now have answers, so **8 / 2 / 1 is the target.**
 - Whether the duplicate `CC-103` (4) is described as a duplicate row or as double counting.
 - Whether mixed units (10) is one finding or two (the £/£000s pair, and the recharge column's
   magnitude being implausible against cost).
-- Whether the `TBC` (9) is Embarrassment or Blocker — it silently drops a row from the total
-  *and* causes an error cell, so a run arguing Blocker has a real case. **Either passes if the
-  reasoning is stated.** The finding count does not change either way.
 - Ordering within a tier.
 - Whether defect 11 is reported once or as a line under both tabs.
 
@@ -108,6 +107,7 @@ Both questions now have answers, so **8 / 2 / 1 is the target.**
 - Any finding outside the twelve families.
 - A flat undifferentiated list with no tiers.
 - Reporting 6b as a Blocker, or 6a as Hygiene.
+- Reporting the `TBC`/`#VALUE!` finding as an Embarrassment — it trips check 5.
 - Splitting `D14` into two or three findings, or `TBC`/`#VALUE!` into two — the enumeration rule
   now settles both.
 - A scope-line caveat for a family that *was* checked and found nothing ("no share columns
