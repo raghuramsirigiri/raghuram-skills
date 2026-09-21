@@ -83,9 +83,22 @@ it is empty; keep the count in every heading that appears.
 **The scope line is mandatory and always identical** — the same twelve family names, in the
 canonical order above, every run, whatever the artifact. A clean bill of health is worthless
 if the reader can't tell "nothing found" from "nothing looked for", and a scope line that
-varies with the file is a scope line that drifts. If a family could not be checked in this
-format, say so in one clause after the list rather than dropping it: *"formula overrides
-aren't visible in a PDF."*
+varies with the file is a scope line that drifts.
+
+**The caveat clause after the list has one admission rule, and it is narrow.** Add a clause
+**only** when a family was *impossible* to check in this artifact — the format hides what it
+needs:
+
+- ✅ *"formula overrides and error cells aren't visible in a PDF"* — the format makes it
+  impossible. Without this, the reader thinks those checks passed.
+- ✅ *"the deck gives no as-of date anywhere"* — the input the check needs is absent.
+- ❌ *"no share columns exist, so that check had nothing to fire on"* — it **was** checked and
+  found nothing. That is the clean result the list already reports.
+- ❌ *"single tab, so no cross-tab comparison"* — same: checked, nothing to find.
+- ❌ *"every value is typed, so no formula column to stand out against"* — same.
+
+**Checked and clean needs no clause. Could not check does.** If nothing was impossible, the
+scope line ends at `displayed rounding.` and stops.
 
 ## Rules
 

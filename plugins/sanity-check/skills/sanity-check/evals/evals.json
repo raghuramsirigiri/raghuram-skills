@@ -1,17 +1,19 @@
 {
   "skill_name": "sanity-check",
-  "note": "Two metrics, and the second is the product. (1) Does it find the planted defects and tier them correctly? (2) Does it report NOTHING outside the twelve check families — no formatting taste, no business advice, no claims about whether the numbers are plausible, no observations about what it couldn't check? Evals 2, 3 and 4 are the false-positive tests and matter more than eval 1: a run that finds all eleven defects in the dirty pack but invents two in the clean one has failed, because the reader then has to check the checking. Graded against pack-2026-11-dirty.KEY.md; never supply a key with a fixture.",
+  "note": "Two metrics, and the second is the product. (1) Does it find the planted defects and tier them correctly? (2) Does it report NOTHING outside the twelve check families — no formatting taste, no business advice, no claims about whether the numbers are plausible, no observations about what it merely didn't find? Evals 2 and 3 are the false-positive tests and matter more than eval 1: a run that finds every defect in the dirty pack but invents two in the clean one has failed, because the reader then has to check the checking. Eval 1's counts are determinate at 8/2/1 under the enumeration rule — see pack-2026-11-dirty.KEY.md, revised after round 1. Never supply a key with a fixture.",
   "evals": [
     {
       "id": 1,
       "name": "dirty-pack-all-tiers",
       "prompt": "This goes to the CFO in an hour. Anything embarrassing in it?",
-      "files": ["skills/sanity-check/evals/pack-2026-11-dirty.xlsx"],
+      "files": [
+        "skills/sanity-check/evals/pack-2026-11-dirty.xlsx"
+      ],
       "expected_output": "Verdict line saying it is not safe to send, then Blockers / Embarrassments / Hygiene with counts, cell locators throughout, and the fixed scope line.",
       "runs": 3,
       "assertions": [
         "Verdict line comes first and says plainly it is NOT safe to send",
-        "BLOCKER: Detail!D14 prints 3,388.0 where D5:D13 sum to 3,206.0 — a 182.0 gap, and the cell is typed rather than a SUM",
+        "BLOCKER (one finding, not two or three): Detail!D14 is typed 3,388.0 where D5:D13 sum to 3,206.0 — a 182.0 gap — and Summary!B8 prints 3,206.0 for the same population. The line names the typed override, the failed reconciliation and the cross-tab contradiction together",
         "BLOCKER: Summary!D8 prints 113 where D5:D7 sum to 111 (cross-foot failure)",
         "BLOCKER: Summary!C5:C7 shares sum to 103%",
         "BLOCKER: Summary!B10 capacity utilisation of 114% is impossible",
@@ -19,24 +21,27 @@
         "BLOCKER: Detail!F9 is #DIV/0! because it points at blank D17, and it sits in the printed share column",
         "BLOCKER: Detail!D12 is -96.0, a negative in a positive cost column",
         "BLOCKER: Detail column D is £000s while column E is £ — mixed units in one table",
-        "BLOCKER: Summary!B8 (3,206.0) contradicts Detail!D14 (3,388.0) on the same headline cost",
         "EMBARRASSMENT: Detail!A2 is dated 30-Sep-2026 in a November pack",
         "EMBARRASSMENT (or Blocker with reasoning stated): Detail!D13 is 'TBC' in a live cost column and is silently skipped by the SUM",
-        "HYGIENE: Summary!B11 cost per head is typed 28.9, which AGREES with 3,206.0/111 — so it is Hygiene, not a Blocker",
         "Summary is identified as the CORRECT figure and Detail!D14 as the wrong one — not the reverse",
         "Detail!A16's stated rounding convention is NOT flagged as a defect",
         "The rounding convention is NOT used to excuse the 182.0 gap",
         "No finding outside the twelve families: no formatting notes, no 'costs look high', no escalation advice, no 'could not verify X'",
         "Scope line present, listing the twelve family names",
         "Every finding carries a cell locator",
-        "All three runs agree on the Blocker count and on which tier each defect landed in"
+        "Counts are exactly 8 Blockers / 2 Embarrassments / 1 Hygiene — Detail!D14 is ONE finding naming checks 1, 6 and 11 together, and the TBC at D13 is ONE finding naming the #VALUE! it causes at F13",
+        "HYGIENE: Summary!F8 is typed 56.0 in a formula column (F5:F7 are =B-E) and agrees exactly, so it is reported at Hygiene — not omitted, not a Blocker",
+        "Scope line carries NO caveat clause for a family that was checked and found nothing",
+        "All three runs agree on the tier counts (8/2/1) and on which tier each defect landed in"
       ]
     },
     {
       "id": 2,
       "name": "borrowed-workbook-false-positive",
       "prompt": "Can you check this over before I send it?",
-      "files": ["skills/sanity-check/evals/sales-2026-09.xlsx"],
+      "files": [
+        "skills/sanity-check/evals/sales-2026-09.xlsx"
+      ],
       "expected_output": "Exactly two findings — the typed-over non-reconciling total and the stale Services tab — and nothing invented.",
       "runs": 3,
       "assertions": [
@@ -53,7 +58,9 @@
       "id": 3,
       "name": "clean-file",
       "prompt": "Is this safe to send?",
-      "files": ["skills/sanity-check/evals/pack-2026-11-clean.xlsx"],
+      "files": [
+        "skills/sanity-check/evals/pack-2026-11-clean.xlsx"
+      ],
       "expected_output": "One verdict line saying it is clean, plus the scope line. Nothing else.",
       "runs": 3,
       "assertions": [
@@ -69,7 +76,9 @@
       "id": 4,
       "name": "deck-format-blindness",
       "prompt": "Check this pack over for me.",
-      "files": ["skills/sanity-check/evals/sales-pack-2026-09.pptx"],
+      "files": [
+        "skills/sanity-check/evals/sales-pack-2026-09.pptx"
+      ],
       "expected_output": "The internal total disagreement and the picture-chart slide, plus an explicit statement that formula-level checks are impossible in a deck.",
       "runs": 3,
       "assertions": [
@@ -78,7 +87,8 @@
         "Reports that slide 4 is a picture of a chart whose numbers cannot be read or checked",
         "States in the scope caveat that formula overrides and error cells are not detectable in a deck — rather than implying those checks passed",
         "Does not invent a defect from the picture slide's apparent bar heights",
-        "Scope line present with the full family list plus the format caveat"
+        "Scope line present with the full family list plus the format caveat",
+        "Reports the partial-table-under-whole-total gap in cash (5 lines shown summing to 1,396.1 under a printed 1,785.8) and ranks it above the 2.6 chart disagreement"
       ]
     },
     {

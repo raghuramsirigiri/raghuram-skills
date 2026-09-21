@@ -23,6 +23,14 @@ Total     70    80    155   <- row totals give 150, column totals give 150; 155 
 Report the gap, both figures, and the cell. **The rows are the truth**; a printed total is a
 claim. Where two disclosures disagree, prefer the one whose parts you can add.
 
+**A total covering a population the table doesn't show is this check too**, and it is usually
+the biggest finding on the page. A deck table listing five lines under a heading like
+`Total (all lines)` is claiming a total its own rows cannot produce: the shown rows sum to one
+figure, the total asserts another, and the difference is undisclosed. Report the gap in cash,
+not just as "the table is partial" — a six-figure sum sitting unexplained under a printed total
+outranks a four-figure disagreement elsewhere, and ranking them the other way round buries the
+thing that matters.
+
 ### 2. Shares don't sum
 
 A `%` column of parts should total 100%. `97%` or `103%` means a part is missing, doubled, or
@@ -143,9 +151,36 @@ good. Two documented exceptions, both mechanical:
 - **A placeholder that breaks a `SUM`** may be argued up to Blocker, because the printed total
   is then wrong — but state the reasoning in the finding when you do.
 
-**One finding per defect, one line each.** Two defects in the same cell are two findings; one
-defect spanning four rows is one finding naming the range. Count defects, not cells, and not
-checks.
+### Enumerating findings
+
+**One finding per defect, one line each — and a defect that trips several checks is still one
+finding.** Name every check it trips inside that line. The unit is *the thing someone has to
+go and fix*, because this output is a worklist.
+
+Worked, because this is where counting drifts:
+
+> A total cell is typed as `912` where its own rows sum to `847`, and a summary tab elsewhere
+> prints `847` for the same population. That single cell trips check 6 (typed into a formula
+> column), check 1 (total doesn't reconcile) and check 11 (two places disagree). **One
+> finding**, one line, naming all three — because fixing that one cell resolves all three.
+
+> A cell holds `TBD`, which also makes the share cell beside it return `#VALUE!`. Checks 9 and
+> 5. **One finding** — the placeholder is the defect, the error cell is its symptom. Say both.
+
+The mirror, so neither reading drifts:
+
+> Two *different* typed-over cells are **two findings**, even in the same column, because each
+> needs its own fix.
+> One defect spanning a range — four rows sharing one stale date — is **one finding** naming
+> the range.
+
+So: count **defects to fix**, not cells, not checks, not symptoms.
+
+**This differs deliberately from `whats-changed`, which counts triggers rather than defects.**
+That is not an inconsistency to reconcile: there, flags annotate a movement report and the
+reader wants to know how many distinct things are suspect; here, the output *is* the fix list
+and the reader wants to know how many cells to open. If you have both skills in mind, do not
+carry one's counting rule into the other.
 
 ## What is never a finding
 
@@ -155,7 +190,9 @@ checks.
 | "Consider highlighting the variance on slide 2" | Presentation advice. |
 | "Column widths and fonts are inconsistent" | Formatting taste. |
 | "This should be escalated to Finance" | A business action, and not yours to recommend. |
-| "No unit counts, so margin can't be verified" | A limitation of your analysis. It belongs in the scope line's caveat. |
+| "No unit counts, so margin can't be verified" | A limitation of your analysis, not a defect in the artifact. |
+| "No share columns exist, so that check found nothing" | Checked and clean. The scope line already says it was checked; a caveat is only for what was *impossible* to check. |
+| "The total cell has no cached value, so it may display blank" | An artifact of how you opened the file, not of the file. |
 | "The rounding note means the £182k gap is fine" | **Wrong, and the worst failure available**: a convention excuses only what it covers. A rounding note covers pence, not three orders of magnitude. |
 | Rewriting the workbook, or offering to | Report, don't repair. |
 | "Looks good overall, nice clear layout" | Reassurance is not information. |
