@@ -27,6 +27,9 @@ Ask "how did you get £41.2k?" or "why is #2 a driver?" to see the rows and arit
 The figure in the line is the headline's own change figure, so the example is always one the
 reader can see.
 
+Follow-up replies — the traces themselves — do **not** repeat it. It is said once, under the
+output, where the reader first needs it.
+
 ## The trace block
 
 ```markdown
@@ -75,7 +78,7 @@ Precision compared at: £0.1k (the deck's).
 | **"Why isn't Kiosks in there? It went up 200%."** | Both gates with its numbers — e.g. 2.2 < 5% × 80 = 4.0, and 0.1% of total < 1% — and that it sits inside `other`. Anticipate this one: large percentages on small lines are what readers notice first. |
 | **"What's in all other movements?"** | Every member row with prior, current and change, summing to the `other` row, and the check that drivers + other = total move. |
 | **"Is it price or volume?"** | The rate/volume arithmetic, or — when the source has no count — one line saying the split can't be made because there is nothing to divide by. Never derive a count. |
-| **"Why did it go down?"** | Only what the source states, quoted and located. If it states nothing: *"Neither source gives a reason for this line."* Do not offer a plausible one. This is the question that most tempts invention. |
+| **"Why did it go down?"** | Only what the source states, quoted and located. If the same note sits against the line in **both** periods, say so — it may describe a standing arrangement rather than this month's move. If it states nothing: *"Neither source gives a reason for this line."* Do not offer a plausible one. This is the question that most tempts invention. |
 | **"Why no growth rate on the new line?"** | There is no prior value to divide by; the share of total move is shown instead, and it's what makes the table close. |
 | **"Isn't North just North America renamed?"** | The evidence used to match or decline: position, value proximity, anything either source says. If it was reported as a rename, say how confident and why; if declined, what was missing. |
 | **"Why didn't you mention the £16k difference?"** | The two precisions, and that the difference is inside the coarser one's rounding step — so it isn't a movement anyone can see. |

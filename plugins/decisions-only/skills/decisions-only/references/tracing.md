@@ -28,6 +28,9 @@ It names the two questions this skill gets most, so the reader learns both exist
 the one-line *"Nothing was decided"* answer too — that is the answer most likely to be
 disputed.
 
+Follow-up replies — the traces themselves — do **not** repeat it. It is said once, under the
+output, where the reader first needs it.
+
 ## The trace block
 
 ```markdown
@@ -50,7 +53,8 @@ disputed.
 ```
 
 - **The lines** — every speaker turn that opened, closed, conditioned or reversed the item,
-  verbatim, with timestamp or line position and the speaker exactly as the transcript labels
+  verbatim, with its timestamp — or, when the transcript has none, its line number in the
+  file, so the reader can search for it and the speaker exactly as the transcript labels
   them (including `Speaker 2` or a mangled name). Mark silence and cross-talk as the
   transcript shows them. Nothing is paraphrased here.
 - **The test** — the two questions from `what-counts.md`, each answered yes or no with the
