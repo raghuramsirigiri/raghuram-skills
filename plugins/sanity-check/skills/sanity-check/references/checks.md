@@ -34,7 +34,8 @@ thing that matters.
 ### 2. Shares don't sum
 
 A `%` column of parts should total 100%. `97%` or `103%` means a part is missing, doubled, or
-individually wrong. Distinguish this from **displayed** rounding (check 12) — three parts shown
+individually wrong. **The parts that are off belong in that one finding** — name which share
+is wrong against its base, don't list each as its own finding. Distinguish this from **displayed** rounding (check 12) — three parts shown
 as 33% each summing to 99% is rounding, not an error.
 
 ### 3. Impossible percentages
@@ -109,6 +110,12 @@ title rows, axis labels, slide titles — and compare, rather than assuming one 
 
 A magnitude that only makes sense under a different unit is evidence too: a "recharge" of
 42,000 beside a cost of 1,184 is not a 35× recharge, it is two different scales.
+
+**A label does not disarm it.** A column headed `Recharge (£)` beside `Cost (£000s)`, or a
+sheet note saying "£000s unless stated", is still two scales in one table — the label tells a
+careful reader, and the finding exists for the one who isn't. This differs from check 12,
+where a stated convention *does* disarm: rounding is expected noise; a thousand-fold scale
+change is not.
 
 ### 11. The same figure differs between places
 
