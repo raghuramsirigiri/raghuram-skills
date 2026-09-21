@@ -59,26 +59,29 @@ with what its formula would produce and **Hygiene** when it agrees.
 **Two blockers — don't send yet.** Plus one date that will draw a question.
 
 ## Blockers (2)
-- `Summary!C12` totals £4,182k; the detail tab's rows sum to £4,201k. £19k apart, and the
+- B1 `Summary!C12` totals £4,182k; the detail tab's rows sum to £4,201k. £19k apart, and the
   summary figure is the one on slide 1.
-- `Detail!F31` is `#DIV/0!` and feeds the margin column, so every margin below row 31 prints
+- B2 `Detail!F31` is `#DIV/0!` and feeds the margin column, so every margin below row 31 prints
   blank.
 
 ## Embarrassments (1)
-- The Headcount tab is dated "as at 30 Sep" in a November pack.
+- E1 The Headcount tab is dated "as at 30 Sep" in a November pack.
 
 ## Hygiene (1)
-- `Detail!D14` is typed in where the rest of column D is a formula. It agrees with the
+- H1 `Detail!D14` is typed in where the rest of column D is a formula. It agrees with the
   formula today, so nothing is wrong yet.
 
 Checked: totals and cross-footing · share columns · impossible percentages · duplicates ·
 error cells · formula overrides · signs · as-of dates · placeholders · units · cross-tab
 agreement · displayed rounding.
+
+Ask "trace <handle>" to see how any line was reached.
 ```
 
 **The verdict line comes first and says whether it is safe to send.** "Safe to send, two
 things worth fixing" is the sentence the user came for. Omit a tier's section entirely when
-it is empty; keep the count in every heading that appears.
+it is empty; keep the count in every heading that appears. Every finding opens with its
+handle — `B`, `E`, `H` plus its number within the tier.
 
 **The scope line is mandatory and always identical** — the same twelve family names, in the
 canonical order above, every run, whatever the artifact. A clean bill of health is worthless
@@ -98,7 +101,8 @@ needs:
 - ❌ *"every value is typed, so no formula column to stand out against"* — same.
 
 **Checked and clean needs no clause. Could not check does.** If nothing was impossible, the
-scope line ends at `displayed rounding.` and stops.
+scope line ends at `displayed rounding.` The fixed trace line follows it, and nothing else
+does.
 
 ## Rules
 
@@ -119,11 +123,29 @@ scope line ends at `displayed rounding.` and stops.
   wrong while sounding careful.
 - **Cite a locator for every finding.** `Summary!C12`, `slide 4, table row 3`, `p.7 Table 2`.
   A finding without a cell reference can't be acted on in the hour available.
-- **When the artifact is clean, say so plainly and stop.** Verdict line, then the scope line.
+- **When the artifact is clean, say so plainly and stop.** Verdict line, the scope line, the
+  trace line.
   No padding, no reassurance paragraph, no "you may wish to consider".
 - **Two files given?** Still sanity findings, tiered, for both. The comparative sharpens the
   stale-figure checks and nothing else. **Do not produce a variance report** — if what they
   wanted was what moved, say so in one line and point at `whats-changed`.
+
+## Tracing
+
+Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
+the four-part trace block. What a trace contains for this skill:
+
+- **Source** — every cell, slide table row or page reference the finding touches, with its
+  value as displayed and, for a spreadsheet, its formula or `typed` if there is none.
+- **Working** — the check's computation with the values substituted: the column summed, the
+  shares added, the formula re-evaluated against the typed value, the two dates compared.
+- **Rule applied** — the check family by number and name from `checks.md`, and the tier test
+  that fired first. This is what answers "why is that a blocker?".
+- **Would change the call** — e.g. "a stated £k rounding convention would disarm this", or
+  "if D14 agreed with its formula this would be Hygiene".
+
+A trace of the scope line itself ("what did you check for dates?") lists, for that family,
+what was examined and what each returned. That is how a clean verdict is audited.
 
 ## Boundary with `whats-changed`
 

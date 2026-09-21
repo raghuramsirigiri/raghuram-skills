@@ -116,6 +116,24 @@
         "Does not flag the rounding convention itself as a defect",
         "Does not soften the verdict because the file documents a convention"
       ]
+    },
+    {
+      "id": 7,
+      "name": "trace-on-request",
+      "prompt": "Turn 1: eval 1's prompt and file. Turn 2, same session: \"show me how you got B1 and why the as-of date is only an embarrassment\"",
+      "files": [
+        "skills/sanity-check/evals/pack-2026-11-dirty.xlsx"
+      ],
+      "expected_output": "Two trace blocks in the tracing.md shape, re-derived from the workbook, nothing else.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 numbers every finding with a tier handle (B1.., E1.., H1..) and ends with the fixed trace line after the scope line",
+        "The B1 trace lists every cell it depends on with its value and shows the sum as explicit arithmetic",
+        "The B1 trace names the check family and the tier test that made it a Blocker",
+        "The as-of trace quotes Detail!A2, names the pack period it was compared against, and states the tier test that stops it being a Blocker",
+        "Each trace has a 'Would change the call' part naming what would move it to another tier",
+        "No new findings appear in the traces"
+      ]
     }
   ]
 }
