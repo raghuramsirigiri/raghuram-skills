@@ -105,7 +105,7 @@ The deck rounds to £0.1k, so smaller movements aren't visible.
 - F3 Slide 6 carries the regional split as a picture, not a chart. Those numbers weren't
   readable; the underlying file is needed if that split matters.
 
-Ask "trace <handle>" to see how any line was reached.
+Ask "how did you get £41.2k?" or "why is #2 a driver?" to see the rows and arithmetic behind any figure.
 ```
 
 Note the first two flags: one typed-over cell fires two triggers — the total not reconciling,
@@ -148,21 +148,16 @@ negative. That is information, not a bug — which is why the column is not call
 
 ## Tracing
 
-Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
-the four-part trace block. Handles here: `headline`, drivers by their rank (`1`, `2` …),
-`S` structural changes, `F` flags. What a trace contains for this skill:
+The output is repeated in meetings, so every figure in it will be questioned once. Read
+`references/tracing.md` before answering any follow-up: it carries the handles (`headline`,
+`#1…`, `other`, `S`, `F`), the fixed closing line — whose example figure is the headline's own
+change — the trace block (*Rows · Arithmetic · Why it's here · What would change it*), and the
+questions to expect: *"your total doesn't match the pack"*, *"why isn't this 200% line in
+there?"*, *"is it price or volume?"*, and above all *"why did it go down?"* — which gets only
+what the source states, quoted, or *"neither source gives a reason"*.
 
-- **Source** — prior and current value for every row involved, each with its locator in its
-  own file, and the precision each source carries.
-- **Working** — change = current − prior; growth = change ÷ prior (or why there is none);
-  `% of total move` = change ÷ total change. Where a count and value exist, the rate/volume
-  split with both periods' units and unit value substituted. For the headline, the row sums
-  of both periods, and — if a printed total disagrees — both figures and which was used.
-  For `all other movements`, every member row with its change, summing to the aggregate.
-- **Rule applied** — the materiality gate it passed, with its numbers in the gate (or both
-  gates it failed, for a row in the aggregate), and its rank. For a flag, its trigger number
-  in `materiality.md`. A quoted cause stays quoted and attributed; the trace adds none.
-- **Would change the call** — e.g. "at the deck's £0.1m rounding this move would vanish".
+A trace recomputes from the sources by locator and **corrects the output** if the numbers
+don't reproduce.
 
 ## Testing
 

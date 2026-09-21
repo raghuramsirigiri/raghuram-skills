@@ -1,89 +1,97 @@
-# Tracing — show the working behind any line
+# Tracing a movement back to the rows
 
-> **Shared reference, duplicated by design.** Byte-identical copies live in every plugin in
-> this repo that reports numbers or findings (plugins are independent, so references cannot
-> be shared by path). Edit one, copy to all, check with `sha256sum`. The skill-specific part —
-> *what* a trace for this skill contains — lives in that skill's `SKILL.md`, not here.
+How `whats-changed` answers *"how did you get that?"*. The output is a headline and a table
+someone will repeat in a meeting. The first question they will be asked back is about one
+number, and they need to answer it without opening two packs side by side.
 
-The output is short on purpose. Tracing is how a reader who doubts one line gets from that
-line back to the source without re-doing the whole job, and without the output carrying the
-working for every line nobody questioned.
+The people asking are usually **the presenter, checking before they stand up**, **the
+reviewer, who has the pack and a calculator**, or **the budget owner of a line**, who thinks
+their line has been described wrongly. Every answer below is written for one of them.
 
-**Two layers: the handle is always there, the working appears only when asked.**
+All examples use invented numbers unrelated to the eval fixtures.
 
-## 1. Handles — always on
+---
 
-Every line a reader could doubt carries a short, stable handle, unique within the output:
-a letter for the section and a number within it (`D2`, `C1`, `B3`, `F2`). The skill's
-`SKILL.md` names its letters. Headline figures are traced as `headline`.
+## Handles and the closing line
 
-The output ends with exactly this line, and it is the only thing permitted after the last
-section:
+`headline` for the headline sentence · drivers by rank, `#1, #2 …` · `other` for
+`all other movements` · `S1, S2 …` structural changes · `F1, F2 …` flags. Any figure in the
+output can also be traced by quoting it ("the £41.2k").
+
+The output ends with exactly this line, and nothing follows it:
 
 ```
-Ask "trace <handle>" to see how any line was reached.
+Ask "how did you get £41.2k?" or "why is #2 a driver?" to see the rows and arithmetic behind any figure.
 ```
 
-It is a fixed contract, not a closing remark — identical every run, never reworded, never
-extended into an offer. When the output is a one-line "nothing found" answer, the trace
-line still follows it: the reader may want to see what was looked at.
+The figure in the line is the headline's own change figure, so the example is always one the
+reader can see.
 
-## 2. Traces — on request
-
-The reader asks in any words: *"trace B2"*, *"how did you get £41.2k?"*, *"where's decision 3
-from?"*, *"show your working"*, *"why is that a blocker?"*. Answer with one block per handle,
-in this order, and nothing else:
+## The trace block
 
 ```markdown
-### Trace B2 — Summary!D8 prints 113 where its parts sum to 111
+### #2 — Support, outsourced  ·  +9.3
 
-**Source**
-- `Summary!D5` = 37 · `Summary!D6` = 41 · `Summary!D7` = 33 · `Summary!D8` = 113 (printed)
+**Rows**
+| | Prior | Current | Locator |
+|---|---|---|---|
+| Value (£k) | 96.0 | 105.3 | `sep.xlsx` Costs!D9 · `oct.pptx` slide 4, row 6 |
+| Tickets | 1,200 | 1,198 | Costs!C9 · slide 4, row 6 |
+Precision compared at: £0.1k (the deck's).
 
-**Working**
-1. D5 + D6 + D7 = 37 + 41 + 33 = **111**
-2. Printed − computed = 113 − 111 = **+2**
+**Arithmetic**
+1. Change = 105.3 − 96.0 = **+9.3**
+2. Own move = 9.3 ÷ 96.0 = **+9.7%**
+3. Share of total move = 9.3 ÷ 41.2 = **23%**
+4. Unit value 96.0k ÷ 1,200 = £80.0 → 105.3k ÷ 1,198 = £87.9 → **rate +9.9%, volume −0.2%**
 
-**Rule applied**
-- Check 1, *Totals and cross-footing* → Blocker: a printed figure is wrong.
+**Why it's here**
+- Absolute gate: 9.3 ≥ 5% × 41.2 = 2.06 → **passes**. Ranked 2nd by absolute change.
+- Note column quotes the source: *"new MSA rate from 1 Oct"* — slide 4 footnote.
 
-**Would change the call**
-- A stated rounding convention of ≥2 on this table. None found.
+**What would change it**
+- At £1k rounding it would still pass; at £10k rounding it would round to zero movement.
 ```
 
-(Invented numbers — illustrative only.)
+- **Rows** — every source value the figure uses, prior and current, each with its locator in
+  its own file, plus the precision the comparison was made at.
+- **Arithmetic** — one operation per step, numbers substituted, in the order the output used
+  them. A reviewer should be able to type each line into a calculator.
+- **Why it's here** — the materiality gate it passed with the gate's numbers filled in, its
+  rank, and any quoted cause with its source. For a flag, the trigger number.
+- **What would change it** — the threshold, rounding step or missing disclosure that would
+  move it in or out of the table, or change its rank.
 
-The four parts:
+---
 
-1. **Source** — every input the line depends on, with its locator (cell, slide + table row,
-   page + table, transcript timestamp or speaker turn) and its value **exactly as the source
-   shows it**. Quote text verbatim. Nothing enters the working that isn't listed here.
-2. **Working** — each step as arithmetic with the numbers substituted, one operation per
-   step, so a reader can reproduce it in a spreadsheet or a calculator. For a judgement rather
-   than a sum, the steps are the tests applied and what each returned.
-3. **Rule applied** — the named rule, gate, check or trigger from this skill's references
-   that put the line in the output, in the section it is in, at the rank or tier it has.
-   This is the part that explains *why this is an insight* rather than just *what it is*.
-4. **Would change the call** — the one or two facts that, if different, would move the line
-   to another tier, rank, or out of the output. Say whether the source contains them. Omit
-   the part only when nothing plausible would.
+## The questions to expect, and what each answer shows
+
+| They ask | Answer with |
+| --- | --- |
+| **"How did you get the headline?"** | Row sums for both periods (listing the rows, or the range), change, percentage — and, if the source prints its own total, both figures and why the row sum was used. This is the question asked most. |
+| **"Your total doesn't match the pack."** | The printed total, the row sum, the gap, and the cell or slide where they part. Point at the flag that already reports it. |
+| **"Where's that number from?"** | The locator(s) and the value exactly as the source displays it, before any rounding you applied. |
+| **"Why is #1 the biggest driver?"** | Its change against every other driver's, ranked by absolute change, and its share of the total move. |
+| **"Why isn't Kiosks in there? It went up 200%."** | Both gates with its numbers — e.g. 2.2 < 5% × 80 = 4.0, and 0.1% of total < 1% — and that it sits inside `other`. Anticipate this one: large percentages on small lines are what readers notice first. |
+| **"What's in all other movements?"** | Every member row with prior, current and change, summing to the `other` row, and the check that drivers + other = total move. |
+| **"Is it price or volume?"** | The rate/volume arithmetic, or — when the source has no count — one line saying the split can't be made because there is nothing to divide by. Never derive a count. |
+| **"Why did it go down?"** | Only what the source states, quoted and located. If it states nothing: *"Neither source gives a reason for this line."* Do not offer a plausible one. This is the question that most tempts invention. |
+| **"Why no growth rate on the new line?"** | There is no prior value to divide by; the share of total move is shown instead, and it's what makes the table close. |
+| **"Isn't North just North America renamed?"** | The evidence used to match or decline: position, value proximity, anything either source says. If it was reported as a rename, say how confident and why; if declined, what was missing. |
+| **"Why didn't you mention the £16k difference?"** | The two precisions, and that the difference is inside the coarser one's rounding step — so it isn't a movement anyone can see. |
+| **"Why is that flagged?"** | Trigger number and the values that fired it. If two flags share a cell, say that one defect fired two triggers. |
+| **"Show all the working"** | `headline`, then each driver in rank order, `other`, structural changes, flags. |
 
 ## Rules
 
-- **Re-derive, don't recall.** Build the trace from the source again, not from memory of the
-  first pass. The trace is a second check, and that is most of its value.
-- **The trace wins.** If re-deriving disagrees with the output, say so on the first line of
-  the trace — *"This corrects B2: the gap is £2k, not £3k"* — and give the corrected line.
-  If the line does not survive at all, retract it plainly. Never bend the working to fit.
-- **No new claims.** A trace explains a line already in the output. It does not add findings,
-  causes, advice, or anything the output's own rules would have excluded. Causal language
-  stays quoted and attributed, exactly as in the output.
-- **Can't trace means can't claim.** If a line's source cannot be pointed at — a figure read
-  from a chart image, a value inferred rather than read — the trace says so in those words.
-  A line that could never be traced should not have been in the output; treat it as a
-  retraction.
-- **"Trace everything"** / "show all working" → one block per handle, in output order.
-  Asked up front ("with working"), append the blocks after the fixed trace line instead of
-  waiting for a second turn.
-- **Aggregates trace to their members.** A roll-up line (`all other movements`, a count, a
-  total) lists every row it contains, with values, so the arithmetic closes in the trace too.
+- **Recompute from the sources, not from the table.** Pull the values again by locator. If a
+  figure in the output doesn't reproduce, **the trace corrects it** — first line, plainly:
+  *"Correction: #2 is +9.3, not +9.8 — I read row 7 instead of row 6."* If a ranking or the
+  headline changes as a result, restate it.
+- **No new causes, ever.** A trace is where invented causes most want to appear, because the
+  reader asked *why*. The only causal text allowed is what the source says, in quotes, with
+  its locator.
+- **Can't trace means it shouldn't have been said.** A figure that came off a chart image or
+  a guess cannot be traced; say so and withdraw it.
+- **Show the precision.** Every trace names the rounding step the comparison was made at,
+  because half of all "that's wrong" disputes are two people reading different precisions.

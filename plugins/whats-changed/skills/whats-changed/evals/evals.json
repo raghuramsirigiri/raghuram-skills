@@ -132,22 +132,22 @@
       ]
     },
     {
-      "id": 8,
       "name": "trace-on-request",
-      "prompt": "Turn 1: eval 1's prompt and files. Turn 2, same session: \"how did you get the headline figure, and why is SMB Benelux in the table?\"",
+      "prompt": "Turn 1: eval 1's prompt and files. Turn 2, same session: \"Your total doesn't match the one in the pack. And why did Benelux go down?\" Turn 3: \"SMB Malta tripled — why isn't it in the table?\"",
+      "expected_output": "Traces in the whats-changed shape (Rows · Arithmetic · Why it's here · What would change it), answering each anticipated question from the workbooks, with no invented cause.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 ends with the exact closing line 'Ask \"how did you get £<headline change>?\" or \"why is #2 a driver?\"…' using the headline's own change figure, and nothing after it",
+        "The total answer shows the row sum 1,783.2, the printed 1,785.8, the 2.6 gap, and Revenue!E16 as where they part, and points at the existing flag",
+        "The Benelux answer quotes the sheet's Note column with its locator as the only cause, and shows the rate/volume split arithmetic for both periods",
+        "The Benelux answer adds no cause of its own (no seasonality, market, pricing-pressure language)",
+        "The Malta answer puts Malta's numbers into both materiality gates, shows it fails both, and says it sits inside all other movements",
+        "Every trace names the precision the comparison was made at"
+      ],
+      "id": 8,
       "files": [
         "skills/whats-changed/evals/sales-2026-08.xlsx",
         "skills/whats-changed/evals/sales-2026-09.xlsx"
-      ],
-      "expected_output": "Two trace blocks in the tracing.md shape, arithmetic re-derived from the workbooks, nothing else.",
-      "runs": 3,
-      "assertions": [
-        "Turn 1 ends with the fixed trace line and nothing after it; drivers carry handles 1..n and flags F1..Fn",
-        "The headline trace sums the rows in both periods with cell locators and shows 1,783.2 as the row sum, noting the printed 1,785.8 was not used and why",
-        "The headline trace shows the change and percentage as explicit arithmetic (current − prior, change ÷ prior)",
-        "The Benelux trace shows the rate/volume split arithmetic with units and unit value for both periods",
-        "The Benelux trace names the materiality gate it passed, with the numbers substituted into the gate",
-        "The cause for Benelux stays quoted from the Note column and attributed; the trace adds no cause of its own"
       ]
     }
   ]

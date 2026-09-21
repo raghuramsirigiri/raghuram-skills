@@ -66,7 +66,7 @@ Two tables, then the flag list, then the fixed trace line. Nothing before, nothi
 - D2 reversed an earlier call in the same meeting; anyone who left early still
   believes December holds.
 
-Ask "trace <handle>" to see how any line was reached.
+Ask "where did D2 come from?" or "why isn't X in here?" to see the transcript behind any line.
 ```
 
 (Rows trimmed above for length — a real run lists every item the counts claim.)
@@ -101,24 +101,15 @@ Output lands in chat as copyable markdown. Write a file only if asked.
 
 ## Tracing
 
-Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
-the four-part trace block. Handles here: `D` decisions, `C` commitments; a *Needs chasing*
-line is traced through the handle it names. What a trace contains for this skill:
+The tables carry no quotes and no reasoning, so the first doubt has to be answerable in one
+turn. Read `references/tracing.md` before answering any follow-up about a row: it carries the
+handles (`D`, `C`), the fixed closing line, the trace block (*The lines · The test · The
+ruling · What would change it*), and the questions to expect — *"we never agreed that"*,
+*"why am I the owner?"*, *"why isn't X here?"*, *"how did you get that date?"* — with what each
+answer must show.
 
-- **Source** — the exchange verbatim: every speaker turn that opened, closed or reversed the
-  option, with timestamp or line position. For a decision by silence, the proposal *and* the
-  turns that followed without objection.
-- **Working** — the two tests from `what-counts.md` and what each returned: was an option
-  closed, by whom; did a named person go on the hook. For a date, the resolution: meeting date
-  + phrase → date (`Tue 3 Mar` + "Friday" → Fri 6 Mar). For `— unassigned`, the turns that
-  came closest to an owner and why none of them counts.
-- **Rule applied** — the ruling in `what-counts.md` that admitted it, and for a flag, which of
-  the four triggers.
-- **Would change the call** — e.g. "an explicit 'agreed' from Sarah would make D3 explicit".
-
-A trace asked of something that *isn't* in the output ("why isn't the contractor idea a
-decision?") gets the same block for the near-miss: the turns, the test it failed, the
-ruling. That is explaining an omission, which is this skill's product.
+A trace re-reads the transcript and **can correct the tables**: a row that doesn't survive is
+retracted, a guessed owner reverts to `— unassigned`, a missed decision is added.
 
 ## Testing
 

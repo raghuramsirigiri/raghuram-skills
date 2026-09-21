@@ -1,89 +1,94 @@
-# Tracing — show the working behind any line
+# Tracing a decision back to the room
 
-> **Shared reference, duplicated by design.** Byte-identical copies live in every plugin in
-> this repo that reports numbers or findings (plugins are independent, so references cannot
-> be shared by path). Edit one, copy to all, check with `sha256sum`. The skill-specific part —
-> *what* a trace for this skill contains — lives in that skill's `SKILL.md`, not here.
+How `decisions-only` answers *"where did that come from?"*. The tables are deliberately bare
+— no quotes, no reasoning — so the reader's first doubt has to be answerable in one turn,
+from the transcript, without re-reading the meeting.
 
-The output is short on purpose. Tracing is how a reader who doubts one line gets from that
-line back to the source without re-doing the whole job, and without the output carrying the
-working for every line nobody questioned.
+People who question this output are almost always in one of three positions: **they were in
+the meeting and remember it differently**, **they weren't and are about to act on it**, or
+**they've been named as an owner and want to know why**. Every answer below is written for
+one of them.
 
-**Two layers: the handle is always there, the working appears only when asked.**
+All examples use invented names and dates.
 
-## 1. Handles — always on
+---
 
-Every line a reader could doubt carries a short, stable handle, unique within the output:
-a letter for the section and a number within it (`D2`, `C1`, `B3`, `F2`). The skill's
-`SKILL.md` names its letters. Headline figures are traced as `headline`.
+## Handles and the closing line
 
-The output ends with exactly this line, and it is the only thing permitted after the last
-section:
+`D1, D2 …` decisions, `C1, C2 …` commitments, in table order. A *Needs chasing* line has no
+handle of its own; it is traced through the row it names.
+
+The output ends with exactly this line, and nothing follows it:
 
 ```
-Ask "trace <handle>" to see how any line was reached.
+Ask "where did D2 come from?" or "why isn't X in here?" to see the transcript behind any line.
 ```
 
-It is a fixed contract, not a closing remark — identical every run, never reworded, never
-extended into an offer. When the output is a one-line "nothing found" answer, the trace
-line still follows it: the reader may want to see what was looked at.
+It names the two questions this skill gets most, so the reader learns both exist. It follows
+the one-line *"Nothing was decided"* answer too — that is the answer most likely to be
+disputed.
 
-## 2. Traces — on request
-
-The reader asks in any words: *"trace B2"*, *"how did you get £41.2k?"*, *"where's decision 3
-from?"*, *"show your working"*, *"why is that a blocker?"*. Answer with one block per handle,
-in this order, and nothing else:
+## The trace block
 
 ```markdown
-### Trace B2 — Summary!D8 prints 113 where its parts sum to 111
+### D3 — Contractor budget frozen until Q2  ·  inferred
 
-**Source**
-- `Summary!D5` = 37 · `Summary!D6` = 41 · `Summary!D7` = 33 · `Summary!D8` = 113 (printed)
+**The lines**
+> [00:41:12] **Amara:** Unless anyone objects, we hold the contractor budget till Q2.
+> [00:41:15] *(4 s silence)*
+> [00:41:19] **Jonah:** Okay — next item, the vendor list.
 
-**Working**
-1. D5 + D6 + D7 = 37 + 41 + 33 = **111**
-2. Printed − computed = 113 − 111 = **+2**
+**The test**
+- Option closed? **Yes** — "hold till Q2" shuts "spend this quarter".
+- Assent given? **No** — nobody said yes; the meeting moved on.
 
-**Rule applied**
-- Check 1, *Totals and cross-footing* → Blocker: a printed figure is wrong.
+**The ruling**
+- *Decided by silence* → recorded, marked `inferred`, and flagged under *Needs chasing*.
 
-**Would change the call**
-- A stated rounding convention of ≥2 on this table. None found.
+**What would change it**
+- Any "agreed" after 00:41:12 would make it `explicit` and drop the flag. There is none.
 ```
 
-(Invented numbers — illustrative only.)
+- **The lines** — every speaker turn that opened, closed, conditioned or reversed the item,
+  verbatim, with timestamp or line position and the speaker exactly as the transcript labels
+  them (including `Speaker 2` or a mangled name). Mark silence and cross-talk as the
+  transcript shows them. Nothing is paraphrased here.
+- **The test** — the two questions from `what-counts.md`, each answered yes or no with the
+  words that settled it.
+- **The ruling** — the rule that put it in (or kept it out), by its name in `what-counts.md`,
+  and any *Needs chasing* trigger it fired, by number.
+- **What would change it** — the one sentence that, had it been said, would move it. Say
+  whether anything close to it *was* said.
 
-The four parts:
+---
 
-1. **Source** — every input the line depends on, with its locator (cell, slide + table row,
-   page + table, transcript timestamp or speaker turn) and its value **exactly as the source
-   shows it**. Quote text verbatim. Nothing enters the working that isn't listed here.
-2. **Working** — each step as arithmetic with the numbers substituted, one operation per
-   step, so a reader can reproduce it in a spreadsheet or a calculator. For a judgement rather
-   than a sum, the steps are the tests applied and what each returned.
-3. **Rule applied** — the named rule, gate, check or trigger from this skill's references
-   that put the line in the output, in the section it is in, at the rank or tier it has.
-   This is the part that explains *why this is an insight* rather than just *what it is*.
-4. **Would change the call** — the one or two facts that, if different, would move the line
-   to another tier, rank, or out of the output. Say whether the source contains them. Omit
-   the part only when nothing plausible would.
+## The questions to expect, and what each answer shows
+
+| They ask | Answer with |
+| --- | --- |
+| **"Where did D2 come from?"** / "Show me C1" | The full block for that row. |
+| **"We never agreed that."** | The block, leading with the closing turn. If re-reading shows no option actually closed, **retract the row** — say so first, plainly. A disputed decision is exactly what this is for. |
+| **"We definitely decided X — why isn't it here?"** | A block for the near-miss: the turns, which row of the *What does not count* table it matches (opinion, proposal, deferral, alignment…), and the tell. If it turns out to be a real decision, **add it** and say the original output missed it. |
+| **"Why is it inferred?"** | The silence or the absent assent, shown as lines, and what an explicit version would have needed. |
+| **"Why am I down for C1?"** | The turn where that person took it on, in their own words. If the only link is that they raised the topic, that is a guessed owner — **correct it to `— unassigned`** and say so. |
+| **"Why is C2 unassigned? Leo said he'd look at it."** | The turns that came closest to an owner, and why each one fails: *"I can look at it"* hedged, a name said by someone else with no acceptance, a task raised but not taken. |
+| **"How did you get Fri 6 Mar?"** | Meeting date as the transcript states it + the phrase used → the date. E.g. *Tue 3 Mar* + *"by Friday"* → Fri 6 Mar. With no meeting date, show why the phrase was kept verbatim. |
+| **"Didn't we change our minds on that?"** | Both turns — the original call and the reversal — with timestamps, and why only the final state is in the table. |
+| **"Why is that flagged?" / "Why isn't that flagged?"** | The trigger number (1–4) and the fact that fired it — or, for an unflagged row, which of the four it was checked against. Anything else they're worried about is not a flag by design; say so in one line. |
+| **"Is that conditional?"** | The condition, verbatim, and where it sits in the decision text. |
+| **"Could she even make that call?"** | One line: authority is out of scope; the table records what was said. No trace block. |
+| **"Show all of it"** | One block per row, in table order, then one per near-miss that was considered and rejected. |
 
 ## Rules
 
-- **Re-derive, don't recall.** Build the trace from the source again, not from memory of the
-  first pass. The trace is a second check, and that is most of its value.
-- **The trace wins.** If re-deriving disagrees with the output, say so on the first line of
-  the trace — *"This corrects B2: the gap is £2k, not £3k"* — and give the corrected line.
-  If the line does not survive at all, retract it plainly. Never bend the working to fit.
-- **No new claims.** A trace explains a line already in the output. It does not add findings,
-  causes, advice, or anything the output's own rules would have excluded. Causal language
-  stays quoted and attributed, exactly as in the output.
-- **Can't trace means can't claim.** If a line's source cannot be pointed at — a figure read
-  from a chart image, a value inferred rather than read — the trace says so in those words.
-  A line that could never be traced should not have been in the output; treat it as a
-  retraction.
-- **"Trace everything"** / "show all working" → one block per handle, in output order.
-  Asked up front ("with working"), append the blocks after the fixed trace line instead of
-  waiting for a second turn.
-- **Aggregates trace to their members.** A roll-up line (`all other movements`, a count, a
-  total) lists every row it contains, with values, so the arithmetic closes in the trace too.
+- **Re-read the transcript; don't recall your first pass.** The trace is a second reading and
+  that is where its value is.
+- **The trace corrects the table.** A row that doesn't survive its own trace is retracted,
+  owner guesses revert to `— unassigned`, and a missed decision is added — each said in the
+  first line of the answer, not buried in the block.
+- **Quote, never paraphrase, in *The lines*.** A paraphrased quote is the one thing a
+  disputing attendee will catch immediately.
+- **No summary sneaks back in.** A trace answers about one row. It does not recap the
+  surrounding discussion, the mood, or who argued what, unless those turns are the evidence.
+- **If the transcript is the problem, say so.** Missing speaker labels, a garbled passage, a
+  gap — show it as it appears and say it is why the row is `inferred` or unassigned.

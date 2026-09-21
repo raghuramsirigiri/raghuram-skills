@@ -24,7 +24,7 @@
         "EXCLUDES the analyst reporting line (deferred offline)",
         "EXCLUDES the customer churn alignment (three assents, no option closed)",
         "Needs chasing carries exactly 4 flags: the unowned kickoff, Tom's unpinned end-of-month date, the decision made by silence, and the in-meeting reversal — no fifth flag for risks or concerns",
-        "No summary paragraph, attendee list, key themes or closing line anywhere in the output — the fixed line 'Ask \"trace <handle>\" to see how any line was reached.' is the only permitted text after the flags",
+        "No summary paragraph, attendee list, key themes or closing line anywhere in the output — the fixed line 'Ask \"where did D2 come from?\" or \"why isn't X in here?\" to see the transcript behind any line.' is the only permitted text after the flags",
         "Every decision and commitment row carries a handle (D1.., C1..)",
         "All three runs agree on the decision, commitment and flag counts"
       ]
@@ -81,21 +81,21 @@
       ]
     },
     {
-      "id": 6,
       "name": "trace-on-request",
-      "prompt": "Turn 1: eval 1's prompt and transcript. Turn 2, same session: \"trace D3, and why isn't the contractor idea in there?\"",
-      "files": [
-        "skills/decisions-only/evals/transcript-quarterly-review.md"
-      ],
-      "expected_output": "Two trace blocks in the tracing.md shape — Source, Working, Rule applied, Would change the call — and nothing else.",
+      "prompt": "Turn 1: eval 1's prompt and transcript. Turn 2, same session: \"Where did D3 come from? And we definitely agreed to bring in contractors — why isn't that in here?\" Turn 3: \"Why is Elena not down for the kickoff? She brought it up.\"",
+      "expected_output": "Traces in the decisions-only shape (The lines · The test · The ruling · What would change it), answering each anticipated question, with no summary and no new rows.",
       "runs": 3,
       "assertions": [
-        "Turn 1 ends with the fixed line 'Ask \"trace <handle>\" to see how any line was reached.' and nothing after it",
-        "D3's Source quotes the freeze proposal and the turns that followed it verbatim, with speaker labels",
-        "D3's Working names both what-counts tests and states that nobody objected, which is why confidence is 'inferred'",
-        "D3's Rule applied names the decision-by-silence ruling and the Needs chasing trigger it fired",
-        "The contractor near-miss gets its own block explaining which test it failed (proposal left hanging, no option closed)",
-        "No new decisions, commitments or flags appear in the traces, and no summary prose"
+        "Turn 1 ends with the exact line 'Ask \"where did D2 come from?\" or \"why isn't X in here?\" to see the transcript behind any line.' and nothing after it",
+        "D3's The lines quotes the freeze proposal and the following turns verbatim, with speaker labels, and shows that nobody assented",
+        "D3's The ruling names decided-by-silence and the Needs chasing trigger it fired",
+        "The contractor answer is a near-miss block naming the 'proposal left hanging' row of the what-counts table; the contractor idea is NOT added as a decision",
+        "The Elena answer quotes the kickoff turns, explains that raising a task is not taking it, and keeps the owner as '— unassigned' — it does not assign Elena",
+        "No summary prose, no recap of the discussion beyond the evidence turns"
+      ],
+      "id": 6,
+      "files": [
+        "skills/decisions-only/evals/transcript-quarterly-review.md"
       ]
     }
   ]
