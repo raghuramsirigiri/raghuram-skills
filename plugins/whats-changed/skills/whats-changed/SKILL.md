@@ -120,6 +120,13 @@ negative. That is information, not a bug — which is why the column is not call
   permitted causal language is **quoted from the source** — a note column, a footnote, a
   variance-reason field, a deck's commentary — and attributed to it. Everything else is
   movement described, not explained.
+- **Every clause in the headline is checkable against the table.** The second sentence is
+  where arithmetic-free wording creeps in — "roughly cancel out", "broadly offset", "mixed
+  picture". Say it in the table's own quantities instead: *"one line explains four fifths of
+  it"*, *"Nordics and DACH offset about a third"*. Before writing it, add up the lines the
+  sentence names and check the words match the sum: lines netting +20 against a −59 fall
+  **offset a third**, they do not cancel. If no short true phrasing exists, keep the first
+  sentence and drop the second.
 - **Rank or don't report.** An unranked list of everything that changed is the problem the
   workbook already has. If the drivers can't be ranked, say why.
 - **Flat is a valid answer.** *"Revenue is flat within 1%; no line moved more than £3k"* is
