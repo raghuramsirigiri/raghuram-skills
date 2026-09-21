@@ -158,11 +158,3 @@ what the source states, quoted, or *"neither source gives a reason"*.
 
 A trace recomputes from the sources by locator and **corrects the output** if the numbers
 don't reproduce.
-
-## Testing
-
-`evals/` ships the fixtures and their answer keys. `sales-2026-08.xlsx` / `-09.xlsx` are the
-clean-shape pair; `sales-pack-2026-08.pptx` / `-09.pptx` test decks, native charts, a
-picture-of-a-chart slide and a top-5 truncation; `sales-pack-2026-08.pdf` tests £0.1m
-rounding against a £k workbook; `-08-scanned.pdf` has no text layer at all.
-`sales.KEY.md` and `sales-pack.KEY.md` grade them — never feed a key in with a fixture.

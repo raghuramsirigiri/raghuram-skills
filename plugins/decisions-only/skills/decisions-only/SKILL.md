@@ -110,10 +110,3 @@ answer must show.
 
 A trace re-reads the transcript and **can correct the tables**: a row that doesn't survive is
 retracted, a guessed owner reverts to `— unassigned`, a missed decision is added.
-
-## Testing
-
-`evals/transcript-quarterly-review.md` is a synthetic transcript with 4 decisions (one by
-silence, one reversed mid-meeting), 3 commitments (one unowned, one vaguely dated), and 4
-deliberate near-misses. `evals/transcript-quarterly-review.KEY.md` grades it — never feed
-the key in with the transcript.
