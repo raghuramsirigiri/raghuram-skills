@@ -154,13 +154,3 @@ Four checks overlap — reconciliation, stale dates, mixed units, hardcoded cell
 expected: the same defect matters to both, but one mentions it in passing and this one exists
 to find it. "Check this month's numbers" is ambiguous between them: if the request is about
 *movement*, it is the other skill.
-
-## Testing
-
-`evals/` ships the fixtures and their keys. `pack-2026-11-dirty.xlsx` carries eleven planted
-defects across ten families, one deliberate non-defect (a stated rounding convention), and one
-trap (that convention must not excuse a 182.0 reconciliation gap). `sales-2026-09.xlsx` and
-`sales-pack-2026-09.pptx` are borrowed from `whats-changed` and have only two and two real
-defects respectively — they are the false-positive tests, and the more important ones.
-`pack-2026-11-clean.xlsx` should return a clean verdict and nothing else. Never feed a `.KEY.md`
-in with a fixture.
