@@ -1,89 +1,102 @@
-# Tracing — show the working behind any line
+# Tracing a finding back to the cells
 
-> **Shared reference, duplicated by design.** Byte-identical copies live in every plugin in
-> this repo that reports numbers or findings (plugins are independent, so references cannot
-> be shared by path). Edit one, copy to all, check with `sha256sum`. The skill-specific part —
-> *what* a trace for this skill contains — lives in that skill's `SKILL.md`, not here.
+How `sanity-check` answers *"show me"*. The output is a worklist read by someone with an hour
+before a file goes out. The findings are one line each, so the first thing that reader does
+is open the file, look at the cell, and either see the problem or push back. The trace has to
+win that exchange in one turn, or the whole ranking is doubted.
 
-The output is short on purpose. Tracing is how a reader who doubts one line gets from that
-line back to the source without re-doing the whole job, and without the output carrying the
-working for every line nobody questioned.
+The people asking are usually **the author of the file**, who is sure it adds up, **the
+sender**, deciding whether a Blocker really blocks, and **a reviewer** who wants to know the
+clean verdict meant something. Every answer below is written for one of them.
 
-**Two layers: the handle is always there, the working appears only when asked.**
+All examples use invented numbers unrelated to the eval fixtures.
 
-## 1. Handles — always on
+---
 
-Every line a reader could doubt carries a short, stable handle, unique within the output:
-a letter for the section and a number within it (`D2`, `C1`, `B3`, `F2`). The skill's
-`SKILL.md` names its letters. Headline figures are traced as `headline`.
+## Handles and the closing line
 
-The output ends with exactly this line, and it is the only thing permitted after the last
-section:
+`B1, B2 …` Blockers · `E1 …` Embarrassments · `H1 …` Hygiene, numbered within their tier ·
+`scope` for the *Checked:* line, traced per family.
+
+The output ends with exactly this line, after the scope line, and nothing follows it:
 
 ```
-Ask "trace <handle>" to see how any line was reached.
+Ask "why is B1 a blocker?" or "show me B1" to see the cells and the arithmetic behind any finding.
 ```
 
-It is a fixed contract, not a closing remark — identical every run, never reworded, never
-extended into an offer. When the output is a one-line "nothing found" answer, the trace
-line still follows it: the reader may want to see what was looked at.
+On a clean verdict, where there is no B1, the line reads instead:
 
-## 2. Traces — on request
+```
+Ask "what did you check for <family>?" to see what was examined.
+```
 
-The reader asks in any words: *"trace B2"*, *"how did you get £41.2k?"*, *"where's decision 3
-from?"*, *"show your working"*, *"why is that a blocker?"*. Answer with one block per handle,
-in this order, and nothing else:
+## The trace block
 
 ```markdown
-### Trace B2 — Summary!D8 prints 113 where its parts sum to 111
+### B2 — Regional total typed over  ·  checks 6, 1, 11
 
-**Source**
-- `Summary!D5` = 37 · `Summary!D6` = 41 · `Summary!D7` = 33 · `Summary!D8` = 113 (printed)
+**Cells**
+| Cell | Shows | Formula |
+|---|---|---|
+| `Detail!E5:E11` | 41, 38, 52, 47, 60, 29, 33 | typed inputs |
+| `Detail!E12` | 318 | **typed** — E12's neighbours F12:H12 are `=SUM(…5:…11)` |
+| `Summary!C6` | 300 | `=Detail!E13` (a different, correct subtotal) |
 
-**Working**
-1. D5 + D6 + D7 = 37 + 41 + 33 = **111**
-2. Printed − computed = 113 − 111 = **+2**
+**Arithmetic**
+1. E5 + … + E11 = 41 + 38 + 52 + 47 + 60 + 29 + 33 = **300**
+2. The formula pattern would give 300; E12 shows 318 → **disagrees by 18**
+3. Summary!C6 = 300 → **the Summary figure is the right one**
 
-**Rule applied**
-- Check 1, *Totals and cross-footing* → Blocker: a printed figure is wrong.
+**Tier**
+- Check 6, typed override **disagreeing** with its formula → Blocker. (Checks 1 and 11 are
+  the same defect's symptoms — one finding, not three.)
 
-**Would change the call**
-- A stated rounding convention of ≥2 on this table. None found.
+**What would change it**
+- If E12 were 300 it would be Hygiene (typed, but agreeing). A stated rounding convention
+  would not help: it covers ±1, not 18.
 ```
 
-(Invented numbers — illustrative only.)
+- **Cells** — every cell, range, slide table row or page the finding touches, with what it
+  displays and, in a spreadsheet, its formula or **typed**. For a PDF or deck, say that
+  formulas aren't visible there.
+- **Arithmetic** — the check's own computation, numbers substituted: the column summed, shares
+  added, the formula pattern re-evaluated, the two dates set side by side, the two
+  disclosures of one figure compared.
+- **Tier** — the check family by number and name, the tier from the severity table in
+  `checks.md`, and which exception applied if one did. If several checks fired, say why it
+  is one finding.
+- **What would change it** — the fact that would move it up or down a tier or clear it,
+  including whether a stated convention in the file covers it.
 
-The four parts:
+---
 
-1. **Source** — every input the line depends on, with its locator (cell, slide + table row,
-   page + table, transcript timestamp or speaker turn) and its value **exactly as the source
-   shows it**. Quote text verbatim. Nothing enters the working that isn't listed here.
-2. **Working** — each step as arithmetic with the numbers substituted, one operation per
-   step, so a reader can reproduce it in a spreadsheet or a calculator. For a judgement rather
-   than a sum, the steps are the tests applied and what each returned.
-3. **Rule applied** — the named rule, gate, check or trigger from this skill's references
-   that put the line in the output, in the section it is in, at the rank or tier it has.
-   This is the part that explains *why this is an insight* rather than just *what it is*.
-4. **Would change the call** — the one or two facts that, if different, would move the line
-   to another tier, rank, or out of the output. Say whether the source contains them. Omit
-   the part only when nothing plausible would.
+## The questions to expect, and what each answer shows
+
+| They ask | Answer with |
+| --- | --- |
+| **"Why is B1 a blocker? It's tiny."** | The tier comes from the check, not the size: its row in the severity table, and the test that means someone may act on a false figure. Don't soften it because they pushed. |
+| **"It adds up when I check it."** | Recompute, cell by cell, and show it. Then name the usual reason two people get different sums: **hidden or filtered rows, displayed vs stored values, a text-formatted number, or a different range**. If they're right, **retract the finding** — first line, plainly. |
+| **"Which number is right?"** | For a cross-tab disagreement: the evidence for each (which one its parts sum to, which one is a formula) and the verdict — or, if nothing settles it, *"The file doesn't say which is right"*. |
+| **"Where exactly?"** / "Show me B1" | The full block. The cell list first — that is what they'll navigate to. |
+| **"What does this break?"** | What the defect feeds: the cells that reference it, and which printed figures are therefore wrong or blank. Name them; don't fix them. |
+| **"Why is the date only an embarrassment?"** | Check 8's tier and why: the numbers may be current, the label isn't — a reader will ask, but no one acts on a false figure. What would make it a Blocker (evidence the figures themselves are stale). |
+| **"It says rounded to £k — isn't that why?"** | What the convention covers (±1 of its step per figure, a few across a sum) against the gap found, as numbers. A convention disarms only what it covers. |
+| **"Why is that one finding, not three?"** | One defect to fix: the cell, and the checks it trips as symptoms. Mirror case: two different typed cells would be two. |
+| **"Why didn't you flag X?"** | Which of the twelve families X would fall under and what that check returned — or that X is outside the twelve by design (formatting, plausibility, advice). |
+| **"You say it's clean — what did you actually check?"** | Per family on the scope line: what was examined (which totals, which share columns, which date cells) and what each returned. This is how a clean verdict is audited. |
+| **"Can you fix it?"** | Not in a trace — the cell and the correct value if the file makes it knowable, then stop. Repair only if asked outright. |
+| **"Show all of it"** | Every finding, B then E then H, then `scope`. |
 
 ## Rules
 
-- **Re-derive, don't recall.** Build the trace from the source again, not from memory of the
-  first pass. The trace is a second check, and that is most of its value.
-- **The trace wins.** If re-deriving disagrees with the output, say so on the first line of
-  the trace — *"This corrects B2: the gap is £2k, not £3k"* — and give the corrected line.
-  If the line does not survive at all, retract it plainly. Never bend the working to fit.
-- **No new claims.** A trace explains a line already in the output. It does not add findings,
-  causes, advice, or anything the output's own rules would have excluded. Causal language
-  stays quoted and attributed, exactly as in the output.
-- **Can't trace means can't claim.** If a line's source cannot be pointed at — a figure read
-  from a chart image, a value inferred rather than read — the trace says so in those words.
-  A line that could never be traced should not have been in the output; treat it as a
-  retraction.
-- **"Trace everything"** / "show all working" → one block per handle, in output order.
-  Asked up front ("with working"), append the blocks after the fixed trace line instead of
-  waiting for a second turn.
-- **Aggregates trace to their members.** A roll-up line (`all other movements`, a count, a
-  total) lists every row it contains, with values, so the arithmetic closes in the trace too.
+- **Re-open the file and recompute.** The trace is a second check; recalling the first pass
+  defeats it.
+- **The trace corrects the list.** A finding that doesn't reproduce is retracted; a tier that
+  was applied wrongly is corrected — both in the first line, and the verdict restated if it
+  changes (*"Correction: that was the only Blocker — safe to send, two things worth fixing"*).
+- **Pushback doesn't move a tier; evidence does.** The tier comes from `checks.md`. Change it
+  only when the recomputation changes which rule applies.
+- **No new findings in a trace.** If one turns up while re-checking, say so in one line at the
+  end as a correction to the list, with its handle.
+- **Say what the format hides.** In a PDF or deck, a trace cannot show formulas or hidden
+  rows. Say so in the Cells part rather than implying it looked.

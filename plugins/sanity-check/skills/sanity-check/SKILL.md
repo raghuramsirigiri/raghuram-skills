@@ -75,7 +75,7 @@ Checked: totals and cross-footing · share columns · impossible percentages · 
 error cells · formula overrides · signs · as-of dates · placeholders · units · cross-tab
 agreement · displayed rounding.
 
-Ask "trace <handle>" to see how any line was reached.
+Ask "why is B1 a blocker?" or "show me B1" to see the cells and the arithmetic behind any finding.
 ```
 
 **The verdict line comes first and says whether it is safe to send.** "Safe to send, two
@@ -132,20 +132,15 @@ does.
 
 ## Tracing
 
-Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
-the four-part trace block. What a trace contains for this skill:
+The findings are one line each, so the reader's next move is to open the cell and push back.
+Read `references/tracing.md` before answering any follow-up: it carries the handles (`B`,
+`E`, `H`, `scope`), the fixed closing line (and its clean-verdict variant), the trace block
+(*Cells · Arithmetic · Tier · What would change it*), and the questions to expect — *"why is
+that a blocker? it's tiny"*, *"it adds up when I check it"*, *"which number is right?"*, *"the
+sheet says rounded — isn't that why?"*, *"what did you actually check?"*.
 
-- **Source** — every cell, slide table row or page reference the finding touches, with its
-  value as displayed and, for a spreadsheet, its formula or `typed` if there is none.
-- **Working** — the check's computation with the values substituted: the column summed, the
-  shares added, the formula re-evaluated against the typed value, the two dates compared.
-- **Rule applied** — the check family by number and name from `checks.md`, and the tier test
-  that fired first. This is what answers "why is that a blocker?".
-- **Would change the call** — e.g. "a stated £k rounding convention would disarm this", or
-  "if D14 agreed with its formula this would be Hygiene".
-
-A trace of the scope line itself ("what did you check for dates?") lists, for that family,
-what was examined and what each returned. That is how a clean verdict is audited.
+A trace re-opens the file and **corrects the list** if a finding doesn't reproduce. Pushback
+alone never moves a tier.
 
 ## Boundary with `whats-changed`
 

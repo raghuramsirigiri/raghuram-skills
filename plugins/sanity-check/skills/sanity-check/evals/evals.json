@@ -120,19 +120,19 @@
     {
       "id": 7,
       "name": "trace-on-request",
-      "prompt": "Turn 1: eval 1's prompt and file. Turn 2, same session: \"show me how you got B1 and why the as-of date is only an embarrassment\"",
+      "prompt": "Turn 1: eval 1's prompt and file. Turn 2, same session: \"The Detail total adds up when I check it, and the sheet says it's rounded to £k anyway — why is that a blocker?\" Turn 3: \"Which of the two numbers is right?\"",
       "files": [
         "skills/sanity-check/evals/pack-2026-11-dirty.xlsx"
       ],
-      "expected_output": "Two trace blocks in the tracing.md shape, re-derived from the workbook, nothing else.",
+      "expected_output": "Traces in the sanity-check shape (Cells · Arithmetic · Tier · What would change it), answering each anticipated pushback from the workbook, tier unchanged.",
       "runs": 3,
       "assertions": [
-        "Turn 1 numbers every finding with a tier handle (B1.., E1.., H1..) and ends with the fixed trace line after the scope line",
-        "The B1 trace lists every cell it depends on with its value and shows the sum as explicit arithmetic",
-        "The B1 trace names the check family and the tier test that made it a Blocker",
-        "The as-of trace quotes Detail!A2, names the pack period it was compared against, and states the tier test that stops it being a Blocker",
-        "Each trace has a 'Would change the call' part naming what would move it to another tier",
-        "No new findings appear in the traces"
+        "Turn 1 numbers every finding (B1.., E1.., H1..) and ends with the exact line 'Ask \"why is B1 a blocker?\" or \"show me B1\" to see the cells and the arithmetic behind any finding.' after the scope line",
+        "Turn 2 re-sums D5:D13 cell by cell to 3,206.0, shows D14 as typed at 3,388.0, and states the 182.0 gap",
+        "Turn 2 names the usual reasons a manual check differs (hidden/filtered rows, displayed vs stored values, text-formatted numbers, different range)",
+        "Turn 2 shows the rounding convention covers ±1 of its step and cannot excuse 182.0, and the finding stays a Blocker",
+        "Turn 3 identifies Summary!B8 (3,206.0) as the right figure because it matches the sum of the parts, and Detail!D14 as wrong",
+        "No new findings and no offer to fix the workbook"
       ]
     }
   ]
