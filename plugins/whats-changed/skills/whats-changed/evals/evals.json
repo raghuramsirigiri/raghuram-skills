@@ -130,6 +130,25 @@
         "Names where each unit label was read from",
         "Offers to proceed on a stated conversion rather than silently converting"
       ]
+    },
+    {
+      "id": 8,
+      "name": "trace-on-request",
+      "prompt": "Turn 1: eval 1's prompt and files. Turn 2, same session: \"how did you get the headline figure, and why is SMB Benelux in the table?\"",
+      "files": [
+        "skills/whats-changed/evals/sales-2026-08.xlsx",
+        "skills/whats-changed/evals/sales-2026-09.xlsx"
+      ],
+      "expected_output": "Two trace blocks in the tracing.md shape, arithmetic re-derived from the workbooks, nothing else.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 ends with the fixed trace line and nothing after it; drivers carry handles 1..n and flags F1..Fn",
+        "The headline trace sums the rows in both periods with cell locators and shows 1,783.2 as the row sum, noting the printed 1,785.8 was not used and why",
+        "The headline trace shows the change and percentage as explicit arithmetic (current − prior, change ÷ prior)",
+        "The Benelux trace shows the rate/volume split arithmetic with units and unit value for both periods",
+        "The Benelux trace names the materiality gate it passed, with the numbers substituted into the gate",
+        "The cause for Benelux stays quoted from the Note column and attributed; the trace adds no cause of its own"
+      ]
     }
   ]
 }

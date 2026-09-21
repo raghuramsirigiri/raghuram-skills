@@ -41,30 +41,32 @@ silence, unowned actions and vague dates, and the closed four-item list of what 
 
 ### 3. Write the tables and stop
 
-Two tables, then the flag list. Nothing before, nothing after.
+Two tables, then the flag list, then the fixed trace line. Nothing before, nothing else after.
 
 ```markdown
 ## Decisions (4)
 
 | # | Decision | Made by | Confidence |
 |---|----------|---------|------------|
-| 1 | Going with Northbeam for the migration, over Calyx, at ~11% higher cost | Sarah | explicit |
-| 2 | Launch moved to January — reverses the earlier call to hold December | Sarah | explicit |
-| 3 | Second analyst req frozen until Q1 | the room | inferred — nobody objected |
+| D1 | Going with Northbeam for the migration, over Calyx, at ~11% higher cost | Sarah | explicit |
+| D2 | Launch moved to January — reverses the earlier call to hold December | Sarah | explicit |
+| D3 | Second analyst req frozen until Q1 | the room | inferred — nobody objected |
 
 ## Commitments (3)
 
 | # | Who | What | By when |
 |---|-----|------|---------|
-| 1 | Priya | Revised cost model to Sarah | Thu 17 Sep |
-| 2 | — unassigned | Book the Northbeam kickoff | before end of month |
+| C1 | Priya | Revised cost model to Sarah | Thu 17 Sep |
+| C2 | — unassigned | Book the Northbeam kickoff | before end of month |
 
 ## Needs chasing (4)
-- Commitment 2 has no owner — someone has to claim it before the slot lapses.
-- Commitment 3's date is "end of the month" — never pinned.
-- Decision 3 rested on silence, not assent. Worth confirming in writing.
-- Decision 2 reversed an earlier call in the same meeting; anyone who left early still
+- C2 has no owner — someone has to claim it before the slot lapses.
+- C3's date is "end of the month" — never pinned.
+- D3 rested on silence, not assent. Worth confirming in writing.
+- D2 reversed an earlier call in the same meeting; anyone who left early still
   believes December holds.
+
+Ask "trace <handle>" to see how any line was reached.
 ```
 
 (Rows trimmed above for length — a real run lists every item the counts claim.)
@@ -93,8 +95,30 @@ Output lands in chat as copyable markdown. Write a file only if asked.
   chasing* line — unowned commitment, undated commitment, decision by silence, in-meeting
   reversal. Risks, concerns and things that merely seemed notable are commentary. Omit the
   section entirely when nothing qualifies.
-- **Quote on request.** Don't carry a quote column — it doubles the width and dilutes the
-  brevity. If the user asks where an item came from, cite the line verbatim.
+- **Trace on request, never inline.** Don't carry a quote column — it doubles the width and
+  dilutes the brevity. Handles (`D1`, `C1`) are always there; the working appears only when
+  asked. See *Tracing* below.
+
+## Tracing
+
+Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
+the four-part trace block. Handles here: `D` decisions, `C` commitments; a *Needs chasing*
+line is traced through the handle it names. What a trace contains for this skill:
+
+- **Source** — the exchange verbatim: every speaker turn that opened, closed or reversed the
+  option, with timestamp or line position. For a decision by silence, the proposal *and* the
+  turns that followed without objection.
+- **Working** — the two tests from `what-counts.md` and what each returned: was an option
+  closed, by whom; did a named person go on the hook. For a date, the resolution: meeting date
+  + phrase → date (`Tue 3 Mar` + "Friday" → Fri 6 Mar). For `— unassigned`, the turns that
+  came closest to an owner and why none of them counts.
+- **Rule applied** — the ruling in `what-counts.md` that admitted it, and for a flag, which of
+  the four triggers.
+- **Would change the call** — e.g. "an explicit 'agreed' from Sarah would make D3 explicit".
+
+A trace asked of something that *isn't* in the output ("why isn't the contractor idea a
+decision?") gets the same block for the near-miss: the turns, the test it failed, the
+ruling. That is explaining an omission, which is this skill's product.
 
 ## Testing
 

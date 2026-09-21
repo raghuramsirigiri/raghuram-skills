@@ -74,8 +74,8 @@ Those cases are the skill; do not improvise them.
 
 ### 5. Write it and stop
 
-A headline, then the tables. No preamble, no methodology section, no offer of further
-analysis.
+A headline, then the tables, then the fixed trace line. No preamble, no methodology section,
+no offer of further analysis — the working is available on request, not printed.
 
 ```markdown
 **Cost of service rose £41.2k (+6.8%) to £647.9k.** One line explains four fifths of it.
@@ -94,16 +94,18 @@ The deck rounds to £0.1k, so smaller movements aren't visible.
 |   | all other movements (7 rows) | 246.1 | 243.2 | −2.9 | −7% | none individually material |
 
 ## Structural changes (2)
-- `Observability` is new this month — £6.8k, no prior comparative.
-- `Legacy monitoring` has gone; it was £5.4k last month. It may have been absorbed into
+- S1 `Observability` is new this month — £6.8k, no prior comparative.
+- S2 `Legacy monitoring` has gone; it was £5.4k last month. It may have been absorbed into
   `Observability`, but nothing in either source says so.
 
 ## Flags (3)
-- The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted.
-- `E22` is a typed-in number, not part of the column formula — which is why that total
+- F1 The Costs tab totals £650.5k; the rows sum to £647.9k. £2.6k unaccounted.
+- F2 `E22` is a typed-in number, not part of the column formula — which is why that total
   doesn't reconcile.
-- Slide 6 carries the regional split as a picture, not a chart. Those numbers weren't
+- F3 Slide 6 carries the regional split as a picture, not a chart. Those numbers weren't
   readable; the underlying file is needed if that split matters.
+
+Ask "trace <handle>" to see how any line was reached.
 ```
 
 Note the first two flags: one typed-over cell fires two triggers — the total not reconciling,
@@ -143,6 +145,24 @@ negative. That is information, not a bug — which is why the column is not call
   would otherwise be wrong by 1000×. This is the one case worth refusing to report on.
 - **Output lands in chat** as copyable markdown. Write a file only if asked. Don't offer to
   chart it — the user has minutes before a meeting and wants sentences.
+
+## Tracing
+
+Read `references/tracing.md` — it is the contract for handles, the fixed closing line, and
+the four-part trace block. Handles here: `headline`, drivers by their rank (`1`, `2` …),
+`S` structural changes, `F` flags. What a trace contains for this skill:
+
+- **Source** — prior and current value for every row involved, each with its locator in its
+  own file, and the precision each source carries.
+- **Working** — change = current − prior; growth = change ÷ prior (or why there is none);
+  `% of total move` = change ÷ total change. Where a count and value exist, the rate/volume
+  split with both periods' units and unit value substituted. For the headline, the row sums
+  of both periods, and — if a printed total disagrees — both figures and which was used.
+  For `all other movements`, every member row with its change, summing to the aggregate.
+- **Rule applied** — the materiality gate it passed, with its numbers in the gate (or both
+  gates it failed, for a row in the aggregate), and its rank. For a flag, its trigger number
+  in `materiality.md`. A quoted cause stays quoted and attributed; the trace adds none.
+- **Would change the call** — e.g. "at the deck's £0.1m rounding this move would vanish".
 
 ## Testing
 

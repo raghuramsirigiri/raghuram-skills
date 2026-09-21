@@ -6,7 +6,9 @@
       "id": 1,
       "name": "quarterly-review-full",
       "prompt": "Here's the transcript from Tuesday's ops review. What did we actually decide?",
-      "files": ["skills/decisions-only/evals/transcript-quarterly-review.md"],
+      "files": [
+        "skills/decisions-only/evals/transcript-quarterly-review.md"
+      ],
       "expected_output": "Two tables and a flag list. Exactly 4 decisions and 3 commitments (4 accepted if the steering-call invite is counted separately — see the key's tolerated variance). None of the 4 planted near-misses present. No summary prose.",
       "runs": 3,
       "assertions": [
@@ -22,7 +24,8 @@
         "EXCLUDES the analyst reporting line (deferred offline)",
         "EXCLUDES the customer churn alignment (three assents, no option closed)",
         "Needs chasing carries exactly 4 flags: the unowned kickoff, Tom's unpinned end-of-month date, the decision made by silence, and the in-meeting reversal — no fifth flag for risks or concerns",
-        "No summary paragraph, attendee list, key themes or closing line anywhere in the output",
+        "No summary paragraph, attendee list, key themes or closing line anywhere in the output — the fixed line 'Ask \"trace <handle>\" to see how any line was reached.' is the only permitted text after the flags",
+        "Every decision and commitment row carries a handle (D1.., C1..)",
         "All three runs agree on the decision, commitment and flag counts"
       ]
     },
@@ -75,6 +78,24 @@
         "Reports no decisions",
         "Does not treat sequential assent as consensus on a course of action",
         "Does not emit a Needs chasing section — an agreed principle with no action is not one of the four flag triggers"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "trace-on-request",
+      "prompt": "Turn 1: eval 1's prompt and transcript. Turn 2, same session: \"trace D3, and why isn't the contractor idea in there?\"",
+      "files": [
+        "skills/decisions-only/evals/transcript-quarterly-review.md"
+      ],
+      "expected_output": "Two trace blocks in the tracing.md shape — Source, Working, Rule applied, Would change the call — and nothing else.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 ends with the fixed line 'Ask \"trace <handle>\" to see how any line was reached.' and nothing after it",
+        "D3's Source quotes the freeze proposal and the turns that followed it verbatim, with speaker labels",
+        "D3's Working names both what-counts tests and states that nobody objected, which is why confidence is 'inferred'",
+        "D3's Rule applied names the decision-by-silence ruling and the Needs chasing trigger it fired",
+        "The contractor near-miss gets its own block explaining which test it failed (proposal left hanging, no option closed)",
+        "No new decisions, commitments or flags appear in the traces, and no summary prose"
       ]
     }
   ]
