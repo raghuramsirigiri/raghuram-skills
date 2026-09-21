@@ -30,6 +30,9 @@ On a clean verdict, where there is no B1, the line reads instead:
 Ask "what did you check for <family>?" to see what was examined.
 ```
 
+Follow-up replies — the traces themselves — do **not** repeat it. It is said once, under the
+output, where the reader first needs it.
+
 ## The trace block
 
 ```markdown
@@ -53,7 +56,7 @@ Ask "what did you check for <family>?" to see what was examined.
 
 **What would change it**
 - If E12 were 300 it would be Hygiene (typed, but agreeing). A stated rounding convention
-  would not help: it covers ±1, not 18.
+  would not help: ±0.5 per figure is at most ±3.5 across seven rows, not 18.
 ```
 
 - **Cells** — every cell, range, slide table row or page the finding touches, with what it
@@ -76,11 +79,11 @@ Ask "what did you check for <family>?" to see what was examined.
 | --- | --- |
 | **"Why is B1 a blocker? It's tiny."** | The tier comes from the check, not the size: its row in the severity table, and the test that means someone may act on a false figure. Don't soften it because they pushed. |
 | **"It adds up when I check it."** | Recompute, cell by cell, and show it. Then name the usual reason two people get different sums: **hidden or filtered rows, displayed vs stored values, a text-formatted number, or a different range**. If they're right, **retract the finding** — first line, plainly. |
-| **"Which number is right?"** | For a cross-tab disagreement: the evidence for each (which one its parts sum to, which one is a formula) and the verdict — or, if nothing settles it, *"The file doesn't say which is right"*. |
+| **"Which number is right?"** | For a cross-tab disagreement: the evidence for each (which one its parts sum to, which one is a formula) and the verdict — or, if nothing settles it, *"The file doesn't say which is right"*. If findings already on the list sit inside the better-supported figure, name them **by handle** — not a new finding, and the reader needs it before quoting the number. |
 | **"Where exactly?"** / "Show me B1" | The full block. The cell list first — that is what they'll navigate to. |
 | **"What does this break?"** | What the defect feeds: the cells that reference it, and which printed figures are therefore wrong or blank. Name them; don't fix them. |
 | **"Why is the date only an embarrassment?"** | Check 8's tier and why: the numbers may be current, the label isn't — a reader will ask, but no one acts on a false figure. What would make it a Blocker (evidence the figures themselves are stale). |
-| **"It says rounded to £k — isn't that why?"** | What the convention covers (±1 of its step per figure, a few across a sum) against the gap found, as numbers. A convention disarms only what it covers. |
+| **"It says rounded to £k — isn't that why?"** | What the convention covers, as numbers: **half its step per figure** ("nearest £1k" → ±£0.5k), so at most *n* × half a step across a sum of *n* figures — then the gap, and the ratio. Do this arithmetic explicitly; it is the one readers check. A convention disarms only what it covers. |
 | **"Why is that one finding, not three?"** | One defect to fix: the cell, and the checks it trips as symptoms. Mirror case: two different typed cells would be two. |
 | **"Why didn't you flag X?"** | Which of the twelve families X would fall under and what that check returned — or that X is outside the twelve by design (formatting, plausibility, advice). |
 | **"You say it's clean — what did you actually check?"** | Per family on the scope line: what was examined (which totals, which share columns, which date cells) and what each returned. This is how a clean verdict is audited. |
