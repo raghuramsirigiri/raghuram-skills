@@ -105,6 +105,15 @@ finding, and never extend it to a line it wasn't written about.
   report **as a rename** under `Structural changes`. Reporting one gone plus one new
   invents movement equal to twice the line's value. If confidence is low, say so **and raise
   flag trigger 5**.
+
+  **Confidence is mechanical, not a feeling.** A rename is **confident — no flag** when the
+  row sits in the same position **and** either its count is identical or, with no count, its
+  value moved by less than the materiality gates would notice. Reworded or narrower-sounding
+  names (`North` → `Northern England`) do not lower confidence on their own; the figures
+  decide. It is **low-confidence — trigger 5** only when position matches but the figures
+  don't pin it (count differs, or no count and the value moved materially). `extraction.md`'s
+  qualifier rule is about an **explicit scope qualifier** — `(excl. NL)`, `ex-`, `only`,
+  `incl.` — which states a different population and is never matched at all.
 - **A rename you suspect but won't assert** — the labels differ, one side gives no figure to
   match on, or a source is truncated so the counterpart simply isn't shown. Say in
   `Structural changes` that the two may be related and that nothing in either source

@@ -60,7 +60,7 @@ Two tables, then the flag list, then the fixed trace line. Nothing before, nothi
 | C2 | — unassigned | Book the Northbeam kickoff | before end of month |
 
 ## Needs chasing (4)
-- C2 has no owner — someone has to claim it before the slot lapses.
+- C2 has no owner and no fixed date — someone has to claim it before the slot lapses.
 - C3's date is "end of the month" — never pinned.
 - D3 rested on silence, not assent. Worth confirming in writing.
 - D2 reversed an earlier call in the same meeting; anyone who left early still

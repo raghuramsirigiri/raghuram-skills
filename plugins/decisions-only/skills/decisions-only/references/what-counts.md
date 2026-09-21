@@ -77,7 +77,13 @@ name is worse than a blank because it stops anyone from chasing it.
 
 **Date implied, not stated.** Resolve relative dates against the meeting date if the
 transcript carries one — "Thursday" in a Tuesday 15 Sep meeting is Thu 17 Sep. With no
-meeting date, keep the phrase verbatim ("end of the month"). Never invent a specific date.
+meeting date, keep the phrase verbatim. Never invent a specific date.
+
+**Only a phrase naming a day resolves** — "Thursday", "tomorrow", "next Monday". A phrase
+naming a *window* — "end of the month", "by Q3", "in the next couple of weeks" — stays verbatim
+**even when the meeting date is known**, and fires *Needs chasing* trigger 2. Converting "end
+of the month" to 30 Sep invents a deadline nobody set; the speaker may mean the last working
+day, the month-end close, or roughly then.
 
 **Conditional decisions.** "If finance approves, we go with B." Record it with the
 condition attached, in the decision text. Dropping the condition converts a contingency
@@ -116,8 +122,8 @@ commentary. **Four triggers, and nothing else:**
 
 ### How to count and lay it out
 
-**One line per flagged item — never one line per trigger.** Walk the two tables in order,
-row by row. Any row hitting one or more triggers gets exactly one line, which names the
+**One line per flagged item — never one line per trigger.** Walk **Commitments first, then Decisions**,
+row by row — commitments are what gets chased, so they lead. Any row hitting one or more triggers gets exactly one line, which names the
 row by number and says what is wrong with it; a row hitting two triggers names both in
 that same line. The number in the heading is the number of *rows* needing attention, which
 is the number of things a reader has to chase.
