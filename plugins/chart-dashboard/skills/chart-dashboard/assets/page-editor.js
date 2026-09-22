@@ -94,6 +94,10 @@
     '.bar button.save{background:var(--pe-accent);font-weight:600}',
     '.bar button.save:hover:not(:disabled){background:#1f58e8}',
     '.bar .status.unsaved{color:#ffcf66}',
+    '.bar button.fmt{font-family:Georgia,serif;padding:6px 10px}',
+    '.bar button.fmt.b{font-weight:700}',
+    '.bar button.fmt.i{font-style:italic}',
+    '.bar button.fmt[aria-pressed=true]{background:var(--pe-accent)}',
     '.menu{position:relative}',
     '.menu .more{padding:6px 10px}',
     '.menu .list{position:absolute;bottom:calc(100% + 8px);right:0;background:#fff;color:#111;border-radius:8px;',
@@ -695,6 +699,8 @@
     }
     node.addEventListener('keydown', textKey);
     node.addEventListener('blur', textBlur);
+    if (h.rich) node.addEventListener('mouseup', updateFormatButtons);
+    if (h.rich) node.addEventListener('keyup', updateFormatButtons);
     node.focus();
     // A label or heading is usually retyped whole, so select it all; in a
     // paragraph the reader clicked where they want to change something.
@@ -718,11 +724,30 @@
     setMessage(h.rich
       ? 'Editing paragraph · Ctrl+B bold · Ctrl+I italic · click outside to finish'
       : 'Editing text · Enter to finish · Esc to cancel');
+    updateFormatButtons();
+  }
+  function applyFormat(cmd) {
+    if (!textEdit || !textEdit.rich) return;
+    textEdit.el.focus();
+    document.execCommand(cmd, false, null);
+    updateFormatButtons();
+  }
+  function updateFormatButtons() {
+    var active = !!textEdit && textEdit.rich;
+    ui.bold.hidden = !active;
+    ui.italic.hidden = !active;
+    if (!active) return;
+    try {
+      ui.bold.setAttribute('aria-pressed', document.queryCommandState('bold'));
+      ui.italic.setAttribute('aria-pressed', document.queryCommandState('italic'));
+    } catch (e) { /* queryCommandState unsupported: leave buttons usable, untoggled */ }
   }
   function textKey(e) {
     var node = textEdit.el;
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finishText(false); select(null); node.focus(); }
     else if (e.key === 'Enter' && !textEdit.rich) { e.preventDefault(); finishText(true); select(null); node.focus(); }
+    else if (textEdit.rich && (e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); applyFormat('bold'); }
+    else if (textEdit.rich && (e.ctrlKey || e.metaKey) && (e.key === 'i' || e.key === 'I')) { e.preventDefault(); applyFormat('italic'); }
   }
   function textBlur() {
     // Clicking the bar's Undo blurs the text first; commit so undo sees it.
@@ -734,6 +759,10 @@
     textEdit = null;
     t.el.removeEventListener('keydown', textKey);
     t.el.removeEventListener('blur', textBlur);
+    t.el.removeEventListener('mouseup', updateFormatButtons);
+    t.el.removeEventListener('keyup', updateFormatButtons);
+    ui.bold.hidden = true;
+    ui.italic.hidden = true;
     t.el.removeAttribute('contenteditable');
     var value = t.rich ? t.el.innerHTML : t.el.textContent;
     if (!keep) { Page.restore(t.before); setMessage(null); return; }
@@ -2075,6 +2104,10 @@
     ui.status = el('span', { class: 'status' });
     ui.undo = el('button', { title: 'Undo (Ctrl+Z)', onmousedown: function (e) { e.preventDefault(); }, onclick: undo }, ['Undo']);
     ui.redo = el('button', { title: 'Redo (Ctrl+Shift+Z)', onmousedown: function (e) { e.preventDefault(); }, onclick: redo }, ['Redo']);
+    ui.bold = el('button', { class: 'fmt b', hidden: true, title: 'Bold (Ctrl+B)', 'aria-pressed': 'false',
+      onmousedown: function (e) { e.preventDefault(); }, onclick: function () { applyFormat('bold'); } }, ['B']);
+    ui.italic = el('button', { class: 'fmt i', hidden: true, title: 'Italic (Ctrl+I)', 'aria-pressed': 'false',
+      onmousedown: function (e) { e.preventDefault(); }, onclick: function () { applyFormat('italic'); } }, ['I']);
     ui.save = el('button', { class: 'save', title: 'Save (Ctrl+S)', onmousedown: function (e) { e.preventDefault(); },
       onclick: function () { save(false); } }, ['Save']);
     ui.list = el('div', { class: 'list', hidden: true }, [
@@ -2082,7 +2115,7 @@
         el('small', { text: 'No editor, no draft marks: the file to share' })])
     ]);
     ui.bar = el('div', { class: 'bar', hidden: true, role: 'toolbar', 'aria-label': 'Page editor' }, [
-      ui.msg, ui.status, ui.undo, ui.redo, ui.save,
+      ui.msg, ui.status, ui.bold, ui.italic, ui.undo, ui.redo, ui.save,
       el('div', { class: 'menu' }, [
         el('button', { class: 'more', title: 'More', 'aria-label': 'More save options', onmousedown: function (e) { e.preventDefault(); },
           onclick: function () { ui.list.hidden = !ui.list.hidden; } }, ['\u22EF']),
