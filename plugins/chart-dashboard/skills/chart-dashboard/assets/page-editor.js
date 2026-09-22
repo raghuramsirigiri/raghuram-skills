@@ -1181,7 +1181,7 @@
     var ST = window.ChartConvert && window.ChartConvert.style;
     var T = window.Charts && Charts.theme;
     var opts = ST ? ST.options(entry.type, entry.config) : {};
-    if (!ST || !T || !(opts.colours || opts.highlight || opts.sort || opts.labels || opts.marks)) {
+    if (!ST || !T || !(opts.colours || opts.highlight || opts.sort || opts.labels || opts.marks || opts.fill)) {
       body.appendChild(el('p', { class: 'hint', text: 'A ' + name(entry.type).toLowerCase() + ' has no style settings you can change here.' }));
       return;
     }
@@ -1197,6 +1197,25 @@
         colourRow(body, sr.name || ('Series ' + (i + 1)), sr.color, 'series-' + i, function (col) {
           applyStyle(id, function (c) { return ST.seriesColour(c.type, c.config, i, col); });
         });
+      });
+    }
+
+    if (opts.fill) {
+      var FILLS = [['actual', 'Solid', 'Actual'], ['plan', 'Outline', 'Plan / budget'], ['forecast', 'Hatched', 'Forecast']];
+      body.appendChild(el('h4', { text: 'Fill' }));
+      body.appendChild(el('p', { class: 'hint', text: 'Shows whether a bar is a measured, planned or forecast number, using the IBCS convention.' }));
+      cfg.series.forEach(function (sr, i) {
+        var cur = ST.fillOf(entry.type, cfg, i);
+        var seg = el('div', { class: 'seg', role: 'group', 'aria-label': (sr.name || ('Series ' + (i + 1))) + ' fill' });
+        FILLS.forEach(function (f) {
+          seg.appendChild(el('button', { 'aria-pressed': String(f[0] === cur), title: f[2],
+            onclick: function () {
+              if (f[0] !== cur) applyStyle(id, function (c) { return ST.fill(c.type, c.config, i, f[0]); });
+            } }, [f[1]]));
+        });
+        body.appendChild(el('div', { class: 'row' }, [
+          el('span', { text: cfg.series.length > 1 ? (sr.name || ('Series ' + (i + 1))) : 'Fill style' }), seg
+        ]));
       });
     }
 

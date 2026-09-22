@@ -179,13 +179,32 @@ test('withData refuses added rows and keeps x-position categories', () => {
 
 test('style options follow the chart', () => {
   const o = (k, t) => CC.style.options(t || typeOf(k), FIXTURES[k]);
-  assert.deepStrictEqual(o('bar'), { sort: true, highlight: true, labels: true, colours: true, marks: true });
+  assert.deepStrictEqual(o('bar'), { sort: true, highlight: true, labels: true, colours: true, marks: true, fill: true });
   assert.strictEqual(o('column').sort, false, 'two series: no single order');
   assert.strictEqual(o('column').highlight, false);
+  assert.strictEqual(o('column').fill, true);
   assert.strictEqual(o('line').sort, false, 'a line keeps its order');
+  assert.strictEqual(o('line').fill, false, 'scenario fill only draws on bars');
   assert.strictEqual(o('donut').sort, true);
   assert.strictEqual(o('donut').colours, false);
-  assert.deepStrictEqual(o('sankey'), { sort: false, highlight: false, labels: false, colours: false, marks: true });
+  assert.strictEqual(o('donut').fill, false);
+  assert.deepStrictEqual(o('sankey'), { sort: false, highlight: false, labels: false, colours: false, marks: true, fill: false });
+});
+
+test('fill sets and clears a series’ scenario', () => {
+  const cfg = { xAxis: { categories: ['a', 'b'] },
+    series: [{ name: 's1', data: [1, 2] }, { name: 's2', data: [3, 4] }] };
+  assert.strictEqual(CC.style.fillOf('bar', cfg, 0), 'actual');
+  const planned = CC.style.fill('bar', cfg, 0, 'plan').config;
+  assert.strictEqual(planned.series[0].scenario, 'plan');
+  assert.strictEqual(CC.style.fillOf('bar', planned, 0), 'plan');
+  assert.strictEqual(planned.series[1].scenario, undefined, 'other series untouched');
+  const forecast = CC.style.fill('bar', planned, 0, 'forecast').config;
+  assert.strictEqual(forecast.series[0].scenario, 'forecast');
+  const back = CC.style.fill('bar', forecast, 0, 'actual').config;
+  assert.strictEqual(back.series[0].scenario, undefined);
+  assert.ok(CC.style.fill('line', cfg, 0, 'plan').error, 'line charts don’t draw scenario fill');
+  assert.ok(CC.style.fill('bar', cfg, 0, 'nonsense').error);
 });
 
 test('sort moves names, values and point colours together', () => {
