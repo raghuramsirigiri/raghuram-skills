@@ -977,6 +977,9 @@
   var HIGHLIGHTABLE = { column: 1, bar: 1, barList: 1 };
   var LABELLED = { column: 1, bar: 1, line: 1 };
   var COLOURED = { column: 1, bar: 1, line: 1, radar: 1, dumbbell: 1, barList: 1, scatter: 1, bubble: 1, barInsightTable: 1 };
+  // Scenario notation (IBCS): solid = actual, outlined = plan/budget, hatched
+  // = forecast/estimate. Only bars draw it, so only column and bar offer it.
+  var FILLABLE = { column: 1, bar: 1 };
 
   function styleOptions(type, config) {
     var ds = extract(type, config);
@@ -989,8 +992,31 @@
       labels: !!(cat && LABELLED[type]),
       colours: !!(COLOURED[type] && series.length >= 1),
       // Per-mark colours replace series colours where each mark has its own.
-      marks: !!marks(type, config)
+      marks: !!marks(type, config),
+      fill: !!(FILLABLE[type] && series.length >= 1)
     };
+  }
+
+  var SCENARIOS = ['actual', 'plan', 'forecast'];
+
+  /** Series i's current scenario: 'actual', 'plan' or 'forecast'. */
+  function fillOf(type, config, i) {
+    var s = config && config.series && config.series[i];
+    if (!s) return 'actual';
+    var v = s.scenario;
+    if (v === 'budget') return 'plan';
+    if (v === 'estimate') return 'forecast';
+    return SCENARIOS.indexOf(v) >= 0 ? v : 'actual';
+  }
+
+  /** Series i takes this scenario's fill; 'actual' clears it back to solid. */
+  function withFill(type, config, i, scenario) {
+    if (!styleOptions(type, config).fill || !config.series[i]) return { error: 'This chart can\'t use fill styles.' };
+    if (SCENARIOS.indexOf(scenario) < 0) return { error: 'Not a known fill.' };
+    var cfg = clone(config);
+    if (scenario === 'actual') delete cfg.series[i].scenario;
+    else cfg.series[i].scenario = scenario;
+    return { config: cfg };
   }
 
   // ── per-mark colours ───────────────────────────────────────────────
@@ -1153,6 +1179,7 @@
     tiles: { list: TILES, variant: tileVariant, set: setTileVariant },
     callouts: { anchors: calloutAnchors, list: calloutList, set: withCallouts },
     style: { options: styleOptions, sort: sortBy, highlight: highlight, highlighted: highlighted,
-      labels: withLabels, seriesColour: seriesColour, marks: marks, markColour: markColour } };
+      labels: withLabels, seriesColour: seriesColour, marks: marks, markColour: markColour,
+      fillOf: fillOf, fill: withFill } };
 
 });
