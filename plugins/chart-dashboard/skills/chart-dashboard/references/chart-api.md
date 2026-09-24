@@ -598,9 +598,9 @@ Charts.radar('container', {
 - **Center text**: `centerText: { value, label, valueFontSize, color }` — `color`
   tints the center value; set it to the focal wedge's color so the number and
   the wedge read as one statement (see `chart-selection.md` § Pie and donut).
-  **Always the object** — `centerText: 'Final mile'` is truthy but has no
-  `value`, so the ring silently prints its own total instead of the string.
-  Omitting `value` (or `centerText: true`) is how you ask for that total.
+  A bare string or number is shorthand for `value`
+  (`centerText: 'Final mile'`). Omitting `value` (or `centerText: true`) prints
+  the ring's own total.
 - **Legend**: auto-shown at the top below the subtitle whenever there are 2+ wedges, wraps to multiple rows for many categories. Force off with `legend: { enabled: false }` to fall back to connector labels around the donut.
 - **Value suffix**: `valueSuffix: '%'`
 - **Show percentages instead of raw values**: `showPercentages: true`

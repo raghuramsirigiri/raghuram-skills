@@ -659,7 +659,7 @@
         "innerSize",
         "startAngle/endAngle",
         "variableRadius",
-        "centerText",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
         "showPercentages"
       ],
       "notes": "The ring grows until the narrower axis binds, so it is safe in any cell. Auto-shows a legend at 2+ wedges, which makes it start lower than a legend-less neighbour.",
@@ -688,7 +688,7 @@
       "gridSpan": 1,
       "keyOptions": [
         "startAngle/endAngle",
-        "centerText",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
         "showPercentages"
       ],
       "notes": "Alias of donut with innerSize 0.",

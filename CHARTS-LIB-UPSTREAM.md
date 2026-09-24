@@ -10,7 +10,6 @@ the skill depends on.
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
 | 1 | Packed bubbles honour a point's own `color` | `engines/scatter.js` | applied in the skill copy | Editor Style tab, "Bubble colours" |
-| 2 | `centerText` accepts a bare string | `engines/pie.js` | proposed — not applied anywhere | Donut/pie center labels that are words, not a number |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -20,10 +19,11 @@ comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-note
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
-**Last synced** from `svg-charts` commit `185de6f` (2026-09-23,
-`charts-lib` 1.0.0: heatmap and calendarHeatmap, chart handles with
-`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation). See
-*Syncing the copy* at the bottom for how, and what to check afterwards.
+**Last synced** from `svg-charts` commit `c8588bd` (2026-09-23,
+`charts-lib` 1.0.0: `centerText` takes a bare string, formerly change 2 here;
+before it `185de6f`: heatmap and calendarHeatmap, chart handles with
+`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation).
+See *Syncing the copy* at the bottom for how, and what to check afterwards.
 
 ---
 
@@ -104,101 +104,6 @@ points (`[name, value]`) have no colour and keep today's behaviour.
   (the engine line is unchanged upstream, so the diff above still applies).
 - **`svg-charts`**: unchanged as of `185de6f`. Copying a fresh `charts.js`
   into the skill without re-applying this change removes per-bubble colours.
-
----
-
-## 2. `centerText` accepts a bare string
-
-<!-- check: proposed; file: charts.js; needle: Charts._centerText -->
-
-### Problem
-
-`plotOptions.pie.centerText` on `Charts.donut` / `Charts.pie` only honours an
-object. The center-label block reads `ct.value`, `ct.label`, `ct.color` and
-`ct.valueFontSize`, and falls back to the series total when `ct.value` is
-undefined. So a bare string is truthy, `ct.value` is undefined, and the ring
-prints its total instead of the string:
-
-```js
-// draws "100", not "Final mile"
-Charts.donut('el', { series: [...], plotOptions: { pie: { centerText: 'Final mile' } } });
-```
-
-Nothing warns; it just looks like a bug to the caller.
-
-### Why the skill needs it
-
-The center of a donut is where the skill puts the finding
-(`references/chart-selection.md` § Pie and donut), and that finding is often a
-word or a phrase, not a number. `centerText: 'Final mile'` is the obvious way
-to write it, and every other text-ish option in the library takes a string.
-
-### Change
-
-`charts-lib/engines/pie.js`, at the center label, plus a small normaliser next
-to the engine:
-
-```diff
-       // Center label
-       if (plotOpts.centerText) {
--        const ct = plotOpts.centerText;
-+        const ct = Charts._centerText(plotOpts.centerText);
-```
-
-```js
-/*
- * centerText accepts the full object, or a bare string/number as shorthand for
- * { value }. `true` (and any other non-object) keeps the old behaviour: no
- * value of its own, so the ring's total is drawn.
- */
-Charts._centerText = function (ct) {
-  if (ct && typeof ct === 'object') return ct;
-  if (typeof ct === 'string' || typeof ct === 'number') return { value: ct };
-  return {};
-};
-```
-
-Placed immediately after the donut IIFE (`Charts.donut = Chart; })();`) so
-`Charts.pie`, which delegates to `Charts.donut`, gets it too.
-
-Behaviour is otherwise unchanged: the object form passes through untouched, and
-`centerText: true` — or an object without `value` — still prints the ring's
-total.
-
-### Apply and verify
-
-1. Make both edits above in `svg-charts/charts-lib/engines/pie.js`.
-2. Rebuild and run the library tests:
-   ```bash
-   cd svg-charts/charts-lib
-   node _build.js
-   node --test test/*.test.js
-   ```
-3. Suggested new test: `Charts._centerText` maps `'Final mile'` and `42` to `{ value }`, passes an object through, and
-   returns `{}` for `true` and `undefined` so the total fallback survives.
-4. Worth adding to the README's donut section: *`centerText` takes
-   `{ value, label, valueFontSize, color }`, or a bare string/number as
-   shorthand for `value`; omit `value` to print the ring's total.*
-5. Re-sync the skill's copy as in change 1.
-6. Remove this section and its table row, and update the `centerText` bullet in
-   `references/chart-api.md` — it currently warns callers off the bare string.
-
-### Also worth doing upstream
-
-The donut and pie `keyOptions` in `charts.manifest.json` list `centerText` by
-name only, which is what let the object shape go unnoticed. Spell it out
-there: `centerText: { value, label, valueFontSize, color }, or a bare
-string/number for value; omit value for the ring total`. The manifest is
-generated upstream, so it has to change there, not in the skill's copy.
-
-### Current state
-
-- **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
-  unchanged — the bare string still prints the ring total.
-- **`svg-charts`**: unchanged as of `185de6f`.
-- **Skill docs**: `references/chart-api.md` warns callers to always use the
-  object form, and says what the bare string does instead. That warning is
-  what to delete once this lands upstream.
 
 ---
 
