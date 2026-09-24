@@ -16,8 +16,8 @@
  *                                                  histogramCumulative
  *   xy           points                           scatter, bubble
  *
- * sankey, reportTable, barInsightTable, panels and geofacet have no
- * neighbours: their data means nothing in another shape. They can still be
+ * sankey, reportTable, barInsightTable, panels, geofacet, heatmap and
+ * calendarHeatmap have no neighbours: their data means nothing in another shape. They can still be
  * edited in place, just not switched.
  *
  * targets() only applies structural rules (series count, category count,
@@ -38,7 +38,8 @@
   var NO_GAPS = { radar: 1, dumbbell: 1, barList: 1, donut: 1, pie: 1, waffle: 1, packedBubble: 1 };
   var VALUES = ['histogram', 'histogramPercent', 'histogramCumulative'];
   var XY = ['scatter', 'bubble'];
-  var FIXED = ['sankey', 'reportTable', 'barInsightTable', 'panels', 'geofacet'];
+  var FIXED = ['sankey', 'reportTable', 'barInsightTable', 'panels', 'geofacet',
+    'heatmap', 'calendarHeatmap'];
 
   // Keys every chart understands. Anything else at the top level belongs to
   // the source type and is reported as lost when switching away.

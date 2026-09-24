@@ -16,11 +16,20 @@
     "  minWidth    below this, labels crowd",
     "  minHeight   below this, the chart stops being readable",
     "  gridSpan    tracks to occupy in a multi-column grid; never span every track",
-    "  api         what the returned handle answers to; every chart has redraw,",
-    "              destroy and getData, plus anything particular to that engine",
+    "  api         what the returned handle answers to; every chart has redraw, update,",
+    "              on, off, toSVG, toPNG, destroy and getData, plus anything particular to that engine",
     "  notes       the one thing a caller most often gets wrong"
   ],
   "version": 1,
+  "events": {
+    "$comment": "Subscribe with handle.on(type, fn) or config.events: { type: fn }. Listeners survive resizes and update().",
+    "render": "{ reason: init | resize | fonts | update }",
+    "hover": "{ name, series?, index?, ...values } once per mark the pointer enters; shared-tooltip charts give points[]",
+    "hoverEnd": "the detail of the hover that ended",
+    "click": "the hover detail of what was clicked; nothing over empty space",
+    "legendToggle": "{ series, visible, index }",
+    "destroy": "{}"
+  },
   "plotBox": {
     "left": 62,
     "right": 20,
@@ -58,8 +67,13 @@
       "notes": "Dates as categories are accepted; names are not.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries",
         "addPoint",
         "shift"
@@ -84,8 +98,13 @@
       "notes": "Category labels are never dropped; crowding is solved by wrapping, staggering then rotating.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -106,8 +125,13 @@
       "notes": "Its value axis is labelled ABOVE the plot, so it reserves topAxisBand and its left gutter is sized to its row labels. Its plot therefore starts lower and further right than the other axis charts.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -131,8 +155,13 @@
       "notes": "Long category names are free here — they are not squeezed into a left gutter.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "dumbbell": {
@@ -160,8 +189,13 @@
       "notes": "Rows pair up by position, not by name.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "histogram": {
@@ -189,8 +223,13 @@
       "notes": "null, '' and booleans are counted out rather than coerced, and named in a footnote. Bars touch because the axis is continuous.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -218,8 +257,13 @@
       "notes": "Identical to histogram except the y-axis.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -245,8 +289,13 @@
       "notes": "Y-axis always runs 0 to 100%.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -279,8 +328,13 @@
       "notes": "The value axis always includes zero: every bar is read against it, and a cropped axis would make the totals misreport their own size.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSteps",
         "getTotal"
       ]
@@ -317,10 +371,96 @@
       "notes": "Every column shares one pixels-per-unit scale, so node heights compare across columns; a node is as tall as the larger of its in- and outflow, and whatever a stage receives but does not pass on flows into a counter-coloured 'Unaccounted' node in the next column, with its amount and share.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getLinks",
         "getNodes"
+      ]
+    },
+    "heatmap": {
+      "purpose": "A value per cell of a grid whose two directions are ordered — hour × weekday, week × cohort, bin × bin — drawn as colour, so the pattern is the reading.",
+      "data": "series[0].data as [x, y, value] or { x, y, value }, x and y a category name or its index; xAxis.categories name the columns left to right, yAxis.categories the rows top to bottom",
+      "requires": [
+        "exactly one series",
+        "xAxis.categories and yAxis.categories, in reading order",
+        "at most one value per cell"
+      ],
+      "refuses": [
+        "more than one series — a cell holds one colour, so a second series would paint over the first; one heatmap per measure in panels",
+        "two values for the same cell — the chart would show whichever came last; aggregate first",
+        "a non-numeric value — null means no data and is drawn as an empty outline, never as zero",
+        "a cell naming a row or column not in the categories"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 25+ columns",
+      "keyOptions": [
+        "colorAxis.min/max (pin the domain so two heatmaps share a scale)",
+        "plotOptions.heatmap.color (one hue instead of the ramp)",
+        "plotOptions.heatmap.upColor|downColor (the diverging pair)",
+        "plotOptions.heatmap.dataLabels: false",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false (hides the colour key)",
+        "plotOptions.heatmap.autoHeight"
+      ],
+      "notes": "Colour is the least precise encoding there is: use this for the pattern across ordered rows and columns. Two sets of unrelated names is table with highlight: scale, which prints the numbers — validate() warns. Values crossing zero diverge through aboveThreshold/belowThreshold, the same scale table uses. In-cell numbers are drawn only when every one of them fits.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "calendarHeatmap": {
+      "purpose": "One cell per day — weeks as columns, weekdays as rows — so weekly rhythm and the days that broke it show at a glance.",
+      "data": "series[0].data as [date, value] or { date, value }; date a timestamp, a Date, or \"YYYY-MM-DD\"",
+      "requires": [
+        "exactly one series",
+        "daily values — at most one per day",
+        "at most four calendar years"
+      ],
+      "refuses": [
+        "more than one series — one heatmap per measure in panels",
+        "two values for the same day — aggregate first",
+        "values weekly or coarser — a calendar would be mostly empty days; use line with a datetime axis, or column",
+        "more than four calendar years — each day becomes a speck; use line, or one calendarHeatmap per year in panels"
+      ],
+      "selfSizing": true,
+      "aspect": "grid",
+      "minWidth": 480,
+      "minHeight": 200,
+      "gridSpan": 2,
+      "gridSpanWhen": "1 for three months or less",
+      "keyOptions": [
+        "plotOptions.heatmap.weekStart: 1 (Monday) | 0 (Sunday)",
+        "plotOptions.heatmap.cellSize (largest day, default 30)",
+        "colorAxis.min/max",
+        "plotOptions.heatmap.color",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false"
+      ],
+      "notes": "Days stay square, so a calendar fills the WIDTH and sits at the top of a tall box; give it no height and it grows to its bands. Up to a year of data is one continuous band of whole months; longer spans take a band per calendar year. Days with no value are drawn as empty outlines, never as zero; days outside the data's range (a band's lead-in and run-out) take a faint fill and no outline. A Date object is read in local time, a timestamp in UTC.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "table": {
@@ -354,8 +494,13 @@
       "notes": "Numbers are never truncated: headers and row labels wrap, and a table wider than its container scrolls sideways. A blank is drawn as a dash and left out of the colour scale — it is not zero.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getRows"
       ]
     },
@@ -391,8 +536,13 @@
       "notes": "Chart cells drop their own title and legend; named series are shown once above the table. line/column/bar/dumbbell cells in one column share a value scale unless sharedScale: false.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getRows",
         "charts"
       ]
@@ -416,8 +566,13 @@
       "notes": "Four columns of content need the width; with 2+ series the stat writes itself as the change from first to last.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "waffle": {
@@ -442,8 +597,13 @@
       "notes": "Spare height grows the DOT, not the gaps — the value is the number of dots, and a dot is one unit at any size.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "radar": {
@@ -473,8 +633,13 @@
       "notes": "The scale starts at zero and is shared by every axis — on a radial scale a cropped baseline multiplies the AREA of a difference, and per-axis scales make the shape meaningless. Mixed units want normalising to a common index first. Past ~4 series the polygons overlap into mush; use panels of small radars instead.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -500,8 +665,13 @@
       "notes": "The ring grows until the narrower axis binds, so it is safe in any cell. Auto-shows a legend at 2+ wedges, which makes it start lower than a legend-less neighbour.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "pie": {
@@ -524,8 +694,13 @@
       "notes": "Alias of donut with innerSize 0.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "scatter": {
@@ -547,8 +722,13 @@
       "notes": "Point labels only draw for points that carry a name.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -568,8 +748,13 @@
       "notes": "z maps to AREA, not radius.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -587,8 +772,13 @@
       "notes": "Cluster positions are settled by simulation and move slightly between renders.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -616,8 +806,13 @@
       "notes": "Tiles stay square and cap at maxTileSize, centring the leftover as margin, so it fits a single cell at 480px and does not need extra width.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "panels": {
@@ -643,8 +838,13 @@
       "notes": "Prefer this over a hand-rolled grid when charts belong together. panelHeight reaches the self-sizing types too, so a row's panels end on one line.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "charts",
         "panels"
       ]

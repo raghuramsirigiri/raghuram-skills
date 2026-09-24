@@ -354,8 +354,8 @@ visible to whoever receives it.
   The library places each box where it covers nothing. A line pins by
   category index (`x`), a scatter by `x` and `y`, a histogram by a value
   inside the bin, and everything else by `name`. Inner charts of a panels
-  chart get their own Callouts tab. Tables, report tables and sankey have
-  no callouts in the library, so they show no tab.
+  chart get their own Callouts tab. Tables, report tables, sankey and the
+  heatmaps have no callouts in the library, so they show no tab.
 - **Stale titles.** Once a chart's data changes, its panel warns that the
   title may no longer describe it, until the title is edited or the warning
   is dismissed.
@@ -436,7 +436,7 @@ are offered:
 | Bridge steps | waterfall → any type above (totals become plain values); never back |
 | Raw values | histogram, histogramPercent, histogramCumulative |
 | Points | scatter ↔ bubble (bubble only when every point has a size) |
-| — | sankey, reportTable, barInsightTable, panels, geofacet: can't become another type (see below for what each can change) |
+| — | sankey, reportTable, barInsightTable, panels, geofacet, heatmap, calendarHeatmap: can't become another type (see below for what each can change) |
 
 A candidate is refused, with a reason the editor shows, when:
 - the data's shape rules it out: one-series charts need one series, a dumbbell
