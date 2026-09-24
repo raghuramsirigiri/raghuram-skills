@@ -50,7 +50,9 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 
 ## Non-negotiables
 
-- `theme.js` must load **before** `charts.js`. Reversed, nothing renders.
+- `theme.js` must load **before** `charts.js`. Reversed, `charts.js` starts on
+  its built-in defaults and logs a missing-theme warning; keep the order so the
+  page's theme is in place before any chart code runs.
 - Donut and pie options (`centerText`, `valueSuffix`, `variableRadius`,
   `startAngle`/`endAngle`, `showPercentages`) live under `plotOptions.pie`, not
   at the top level. At the top level they are silently ignored.

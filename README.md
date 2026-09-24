@@ -243,7 +243,7 @@ no network needed.
 
 ### Dashboard — [`logistics-network-dashboard/`](examples/logistics-network-dashboard/)
 
-A quarterly operations dashboard in one standalone file (719 KB, library inlined):
+A quarterly operations dashboard in one standalone file (770 KB, library inlined):
 a geofacet tile map of on-time delivery by US state, a cost-per-parcel waterfall
 bridge, a Sankey of parcel flow through the hubs, a histogram of time in network,
 waffle grids, a dumbbell of hub dwell before and after, a 100% stacked column of
@@ -281,6 +281,7 @@ category comparisons, funnel and cohort views, and a full-width composition pane
 | Histogram | counts, percentage, and cumulative distributions |
 | Waterfall | running total built from positive and negative steps |
 | Sankey | flows between stages |
+| Heatmap | a value per cell of two ordered dimensions (hour × weekday, cohort × week); a calendar heatmap of one value per day |
 | Radar | several measures per item on shared spokes |
 | Column & bar | grouped, stacked, 100% stacked, range, pyramid, 3D, population pyramid |
 | Bar list | axis-free ranked bars, label above each bar, sortable, negative values |
@@ -294,8 +295,9 @@ category comparisons, funnel and cohort views, and a full-width composition pane
 | Panels | a compositor, not an engine: several charts under one shared title as a single exhibit |
 
 Every chart is inline SVG with native tooltips, hover highlighting, and clickable
-legends. Donut wedges explode on click; line charts zoom by drag. No canvas, no
-framework.
+legends. Donut wedges explode on click; line charts zoom by drag. Charts animate in
+on first draw (not under reduced motion), and every chart can be reached and walked
+from the keyboard. No canvas, no framework.
 
 ## Theming and brand colors
 
@@ -349,8 +351,8 @@ types read as one family. Method and rationale in
 
 ### What are the dependencies?
 
-None. The chart library — `charts.js`, `theme.js`, and `charts.css`, about 720 KB
-unminified (~200 KB gzipped) — is inlined into the page as the last build step, so
+None. The chart library — `charts.js`, `theme.js`, and `charts.css`, about 760 KB
+unminified (~210 KB gzipped) — is inlined into the page as the last build step, so
 you get one standalone HTML file with no sibling folder. There is no npm install, no
 CDN script tag, no build step, and no framework. Open the file in any browser from
 the last decade and it renders.
@@ -487,11 +489,11 @@ needed.
 ## Known limitations
 
 - **Chart families.** Line, bar/column, bar list, dumbbell, histogram, waterfall,
-  Sankey, radar, tables, bar insight table, waffle, donut/pie, scatter, bubble, and
-  geofacet, plus a `panels` compositor that groups several of them under one title.
-  Geofacet covers region-by-region data on a tile grid (US states built in, custom
-  grids supported), but there are no true geographic maps, and no treemaps,
-  heatmaps, or Gantt charts yet.
+  Sankey, heatmap and calendar heatmap, radar, tables, bar insight table, waffle,
+  donut/pie, scatter, bubble, and geofacet, plus a `panels` compositor that groups
+  several of them under one title. Geofacet covers region-by-region data on a tile
+  grid (US states built in, custom grids supported), but there are no true
+  geographic maps, and no treemaps or Gantt charts yet.
 - **No live data.** Charts render from data baked into the file. There's no live
   data binding or auto-refresh — regenerate the page (or edit an editable one) when
   the numbers change.

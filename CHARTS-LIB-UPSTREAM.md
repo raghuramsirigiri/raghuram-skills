@@ -20,6 +20,11 @@ comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-note
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
+**Last synced** from `svg-charts` commit `185de6f` (2026-09-23,
+`charts-lib` 1.0.0: heatmap and calendarHeatmap, chart handles with
+`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation). See
+*Syncing the copy* at the bottom for how, and what to check afterwards.
+
 ---
 
 ## 1. Packed bubbles honour a point's own `color`
@@ -84,21 +89,21 @@ points (`[name, value]`) have no colour and keep today's behaviour.
    keep their gradient fills.
 4. Worth adding to the README's packed-bubble section: *a point's `color`
    overrides the size gradient (one series) or the series colour (several)*.
-5. Re-sync the skill's copy and confirm it matches:
-   ```bash
-   cp svg-charts/charts-lib/charts.js claude-chart-dashboard/plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js
-   ```
-   After that, `diff -rq` between the two `charts-lib` folders should report
-   only the files that exist upstream alone (README, engines, tests, and so
-   on).
+5. Re-sync the skill's copy (*Syncing the copy* below) and confirm it
+   matches: after that, `diff -rq` between the two `charts-lib` folders
+   should report only the files that exist upstream alone (README, engines,
+   tests, `esm/`, `types/`, `charts.bundle.js`, `charts.min.js`,
+   `charts.d.ts`, and so on).
 6. Remove this section from this note.
 
 ### Current state
 
 - **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
-  includes the change, committed on `feat/editable-pages` as `7582126`.
-- **`svg-charts`**: unchanged. Rebuilding there and copying `charts.js` into
-  the skill before applying this change would remove per-bubble colours.
+  includes the change. First committed on `feat/editable-pages` as
+  `7582126`, and re-applied by hand after the sync to `svg-charts` `185de6f`
+  (the engine line is unchanged upstream, so the diff above still applies).
+- **`svg-charts`**: unchanged as of `185de6f`. Copying a fresh `charts.js`
+  into the skill without re-applying this change removes per-bubble colours.
 
 ---
 
@@ -190,12 +195,44 @@ generated upstream, so it has to change there, not in the skill's copy.
 
 - **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
   unchanged — the bare string still prints the ring total.
-- **`svg-charts`**: unchanged.
+- **`svg-charts`**: unchanged as of `185de6f`.
 - **Skill docs**: `references/chart-api.md` warns callers to always use the
   object form, and says what the bare string does instead. That warning is
   what to delete once this lands upstream.
 
 ---
+
+## Syncing the copy
+
+The skill vendors four files, not upstream's one-file `charts.min.js`: the
+templates, `scripts/inline-lib.js`, `scripts/finalize.js` and the theming
+scripts all expect `theme.js` and `charts.js` separately, so a brand theme can
+be applied between them.
+
+```bash
+U=svg-charts/charts-lib
+S=claude-chart-dashboard/plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib
+(cd $U && node _build.js && node --test test/*.test.js)
+cp $U/charts.js $U/theme.js $U/charts.css $U/charts.manifest.json $S/
+```
+
+Then, in this repo:
+
+1. Re-apply every section above marked *applied in the skill copy*, and run
+   `node --test plugins/chart-dashboard/skills/chart-dashboard/tests/*.test.js`.
+   `upstream-notes.test.js` fails if an applied change went missing, or if a
+   proposed one has landed upstream (then delete its section).
+2. Read upstream's `git log` and the diff of its agent docs
+   (`.agents/skills/charts-lib/`) and `README.md` since the last sync, and
+   carry anything a page author needs into `references/chart-api.md`,
+   `references/chart-selection.md` and the manifest-driven parts of the
+   editor (`assets/chart-convert.js`, `assets/page-editor.js`). A new chart
+   type needs a selection entry, not just an API entry.
+3. Refresh the copies under `examples/`: the staged `charts-lib/` folders
+   get the same files, and the inlined pages get the new `charts.js` in
+   place of the old `<script>` block. Open each and check it draws with no
+   console errors.
+4. Update **Last synced** at the top of this note.
 
 ## Recording a new change
 

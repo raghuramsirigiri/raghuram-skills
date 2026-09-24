@@ -41,6 +41,8 @@ table to see them against each other.
 | `radar` | Named axes, **three minimum**, shared by every series | Numbers on **one scale from a common centre** | Fewer than three axes draws a refusal panel naming `column`/`dumbbell` |
 | `waterfall` | Named steps, in order, one series | Signed numbers; `{isSum:true}` totals the engine computes | Refusal panel on 2+ series or a declared total that doesn't match its steps; a blank step shifts every later bar |
 | `sankey` | `[from, to, weight]` links, one series, forward-only | Weights ≥ 0 | Refusal panel on negative weights, self-links, loops |
+| `heatmap` | `[x, y, value]` cells, one series; **both** `xAxis.categories` and `yAxis.categories`, and both directions **ordered** (hour × weekday, cohort × week) | Numbers; `null` or an absent cell means no data and is drawn as an empty outline | Refusal panel on a second series, two values for one cell, a non-number, or a cell naming a row/column not in the categories; `validate()` warns on ≤24 cells or two unordered axes |
+| `calendarHeatmap` | `[date, value]`, **one value per day**, one series, ≤4 years | Numbers; `null` = no data | Refusal panel on weekly-or-coarser values (use `line`), two values for one day, or a span over four years |
 | `reportTable` | Rows, with typed columns (`text`/`insight`/`kpi`/`chart`) | Per column kind | Refusal panel on a missing `kind`, a `number` kind, or an exhibit-type chart column |
 | `waffle` | Named categories, each a share of the *same* whole | Non-negative numbers ≤ `total` | Negatives silently clamped to zero |
 | `donut`, `pie` | Named categories that sum to a whole | Positive numbers only | Negative/non-finite wedges dropped, console warning, footnote |
@@ -114,6 +116,8 @@ loses data. Use a column chart with `negativeColor` instead.
 | Many rows, each needing a mini-chart, a sentence **and** a number | report table | `Charts.reportTable` — the scorecard/QBR page in one exhibit |
 | How a total moved from A to B through signed contributions | waterfall | `Charts.waterfall` + `{isSum:true}` for the closing total |
 | Where an amount flows — splits, merges, drop-off across stages | sankey | `Charts.sankey` (`stages` for column headers); give it 2 grid tracks |
+| A value per cell of two **ordered** dimensions — hour × weekday, weeks since sign-up × cohort | heatmap | `Charts.heatmap` — both axes' `categories`, in reading order |
+| One value per **day**, where the weekly rhythm or the odd day out is the finding | calendar heatmap | `Charts.calendarHeatmap` — daily data only; weekly or coarser is a `line` |
 | A proportion the reader should *feel* ("29 in 100") | waffle | `Charts.waffle` — survey shares, adoption rates; a bar compares lengths, a waffle counts units |
 | Composition over time | stacked columns | `Charts.column` + `plotOptions.column.stacking:'normal'` |
 | Share-of-total over time | 100% stacked | `stacking:'percent'` |
@@ -193,6 +197,17 @@ title.
   stages, or the drop-off per stage is the story — its "Unaccounted" node shows
   loss for free. A single linear conversion path with no branching reads faster
   as a ranked `barList`.
+- **Heatmap vs. table vs. line.** Colour is the least precise encoding the
+  library has, so a heatmap earns it only where *position already means
+  something* and the pattern across neighbouring cells is the finding (busy
+  afternoons, a cohort that decays faster). Use `heatmap` when **both**
+  directions are ordered, and `calendarHeatmap` for one value per day when the
+  weekly rhythm matters. If either axis is a set of unrelated names (products ×
+  regions), or the grid is small, use `Charts.table` with `highlight: 'scale'`:
+  the same colour scale, and it prints the numbers. Weekly or coarser values,
+  or a question about the trend rather than the rhythm, are a `line`. The tell:
+  if you would sort the rows or columns to make it readable, the order is doing
+  no work — it is a table.
 
 ## Anti-patterns
 

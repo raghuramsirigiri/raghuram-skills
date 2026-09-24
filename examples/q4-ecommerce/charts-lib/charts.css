@@ -1,11 +1,28 @@
 /* Base theme for the charts library — clean-charts (cream + Inter).
  *
- * The background color below (#f4f3f0) matches Charts.theme.bg.
- * At runtime the JS overrides container.style.background, so changing
- * Charts.theme.bg is sufficient — this CSS is a progressive-enhancement
- * fallback for the brief moment before the script executes.
+ * The background below matches Charts.theme.bg, which is derived from palette
+ * n0 in theme.js. Keep the two in step: this is the shade painted before the
+ * script runs, so a mismatch shows as a flash. A test fails if they diverge.
+ *
+ * At runtime the JS sets container.style.background, so changing
+ * Charts.theme.bg is sufficient — this file is only what the page shows in the
+ * moment before the script executes.
+ *
+ * The font is deliberately NOT imported here. An @import for Inter made every
+ * page that loads this stylesheet block first paint on a third-party request,
+ * fail in an offline or air-gapped build, and log a console error behind a
+ * strict CSP — all for a font the host page is better placed to decide about.
+ * Load it yourself if you want it:
+ *
+ *   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ *   <link rel="stylesheet"
+ *         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+ *
+ * or self-host it, or set Charts.theme.font to something already on the page.
+ * Without it the charts fall back to Segoe UI / Arial and still lay out
+ * correctly, because text is measured against whichever font is actually in
+ * use rather than an assumed one.
  */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
 .charts-body {
     font-family: 'Inter', 'Segoe UI', Arial, Helvetica, sans-serif;
@@ -14,5 +31,5 @@
 .charts-container {
     width: 100%;
     height: 500px;
-    background: #f4f3f0;
+    background: #f4f4f0;
 }

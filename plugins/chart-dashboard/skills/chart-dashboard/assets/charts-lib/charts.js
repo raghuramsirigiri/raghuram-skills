@@ -1,12 +1,13 @@
 /*!
  * charts.js — unified chart library (clean-charts theme)
  *
- * Combines four chart engines under a single Charts namespace:
+ * Combines the chart engines under a single Charts namespace:
  *   Charts.line(container, config)              — line, spline, step
  *   Charts.column(container, config)            — vertical columns; grouped, stacked, range, pyramid, 3D
  *   Charts.bar(container, config)               — horizontal bars; groups + stacks + population pyramid
  *   Charts.barList(container, config)           — axis-free horizontal bars, category label above each bar
  *   Charts.barInsightTable(container, config)   — rows of bars + insight text + a large change/summary stat
+ *   Charts.geofacet(container, config)          — small multiples laid out on a geographic grid
  *   Charts.waffle(container, config)            — part-of-whole dot-grid panels with headline stat + caption
  *   Charts.dumbbell(container, config)          — one row per category: two dots joined by a rod (the gap between two states)
  *   Charts.histogram(container, config)           — raw numbers binned and counted
@@ -14,6 +15,8 @@
  *   Charts.histogramCumulative(container, config) — the same bins as a running share (ogive)
  *   Charts.waterfall(container, config)         — a bridge: opening balance, signed steps, closing total
  *   Charts.sankey(container, config)            — where an amount goes: nodes in columns, bands as thick as the flow
+ *   Charts.heatmap(container, config)           — a value per cell of two ordered dimensions (hour × weekday), as colour
+ *   Charts.calendarHeatmap(container, config)   — one cell per day: weeks as columns, weekdays as rows
  *   Charts.table(container, config)             — exact numbers in rows and columns, grouped, cells coloured by value
  *   Charts.reportTable(container, config)       — a table whose columns are numbers, prose, insights, KPIs or charts
  *   Charts.panels(container, config)            — up to 4 charts of any type side by side under one shared title
@@ -32,9 +35,12 @@
  * callout placement subsystem) live once in engines/_shared.js and are
  * emitted at the top of this bundle as window.ChartsShared.
  *
- * Load theme.js BEFORE this file in the page so Charts.theme exists.
- * Edits to theme.js take effect on next page load — no rebuild needed.
+ * Load theme.js before this file to apply the design system, or load
+ * charts.bundle.js (theme + library in one file) or charts.min.js instead.
+ * Without a theme the charts draw with the built-in defaults.
  */
+var Charts = window.Charts = window.Charts || {};
+
 // --- shared helpers ---
 
 /*!
@@ -197,8 +203,36 @@
   function createLifecycle(container) {
     const listeners = [];
     let destroyed = false;
+    // The chart's own events go to the emitter on the handle the caller holds,
+    // looked up by container so an engine's internal redraw — which builds a
+    // new lifecycle — still reaches it. A chart drawn inside another (a panel,
+    // a reportTable cell) has no handle of its own, so its events go to the
+    // chart being built around it.
+    const emitter = (container && typeof container === 'object' && emitters.get(container)) ||
+      currentEmitter;
+    let hovered = null, hoveredKey = null;
     return {
       container: container,
+      /** Tell whoever subscribed through the handle's on(). */
+      emit: function (type, detail) {
+        if (emitter && !destroyed) emitter.emit(type, detail || {});
+      },
+      /**
+       * Report what the pointer is over, or null when it leaves the marks.
+       * Engines call this on every mousemove; only a change is announced, so a
+       * listener hears one `hover` per mark rather than one per pixel.
+       * `detail` is { name, series?, value?, index?, points? }.
+       */
+      hover: function (detail) {
+        const key = detail
+          ? [detail.index, detail.series, detail.name].join('|') : null;
+        if (key === hoveredKey) { hovered = detail; return; }
+        if (hovered) this.emit('hoverEnd', hovered);
+        hovered = detail || null;
+        hoveredKey = key;
+        if (hovered) this.emit('hover', hovered);
+      },
+      get hovered() { return hovered; },
       /** addEventListener, remembered so destroy() can undo it. */
       on: function (target, type, handler, options) {
         target.addEventListener(type, handler, options);
@@ -260,88 +294,404 @@
   // Charts.bar calls the column engine, so the public factory a caller reaches
   // for may run another one underneath; only the outermost gets an observer.
   let insideFactory = false;
-  function runFactory(factory, container, opts) {
-    const prev = insideFactory;
+  // The emitter of the handle being built, for charts drawn inside it.
+  let currentEmitter = null;
+  // Container → the emitter of the handle that owns it. See createLifecycle.
+  const emitters = new WeakMap();
+  function runFactory(factory, container, opts, emitter) {
+    const prev = insideFactory, prevEmitter = currentEmitter;
     insideFactory = true;
-    try { return factory(container, opts); } finally { insideFactory = prev; }
+    currentEmitter = emitter || currentEmitter;
+    try { return factory(container, opts); } finally { insideFactory = prev; currentEmitter = prevEmitter; }
+  }
+
+  // ── events ─────────────────────────────────────────────────────────────
+  // A chart could be drawn and thrown away, but a page could not ask it
+  // anything while it was on screen: which bar was clicked, which series the
+  // reader switched off. The emitter lives on the handle, not the chart, so a
+  // listener added once keeps hearing after a resize or an update() rebuilds
+  // the chart underneath it.
+  //
+  //   render       { reason: 'init' | 'resize' | 'fonts' | 'update' }
+  //   hover        { name, series?, value?, index?, points? }
+  //   hoverEnd     the detail of the hover that ended
+  //   click        the detail of what was under the pointer
+  //   legendToggle { series, visible, index }
+  //   destroy      {}
+  const EVENTS = ['render', 'hover', 'hoverEnd', 'click', 'legendToggle', 'destroy'];
+  function createEmitter() {
+    const map = {};
+    return {
+      on: function (type, fn) {
+        if (EVENTS.indexOf(type) < 0) {
+          throw new Error('Unknown chart event "' + type + '". Available: ' + EVENTS.join(', '));
+        }
+        if (typeof fn !== 'function') throw new TypeError('on("' + type + '", fn): fn must be a function');
+        (map[type] || (map[type] = [])).push(fn);
+      },
+      off: function (type, fn) {
+        if (type == null) { for (const k in map) delete map[k]; return; }
+        if (!fn) { delete map[type]; return; }
+        const list = map[type];
+        const i = list ? list.indexOf(fn) : -1;
+        if (i >= 0) list.splice(i, 1);
+      },
+      emit: function (type, detail) {
+        const list = map[type];
+        if (!list) return;
+        // A listener that throws must not stop the chart drawing, nor the
+        // listeners after it; rethrow asynchronously so it still reaches the console.
+        list.slice().forEach(function (fn) {
+          try { fn(detail); } catch (e) { setTimeout(function () { throw e; }, 0); }
+        });
+      }
+    };
+  }
+
+  // update() merges a patch into the config the chart was built from. Plain
+  // objects merge key by key; arrays are replaced — except `series`, which
+  // merges by position, so `update({ series: [{ data }] })` swaps the numbers
+  // and keeps the name, colour and legend visibility. A new object is built
+  // along every patched path; the caller's config is never written to.
+  function isPlain(v) {
+    return v != null && typeof v === 'object' && !Array.isArray(v) &&
+      Object.getPrototypeOf(v) === Object.prototype;
+  }
+  function mergeConfig(base, patch, key) {
+    if (patch === undefined) return base;
+    if (key === 'series' && Array.isArray(base) && Array.isArray(patch)) {
+      return patch.map(function (p, i) {
+        return isPlain(base[i]) && isPlain(p) ? mergeConfig(base[i], p) : p;
+      });
+    }
+    if (!isPlain(base) || !isPlain(patch)) return patch;
+    const out = Object.assign({}, base);
+    for (const k in patch) out[k] = mergeConfig(base[k], patch[k], k);
+    return out;
   }
 
   /**
-   * Wrap a factory so its chart follows the size of its container.
+   * Wrap a factory so its chart follows the size of its container, can be
+   * updated in place, and reports events.
    *
    * The handle returned here stays valid across re-renders: it forwards to
    * whichever chart is current, so a caller can hold it, resize the window
    * twice, and still call destroy() on the thing that is actually on screen.
    * Returning the inner handle directly would go stale on the first resize.
    *
-   * Opt out with `chart.responsive: false`.
+   * Opt out of resizing with `chart.responsive: false`; update() and events
+   * work either way.
    */
+  // ── animation ──────────────────────────────────────────────────────────
+  // A chart appears by growing into place, and update() moves marks from
+  // where they were to where they are now, so a reader sees what changed
+  // rather than a new picture replacing the old one.
+  //
+  // It is done here, after an engine has drawn, from the marks alone: bars
+  // (rects with a mark class) grow from their baseline, dots scale from their
+  // centre, stroked lines draw along their length, filled shapes (slices,
+  // areas, links, tiles) fade in, and value and axis labels fade in last.
+  // Headings and legends stay still. No engine has animation code.
+  //
+  // Everything runs through the Web Animations API, holding no end state, so
+  // nothing is written to the DOM: when an animation ends the markup is exactly what the
+  // engine drew, which is what export, the render tests and hit-testing see.
+  //
+  // Off with `chart.animation: false`, and always off when the reader's system
+  // asks for reduced motion. `chart.animation: { duration }` sets the length.
+
+  const BAR_MARKS = '.bar, .blist-bar, .bit-bar, .hist-bar, .wf-bar';
+  const FADE_MARKS = '.slice, .sk-link, .sk-node, .geo-tile, .waffle-hit, .hm-cell';
+  const ENTER_MS = 650, UPDATE_MS = 450, STAGGER_MS = 260, EASE = 'cubic-bezier(0.2, 0.7, 0.2, 1)';
+  /** Past this many marks in one chart, fade the chart instead of each mark. */
+  const MAX_ANIMATED = 400;
+
+  function animates(opts) {
+    const a = opts && opts.chart && opts.chart.animation;
+    if (a === false) return false;
+    if (typeof window === 'undefined' || typeof Element === 'undefined' || !Element.prototype.animate) return false;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    return true;
+  }
+
+  function durationOf(opts, fallback) {
+    const a = opts && opts.chart && opts.chart.animation;
+    return a && typeof a === 'object' && +a.duration >= 0 ? +a.duration : fallback;
+  }
+
+  /** The svgs in a container, each with its own marks (nested charts included). */
+  function chartSvgs(el) {
+    return Array.prototype.filter.call(el.querySelectorAll('svg'), function (s) {
+      return !s.hasAttribute('data-charts-noanim');
+    });
+  }
+
+  function own(svg, selector) {
+    return Array.prototype.filter.call(svg.querySelectorAll(selector), function (n) {
+      return n.closest('svg') === svg && !n.closest('.lg-item') && !n.hasAttribute('data-charts-focus');
+    });
+  }
+
+  function isStrokedLine(p) {
+    const fill = p.getAttribute('fill');
+    const stroke = p.getAttribute('stroke');
+    return (fill === 'none' || fill === 'transparent') && stroke && stroke !== 'none' &&
+      !p.getAttribute('stroke-dasharray') && !p.closest('marker, defs, clipPath');
+  }
+
+  /**
+   * Which edge each bar grows from: the one it shares with the most other
+   * bars. Columns share their bottom (negatives their top, at the same zero
+   * line), horizontal bars their left, and no chart has to say which it is.
+   */
+  function barAnchors(bars) {
+    const round = function (v) { return Math.round(v * 2) / 2; };
+    const boxes = bars.map(function (b) { return b.getBBox(); });
+    const ys = {}, xs = {};
+    boxes.forEach(function (bb) {
+      [round(bb.y), round(bb.y + bb.height)].forEach(function (v) { ys[v] = (ys[v] || 0) + 1; });
+      [round(bb.x), round(bb.x + bb.width)].forEach(function (v) { xs[v] = (xs[v] || 0) + 1; });
+    });
+    // Which way the bars run: columns share a width and vary in height,
+    // horizontal bars the reverse. A lone bar goes by its own shape.
+    const distinct = function (key) {
+      return new Set(boxes.map(function (bb) { return round(bb[key]); })).size;
+    };
+    const horizontal = boxes.length > 1
+      ? distinct('width') > distinct('height')
+      : boxes.length === 1 && boxes[0].width > boxes[0].height;
+    return boxes.map(function (bb) {
+      if (horizontal) return xs[round(bb.x + bb.width)] > xs[round(bb.x)] ? 'right' : 'left';
+      return ys[round(bb.y)] > ys[round(bb.y + bb.height)] ? 'top' : 'bottom';
+    });
+  }
+
+  function play(node, frames, ms, delay) {
+    // `backwards` holds the first frame through the delay, so a staggered bar
+    // is not drawn at full height while it waits; nothing is kept afterwards.
+    node.animate(frames, { duration: ms, delay: delay || 0, easing: EASE, fill: 'backwards' });
+  }
+
+  function animateEnter(el, opts) {
+    chartSvgs(el).forEach(function (svg) {
+      const ms = durationOf(opts, ENTER_MS);
+      const bars = own(svg, BAR_MARKS);
+      let dots = own(svg, 'circle');
+      const lines = own(svg, 'path').filter(isStrokedLine);
+      const fills = own(svg, FADE_MARKS);
+      const areas = own(svg, 'path').filter(function (p) {
+        return !isStrokedLine(p) && fills.indexOf(p) < 0 && !p.closest('marker, defs, clipPath') &&
+          p.getAttribute('fill') && p.getAttribute('fill') !== 'none';
+      });
+      if (!(bars.length + dots.length + lines.length + fills.length + areas.length)) return;
+
+      // Where the plot starts, measured before anything moves (a growing bar
+      // starts at its baseline): the highest mark, gridline or axis. A value
+      // label over the tallest bar sits below the top gridline; the heading and
+      // the legend sit above both.
+      const plotTop = Math.min.apply(null, bars.concat(lines, fills, areas, own(svg, 'line')).map(function (m) {
+        return m.getBoundingClientRect().top;
+      }));
+      const markTop = isFinite(plotTop) ? plotTop : -Infinity;
+      // A dot above the plot is a legend swatch, not data.
+      dots = dots.filter(function (d) { return d.getBoundingClientRect().top >= markTop - 1; });
+      const count = bars.length + dots.length + lines.length + fills.length + areas.length;
+      if (!count) return;
+      if (count > MAX_ANIMATED) { play(svg, [{ opacity: 0 }, { opacity: 1 }], ms); return; }
+      const stagger = function (i, n) { return n > 1 ? Math.round(STAGGER_MS * i / (n - 1)) : 0; };
+      const anchors = barAnchors(bars);
+      bars.forEach(function (b, i) {
+        const origin = { bottom: '0% 100%', top: '0% 0%', left: '0% 0%', right: '100% 0%' }[anchors[i]];
+        const from = anchors[i] === 'bottom' || anchors[i] === 'top' ? 'scale(1, 0)' : 'scale(0, 1)';
+        const fixed = { transformBox: 'fill-box', transformOrigin: origin };
+        play(b, [Object.assign({ transform: from }, fixed), Object.assign({ transform: 'scale(1, 1)' }, fixed)], ms, stagger(i, bars.length));
+      });
+      dots.forEach(function (d, i) {
+        const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
+        play(d, [Object.assign({ transform: 'scale(0)', opacity: 0 }, fixed), Object.assign({ transform: 'scale(1)', opacity: 1 }, fixed)],
+          ms * 0.6, ms * 0.3 + stagger(i, dots.length));
+      });
+      lines.forEach(function (p) {
+        let len = 0;
+        try { len = p.getTotalLength(); } catch (e) { len = 0; }
+        if (!(len > 0)) return;
+        play(p, [{ strokeDasharray: len + ' ' + len, strokeDashoffset: len },
+                 { strokeDasharray: len + ' ' + len, strokeDashoffset: 0 }], ms * 1.3);
+      });
+      fills.concat(areas).forEach(function (f, i, all) {
+        const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
+        play(f, [Object.assign({ opacity: 0, transform: 'scale(0.92)' }, fixed), Object.assign({ opacity: 1, transform: 'scale(1)' }, fixed)],
+          ms, stagger(i, all.length));
+      });
+
+      // Labels on and around the marks arrive once the marks have; the heading
+      // and the legend, which sit above every mark, are there from the start.
+      own(svg, 'text').forEach(function (t) {
+        if (t.getBoundingClientRect().bottom <= markTop + 1) return;
+        play(t, [{ opacity: 0 }, { opacity: 1 }], ms * 0.5, ms * 0.6);
+      });
+    });
+  }
+
+  /** Where each bar and dot is, keyed by svg, mark kind and position in draw order. */
+  function captureMarks(el) {
+    const out = {};
+    chartSvgs(el).forEach(function (svg, si) {
+      own(svg, BAR_MARKS).forEach(function (b, i) { out[si + '|bar|' + i] = b.getBoundingClientRect(); });
+      own(svg, 'circle').forEach(function (c, i) { out[si + '|dot|' + i] = c.getBoundingClientRect(); });
+    });
+    return out;
+  }
+
+  /**
+   * Move each bar and dot from where it was to where it is. Screen boxes are
+   * compared, so the transform is worked out in pixels and converted into the
+   * element's own units with its screen matrix.
+   */
+  function animateUpdate(el, before, opts) {
+    chartSvgs(el).forEach(function (svg, si) {
+      const ms = durationOf(opts, UPDATE_MS);
+      const moved = [];
+      [['bar', BAR_MARKS], ['dot', 'circle']].forEach(function (kind) {
+        own(svg, kind[1]).forEach(function (node, i) {
+          const was = before[si + '|' + kind[0] + '|' + i];
+          const now = node.getBoundingClientRect();
+          const m = node.getScreenCTM && node.getScreenCTM();
+          moved.push(node);
+          if (!was || !m || !now.width && !now.height) {
+            play(node, [{ opacity: 0 }, { opacity: 1 }], ms);
+            return;
+          }
+          // Screen pixels to the element's user units (no rotation in chart marks).
+          const ux = m.a || 1, uy = m.d || 1;
+          const sx = now.width ? was.width / now.width : 1;
+          const sy = now.height ? was.height / now.height : 1;
+          const dx = (was.left - now.left) / ux, dy = (was.top - now.top) / uy;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+          const fixed = { transformBox: 'fill-box', transformOrigin: '0% 0%' };
+          play(node, [Object.assign({ transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' }, fixed),
+                      Object.assign({ transform: 'none' }, fixed)], ms);
+        });
+      });
+      // Everything that is not a bar or a dot is new drawing: let it arrive.
+      own(svg, 'path').concat(own(svg, FADE_MARKS)).forEach(function (n) {
+        if (moved.indexOf(n) < 0) play(n, [{ opacity: 0 }, { opacity: 1 }], ms * 0.8);
+      });
+      own(svg, 'text').forEach(function (t) { play(t, [{ opacity: 0.2 }, { opacity: 1 }], ms * 0.6, ms * 0.3); });
+    });
+  }
+
   function makeResponsive(factory, container, opts) {
     if (insideFactory) return factory(container, opts);
-
-    let inner = runFactory(factory, container, opts);
 
     const el = typeof container === 'string'
       ? (typeof document !== 'undefined' ? document.getElementById(container) : null)
       : container;
-    const wants = !(opts && opts.chart && opts.chart.responsive === false);
-    if (!wants || !el || typeof ResizeObserver === 'undefined') return inner;
+    const emitter = createEmitter();
+    if (el && typeof el === 'object') emitters.set(el, emitter);
 
-    // The size the chart was actually drawn at. A ResizeObserver fires once on
-    // observe(), and again for the height a self-sizing chart gave itself, so
-    // re-rendering on every callback would loop.
-    let drawnW = Math.round(el.clientWidth);
-    let drawnH = Math.round(el.clientHeight);
-    let frame = 0;
+    // `events: { click: fn }` in the config is the same as handle.on('click', fn).
+    // Those subscriptions are swapped when update() brings new ones.
+    let configListeners = [];
+    function subscribeConfig() {
+      configListeners.forEach(function (p) { emitter.off(p[0], p[1]); });
+      configListeners = [];
+      const evs = opts && isPlain(opts.events) ? opts.events : null;
+      if (!evs) return;
+      for (const k in evs) {
+        if (typeof evs[k] !== 'function') continue;
+        emitter.on(k, evs[k]);
+        configListeners.push([k, evs[k]]);
+      }
+    }
+    subscribeConfig();
+
+    let inner = runFactory(factory, container, opts, emitter);
+    if (el && animates(opts)) animateEnter(el, opts);
     let destroyed = false;
+    let frame = 0, ro = null;
+    let drawnW = el ? Math.round(el.clientWidth) : 0;
+    let drawnH = el ? Math.round(el.clientHeight) : 0;
 
-    const ro = new ResizeObserver(function () {
-      const w = Math.round(el.clientWidth);
-      const h = Math.round(el.clientHeight);
-      // A hidden container reports 0. Re-rendering into it would only bake in
-      // the fallback size, so wait until it is on screen again.
-      if (w === 0 || h === 0) return;
-      // Sub-pixel jitter, and the height a chart gave itself, are not resizes.
-      if (Math.abs(w - drawnW) < 2 && Math.abs(h - drawnH) < 2) return;
-      if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(function () {
-        frame = 0;
-        if (destroyed) return;
-        drawnW = Math.round(el.clientWidth);
-        drawnH = Math.round(el.clientHeight);
-        carryStateForward(inner, opts);
-        inner.destroy();
-        inner = runFactory(factory, container, opts);
-      });
-    });
-    ro.observe(el);
+    function rerender(reason) {
+      carryStateForward(inner, opts);
+      // Only an update is a change a reader should watch happen. A resize or a
+      // font swap redraws the same data, and animating it would be noise.
+      const before = reason === 'update' && el && animates(opts) ? captureMarks(el) : null;
+      inner.destroy();
+      inner = runFactory(factory, container, opts, emitter);
+      if (before) animateUpdate(el, before, opts);
+      if (el) { drawnW = Math.round(el.clientWidth); drawnH = Math.round(el.clientHeight); }
+      emitter.emit('render', { reason: reason });
+    }
 
-    // A chart drawn before its webfont arrives was laid out with the fallback
-    // font's metrics, which are narrower: wrapped text then paints past the
-    // width it was wrapped to. When the fonts settle (the text cache is cleared
-    // by then, see measureText), draw once more so the layout measures the
-    // font that is actually on screen.
-    const fonts = typeof document !== 'undefined' ? document.fonts : null;
-    if (fonts && fonts.status !== 'loaded' && fonts.ready && typeof fonts.ready.then === 'function') {
-      fonts.ready.then(function () {
-        if (destroyed) return;
-        carryStateForward(inner, opts);
-        inner.destroy();
-        inner = runFactory(factory, container, opts);
-        drawnW = Math.round(el.clientWidth);
-        drawnH = Math.round(el.clientHeight);
+    const wants = !(opts && opts.chart && opts.chart.responsive === false);
+    if (wants && el && typeof ResizeObserver !== 'undefined') {
+      // The size the chart was actually drawn at. A ResizeObserver fires once on
+      // observe(), and again for the height a self-sizing chart gave itself, so
+      // re-rendering on every callback would loop.
+      ro = new ResizeObserver(function () {
+        const w = Math.round(el.clientWidth);
+        const h = Math.round(el.clientHeight);
+        // A hidden container reports 0. Re-rendering into it would only bake in
+        // the fallback size, so wait until it is on screen again.
+        if (w === 0 || h === 0) return;
+        // Sub-pixel jitter, and the height a chart gave itself, are not resizes.
+        if (Math.abs(w - drawnW) < 2 && Math.abs(h - drawnH) < 2) return;
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(function () {
+          frame = 0;
+          if (destroyed) return;
+          rerender('resize');
+        });
       });
+      ro.observe(el);
+
+      // A chart drawn before its webfont arrives was laid out with the fallback
+      // font's metrics, which are narrower: wrapped text then paints past the
+      // width it was wrapped to. When the fonts settle (the text cache is cleared
+      // by then, see measureText), draw once more so the layout measures the
+      // font that is actually on screen.
+      const fonts = typeof document !== 'undefined' ? document.fonts : null;
+      if (fonts && fonts.status !== 'loaded' && fonts.ready && typeof fonts.ready.then === 'function') {
+        fonts.ready.then(function () {
+          if (!destroyed) rerender('fonts');
+        });
+      }
     }
 
     const handle = {
       redraw: function () { return inner.redraw(); },
       getData: function () { return inner.getData(); },
+      /**
+       * Merge `patch` into the config and draw again in place. Legend
+       * visibility carries over; everything else comes from the merged config.
+       * Returns the handle, so calls chain.
+       */
+      update: function (patch) {
+        if (destroyed) return handle;
+        carryStateForward(inner, opts);
+        opts = mergeConfig(opts || {}, patch || {});
+        if (patch && 'events' in patch) subscribeConfig();
+        rerender('update');
+        return handle;
+      },
+      /** Subscribe; returns a function that unsubscribes. */
+      on: function (type, fn) {
+        emitter.on(type, fn);
+        return function () { emitter.off(type, fn); };
+      },
+      /** off(type, fn) removes one, off(type) all of a type, off() everything. */
+      off: function (type, fn) { emitter.off(type, fn); return handle; },
       destroy: function () {
         if (destroyed) return;
+        emitter.emit('destroy', {});
         destroyed = true;
         if (frame) cancelAnimationFrame(frame);
-        ro.disconnect();     // the observer holds the container and the chart
+        if (ro) ro.disconnect();     // the observer holds the container and the chart
         inner.destroy();
+        emitter.off();
+        if (el && typeof el === 'object') emitters.delete(el);
       }
     };
 
@@ -355,6 +705,12 @@
       } else {
         Object.defineProperty(handle, k, { get: function () { return inner[k]; }, enumerable: true });
       }
+    });
+
+    // Announced after the caller has the handle, so a listener attached on the
+    // line after the factory call still hears the first render.
+    Promise.resolve().then(function () {
+      if (!destroyed) emitter.emit('render', { reason: 'init' });
     });
     return handle;
   }
@@ -395,12 +751,17 @@
 
   /** Pull a comparable [label, value] list out of the documented point shapes. */
   function pointsOf(series, isTime) {
-    const data = (series && series.data) || [];
+    let data = (series && series.data) || [];
+    // Keyed data — geofacet's { CA: 39, TX: 30 } — reads as [code, value] pairs.
+    if (!Array.isArray(data)) {
+      data = typeof data === 'object'
+        ? Object.keys(data).map(function (k) { return [k, data[k]]; }) : [];
+    }
     return data.map(function (d, i) {
       if (d == null) return { label: String(i), value: '' };
       if (Array.isArray(d)) return { label: axisLabel(d[0], isTime), value: d[1] };
       if (typeof d === 'object') {
-        return { label: d.name != null ? String(d.name) : axisLabel(d.x != null ? d.x : i, isTime),
+        return { label: d.name != null ? String(d.name) : d.code != null ? String(d.code) : axisLabel(d.x != null ? d.x : i, isTime),
                  value: d.y != null ? d.y : (d.value != null ? d.value : '') };
       }
       return { label: String(i), value: d };
@@ -527,7 +888,7 @@
     // The tooltip is a mouse affordance duplicating what the table already
     // says; announcing it as live content would just repeat the numbers.
     container.querySelectorAll('div').forEach(function (d) {
-      if (d.style && d.style.position === 'absolute') d.setAttribute('aria-hidden', 'true');
+      if (d.style && d.style.position === 'absolute' && !d.hasAttribute('data-charts-live')) d.setAttribute('aria-hidden', 'true');
     });
 
     const old = container.querySelector(':scope > [data-charts-a11y]');
@@ -563,6 +924,16 @@
     // hand. Doing it here rather than in twelve engines means a new engine is
     // accessible by default instead of by remembering.
     describeChart(life.container, parts.opts, parts.typeName, parts.getData);
+    // A click reports whatever the engine last said was under the pointer, so
+    // an engine that reports hover gets click without wiring it separately.
+    // Bound on the container rather than the svg: a redraw replaces the svg.
+    const c = life.container;
+    if (c && typeof c.addEventListener === 'function') {
+      life.on(c, 'click', function () {
+        if (life.hovered) life.emit('click', life.hovered);
+      });
+    }
+    enableKeyboard(life, parts);
     const getData = parts.getData || function () { return null; };
     const api = {
       redraw: parts.redraw || function () {},
@@ -578,11 +949,338 @@
         }
         life.destroy();
       },
-      getData: getData
+      getData: getData,
+      toSVG: function () { return exportSVG(life.container); },
+      toPNG: function (options) { return exportPNG(life.container, options); }
     };
     if (parts.getSeries) api.getSeries = parts.getSeries;
     if (parts.extras) for (const k in parts.extras) api[k] = parts.extras[k];
     return api;
+  }
+
+  // ── keyboard ───────────────────────────────────────────────────────────
+  // Every hover affordance was mouse-only: a keyboard user could reach
+  // neither a tooltip nor a legend toggle. The chart becomes one tab stop,
+  // and the arrow keys walk its marks.
+  //
+  // Walking is done by sending the engine the pointer move it already
+  // handles, at the mark's centre, so each engine's own tooltip, highlight
+  // and hover event run unchanged and there is no second hover path to keep
+  // in step with the first. Engines whose hover is computed from coordinates
+  // rather than from the element under the pointer (line, column/bar, radar)
+  // pass `keyTargets`: the points to visit, in svg units.
+  //
+  //   ← → ↑ ↓   previous / next mark      Home / End   first / last
+  //   Enter, Space   click it              Escape       clear
+  //
+  // Legend items become buttons that Enter and Space toggle. The table
+  // describeChart publishes stays the way a screen reader reads the numbers;
+  // the live region below says which mark the keys have reached.
+
+  /** Marks whose own hover handler reads the event target, in visiting order. */
+  const KEY_MARKS = ['.slice', '.pt', '.blist-bar', '.bit-bar', '.hist-bar', '.wf-bar', '.db-row',
+    '.waffle-hit', '.sk-node', '.sk-link', '.geo-tile rect[style*="cursor"]', '.hm-cell'];
+
+  function enableKeyboard(life, parts) {
+    const container = life.container;
+    if (!container || typeof container.querySelector !== 'function' || typeof document === 'undefined') return;
+    const svg = container.querySelector(':scope > svg');
+    if (!svg) return;
+    // Nested charts (panels, reportTable cells) handle their own keys; a
+    // keydown bubbling out of one must not also move the chart around it.
+    container.setAttribute('data-charts-chart', '');
+    const mine = function (ev) {
+      const t = ev.target;
+      return t && t.closest && t.closest('[data-charts-chart]') === container;
+    };
+
+    const ink = cssColor(resolveTheme(parts.opts).titleColor) || '#111';
+
+    function markTargets() {
+      if (parts.keyTargets) {
+        const box = svg.getBoundingClientRect();
+        const vb = svg.viewBox && svg.viewBox.baseVal;
+        const sx = vb && vb.width ? box.width / vb.width : 1;
+        const sy = vb && vb.height ? box.height / vb.height : 1;
+        return (parts.keyTargets() || []).map(function (p) {
+          const t = { node: svg, x: box.left + p.x * sx, y: box.top + p.y * sy, r: p.r || 7 };
+          // A band (a column's category) is ringed as a box rather than a dot.
+          if (p.w && p.h) {
+            t.rect = { left: t.x - p.w * sx / 2, right: t.x + p.w * sx / 2, top: t.y - p.h * sy / 2, bottom: t.y + p.h * sy / 2 };
+          }
+          return t;
+        });
+      }
+      const nodes = [];
+      KEY_MARKS.forEach(function (sel) {
+        svg.querySelectorAll(sel).forEach(function (n) {
+          if (n.closest('svg') !== svg || nodes.indexOf(n) >= 0) return;
+          const cs = getComputedStyle(n);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return;
+          nodes.push(n);
+        });
+      });
+      const out = nodes.map(function (n) {
+        const r = n.getBoundingClientRect();
+        return { node: n, x: r.left + r.width / 2, y: r.top + r.height / 2, rect: r };
+      }).filter(function (t) { return t.rect.width > 0 || t.rect.height > 0; });
+      // Points read left to right, whatever order their series were drawn in.
+      if (out.length && out[0].node.classList.contains('pt')) out.sort(function (a, b) { return a.x - b.x || a.y - b.y; });
+      return out;
+    }
+    if (!markTargets().length && !svg.querySelector('.lg-item')) return;
+
+    // Legend items as toggle buttons. Re-tagged after every click, because
+    // engines redraw the legend and the nodes are new.
+    function tagLegend() {
+      container.querySelectorAll('.lg-item').forEach(function (g) {
+        if (g.closest('[data-charts-chart]') !== container) return;
+        const label = g.querySelector('text');
+        const shown = !label || label.getAttribute('text-decoration') !== 'line-through';
+        g.setAttribute('tabindex', '0');
+        g.setAttribute('role', 'button');
+        g.setAttribute('aria-pressed', shown ? 'true' : 'false');
+        if (label) g.setAttribute('aria-label', (label.textContent || '') + (shown ? ', shown' : ', hidden'));
+      });
+    }
+    tagLegend();
+    // After a mouse click the clicked node has already been replaced, so its
+    // ancestry cannot say whose legend it was; re-tagging is cheap, do it anyway.
+    life.on(container, 'click', tagLegend);
+
+    if (markTargets().length) {
+      svg.setAttribute('tabindex', '0');
+      svg.setAttribute('aria-keyshortcuts', 'ArrowLeft ArrowRight Home End Enter Escape');
+    }
+
+    // What the keys reached, for a screen reader: the tooltip's own text.
+    let live = container.querySelector(':scope > [data-charts-live]');
+    if (!live) {
+      live = document.createElement('div');
+      live.setAttribute('data-charts-live', '');
+      live.setAttribute('aria-live', 'polite');
+      live.style.cssText = VISUALLY_HIDDEN;
+      container.appendChild(live);
+    }
+
+    let index = -1, current = null, ring = null;
+
+    function clearRing() { if (ring && ring.parentNode) ring.parentNode.removeChild(ring); ring = null; }
+
+    // The chart itself shows focus before any mark is reached, and a legend
+    // button — an svg group, which browsers do not outline — gets the ring.
+    life.on(svg, 'focus', function () { svg.style.outline = '2px solid ' + ink; svg.style.outlineOffset = '2px'; });
+    life.on(container, 'focusin', function (ev) {
+      const item = ev.target.closest && ev.target.closest('.lg-item');
+      if (!item || !mine(ev)) return;
+      const r = item.getBoundingClientRect();
+      drawRing({ rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    });
+    life.on(container, 'focusout', function (ev) {
+      if (ev.target === svg) { svg.style.outline = ''; svg.style.outlineOffset = ''; }
+      else if (ev.target.closest && ev.target.closest('.lg-item')) clearRing();
+    });
+
+    // A ring on the reached mark, drawn in svg units over everything else.
+    function drawRing(t) {
+      clearRing();
+      const m = svg.getScreenCTM && svg.getScreenCTM();
+      if (!m) return;
+      const inv = m.inverse();
+      const at = function (x, y) {
+        const p = svg.createSVGPoint(); p.x = x; p.y = y;
+        return p.matrixTransform(inv);
+      };
+      if (t.rect) {
+        const a = at(t.rect.left, t.rect.top), b = at(t.rect.right, t.rect.bottom);
+        ring = el('rect', { x: Math.min(a.x, b.x) - 3, y: Math.min(a.y, b.y) - 3,
+          width: Math.abs(b.x - a.x) + 6, height: Math.abs(b.y - a.y) + 6, rx: 3 });
+      } else {
+        const c = at(t.x, t.y);
+        ring = el('circle', { cx: c.x, cy: c.y, r: t.r + 3 });
+      }
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', ink);
+      ring.setAttribute('stroke-width', 2);
+      ring.setAttribute('pointer-events', 'none');
+      ring.setAttribute('data-charts-focus', '');
+      svg.appendChild(ring);
+    }
+
+    function pointer(type, t) {
+      const init = { bubbles: true, cancelable: true, clientX: t.x, clientY: t.y, view: window };
+      t.node.dispatchEvent(new MouseEvent(type, init));
+    }
+
+    function leave() {
+      if (current && current.node !== svg) current.node.dispatchEvent(new MouseEvent('mouseleave', { clientX: current.x, clientY: current.y }));
+      svg.dispatchEvent(new MouseEvent('mouseleave'));
+      life.hover(null);
+      current = null;
+      clearRing();
+    }
+
+    function visit(i, direction) {
+      const targets = markTargets();
+      if (!targets.length) return;
+      const before = life.hovered;
+      i = Math.max(0, Math.min(targets.length - 1, i));
+      // A column's grouped bars all open the same category tooltip; step past
+      // marks that would announce what is already on screen.
+      for (;;) {
+        const t = targets[i];
+        if (current && current.node !== t.node && current.node !== svg) {
+          current.node.dispatchEvent(new MouseEvent('mouseleave', { clientX: current.x, clientY: current.y }));
+        }
+        pointer('mouseenter', t);
+        pointer('mousemove', t);
+        current = t;
+        index = i;
+        const same = before && life.hovered && before !== life.hovered &&
+          before.name === life.hovered.name && before.index === life.hovered.index && before.series === life.hovered.series;
+        const next = i + (direction || 0);
+        if (!same || !direction || next < 0 || next >= targets.length) break;
+        i = next;
+      }
+      drawRing(current);
+      const tip = Array.prototype.find.call(container.querySelectorAll(':scope > div[aria-hidden="true"]:not([data-charts-live])'),
+        function (d) { return d.style.display !== 'none' && d.textContent; });
+      live.textContent = tip ? tip.innerText || tip.textContent
+        : (life.hovered && life.hovered.name) || '';
+    }
+
+    life.on(container, 'keydown', function (ev) {
+      if (!mine(ev) || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      const item = ev.target.closest && ev.target.closest('.lg-item');
+      if (item) {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        const items = Array.prototype.slice.call(container.querySelectorAll('.lg-item'));
+        const at = items.indexOf(item);
+        item.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        tagLegend();
+        const again = container.querySelectorAll('.lg-item')[at];
+        if (again) again.focus();
+        return;
+      }
+      if (ev.target !== svg) return;
+      const n = markTargets().length;
+      if (!n) return;
+      let handled = true;
+      switch (ev.key) {
+        case 'ArrowRight': case 'ArrowDown': visit(index < 0 ? 0 : index + 1, 1); break;
+        case 'ArrowLeft': case 'ArrowUp': visit(index < 0 ? n - 1 : index - 1, -1); break;
+        case 'Home': visit(0, 1); break;
+        case 'End': visit(n - 1, -1); break;
+        case 'Enter': case ' ':
+          if (index < 0) { visit(0, 1); break; }
+          if (current) {
+            const at = index;
+            pointer('click', current);
+            // A click may redraw (a donut slice explodes): find the mark again.
+            if (svg.isConnected) visit(at, 0);
+          }
+          break;
+        case 'Escape': leave(); break;
+        default: handled = false;
+      }
+      if (handled) ev.preventDefault();
+    });
+    life.on(svg, 'blur', function () { leave(); });
+  }
+
+  // ── export ─────────────────────────────────────────────────────────────
+  // A chart is already an svg, so a standalone file is mostly a copy of it.
+  // Mostly: panels draw a heading svg above a row of chart svgs, and a
+  // reportTable lays chart svgs over its own. So every top-level svg in the
+  // container is placed where it sits on screen inside one outer svg, over the
+  // background the container paints. Tooltips, the reset-zoom button and the
+  // hidden accessible table are HTML and are left behind.
+
+  /**
+   * Pure half of export, so it can be tested without a DOM.
+   * `pieces` are { markup, x, y } with markup a serialized <svg>; the
+   * result is a standalone document of `width` x `height`.
+   */
+  function composeSVG(pieces, width, height, background) {
+    const w = Math.ceil(width), h = Math.ceil(height);
+    let out = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<svg xmlns="' + NS + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">';
+    if (background) out += '<rect width="100%" height="100%" fill="' + esc(cssColor(background)) + '"/>';
+    pieces.forEach(function (p) {
+      // A nested <svg> takes x/y, so each piece keeps its own viewBox and
+      // scaling rather than being re-transformed.
+      out += p.markup.replace(/^<svg\b/, '<svg x="' + (+p.x || 0) + '" y="' + (+p.y || 0) + '"');
+    });
+    return out + '</svg>';
+  }
+
+  function exportSVG(container) {
+    if (!container || typeof container.querySelectorAll !== 'function' ||
+        typeof XMLSerializer === 'undefined') {
+      throw new Error('toSVG() needs a chart drawn in a browser document');
+    }
+    const box = container.getBoundingClientRect();
+    const tops = Array.prototype.filter.call(container.querySelectorAll('svg'), function (s) {
+      const p = s.parentNode && s.parentNode.closest ? s.parentNode.closest('svg') : null;
+      return !(p && container.contains(p));
+    });
+    if (!tops.length) throw new Error('toSVG(): this chart has nothing drawn to export');
+    const ser = new XMLSerializer();
+    let width = 0, height = 0;
+    const pieces = tops.map(function (s) {
+      const r = s.getBoundingClientRect();
+      const x = Math.round(r.left - box.left), y = Math.round(r.top - box.top);
+      width = Math.max(width, x + r.width);
+      height = Math.max(height, y + r.height);
+      const copy = s.cloneNode(true);
+      // Hover furniture drawn hidden (crosshairs, highlight rects) stays hidden
+      // in a file only as long as its inline style survives; drop it instead.
+      Array.prototype.forEach.call(copy.querySelectorAll('[style*="display:none"],[style*="display: none"]'),
+        function (n) { n.parentNode.removeChild(n); });
+      copy.removeAttribute('style');
+      if (!copy.getAttribute('width')) copy.setAttribute('width', Math.round(r.width));
+      if (!copy.getAttribute('height')) copy.setAttribute('height', Math.round(r.height));
+      return { markup: ser.serializeToString(copy), x: x, y: y };
+    });
+    const bg = typeof getComputedStyle === 'function' ? getComputedStyle(container).backgroundColor : '';
+    const painted = bg && bg !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(bg) ? bg : null;
+    return composeSVG(pieces, width, height, painted);
+  }
+
+  /**
+   * Rasterize the exported svg. Resolves to a PNG Blob.
+   * `scale` (default 2) multiplies the pixel size for sharp output on
+   * high-density screens and in slides. Text renders in a font the browser
+   * already has: a web font the page loaded is not embedded in the image.
+   */
+  function exportPNG(container, options) {
+    const scale = options && +options.scale > 0 ? +options.scale : 2;
+    let markup;
+    try { markup = exportSVG(container); } catch (e) { return Promise.reject(e); }
+    const m = /width="(\d+)" height="(\d+)"/.exec(markup);
+    const w = +m[1], h = +m[2];
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      const url = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }));
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error('toPNG(): the canvas produced no image'));
+        }, 'image/png');
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('toPNG(): the exported svg could not be rasterized'));
+      };
+      img.src = url;
+    });
   }
 
   function el(tag, attrs, parent) {
@@ -1185,6 +1883,42 @@
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
   }
 
+  // ── value → colour scale (table, reportTable, heatmap) ─────────────────
+  // The series palette read light → dark (colors minus s1, which is black and
+  // would drown a number drawn on it), interpolated between its steps.
+  function rampAt(T, k) {
+    const colors = T.colors && T.colors.length ? T.colors : [T.defaultColor];
+    const stops = (colors.length > 2 ? colors.slice(1) : colors).slice().reverse();
+    if (stops.length === 1) return stops[0];
+    const p = Math.max(0, Math.min(1, k)) * (stops.length - 1);
+    const i = Math.min(stops.length - 2, Math.floor(p));
+    return mix(stops[i], stops[i + 1], p - i);
+  }
+
+  /**
+   * The fill for `v` on a scale over `d` = { lo, hi }. A domain that crosses
+   * zero diverges through the threshold pair, with the intensity the distance
+   * from zero so a colour means the same size in either direction; zero itself
+   * returns null, the midpoint that takes no fill. Otherwise it is sequential:
+   * the larger the magnitude, the further along the ramp, with the lightest
+   * step still a visible fill so the smallest value does not read as no data.
+   * `o` may carry upColor / downColor / color (one hue instead of the ramp),
+   * and `floor`, the least intensity a diverging non-zero value gets.
+   */
+  function scaleColor(T, d, v, o) {
+    o = o || {};
+    if (d.lo < 0 && d.hi > 0) {
+      if (v === 0) return null;
+      const m = Math.max(-d.lo, d.hi);
+      const f = o.floor || 0;
+      return mix(T.bg, v > 0 ? (o.upColor || T.aboveThreshold) : (o.downColor || T.belowThreshold),
+        f + (1 - f) * Math.min(1, Math.abs(v) / m));
+    }
+    const t = d.hi === d.lo ? 1 : Math.max(0, Math.min(1, (v - d.lo) / (d.hi - d.lo)));
+    const k = d.hi > 0 ? t : 1 - t;
+    return o.color ? mix(T.bg, o.color, 0.12 + 0.88 * k) : rampAt(T, k);
+  }
+
   // ── reportTable refusals ───────────────────────────────────────────────
   // A report table is a table whose cells may also be prose, a headline stat
   // or a real chart. Everything a table refuses it refuses too — the number
@@ -1764,7 +2498,192 @@
 
   function sankeyProblems(config) { return sankeyGraph(config).errors; }
 
+  // ── heatmap cells + refusals ───────────────────────────────────────────
+  // Charts.heatmap and Charts.calendarHeatmap read their input here, for the
+  // reason the sankey's reading lives here: the refusal panel and
+  // Charts.validate() have to be the same function.
+  //
+  // A heatmap's one mark is colour, and colour is the least precise encoding
+  // there is, so the chart earns its place only where position already says
+  // something: two ORDERED dimensions (hour × weekday), or a calendar, where a
+  // cell's column is its week and its row its weekday. A grid of two sets of
+  // unrelated names is a table with a colour scale, which also prints the
+  // numbers; validate() says so as a warning, not a refusal, because the
+  // library cannot tell an ordered list of names from an unordered one.
+  //
+  // What it refuses is what would make the colour lie:
+  //  - more than one series: a cell holds one colour, so a second value
+  //    would paint over the first
+  //  - two values for one cell (or one day): the chart would silently show
+  //    whichever came last
+  //  - a value that is not a number (null, undefined and '' are "no data",
+  //    drawn as an empty cell — never as zero)
+  //  - a matrix without both axes named, or a cell naming a row or column
+  //    that is not there
+  //  - calendar values weekly or coarser: a calendar would be mostly empty
+  //    days, and the few filled ones would read as isolated events
+  //  - a calendar over more than four years: a year per row of weeks turns
+  //    each day into a speck; that is a line chart
+  //
+  // Returns { layout, cells, errors, warnings } plus, for a matrix, the
+  // category lists. Calendar cells carry an epoch-day number `day` and their
+  // UTC y/m/d. A date that is a Date object is read in local time (the day the
+  // author constructed); a timestamp or a non-ISO string in UTC; "YYYY-MM-DD"
+  // literally, so a date never shifts by a day with the reader's time zone.
+  const DAY_MS = 86400000;
+  const HEATMAP_MAX_YEARS = 4;
+
+  function heatmapDay(v) {
+    let y, m, d;
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return null;
+      y = v.getFullYear(); m = v.getMonth(); d = v.getDate();
+    } else if (typeof v === 'string' && /^\s*(\d{4})-(\d{1,2})-(\d{1,2})\s*$/.test(v)) {
+      const p = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v);
+      y = +p[1]; m = +p[2] - 1; d = +p[3];
+      const chk = new Date(Date.UTC(y, m, d));
+      if (chk.getUTCMonth() !== m || chk.getUTCDate() !== d) return null;   // 2026-02-30
+    } else if ((typeof v === 'number' && isFinite(v)) || (typeof v === 'string' && v.trim() && !isNaN(Date.parse(v)))) {
+      const t = new Date(typeof v === 'number' ? v : Date.parse(v));
+      y = t.getUTCFullYear(); m = t.getUTCMonth(); d = t.getUTCDate();
+    } else return null;
+    return { day: Math.floor(Date.UTC(y, m, d) / DAY_MS), y: y, m: m, d: d };
+  }
+
+  /** null for "no data", NaN for a value that is not a number, else the number. */
+  function heatmapValue(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : NaN;
+    if (typeof v === 'string' && v.trim() && isFinite(+v)) return +v;
+    return NaN;
+  }
+
+  function heatmapGrid(config, layout) {
+    config = config || {};
+    layout = layout === 'calendar' ? 'calendar' : 'matrix';
+    const errors = [], warnings = [];
+    const out = { layout: layout, cells: [], errors: errors, warnings: warnings };
+    const series = Array.isArray(config.series) ? config.series : [];
+    if (series.length > 1) {
+      errors.push('A heatmap paints one value per cell, not ' + series.length + ' — a cell holds one colour, so a ' +
+        'second series would paint over the first. Give each measure its own heatmap inside panels.');
+      return out;
+    }
+    const raw = (series[0] && series[0].data) || config.data || [];
+    if (!Array.isArray(raw) || !raw.length) {
+      errors.push(layout === 'calendar'
+        ? 'A calendar heatmap needs one value per day — pass them as series: [{ data: [[date, value], ...] }].'
+        : 'A heatmap needs cells — pass them as series: [{ data: [[x, y, value], ...] }], with the columns named ' +
+          'in xAxis.categories and the rows in yAxis.categories.');
+      return out;
+    }
+    const seen = new Map();
+    const badValue = (where, v) => errors.push(where + ' has the value ' + JSON.stringify(v) + ' — a cell\'s ' +
+      'colour is its number, so it must be one. Leave it null for a cell with no data; that is drawn empty, not as zero.');
+    const twice = where => errors.push(where + ' has two values — a cell holds one colour, and drawing both would ' +
+      'show whichever came last. Add them up (or average them) before charting.');
+
+    if (layout === 'matrix') {
+      const xc = (config.xAxis && config.xAxis.categories) || null;
+      const yc = (config.yAxis && config.yAxis.categories) || null;
+      if (!xc || !xc.length || !yc || !yc.length) {
+        errors.push('A heatmap\'s columns and rows are ordered, so they are named rather than inferred — pass ' +
+          'xAxis.categories (left to right) and yAxis.categories (top to bottom). One value per day is calendarHeatmap.');
+        return out;
+      }
+      out.xCats = xc.map(String);
+      out.yCats = yc.map(String);
+      const pos = (v, cats) => {
+        if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < cats.length) return v;
+        const i = cats.indexOf(String(v));
+        return i >= 0 ? i : null;
+      };
+      for (let i = 0; i < raw.length; i++) {
+        const d = raw[i];
+        let x, y, v;
+        if (Array.isArray(d)) { x = d[0]; y = d[1]; v = d[2]; }
+        else if (d && typeof d === 'object') { x = d.x; y = d.y; v = d.value; }
+        const where = 'Cell ' + (i + 1) + (x != null && y != null ? ' (' + x + ', ' + y + ')' : '');
+        const cx = x == null ? null : pos(x, out.xCats), cy = y == null ? null : pos(y, out.yCats);
+        if (cx == null || cy == null) {
+          errors.push(where + (cx == null ? ' names a column that is not in xAxis.categories' : ' names a row that is not in yAxis.categories') +
+            ' — each cell is [x, y, value] or { x, y, value }, with x and y a category name or its index.');
+          return out;
+        }
+        const value = heatmapValue(v);
+        if (value !== null && isNaN(value)) { badValue(where, v); return out; }
+        const key = cx + '|' + cy;
+        if (seen.has(key)) { twice('The cell ' + out.xCats[cx] + ', ' + out.yCats[cy]); return out; }
+        seen.set(key, true);
+        out.cells.push({ x: cx, y: cy, xName: out.xCats[cx], yName: out.yCats[cy], value: value });
+      }
+      const n = out.xCats.length * out.yCats.length;
+      if (n <= 24) {
+        warnings.push('Only ' + n + ' cells: a grid this small reads better as a table with highlight: \'scale\', ' +
+          'which prints each number beside its colour.');
+      }
+      if (!isContinuousCats(out.xCats) && !isContinuousCats(out.yCats)) {
+        warnings.push('Neither axis looks ordered. A heatmap\'s pattern only means something when neighbouring rows or ' +
+          'columns are neighbours (hours, weekdays, bins); for two sets of names, table with highlight: \'scale\' says the same and prints the numbers.');
+      }
+    } else {
+      for (let i = 0; i < raw.length; i++) {
+        const d = raw[i];
+        let t, v;
+        if (Array.isArray(d)) { t = d[0]; v = d[1]; }
+        else if (d && typeof d === 'object') { t = d.date != null ? d.date : d.x; v = d.value != null ? d.value : d.y; }
+        const day = heatmapDay(t);
+        if (!day) {
+          errors.push('Point ' + (i + 1) + ' has the date ' + JSON.stringify(t) + ', which is not a date — use a ' +
+            'timestamp, a Date, or "YYYY-MM-DD".');
+          return out;
+        }
+        const iso = day.y + '-' + tpad(day.m + 1) + '-' + tpad(day.d);
+        const value = heatmapValue(v);
+        if (value !== null && isNaN(value)) { badValue(iso, v); return out; }
+        if (seen.has(day.day)) { twice(iso); return out; }
+        seen.set(day.day, true);
+        out.cells.push(Object.assign(day, { date: iso, value: value }));
+      }
+      out.cells.sort((a, b) => a.day - b.day);
+      const days = out.cells.map(c => c.day);
+      if (days.length >= 3) {
+        const gaps = days.slice(1).map((d, i) => d - days[i]).sort((a, b) => a - b);
+        const median = gaps[Math.floor(gaps.length / 2)];
+        if (median >= 7) {
+          errors.push('These values are ' + median + ' days apart — a calendar needs daily values; at weekly or coarser ' +
+            'it would be mostly empty days, and the filled ones would read as one-off events. Use line with ' +
+            'xAxis.type \'datetime\', or column.');
+          return out;
+        }
+      }
+      const years = out.cells[out.cells.length - 1].y - out.cells[0].y + 1;
+      if (days[days.length - 1] - days[0] > 370 && years > HEATMAP_MAX_YEARS) {
+        errors.push('The dates cover ' + years + ' calendar years — a row of weeks per year turns each day into a ' +
+          'speck. Use line with xAxis.type \'datetime\', or one calendarHeatmap per year inside panels.');
+        return out;
+      }
+    }
+    if (!out.cells.some(c => c.value !== null)) {
+      errors.push('Every cell is empty — there is no value to colour. Give the cells their numbers.');
+    }
+    return out;
+  }
+
+  function heatmapProblems(config, layout) { return heatmapGrid(config, layout).errors; }
+
+  // How an engine puts its factory on the Charts namespace. Each engine used
+  // to end with `window.Chart = Chart;`, which _build.js rewrote with a regex:
+  // an engine that spelled the line any other way was silently left off the
+  // bundle. Registering by name makes the engine say what it provides, and the
+  // build's manifest check catches a name that never arrives.
+  function register(names, factory) {
+    const ns = window.Charts || (window.Charts = {});
+    [].concat(names).forEach(function (n) { ns[n] = factory; });
+  }
+
   window.ChartsShared = {
+    register: register, composeSVG: composeSVG, createEmitter: createEmitter, mergeConfig: mergeConfig, EVENTS: EVENTS,
     NS: NS, CALLOUT_PAD: CALLOUT_PAD, CALLOUT_OFFSETS: CALLOUT_OFFSETS,
     describeChart: describeChart, chartDescription: chartDescription,
     resolveTheme: resolveTheme, CHART_DEFAULTS: CHART_DEFAULTS,
@@ -1780,10 +2699,11 @@
     calloutOverlap: calloutOverlap, measureCalloutBox: measureCalloutBox, drawCalloutBox: drawCalloutBox, drawCalloutLeader: drawCalloutLeader,
     drawCallouts: drawCallouts,
     tableProblems: tableProblems, tableIsBlank: tableIsBlank, allocateWidths: allocateWidths,
-    parseColor: parseColor, mix: mix, contrast: contrast,
+    parseColor: parseColor, mix: mix, contrast: contrast, scaleColor: scaleColor,
     isTransparent: isTransparent, canvasColor: canvasColor,
     reportTableProblems: reportTableProblems, REPORT_KINDS: REPORT_KINDS, REPORT_EXCLUDED: REPORT_EXCLUDED,
     sankeyGraph: sankeyGraph, sankeyProblems: sankeyProblems,
+    heatmapGrid: heatmapGrid, heatmapProblems: heatmapProblems,
   };
 })();
 
@@ -1798,7 +2718,7 @@
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { monthNames, layoutCategoryAxis, labelsFit, maxLineChars, isSequentialCats, isContinuousCats, parseAxisDate, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, ellipsize, wrapAxisLabel, dlEnabled, drawCallouts, NS } = window.ChartsShared;
+  const { monthNames, layoutCategoryAxis, labelsFit, isContinuousCats, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, dlEnabled, drawCallouts, NS } = window.ChartsShared;
   // --- theme tokens (populated from window.Charts.theme at render time) ---
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
@@ -2055,33 +2975,6 @@
   // Refusal panel: drawn in place of the chart when the options describe
   // something a line chart cannot honestly show. Returns the same stub API
   // shape as Chart() so callers do not blow up on .redraw().
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   // ---------------- main ----------------
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
@@ -2092,76 +2985,21 @@
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, GRID, AXIS, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, HIGHLIGHT, CALLOUT_C, INV_TEXT, COLORS;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_INLINE;
-  let AXIS_W, GRID_W, LINE_W, TICK_L, TICK_W;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_POINT_LBL, F_NOTICE, F_VALUE;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      HIGHLIGHT = t.highlight;
-      CALLOUT_C = t.callout;
-      INV_TEXT = t.inverseText;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      F_POINT_LBL = t.pointLabelSize;
-      F_NOTICE = t.noticeSize;
-      F_VALUE = t.valueSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_INLINE = t.inlineSize;
-      AXIS_W = t.axisWidth;
-      GRID_W = t.gridWidth;
-      LINE_W = t.lineWidth;
-      TICK_L = t.tickLength;
-      TICK_W = t.tickWidth;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
     function drawCategoryLabel(g, layout, tick, k, x, yTop, color, weight) {
-      const a = { 'font-size': layout.font, 'font-weight': weight, fill: color, 'font-family': FONT };
+      const a = { 'font-size': layout.font, 'font-weight': weight, fill: color, 'font-family': T.font };
       const lh = layout.font * 1.25;
       const y0 = yTop + (layout.stagger && k % 2 ? lh : 0);
       tick.lines.forEach((ln, li) => {
@@ -2177,14 +3015,14 @@
         console.warn('[charts-lib line] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: 20, y, 'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL,
-            'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: 20, y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
+            'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
@@ -2193,16 +3031,16 @@
       // The detail sits below however many lines the headline actually took: at a
       // fixed 26px it lands on top of the second line whenever the headline wraps,
       // which is exactly when the message is longest and most needed. The wrap is
-      // measured at F_NOTICE too - it was measuring at a hardcoded 13 and drawing
+      // measured at T.noticeSize too - it was measuring at a hardcoded 13 and drawing
       // at the token, so a themed noticeSize wrapped to the wrong width.
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': F_SUB,
-          'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
+          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       return chartAPI(createLifecycle(container), {
       opts: opts, typeName: "Line chart",
@@ -2218,8 +3056,8 @@
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -2230,13 +3068,13 @@
     const hasSub = !!opts.subtitle;
     // Left-aligned title zone; extra top space if title/subtitle present
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // Compute right pad based on longest y-tick label + inline series label estimate
     const yAxis = opts.yAxis || {};
@@ -2274,7 +3112,7 @@
 
     // ── Legend layout (top rows, wraps as needed) ───────────────────────
     function _layoutLegend(items, availW) {
-      const widths = items.map(it => LEG_ICON + LEG_ICON_GAP + Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+      const widths = items.map(it => T.legendIconSize + T.legendIconGap + Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       const rows = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -2283,9 +3121,9 @@
         curX += widths[i];
       }
       if (cur.length) rows.push(cur);
-      return { rows, height: rows.length * LEG_ROW };
+      return { rows, height: rows.length * T.legendRowHeight };
     }
-    const availLegW = W - HEAD_X * 2;
+    const availLegW = W - T.headingGutter * 2;
     const _legendLayout = legendEnabled
       ? _layoutLegend(seriesRaw.map((s, i) => ({ name: s.name || 'Series ' + (i + 1) })), availLegW)
       : { rows: [], height: 0 };
@@ -2300,7 +3138,7 @@
     const M = compact ? {
       l: 14,
       r: 14 + rightPadForNames,
-      t: titleBlockH + legendZone + PLOT_GAP + 16,   // a value label sits 10px above its point
+      t: titleBlockH + legendZone + T.plotGap + 16,   // a value label sits 10px above its point
       b: 6
     } : {
       // Y-labels sit in the LEFT margin, floating at titleX with no spine —
@@ -2311,7 +3149,7 @@
       // right margin now only carries the inline series names, when asked for.
       l: 62,
       r: 20 + rightPadForNames,
-      t: titleBlockH + legendZone + PLOT_GAP,
+      t: titleBlockH + legendZone + T.plotGap,
       b: 42
     };
     const IW = W - M.l - M.r;
@@ -2324,32 +3162,32 @@
     // labelled normally, collapsed to a calendar period.
     function planCatAxis(n, band) {
       const cats = (xAxis.categories || []).slice(0, n);
-      const empty = { ticks: [], font: F_TICK, rotate: 0, stagger: false,
+      const empty = { ticks: [], font: T.tickSize, rotate: 0, stagger: false,
         lines: 1, count: n, height: 20 };
       if (!isContinuousCats(cats)) return empty;
-      return layoutCategoryAxis(cats, IW, F_TICK,
+      return layoutCategoryAxis(cats, IW, T.tickSize,
         band || Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
     }
     let catLayout = (xAxis.categories && (xAxis.type || 'category') === 'category')
       ? planCatAxis(xAxis.categories.length) : null;
-    if (catLayout && !compact) M.b = Math.max(42, catLayout.height + TICK_L + 6);
+    if (catLayout && !compact) M.b = Math.max(42, catLayout.height + T.tickLength + 6);
     const IH = H - M.t - M.b;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
     // --- title / subtitle (top-left) ---
-    const titleX = HEAD_X;
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    const titleX = T.headingGutter;
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // --- series def ---
     const seriesDefs = seriesRaw.map((s, i) => {
-      const color = s.color || COLORS[i % COLORS.length];
+      const color = s.color || T.colors[i % T.colors.length];
       // Default to smoothed spline; opt out per series (type:'line'/'step') or globally (chart.smooth:false).
       const smoothDefault = !(opts.chart && opts.chart.smooth === false);
       const type = s.type || (opts.chart && opts.chart.type) || (smoothDefault ? 'spline' : 'line');
@@ -2367,7 +3205,7 @@
       return {
         name: s.name || 'Series ' + (i + 1), color, type, points,
         legendColor: s.legendColor,
-        marker, dataLabels, lineWidth: s.lineWidth != null ? s.lineWidth : LINE_W,
+        marker, dataLabels, lineWidth: s.lineWidth != null ? s.lineWidth : T.lineWidth,
         dashStyle: s.dashStyle, step: s.step,
         negativeColor: s.negativeColor, threshold: s.threshold != null ? s.threshold : 0,
         visible: s.visible !== false,
@@ -2480,52 +3318,52 @@
       (xAxis.plotBands || []).forEach(b => {
         const x1 = xScale(b.from), x2 = xScale(b.to);
         el('rect', { x: Math.min(x1,x2), y: M.t, width: Math.abs(x2-x1), height: IH,
-          fill: b.color || HIGHLIGHT, 'fill-opacity': b.alpha != null ? b.alpha : 0.12 }, gBands);
+          fill: b.color || T.highlight, 'fill-opacity': b.alpha != null ? b.alpha : 0.12 }, gBands);
         if (b.label) {
           txt(b.label.text, { x: (x1+x2)/2, y: M.t - 6, 'text-anchor': 'middle',
-            'font-size': F_POINT_LBL, 'font-weight': VAL_FW, fill: b.color || HIGHLIGHT,
-            'font-family': FONT }, gBands);
+            'font-size': T.pointLabelSize, 'font-weight': T.valueWeight, fill: b.color || T.highlight,
+            'font-family': T.font }, gBands);
         }
         if (b.paragraph) {
           const py = M.t + IH * (1 - (b.paragraphY != null ? b.paragraphY : 0.85));
-          drawParagraphBox(gAnnot, (x1+x2)/2, py, b.paragraph, b.color || HIGHLIGHT, 'center');
+          drawParagraphBox(gAnnot, (x1+x2)/2, py, b.paragraph, b.color || T.highlight, 'center');
         }
       });
       // yAxis plotBands
       (yAxis.plotBands || []).forEach(b => {
         const y1 = yScale(b.from), y2 = yScale(b.to);
         el('rect', { x: M.l, y: Math.min(y1,y2), width: IW, height: Math.abs(y2-y1),
-          fill: b.color || HIGHLIGHT, 'fill-opacity': b.alpha != null ? b.alpha : 0.12 }, gBands);
+          fill: b.color || T.highlight, 'fill-opacity': b.alpha != null ? b.alpha : 0.12 }, gBands);
       });
 
       // Horizontal gridlines
       if (!compact) yTicks.forEach(v => {
         const y = yScale(v);
-        el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+        el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
       });
 
       // xAxis plotLines (vlines)
       (xAxis.plotLines || []).forEach(pl => {
         const x = xScale(pl.value);
         el('line', { x1: x, x2: x, y1: M.t, y2: M.t + IH,
-          stroke: pl.color || AXIS, 'stroke-width': pl.width || 1.5,
+          stroke: pl.color || T.axis, 'stroke-width': pl.width || 1.5,
           'stroke-dasharray': dashArray(pl.dashStyle || 'Dash') }, gAnnot);
         if (pl.label) txt(pl.label.text, { x, y: M.t - 6, 'text-anchor': 'middle',
-          'font-size': F_POINT_LBL, 'font-weight': VAL_FW, fill: pl.color || AXIS,
-          'font-family': FONT }, gAnnot);
+          'font-size': T.pointLabelSize, 'font-weight': T.valueWeight, fill: pl.color || T.axis,
+          'font-family': T.font }, gAnnot);
         if (pl.paragraph) {
           const py = M.t + IH * (1 - (pl.paragraphY != null ? pl.paragraphY : 0.85));
-          drawParagraphBox(gAnnot, x, py, pl.paragraph, pl.color || AXIS, 'center');
+          drawParagraphBox(gAnnot, x, py, pl.paragraph, pl.color || T.axis, 'center');
         }
       });
       // yAxis plotLines
       (yAxis.plotLines || []).forEach(pl => {
         const y = yScale(pl.value);
         el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y,
-          stroke: pl.color || AXIS, 'stroke-width': pl.width || 1.5,
+          stroke: pl.color || T.axis, 'stroke-width': pl.width || 1.5,
           'stroke-dasharray': dashArray(pl.dashStyle || 'Dash') }, gAnnot);
-        if (pl.label) txt(pl.label.text, { x: M.l + 4, y: y - 5, 'font-size': F_POINT_LBL,
-          'font-weight': VAL_FW, fill: pl.color || AXIS, 'font-family': FONT }, gAnnot);
+        if (pl.label) txt(pl.label.text, { x: M.l + 4, y: y - 5, 'font-size': T.pointLabelSize,
+          'font-weight': T.valueWeight, fill: pl.color || T.axis, 'font-family': T.font }, gAnnot);
       });
 
       // Series
@@ -2580,9 +3418,9 @@
             if (clash) return;
             labelBoxes.push(box);
             const t = txt(label, { x: lx, y: ly,
-              'text-anchor': 'middle', 'font-size': F_VALUE, 'font-weight': VAL_FW,
-              fill: VAL_COL, 'font-family': FONT }, gLabels);
-            t.setAttribute('stroke', BG);
+              'text-anchor': 'middle', 'font-size': T.valueSize, 'font-weight': T.valueWeight,
+              fill: T.valueColor, 'font-family': T.font }, gLabels);
+            t.setAttribute('stroke', T.bg);
             t.setAttribute('stroke-width', '3');
             t.setAttribute('paint-order', 'stroke');
           });
@@ -2601,7 +3439,7 @@
       yTicks.forEach(v => {
         const y = yScale(v);
         txt(formatY(v), { x: titleX, y: y + 4, 'text-anchor': 'start',
-          'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+          'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
       });
 
       // X-axis: boundary ticks + centered labels
@@ -2612,10 +3450,10 @@
         // keep a label, temporal ones collapse to calendar periods. Drawn here
         // rather than through `centers`, which only handles plain upright text.
         const n = xAxis.categories.length;
-        if (!catLayout || n !== catLayout.count) catLayout = planCatAxis(n, M.b - TICK_L - 6);
+        if (!catLayout || n !== catLayout.count) catLayout = planCatAxis(n, M.b - T.tickLength - 6);
         catLayout.ticks.forEach((tk, k) => {
           drawCategoryLabel(gAxes, catLayout, tk, k, xScale(tk.i),
-            M.t + IH + TICK_L + 12, TICK_COL, TICK_FW);
+            M.t + IH + T.tickLength + 12, T.tickColor, T.tickWeight);
         });
         if (!catLayout.ticks.length) {
           boundaries.push(-0.5, n - 0.5);
@@ -2626,7 +3464,7 @@
           boundaries.push(n - 0.5);
         }
       } else if (xType === 'datetime') {
-        const bs = dateBoundaries(viewMin, viewMax, xAxis.tickInterval || 'auto', IW, F_TICK, monthNames(resolveTheme(opts)));
+        const bs = dateBoundaries(viewMin, viewMax, xAxis.tickInterval || 'auto', IW, T.tickSize, monthNames(resolveTheme(opts)));
         boundaries = bs.boundaries;
         centers = bs.centers;
       } else {
@@ -2636,18 +3474,18 @@
         centers.push({ ms: t[t.length - 1], label: String(t[t.length - 1]) });
       }
       // Bottom spine (thick black)
-      el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: AXIS, 'stroke-width': AXIS_W }, gAxes);
+      el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: T.axis, 'stroke-width': T.axisWidth }, gAxes);
       // Boundary tick marks (down)
       boundaries.forEach(b => {
         if (b < viewMin - 1e-9 || b > viewMax + 1e-9) return;
         const x = xScale(b);
-        el('line', { x1: x, y1: M.t + IH, x2: x, y2: M.t + IH + TICK_L, stroke: AXIS, 'stroke-width': TICK_W }, gAxes);
+        el('line', { x1: x, y1: M.t + IH, x2: x, y2: M.t + IH + T.tickLength, stroke: T.axis, 'stroke-width': T.tickWidth }, gAxes);
       });
       // Centered labels
       centers.forEach(c => {
         if (c.ms < viewMin - 1e-9 || c.ms > viewMax + 1e-9) return;
-        txt(c.label, { x: xScale(c.ms), y: M.t + IH + TICK_L + 14, 'text-anchor': 'middle',
-          'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+        txt(c.label, { x: xScale(c.ms), y: M.t + IH + T.tickLength + 14, 'text-anchor': 'middle',
+          'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
       });
 
       // Inline line-end labels
@@ -2661,8 +3499,8 @@
       const r = hover ? ((s.marker.radius || 4) + 2) : (s.marker.radius || 4);
       const sym = (p.marker && p.marker.symbol) || (s.marker && s.marker.symbol) || 'circle';
       const path = symbolPath(sym, cx, cy, r);
-      if (path) return el('path', { d: path, fill: s.color, stroke: INV_TEXT, 'stroke-width': hover ? 1.5 : 1 }, g);
-      return el('circle', { cx, cy, r, fill: s.color, stroke: INV_TEXT, 'stroke-width': hover ? 1.5 : 1 }, g);
+      if (path) return el('path', { d: path, fill: s.color, stroke: T.inverseText, 'stroke-width': hover ? 1.5 : 1 }, g);
+      return el('circle', { cx, cy, r, fill: s.color, stroke: T.inverseText, 'stroke-width': hover ? 1.5 : 1 }, g);
     }
 
     function placeInlineLabels() {
@@ -2689,7 +3527,7 @@
         if (inlineMode === 'value') label = formatValue(it.p.y, it.s);
         else if (inlineMode === 'both') label = `${it.s.name}: ${formatValue(it.p.y, it.s)}`;
         txt(label, { x, y: it.y + 4, 'text-anchor': 'start',
-          'font-size': F_INLINE, 'font-weight': CAT_FW, fill: it.s.color, 'font-family': FONT }, gLabels);
+          'font-size': T.inlineSize, 'font-weight': T.categoryWeight, fill: it.s.color, 'font-family': T.font }, gLabels);
       });
     }
 
@@ -2738,10 +3576,10 @@
 
     // ---- interaction ----
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container.appendChild(tooltip);
 
-    const crosshair = el('line', { x1: 0, x2: 0, y1: M.t, y2: M.t + IH, stroke: AXIS,
+    const crosshair = el('line', { x1: 0, x2: 0, y1: M.t, y2: M.t + IH, stroke: T.axis,
       'stroke-width': 1, 'stroke-dasharray': '3 3', style: 'display:none;pointer-events:none' }, gInteract);
     const hoverGroup = el('g', {}, gInteract);
 
@@ -2767,9 +3605,12 @@
       hoverGroup.innerHTML = '';
       rows.forEach(r => drawMarker(hoverGroup, r.s, r.p, xScale(r.p.x), yScale(r.p.y), true));
       const header = formatHeader(nearestX);
-      let html = `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(header)}</div>`;
+      life.hover({ name: header, x: nearestX,
+        index: xType === 'category' ? Math.round(nearestX) : undefined,
+        points: rows.map(r => ({ series: r.s.name, x: r.p.x, y: r.p.y })) });
+      let html = `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(header)}</div>`;
       rows.forEach(r => {
-        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(r.s.color)};border-radius:2px"></span><span style="color:${cssColor(LABEL_COL)}">${esc(r.s.name)}: </span><b style="color:${cssColor(TITLE_COL)}">${esc(formatValue(r.p.y, r.s) + valueSuffix)}</b></div>`;
+        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(r.s.color)};border-radius:2px"></span><span style="color:${cssColor(T.labelColor)}">${esc(r.s.name)}: </span><b style="color:${cssColor(T.titleColor)}">${esc(formatValue(r.p.y, r.s) + valueSuffix)}</b></div>`;
       });
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
@@ -2782,6 +3623,7 @@
       tooltip.style.top = ty + 'px';
     }
     function hideTooltip() {
+      life.hover(null);
       crosshair.style.display = 'none';
       tooltip.style.display = 'none';
       hoverGroup.innerHTML = '';
@@ -2798,7 +3640,7 @@
     let dragStart = null, selection = null, resetBtn = null;
     if (chartOpts.zoomType === 'x') {
       selection = el('rect', { x: 0, y: M.t, width: 0, height: IH,
-        fill: HIGHLIGHT, 'fill-opacity': 0.15, style: 'display:none;pointer-events:none' }, gInteract);
+        fill: T.highlight, 'fill-opacity': 0.15, style: 'display:none;pointer-events:none' }, gInteract);
       life.on(svg, 'mousedown', e => {
         const rect = svg.getBoundingClientRect();
         const px = e.clientX - rect.left;
@@ -2834,7 +3676,7 @@
       if (resetBtn) return;
       resetBtn = document.createElement('button');
       resetBtn.textContent = 'Reset zoom';
-      resetBtn.style.cssText = `position:absolute;top:12px;right:12px;padding:5px 10px;font:11px ${cssFont(FONT)};background:${cssColor(BG)};border:1px solid ${cssColor(AXIS)};border-radius:3px;cursor:pointer;color:${cssColor(LABEL_COL)};z-index:5;`;
+      resetBtn.style.cssText = `position:absolute;top:12px;right:12px;padding:5px 10px;font:11px ${cssFont(T.font)};background:${cssColor(T.bg)};border:1px solid ${cssColor(T.axis)};border-radius:3px;cursor:pointer;color:${cssColor(T.labelColor)};z-index:5;`;
       life.on(resetBtn, 'click', () => {
         viewMin = xMin; viewMax = xMax + xPad; render();
         resetBtn.remove(); resetBtn = null;
@@ -2865,26 +3707,27 @@
       gLegend.innerHTML = '';
       if (!legendEnabled) return;
       const startY = titleBlockH + 2;
-      const availW = W - HEAD_X * 2;
+      const availW = W - T.headingGutter * 2;
       _legendLayout.rows.forEach((row, ri) => {
-        const rowW = row.reduce((s, c) => s + c.w, 0) - LEG_GAP;
-        const rowStartX = HEAD_X;
+        const rowW = row.reduce((s, c) => s + c.w, 0) - T.legendGap;
+        const rowStartX = T.headingGutter;
         row.forEach(cell => {
           const s = seriesDefs.find(x => x.name === cell.item.name);
           if (!s) return;
           const x = rowStartX + cell.x;
-          const y = startY + ri * LEG_ROW;
+          const y = startY + ri * T.legendRowHeight;
           const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, gLegend);
-          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
-          el('rect', { x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
-            fill: s.visible ? s.color : DIM_COL }, gr);
-          txt(s.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW,
-            fill: s.visible ? (s.legendColor || TITLE_COL) : DIM_COL,
+          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
+          el('rect', { x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
+            fill: s.visible ? s.color : T.dimmed }, gr);
+          txt(s.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight,
+            fill: s.visible ? (s.legendColor || T.titleColor) : T.dimmed,
             'text-decoration': s.visible ? 'none' : 'line-through',
-            'font-family': FONT }, gr);
+            'font-family': T.font }, gr);
           gr.addEventListener('click', () => {
             s.visible = !s.visible;
+            life.emit('legendToggle', { series: s.name, visible: s.visible !== false, index: seriesDefs.indexOf(s) });
             render(); renderLegend();
           });
         });
@@ -2897,6 +3740,15 @@
     return chartAPI(life, {
       opts: opts, typeName: "Line chart",
       redraw: () => { render(); renderLegend(); },
+      // One keyboard stop per x, where the shared tooltip for that x opens.
+      keyTargets: () => {
+        const at = new Map();
+        seriesDefs.forEach(s => { if (s.visible) s.points.forEach(p => {
+          if (p && p.x >= viewMin && p.x <= viewMax && !at.has(p.x)) at.set(p.x, p);
+        }); });
+        return Array.from(at.values()).sort((a, b) => a.x - b.x).map(p => ({
+          x: xScale(p.x), y: Math.max(M.t + 1, Math.min(M.t + IH - 1, yScale(p.y))) }));
+      },
       getData: () => seriesDefs,
       getSeries: () => seriesDefs,
       extras: {
@@ -2912,7 +3764,7 @@
     });
   }
 
-    Charts.line = Chart;
+  window.ChartsShared.register('line', Chart);
 })();
 
 // ─── column / bar ───────────────────────────────────────────────────
@@ -2932,7 +3784,7 @@
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { monthNames, layoutCategoryAxis, maxLineChars, isSequentialCats, parseAxisDate, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, ellipsize, wrapAxisLabel, dlEnabled, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
+  const { monthNames, layoutCategoryAxis, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, ellipsize, wrapAxisLabel, dlEnabled, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
   // clean_charts tokens
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
@@ -3000,54 +3852,8 @@
     return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
   }
   function lighten(hex, amt) { return darken(hex, -amt); }
-  // Rough luminance to pick contrast text
-  // Word-wrap into up to N lines of a target character width (rough px based)
-  function wrapText(str, maxChars, maxLines) {
-    const words = String(str).split(/\s+/);
-    const lines = [];
-    let cur = '';
-    for (const w of words) {
-      if (!cur.length) { cur = w; continue; }
-      if ((cur + ' ' + w).length <= maxChars) cur += ' ' + w;
-      else { lines.push(cur); cur = w; if (lines.length >= maxLines - 1) break; }
-    }
-    if (cur) lines.push(cur);
-    if (lines.length > maxLines) {
-      const last = lines.slice(0, maxLines);
-      last[maxLines - 1] = last[maxLines - 1].slice(0, maxChars - 1) + '…';
-      return last;
-    }
-    return lines;
-  }
 
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -3057,73 +3863,21 @@
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, GRID, AXIS, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, INV_TEXT, HIGHLIGHT, POS_COL, NEG_COL, DEFAULT_COL, COLORS;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE, SPINE_W, GRID_W;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_POINT_LBL, F_NOTICE;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      INV_TEXT = t.inverseText;
-      HIGHLIGHT = t.highlight;
-      POS_COL = t.aboveThreshold;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      F_POINT_LBL = t.pointLabelSize;
-      F_NOTICE = t.noticeSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_VALUE = t.valueSize;
-      SPINE_W = t.spineWidth;
-      GRID_W = t.gridWidth;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
     function drawCategoryLabel(g, layout, tick, k, x, yTop, color, weight) {
-      const a = { 'font-size': layout.font, 'font-weight': weight, fill: color, 'font-family': FONT };
+      const a = { 'font-size': layout.font, 'font-weight': weight, fill: color, 'font-family': T.font };
       const lh = layout.font * 1.25;
       const y0 = yTop + (layout.stagger && k % 2 ? lh : 0);
       tick.lines.forEach((ln, li) => {
@@ -3139,7 +3893,7 @@
       const n = parseInt(c.length === 3 ? c.split('').map(x=>x+x).join('') : c, 16);
       const r=(n>>16)&255, g=(n>>8)&255, b=n&255;
       const L = 0.299*r + 0.587*g + 0.114*b;
-      return L < 140 ? INV_TEXT : TITLE_COL;
+      return L < 140 ? T.inverseText : T.titleColor;
     }
 
     applyTheme();
@@ -3149,8 +3903,8 @@
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -3183,26 +3937,26 @@
 
     // Title zone (fig.text style: top-left)
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // Determine longest category label for horizontal bar left pad
     const maxCatLen = categories.reduce((a,c) => Math.max(a, String(c).length), 0);
 
     // titleX is the shared left edge for title, subtitle, and (for columns) y-labels
-    const titleX = HEAD_X;
+    const titleX = T.headingGutter;
 
     // ── Legend layout (top row(s), auto-enabled when multi-series) ──────
     const seriesCount = (opts.series || []).length;
     const legendEnabled = (opts.legend && opts.legend.enabled != null)
       ? !!opts.legend.enabled : (seriesCount > 1);
     function layoutLegend(items, availW) {
-      const widths = items.map(it => LEG_ICON + LEG_ICON_GAP + Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+      const widths = items.map(it => T.legendIconSize + T.legendIconGap + Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       const rows = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -3211,9 +3965,9 @@
         curX += widths[i];
       }
       if (cur.length) rows.push(cur);
-      return { rows, height: rows.length * LEG_ROW };
+      return { rows, height: rows.length * T.legendRowHeight };
     }
-    const availLegW = W - HEAD_X * 2;
+    const availLegW = W - T.headingGutter * 2;
     const legendLayout = legendEnabled
       ? layoutLegend((opts.series || []).map((s, i) => ({ name: s.name || 'Series ' + (i + 1) })), availLegW)
       : { rows: [], height: 0 };
@@ -3231,9 +3985,9 @@
     let rowLabels = null;
     let leftPadForBars = 24;
     if (inverted) {
-      const ihEst = Math.max(40, H - (titleBlockH + legendZone + PLOT_GAP + TOP_AXIS_BAND) - 26);
+      const ihEst = Math.max(40, H - (titleBlockH + legendZone + T.plotGap + T.topAxisBand) - 26);
       rowLabels = layoutRowLabels(rowLabelCats, gutterMax - titleX - 10,
-        ihEst / rowCount, F_LABEL);
+        ihEst / rowCount, T.labelSize);
       leftPadForBars = Math.min(gutterMax,
         Math.round(titleX + rowLabelWidth(rowLabels) + 12));
     }
@@ -3246,15 +4000,15 @@
     const M = compact ? {
       l: inverted ? leftPadForBars : 14,
       r: 20,
-      t: titleBlockH + legendZone + PLOT_GAP + (inverted ? 0 : 8),
+      t: titleBlockH + legendZone + T.plotGap + (inverted ? 0 : 8),
       b: inverted ? 6 : 40
     } : {
       l: inverted ? leftPadForBars : 62,   // column: room for y-labels left-aligned to titleX
       r: 20,
       // The horizontal bar carries its value-axis labels ABOVE the plot, so it
       // reserves a band for them on top of the shared clearance; every other
-      // engine starts its plot at exactly titleBlockH + legendZone + PLOT_GAP.
-      t: titleBlockH + legendZone + PLOT_GAP + (inverted ? TOP_AXIS_BAND : 0),
+      // engine starts its plot at exactly titleBlockH + legendZone + T.plotGap.
+      t: titleBlockH + legendZone + T.plotGap + (inverted ? T.topAxisBand : 0),
       b: (inverted ? 26 : 40)  // room for category labels + ~20px outer pad
     };
     const IW = W - M.l - M.r;
@@ -3266,26 +4020,26 @@
       ? null
       : layoutCategoryAxis(
           categories.length ? categories : Array.from({ length: catCount }, (_, i) => i),
-          IW, F_LABEL, Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
+          IW, T.labelSize, Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
     if (catLayout) M.b = Math.max(26, catLayout.height);
     const IH = H - M.t - M.b;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
     // Title & subtitle top-left (titleX declared above with M)
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // Normalize series (assign gradient colors by default)
     const nSeries = (opts.series || []).length;
     const seriesDefs = (opts.series || []).map((s, i) => {
-      // Default color: gradient palette when >1 series, else DEFAULT_COL
-      const defaultColor = (nSeries === 1) ? DEFAULT_COL : COLORS[i % COLORS.length];
+      // Default color: gradient palette when >1 series, else T.defaultColor
+      const defaultColor = (nSeries === 1) ? T.defaultColor : T.colors[i % T.colors.length];
       const color = s.color || defaultColor;
       const type = s.type || forcedType || 'column';
       const dataLabels = Object.assign(
@@ -3381,7 +4135,7 @@
     // readable. Widths are estimated, as everywhere else in the engines.
     const labelBoxes = [];
     function placeLabel(cx, cy, text, anchor) {
-      const w = String(text).length * F_VALUE * 0.60 + 4, h = 13;
+      const w = String(text).length * T.valueSize * 0.60 + 4, h = 13;
       const x1 = anchor === 'end' ? cx - w : anchor === 'start' ? cx : cx - w / 2;
       const box = { x1: x1, x2: x1 + w, y1: cy - h, y2: cy + 3 };
       if (labelBoxes.some(b => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
@@ -3461,41 +4215,41 @@
         if (!compact) ranges.yTicks.forEach(v => {
           const y = yScale(v);
           el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y,
-            stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+            stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
           const label = stacking === 'percent' ? (Math.round(v) + '%') : fmtY(v);
           txt(label, { x: titleX, y: y + 4, 'text-anchor': 'start',
-            'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+            'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
         });
         // Bottom spine (light, thin)
         const y0 = yScale(Math.max(0, ranges.yMin));
         el('line', { x1: M.l, y1: y0, x2: M.l + IW, y2: y0,
-          stroke: LABEL_COL, 'stroke-width': SPINE_W }, gAxes);
+          stroke: T.labelColor, 'stroke-width': T.spineWidth }, gAxes);
         // Category labels below bars, laid out to fit without dropping any
         // named category (see layoutCategoryAxis).
         if (n !== catLayout.count) {
           catLayout = layoutCategoryAxis(
             categories.length ? categories : Array.from({ length: n }, (_, i) => i),
-            IW, F_LABEL, M.b, monthNames(resolveTheme(opts)));
+            IW, T.labelSize, M.b, monthNames(resolveTheme(opts)));
         }
         catLayout.ticks.forEach((tk, k) => {
           drawCategoryLabel(gAxes, catLayout, tk, k, catCenterX(tk.i, n),
-            M.t + IH + 16, CAT_COL, CAT_FW);
+            M.t + IH + 16, CAT_COL, T.categoryWeight);
         });
       } else {
         // Horizontal bar: vertical gridlines, top spine, x-axis labels on TOP
         if (!compact) ranges.yTicks.forEach(v => {
           const x = xScaleVal(v);
           el('line', { x1: x, x2: x, y1: M.t, y2: M.t + IH,
-            stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+            stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
           let label = stacking === 'percent' ? (Math.round(v) + '%') : fmtY(v);
           if (opts.tooltip && opts.tooltip.absoluteX) label = fmtY(Math.abs(v));
           txt(label, { x, y: M.t - 10, 'text-anchor': 'middle',
-            'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+            'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
         });
         // Top spine — or, compact, a baseline on zero for the bars to grow from
         const sx = compact ? xScaleVal(Math.max(0, ranges.yMin)) : null;
         el('line', Object.assign(compact ? { x1: sx, y1: M.t, x2: sx, y2: M.t + IH } : { x1: M.l, y1: M.t, x2: M.l + IW, y2: M.t },
-          { stroke: LABEL_COL, 'stroke-width': SPINE_W }), gAxes);
+          { stroke: T.labelColor, 'stroke-width': T.spineWidth }), gAxes);
         // Category labels aligned to titleX, vertically centered on bar. Never
         // thinned: each category owns a row, so labels stack instead of
         // colliding and a dropped one would leave a bar unidentified. They are
@@ -3504,13 +4258,13 @@
         if (rowLabels.lines.length !== n) {
           rowLabels = layoutRowLabels(
             categories.length ? categories : Array.from({ length: n }, (_, i) => i),
-            M.l - titleX - 10, IH / Math.max(1, n), F_LABEL);
+            M.l - titleX - 10, IH / Math.max(1, n), T.labelSize);
         }
         rowLabels.lines.forEach((lns, i) => {
           const y = catCenterY(i, n) + 4 - (lns.length - 1) * rowLabels.lh / 2;
           lns.forEach((ln, li) => {
             txt(ln, { x: titleX, y: y + li * rowLabels.lh, 'text-anchor': 'start',
-              'font-size': rowLabels.font, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gAxes);
+              'font-size': rowLabels.font, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gAxes);
           });
         });
       }
@@ -3645,7 +4399,7 @@
         const attrs = inverted
           ? { x: Math.min(a,c), y: M.t, width: Math.abs(c-a), height: IH }
           : { x: M.l, y: Math.min(a,c), width: IW, height: Math.abs(c-a) };
-        el('rect', Object.assign(attrs, { fill: b.color || HIGHLIGHT,
+        el('rect', Object.assign(attrs, { fill: b.color || T.highlight,
           'fill-opacity': b.alpha != null ? b.alpha : 0.12 }), gAxes);
       });
 
@@ -3656,15 +4410,15 @@
           ? { x1: p, x2: p, y1: M.t, y2: M.t + IH }
           : { x1: M.l, x2: M.l + IW, y1: p, y2: p };
         el('line', Object.assign(attrs, {
-          stroke: pl.color || AXIS, 'stroke-width': pl.width || 1.5,
+          stroke: pl.color || T.axis, 'stroke-width': pl.width || 1.5,
           'stroke-dasharray': DASH[pl.dashStyle || 'ShortDash'] || '4 2' }), gAxes);
         if (pl.label && pl.label.text) {
           // Label rides the end of the mark, inside the plot area.
           const la = inverted
             ? { x: p + 5, y: M.t + 12, 'text-anchor': 'start' }
             : { x: M.l + IW, y: p - 5, 'text-anchor': 'end' };
-          txt(pl.label.text, Object.assign(la, { 'font-size': F_POINT_LBL, 'font-weight': VAL_FW,
-            fill: pl.color || AXIS, 'font-family': FONT }), gAxes);
+          txt(pl.label.text, Object.assign(la, { 'font-size': T.pointLabelSize, 'font-weight': T.valueWeight,
+            fill: pl.color || T.axis, 'font-family': T.font }), gAxes);
         }
       });
     }
@@ -3681,7 +4435,7 @@
       const id = 'cc-hatch-' + Math.random().toString(36).slice(2);
       const pat = el('pattern', { id, width: 5, height: 5,
         patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
-      el('rect', { width: 5, height: 5, fill: BG }, pat);
+      el('rect', { width: 5, height: 5, fill: T.bg }, pat);
       el('rect', { width: 2.4, height: 5, fill: color }, pat);
       hatchIds[color] = id;
       return id;
@@ -3689,7 +4443,7 @@
     // Returns the SVG paint attributes for a bar in the given scenario.
     function scenarioFill(scenario, color) {
       if (scenario === 'plan' || scenario === 'budget')
-        return { fill: BG, stroke: color, 'stroke-width': 1.6 };
+        return { fill: T.bg, stroke: color, 'stroke-width': 1.6 };
       if (scenario === 'forecast' || scenario === 'estimate')
         return { fill: `url(#${hatchFor(color)})`, stroke: color, 'stroke-width': 1 };
       return { fill: color };
@@ -3743,7 +4497,7 @@
           : (typeof val === 'number' ? fmtY(Math.abs(val)) : val);
 
         // Estimated label width — the engines size text without measuring it.
-        const labelW = String(label).length * F_VALUE * 0.60;
+        const labelW = String(label).length * T.valueSize * 0.60;
 
         if (!isBar) {
           const side = segsPerSide[catIdx] || { pos: 0, neg: 0 };
@@ -3753,15 +4507,15 @@
             // Inside the segment: above it is where the NEXT segment sits, so
             // an above-bar label would land on its neighbour. Segments too
             // short to hold the number simply go unlabelled.
-            if (h >= F_VALUE + 6) {
-              txt(label, { x: x + w / 2, y: y + h / 2 + F_VALUE * 0.36, 'text-anchor': 'middle',
-                'font-size': F_VALUE, 'font-weight': VAL_FW, fill: contrastText(barColor),
-                'font-family': FONT }, gLabels);
+            if (h >= T.valueSize + 6) {
+              txt(label, { x: x + w / 2, y: y + h / 2 + T.valueSize * 0.36, 'text-anchor': 'middle',
+                'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
+                'font-family': T.font }, gLabels);
             }
           } else if (placeLabel(x + w / 2, y - 6, label, 'middle')) {
             // Value ABOVE bar
             txt(label, { x: x + w / 2, y: y - 6, 'text-anchor': 'middle',
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT }, gLabels);
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font }, gLabels);
           }
         } else if (isStacked) {
           const side = segsPerSide[catIdx] || { pos: 0, neg: 0 };
@@ -3775,22 +4529,22 @@
             if (w >= labelW + 12) {
               txt(label, { x: outward ? x + 6 : x + w - 6, y: ly,
                 'text-anchor': outward ? 'start' : 'end',
-                'font-size': F_VALUE, 'font-weight': VAL_FW, fill: contrastText(barColor),
-                'font-family': FONT }, gLabels);
+                'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
+                'font-family': T.font }, gLabels);
             } else {
               const lx = outward ? x - 6 : x + w + 6;
               if (placeLabel(lx, ly, label, outward ? 'end' : 'start')) {
                 txt(label, { x: lx, y: ly, 'text-anchor': outward ? 'end' : 'start',
-                  'font-size': F_VALUE, 'font-weight': VAL_FW, fill: VAL_COL,
-                  'font-family': FONT }, gLabels);
+                  'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.valueColor,
+                  'font-family': T.font }, gLabels);
               }
             }
           } else if (w >= labelW + 12) {
             // Several segments on this side: the only honest place for the
             // number is inside the segment it belongs to.
             txt(label, { x: x + w / 2, y: ly, 'text-anchor': 'middle',
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: contrastText(barColor),
-              'font-family': FONT }, gLabels);
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
+              'font-family': T.font }, gLabels);
           }
         } else {
           // Value at right end of bar; inside-white if long enough, else outside-dark
@@ -3798,12 +4552,12 @@
           const threshold = total * 0.15;
           // An outlined (plan) bar has no fill to sit a label on, so it always
           // takes the outside placement regardless of length.
-          if (w >= threshold && paint.fill !== BG) {
+          if (w >= threshold && paint.fill !== T.bg) {
             txt(label, { x: x + w - 6, y: y + h/2 + 4, 'text-anchor': 'end',
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: contrastText(barColor), 'font-family': FONT }, gLabels);
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor), 'font-family': T.font }, gLabels);
           } else if (placeLabel(x + w + 6, y + h/2 + 4, label, 'start')) {
             txt(label, { x: x + w + 6, y: y + h/2 + 4, 'text-anchor': 'start',
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT }, gLabels);
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font }, gLabels);
           }
         }
       }
@@ -3817,11 +4571,11 @@
 
     // Interaction — shared tooltip
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container.appendChild(tooltip);
 
     const crosshair = el('rect', { x: 0, y: 0, width: 0, height: 0,
-      fill: HOVER_INK, 'fill-opacity': 0.04, style: 'display:none;pointer-events:none' }, gInteract);
+      fill: T.hoverInk, 'fill-opacity': 0.04, style: 'display:none;pointer-events:none' }, gInteract);
 
     function onMove(evt) {
       const rect = svg.getBoundingClientRect();
@@ -3844,7 +4598,13 @@
       }
       crosshair.style.display = 'block';
       const header = categories[idx] != null ? String(categories[idx]) : String(idx);
-      let html = `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(header)}</div>`;
+      life.hover({ name: header, index: idx,
+        points: seriesDefs.filter(s => s.visible && s.points[idx]).map(s => {
+          const p = s.points[idx];
+          return p.low != null && p.high != null
+            ? { series: s.name, low: p.low, high: p.high } : { series: s.name, y: p.y };
+        }) });
+      let html = `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(header)}</div>`;
       seriesDefs.forEach(s => {
         if (!s.visible) return;
         const p = s.points[idx]; if (!p) return;
@@ -3852,7 +4612,7 @@
         if (p.low != null && p.high != null) val = `${formatValue(p.low, s)} – ${formatValue(p.high, s)}`;
         else if (p.y != null) val = formatValue(Math.abs(p.y), s);
         else return;
-        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(s.color)};border-radius:2px"></span><span style="color:${cssColor(LABEL_COL)}">${esc(s.name)}: </span><b style="color:${cssColor(TITLE_COL)}">${esc(val)}</b></div>`;
+        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(s.color)};border-radius:2px"></span><span style="color:${cssColor(T.labelColor)}">${esc(s.name)}: </span><b style="color:${cssColor(T.titleColor)}">${esc(val)}</b></div>`;
       });
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
@@ -3865,6 +4625,7 @@
       tooltip.style.top = ty + 'px';
     }
     function hideTooltip() {
+      life.hover(null);
       crosshair.style.display = 'none';
       tooltip.style.display = 'none';
     }
@@ -3876,28 +4637,29 @@
       gLegend.innerHTML = '';
       if (!legendEnabled) return;
       const startY = titleBlockH + 2;
-      const availW = W - HEAD_X * 2;
+      const availW = W - T.headingGutter * 2;
       legendLayout.rows.forEach((row, ri) => {
-        const rowW = row.reduce((s, c) => s + c.w, 0) - LEG_GAP;
-        const rowStartX = HEAD_X;
+        const rowW = row.reduce((s, c) => s + c.w, 0) - T.legendGap;
+        const rowStartX = T.headingGutter;
         row.forEach(cell => {
           const s = seriesDefs.find(x => x.name === cell.item.name);
           if (!s) return;
           const x = rowStartX + cell.x;
-          const y = startY + ri * LEG_ROW;
+          const y = startY + ri * T.legendRowHeight;
           const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, gLegend);
-          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
+          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
           // The swatch carries the scenario notation too — a legend showing a
           // solid block for a hatched forecast series misreports the data.
-          el('rect', Object.assign({ x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2 },
-            s.visible ? scenarioFill(s.scenario, s.color) : { fill: DIM_COL }), gr);
-          txt(s.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW,
-            fill: s.visible ? (s.legendColor || TITLE_COL) : DIM_COL,
+          el('rect', Object.assign({ x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2 },
+            s.visible ? scenarioFill(s.scenario, s.color) : { fill: T.dimmed }), gr);
+          txt(s.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight,
+            fill: s.visible ? (s.legendColor || T.titleColor) : T.dimmed,
             'text-decoration': s.visible ? 'none' : 'line-through',
-            'font-family': FONT }, gr);
+            'font-family': T.font }, gr);
           gr.addEventListener('click', () => {
             s.visible = !s.visible;
+            life.emit('legendToggle', { series: s.name, visible: s.visible !== false, index: seriesDefs.indexOf(s) });
             render(); renderLegend();
           });
         });
@@ -3910,13 +4672,19 @@
     return chartAPI(life, {
       opts: opts, typeName: "Bar chart",
       redraw: () => { render(); renderLegend(); },
+      // One keyboard stop per category band, where its shared tooltip opens.
+      keyTargets: () => {
+        const n = categories.length || (seriesDefs[0] ? seriesDefs[0].points.length : 0);
+        return Array.from({ length: n }, (_, i) => inverted
+          ? { x: M.l + IW / 2, y: M.t + (i + 0.5) * IH / n, w: IW, h: IH / n }
+          : { x: M.l + (i + 0.5) * IW / n, y: M.t + IH / 2, w: IW / n, h: IH });
+      },
       getData: () => seriesDefs,
       getSeries: () => seriesDefs
     });
   }
 
-    Charts.column = Chart;
-  Charts._barBase = Chart;
+  window.ChartsShared.register(['column', '_barBase'], Chart);
 })();
 
 
@@ -3932,7 +4700,7 @@ Charts.bar = function (container, opts) {
  * Matches clean_charts/plots/donut.py:
  *  - Cream bg, Inter, top-left title/subtitle
  *  - Black → blue gradient wedges (get_gradient_colors)
- *  - BG-colored 2px separators between wedges (cutout look)
+ *  - T.bg-colored 2px separators between wedges (cutout look)
  *  - Callout: radial-out → diagonal-to-elbow → horizontal-to-label-column
  *  - Fixed label columns at outer chart margins (left/right)
  *  - Two-line label: bold category name above, lighter value below
@@ -3970,14 +4738,6 @@ Charts.bar = function (container, opts) {
     }
     return out;
   }
-  function lighten(hex, amt) {
-    const [r,g,b] = hex2rgb(hex);
-    return rgb2hex(r + (255-r)*amt, g + (255-g)*amt, b + (255-b)*amt);
-  }
-  function darken(hex, amt) {
-    const [r,g,b] = hex2rgb(hex);
-    return rgb2hex(r*(1-amt), g*(1-amt), b*(1-amt));
-  }
 
   function parseSize(v, ref) {
     if (v == null) return null;
@@ -4012,33 +4772,6 @@ Charts.bar = function (container, opts) {
   }
 
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -4048,62 +4781,20 @@ Charts.bar = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, AXIS, TITLE_COL, SUB_COL, LABEL_COL, CALLOUT_COL, CONNECT_COL, CONNECT_W, START_COL, END_COL;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_VALUE, F_CENTER;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CONNECT_COL;
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      CALLOUT_COL = t.connectorLabel;
+      T = Object.freeze(resolveTheme(opts));
       // The connector rule carries the label, so it is drawn darker and heavier
       // than the old hairline; both are theme tokens.
-      CONNECT_COL = t.connectorLine;
-      CONNECT_W = t.connectorWidth;
-      START_COL = t.gradientStart;
-      END_COL = t.gradientEnd;
+      CONNECT_COL = T.connectorLine;
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_VALUE = t.valueSize;
-      F_CENTER = t.centerSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -4113,8 +4804,8 @@ Charts.bar = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -4192,29 +4883,29 @@ Charts.bar = function (container, opts) {
     // Uniform outer margin (clean-charts uses ~40px)
     const marginPx = 22;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
     // Title & subtitle top-left
-    const titleX = HEAD_X;
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    const titleX = T.headingGutter;
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // ── Legend layout (top, below subtitle, wraps to multiple rows) ─────
     function layoutLegend(items, availW) {
-      const widths = items.map(it => LEG_ICON + LEG_ICON_GAP + Math.ceil(it.name.length * F_LEG * 0.55) + LEG_GAP);
+      const widths = items.map(it => T.legendIconSize + T.legendIconGap + Math.ceil(it.name.length * T.legendSize * 0.55) + T.legendGap);
       const rows = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -4223,7 +4914,7 @@ Charts.bar = function (container, opts) {
         curX += widths[i];
       }
       if (cur.length) rows.push(cur);
-      return { rows, height: rows.length * LEG_ROW };
+      return { rows, height: rows.length * T.legendRowHeight };
     }
     const availLegendW = W - marginPx * 2;
     const legendLayout = legendEnabled
@@ -4285,17 +4976,17 @@ Charts.bar = function (container, opts) {
     // is the text's inset from the end of its rule (see lx below) plus a hair.
     const LABEL_INSET = 6, ONE_LINE_GAP = 8;
     const boldFW = fw => fw === 'bold' || +fw >= 600;
-    const nameW = (name, size) => measureText(String(name), size, boldFW(CAT_FW), FONT);
+    const nameW = (name, size) => measureText(String(name), size, boldFW(T.categoryWeight), T.font);
     const valueStrFor = y => plotOpts.showPercentages
       ? ((+y || 0) / totalForPct * 100).toFixed(1) + '%'
       : addCommas(+y || 0) + (plotOpts.valueSuffix || '');
     // Width of one callout block in a given mode at full type size. Measured
     // text scales linearly with font size, so callers multiply by labelScale.
     const labelWidthFor = (name, y, mode) => {
-      const nw = nameW(name, F_LABEL);
-      const vw = measureText(valueStrFor(y), F_VALUE, boldFW(TICK_FW), FONT);
+      const nw = nameW(name, T.labelSize);
+      const vw = measureText(valueStrFor(y), T.valueSize, boldFW(T.tickWeight), T.font);
       // value-only labels are drawn in the name's role (size and weight)
-      const vwAsName = nameW(valueStrFor(y), F_LABEL);
+      const vwAsName = nameW(valueStrFor(y), T.labelSize);
       return LABEL_INSET + (mode === 'two' ? Math.max(nw, vw)
         : mode === 'one' ? nw + ONE_LINE_GAP + vw
         : mode === 'value' ? vwAsName : nw);
@@ -4313,7 +5004,7 @@ Charts.bar = function (container, opts) {
     //   two-line blocks → one-line blocks → drop the legend → name-only
     //   labels → shrink the type (floor 0.72).
     // Something is always drawn; only the amount of detail gives way.
-    const vRoomFor = zone => (chartBottom - (titleBlockH + zone + PLOT_GAP)) - 24;
+    const vRoomFor = zone => (chartBottom - (titleBlockH + zone + T.plotGap)) - 24;
     const textWidthFor = mode =>
       mode === 'two' ? Math.max(widestName, widestValue)
       : mode === 'one' ? widestPair
@@ -4371,7 +5062,7 @@ Charts.bar = function (container, opts) {
       // gets at least RING_SHARE of the radius the height allows. If no step
       // gets there, take the one that gives the ring the most.
       const RING_SHARE = 0.75;
-      const heightRAt = zone => (chartBottom - (titleBlockH + zone + PLOT_GAP)) / 2
+      const heightRAt = zone => (chartBottom - (titleBlockH + zone + T.plotGap)) / 2
         - (STUB_GAP_MAX + STUB_LEN_MAX + 6);
       const ringRFor = (mode, scale) => (chartW - 2 * Math.max(COL_MIN,
         Math.min(capPadFor(mode), textWidthFor(mode) * scale + CONNECT_RUN))) / 2;
@@ -4396,7 +5087,7 @@ Charts.bar = function (container, opts) {
       }
     }
     const legendVisible = legendEnabled && legendZone > 0;
-    const chartTop = titleBlockH + legendZone + PLOT_GAP;
+    const chartTop = titleBlockH + legendZone + T.plotGap;
     const chartH = chartBottom - chartTop;
     const vRoom = chartH - 24;
     // The column is only as wide as the text it holds plus the connector run,
@@ -4445,8 +5136,8 @@ Charts.bar = function (container, opts) {
     const autoRotate = plotOpts.autoRotate !== false;
 
     // Data + gradient colors (clean-charts default black → blue)
-    const startCol = plotOpts.startColor || opts.startColor || START_COL;
-    const endCol   = plotOpts.endColor   || opts.endColor   || END_COL;
+    const startCol = plotOpts.startColor || opts.startColor || T.gradientStart;
+    const endCol   = plotOpts.endColor   || opts.endColor   || T.gradientEnd;
     // Colors span the slices that will actually be drawn, so dropping a bad
     // point does not leave a gap in the gradient.
     const gradList = gradientColors(startCol, endCol, rawData.length);
@@ -4488,7 +5179,7 @@ Charts.bar = function (container, opts) {
     if (droppedNote) {
       txt(droppedNote, {
         x: titleX, y: H - marginPx + 2, 'text-anchor': 'start',
-        'font-size': F_NOTE, fill: SUB_COL, 'font-family': FONT
+        'font-size': F_NOTE, fill: T.subtitleColor, 'font-family': T.font
       }, svg);
     }
 
@@ -4508,7 +5199,7 @@ Charts.bar = function (container, opts) {
           : 'Nothing to show';
         txt(why, {
           x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
-          'font-size': F_LABEL, fill: SUB_COL, 'font-family': FONT
+          'font-size': T.labelSize, fill: T.subtitleColor, 'font-family': T.font
         }, gCenter);
         return;
       }
@@ -4612,13 +5303,13 @@ Charts.bar = function (container, opts) {
         it.idealY = d._p2[1];
       });
 
-      // Pass 2: draw wedges (BG-colored 2px separators for cutout look)
+      // Pass 2: draw wedges (T.bg-colored 2px separators for cutout look)
       items.forEach(({ d }) => {
         const ox = Math.cos(d._midA) * d._off, oy = Math.sin(d._midA) * d._off;
         const path = arcSegment(cx + ox, cy + oy, d._rOut, innerR, d._a0, d._a1);
         const fill = d.color;
         const slice = el('path', { d: path, fill,
-          stroke: BG, 'stroke-width': 2, 'stroke-linejoin': 'round',
+          stroke: T.bg, 'stroke-width': 2, 'stroke-linejoin': 'round',
           class: 'slice', 'data-idx': d.origIdx,
           style: 'cursor:pointer;transition:opacity .15s' }, gSlices);
         d._node = slice;
@@ -4654,7 +5345,7 @@ Charts.bar = function (container, opts) {
         // below it. In the compact one-line mode both sit above the rule, which
         // halves the vertical budget per label.
         // Type shrinks with labelScale when the stack would otherwise overflow.
-        const fLabel = F_LABEL * labelScale, fValue = F_VALUE * labelScale;
+        const fLabel = T.labelSize * labelScale, fValue = T.valueSize * labelScale;
         // clean-charts anchors both lines to the connector's horizontal run:
         // the name sits on it (baseline just above), the value hangs below it.
         const nameDY = oneLine ? -(fLabel * 0.35) : -(fLabel * 0.55);
@@ -4736,7 +5427,7 @@ Charts.bar = function (container, opts) {
           const elbowX = isRight ? rightElbowX : leftElbowX;
           el('path', {
             d: `M ${p1[0]} ${p1[1]} L ${p2[0]} ${p2[1]} L ${elbowX} ${it.y} L ${colX} ${it.y}`,
-            stroke: CONNECT_COL, 'stroke-width': CONNECT_W, fill: 'none',
+            stroke: CONNECT_COL, 'stroke-width': T.connectorWidth, fill: 'none',
             'stroke-linecap': 'round', 'stroke-linejoin': 'round'
           }, gConnectors);
 
@@ -4763,12 +5454,12 @@ Charts.bar = function (container, opts) {
           if (valueOnly) {
             txt(valueStr, {
               x: lx, y: it.y +nameDY, 'text-anchor': anch,
-              'font-size': fLabel, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+              'font-size': fLabel, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font
             }, gLabels);
           } else if (nameOnly) {
             txt(d.name, {
               x: lx, y: it.y +nameDY, 'text-anchor': anch,
-              'font-size': fLabel, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+              'font-size': fLabel, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font
             }, gLabels);
           } else if (oneLine) {
             // Name then value share one baseline, reading outward-in on both
@@ -4776,21 +5467,21 @@ Charts.bar = function (container, opts) {
             const nameGap = nameW(d.name, fLabel) + ONE_LINE_GAP;
             txt(d.name, {
               x: lx, y: it.y +nameDY, 'text-anchor': anch,
-              'font-size': fLabel, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+              'font-size': fLabel, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font
             }, gLabels);
             txt(valueStr, {
               x: isRight ? lx - nameGap : lx + nameGap, y: it.y + valueDY,
               'text-anchor': anch,
-              'font-size': fValue, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT
+              'font-size': fValue, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font
             }, gLabels);
           } else {
             txt(d.name, {
               x: lx, y: it.y +nameDY, 'text-anchor': anch,
-              'font-size': fLabel, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+              'font-size': fLabel, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font
             }, gLabels);
             txt(valueStr, {
               x: lx, y: it.y +valueDY, 'text-anchor': anch,
-              'font-size': fValue, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT
+              'font-size': fValue, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font
             }, gLabels);
           }
         });
@@ -4837,13 +5528,13 @@ Charts.bar = function (container, opts) {
         const lines = String(ct.value != null ? ct.value : total).split('\n');
         lines.forEach((ln, i) => {
           txt(ln, { x: cx, y: cyC - (lines.length - 1) * 8 + i * 20,
-            'text-anchor': 'middle', 'font-size': ct.valueFontSize || F_CENTER * 1.6,
-            'font-weight': VAL_FW, fill: ct.color || VAL_COL, 'font-family': FONT }, gCenter);
+            'text-anchor': 'middle', 'font-size': ct.valueFontSize || T.centerSize * 1.6,
+            'font-weight': T.valueWeight, fill: ct.color || T.valueColor, 'font-family': T.font }, gCenter);
         });
         if (ct.label) txt(ct.label, {
           x: cx, y: cyC + (lines.length - 1) * 10 + 22,
-          'text-anchor': 'middle', 'font-size': F_LABEL, fill: SUB_COL,
-          'font-family': FONT
+          'text-anchor': 'middle', 'font-size': T.labelSize, fill: T.subtitleColor,
+          'font-family': T.font
         }, gCenter);
       }
     }
@@ -4863,17 +5554,18 @@ Charts.bar = function (container, opts) {
           ))] || data.find(x => x.name === cell.item.name);
           if (!d) return;
           const x = rowStartX + cell.x;
-          const y = startY + ri * LEG_ROW;
+          const y = startY + ri * T.legendRowHeight;
           const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, gLegend);
-          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
-          el('rect', { x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
-            fill: d.visible ? d.color : DIM_COL }, gr);
-          txt(d.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12, 'font-size': F_LEG, 'font-weight': LEG_FW,
-            fill: d.visible ? CAT_COL : DIM_COL,
+          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
+          el('rect', { x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
+            fill: d.visible ? d.color : T.dimmed }, gr);
+          txt(d.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12, 'font-size': T.legendSize, 'font-weight': T.legendWeight,
+            fill: d.visible ? CAT_COL : T.dimmed,
             'text-decoration': d.visible ? 'none' : 'line-through',
-            'font-family': FONT }, gr);
+            'font-family': T.font }, gr);
           gr.addEventListener('click', () => {
             d.visible = !d.visible;
+            life.emit('legendToggle', { series: d.name, visible: d.visible !== false, index: data.indexOf(d) });
             render(); renderLegend();
           });
         });
@@ -4882,15 +5574,15 @@ Charts.bar = function (container, opts) {
 
     // Tooltip
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container.appendChild(tooltip);
 
     function showTooltip(d, ev) {
       const total = data.filter(x=>x.visible).reduce((s,x)=>s+x.y, 0);
       const pct = (d.y / total * 100).toFixed(1);
       tooltip.innerHTML =
-        `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(dataName)}</div>` +
-        `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(d.color)};border-radius:2px;margin-right:6px"></span>${esc(d.name)}: <b style="color:${cssColor(TITLE_COL)}">${esc(addCommas(d.y))}</b> (${pct}%)</div>`;
+        `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(dataName)}</div>` +
+        `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(d.color)};border-radius:2px;margin-right:6px"></span>${esc(d.name)}: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(d.y))}</b> (${pct}%)</div>`;
       tooltip.style.display = 'block';
       const rect = svg.getBoundingClientRect();
       const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
@@ -4912,15 +5604,18 @@ Charts.bar = function (container, opts) {
         if (!d) return;
         data.forEach(x => { if (x._node) x._node.style.opacity = '1'; });
         target.style.opacity = '0.85';
+        life.hover({ name: d.name, series: dataName, index: idx, y: d.y });
         showTooltip(d, ev);
       } else {
         data.forEach(x => { if (x._node) x._node.style.opacity = '1'; });
         hideTooltip();
+        life.hover(null);
       }
     });
     life.on(svg, 'mouseleave', () => {
       data.forEach(x => { if (x._node) x._node.style.opacity = '1'; });
       hideTooltip();
+      life.hover(null);
     });
 
     life.on(svg, 'click', ev => {
@@ -4939,7 +5634,7 @@ Charts.bar = function (container, opts) {
       opts: opts, typeName: "Donut chart", redraw: () => { render(); renderLegend(); }, getData: () => data });
   }
 
-    Charts.donut = Chart;
+  window.ChartsShared.register('donut', Chart);
 })();
 
 
@@ -4998,10 +5693,6 @@ Charts.pie = function (container, opts) {
     }
     return out;
   }
-  function darken(hex, amt) {
-    const [r,g,b] = hex2rgb(hex);
-    return rgb2hex(r*(1-amt), g*(1-amt), b*(1-amt));
-  }
 
   function symbolPath(kind, cx, cy, r) {
     switch (kind) {
@@ -5059,33 +5750,6 @@ Charts.pie = function (container, opts) {
   }
 
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -5095,70 +5759,19 @@ Charts.pie = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, GRID, AXIS, TITLE_COL, SUB_COL, LABEL_COL, INV_TEXT, START_COL, END_COL, TREND_COL, DEFAULT_COL;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_POINT_LBL, SPINE_W, GRID_W;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      applyThemeColors();
-      const t = resolveTheme(opts);
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_POINT_LBL = t.pointLabelSize;
-      SPINE_W = t.axisWidth;
-      GRID_W = t.gridWidth;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
-    function applyThemeColors() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      INV_TEXT = t.inverseText;
-      START_COL = t.gradientStart;
-      END_COL = t.gradientEnd;
-      TREND_COL = t.trend;
-      DEFAULT_COL = t.defaultColor;
-    }
 
     applyTheme();
     opts = opts || {};
@@ -5167,8 +5780,8 @@ Charts.pie = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -5189,20 +5802,20 @@ Charts.pie = function (container, opts) {
     // Layout tokens (clean-charts uses ~45px outer margin)
     const marginPx = 20;   // the shared outer pad, as in column/line/histogram
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // Legend: auto-enable when multi-series; wraps across rows as needed.
     const hasLegend = (opts.legend && opts.legend.enabled != null)
       ? !!opts.legend.enabled
       : ((opts.series || []).length > 1);
     function _layoutLegend(items, availW) {
-      const widths = items.map(it => LEG_ICON + LEG_ICON_GAP + Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+      const widths = items.map(it => T.legendIconSize + T.legendIconGap + Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       const rows = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -5211,10 +5824,10 @@ Charts.pie = function (container, opts) {
         curX += widths[i];
       }
       if (cur.length) rows.push(cur);
-      return { rows, height: rows.length * LEG_ROW };
+      return { rows, height: rows.length * T.legendRowHeight };
     }
     const _legendLayout = hasLegend
-      ? _layoutLegend((opts.series || []).map((s, i) => ({ name: s.name || 'Series ' + (i + 1) })), W - HEAD_X * 2)
+      ? _layoutLegend((opts.series || []).map((s, i) => ({ name: s.name || 'Series ' + (i + 1) })), W - T.headingGutter * 2)
       : { rows: [], height: 0 };
     const legendZone = _legendLayout.height;
 
@@ -5233,7 +5846,7 @@ Charts.pie = function (container, opts) {
       ? niceTicks(_yLo - _yPad, _yHi + _yPad, 6) : [0];
     const _maxLbl = _previewTicks.reduce((m, v) =>
       Math.max(m, (addCommas((+v.toFixed(6)).toString()) + ySuffix).length), 3);
-    const _tickTextW = Math.ceil(_maxLbl * F_TICK * 0.6) + 8; // +8 gap between text and spine
+    const _tickTextW = Math.ceil(_maxLbl * T.tickSize * 0.6) + 8; // +8 gap between text and spine
     // Symmetric with bottomPad: edge pad + title + tick strings.
     // At least the 62 the column, line and histogram engines use, so a scatter
     // sitting beside one of them in a grid starts its plot on the same line;
@@ -5248,28 +5861,28 @@ Charts.pie = function (container, opts) {
     const compact = !!chartOpts.compact;
     const M = compact ? {
       l: 12, r: 12,
-      t: titleBlockH + legendZone + PLOT_GAP + 4,
+      t: titleBlockH + legendZone + T.plotGap + 4,
       b: 8
     } : {
       l: leftPad,
       r: marginPx,
-      t: titleBlockH + legendZone + PLOT_GAP,
+      t: titleBlockH + legendZone + T.plotGap,
       b: bottomPad
     };
     const IW = W - M.l - M.r;
     const IH = H - M.t - M.b;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
     // Title and subtitle top-left, aligned to titleX
-    const titleX = HEAD_X;
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    const titleX = T.headingGutter;
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // Normalize series
     const seriesDefs = (opts.series || []).map((s, i) => {
@@ -5306,10 +5919,10 @@ Charts.pie = function (container, opts) {
 
     // Auto-assign colors: gradient across series for scatter groups; single default for a single series
     if (seriesDefs.length > 1) {
-      const grad = gradientColors(START_COL, END_COL, seriesDefs.length);
+      const grad = gradientColors(T.gradientStart, T.gradientEnd, seriesDefs.length);
       seriesDefs.forEach((s, i) => { if (!s.color) s.color = grad[i]; });
     } else {
-      seriesDefs.forEach(s => { if (!s.color) s.color = DEFAULT_COL; });
+      seriesDefs.forEach(s => { if (!s.color) s.color = T.defaultColor; });
     }
 
     // Compute ranges
@@ -5371,30 +5984,30 @@ Charts.pie = function (container, opts) {
       // Both x AND y gridlines
       if (!compact) r.yTicks.forEach(v => {
         const y = yScale(v);
-        el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+        el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
         const label = addCommas((+v.toFixed(6)).toString()) + ySuffix;
         txt(label, { x: M.l - 8, y: y + 4, 'text-anchor': 'end',
-          'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+          'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
       });
       if (!compact) r.xTicks.forEach(v => {
         const x = xScale(v);
-        el('line', { x1: x, x2: x, y1: M.t, y2: M.t + IH, stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+        el('line', { x1: x, x2: x, y1: M.t, y2: M.t + IH, stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
         const label = addCommas((+v.toFixed(6)).toString()) + xSuffix;
         txt(label, { x, y: M.t + IH + 18, 'text-anchor': 'middle',
-          'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL, 'font-family': FONT }, gAxes);
+          'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, gAxes);
       });
 
       // Both LEFT and BOTTOM spines (dark)
-      if (!compact) el('line', { x1: M.l, y1: M.t, x2: M.l, y2: M.t + IH, stroke: AXIS, 'stroke-width': SPINE_W }, gAxes);
-      if (!compact) el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: AXIS, 'stroke-width': SPINE_W }, gAxes);
+      if (!compact) el('line', { x1: M.l, y1: M.t, x2: M.l, y2: M.t + IH, stroke: T.axis, 'stroke-width': T.axisWidth }, gAxes);
+      if (!compact) el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: T.axis, 'stroke-width': T.axisWidth }, gAxes);
 
       // X label bottom-centered
       if (xTitle && !compact) txt(xTitle, { x: M.l + IW/2, y: H - 8, 'text-anchor': 'middle',
-        'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gAxes);
+        'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gAxes);
       // Y label rotated, aligned to titleX
       if (yTitle && !compact) {
         const t = txt(yTitle, { x: 0, y: 0, 'text-anchor': 'middle',
-          'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gAxes);
+          'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gAxes);
         // Shift anchor right by ~ascent so the rotated text's visual left edge sits at titleX.
         t.setAttribute('transform', `translate(${titleX + 11}, ${M.t + IH/2}) rotate(-90)`);
       }
@@ -5408,7 +6021,7 @@ Charts.pie = function (container, opts) {
 
       // Determine bubble color mode: gradient by size when only one bubble series
       const bubbleGrad = (r.zMin !== Infinity && r.zMax !== r.zMin)
-        ? gradientColors(START_COL, END_COL, 100) : null;
+        ? gradientColors(T.gradientStart, T.gradientEnd, 100) : null;
 
       seriesDefs.forEach((s, si) => {
         if (!s.visible) return;
@@ -5431,7 +6044,7 @@ Charts.pie = function (container, opts) {
           // Point labels
           if (s.showLabels && p.name) {
             txt(p.name, { x: cx, y: cy - radius - 4, 'text-anchor': 'middle',
-              'font-size': F_POINT_LBL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gLabels);
+              'font-size': T.pointLabelSize, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gLabels);
           }
         });
 
@@ -5445,7 +6058,7 @@ Charts.pie = function (container, opts) {
             el('line', {
               x1: xScale(r.xMin), y1: yScale(y1),
               x2: xScale(r.xMax), y2: yScale(y2),
-              stroke: TREND_COL, 'stroke-width': 2, 'stroke-dasharray': '6 4'
+              stroke: T.trend, 'stroke-width': 2, 'stroke-dasharray': '6 4'
             }, gLines);
           }
         }
@@ -5461,7 +6074,7 @@ Charts.pie = function (container, opts) {
       const n = visible.length;
 
       // Draw a light bottom spine as a base reference
-      el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: AXIS, 'stroke-width': SPINE_W }, gAxes);
+      el('line', { x1: M.l, y1: M.t + IH, x2: M.l + IW, y2: M.t + IH, stroke: T.axis, 'stroke-width': T.axisWidth }, gAxes);
 
       visible.forEach((s, si) => {
         const gx = M.l + IW * ((si + 0.5) / n);
@@ -5479,7 +6092,7 @@ Charts.pie = function (container, opts) {
       const packedOpts = (opts.plotOptions && opts.plotOptions.packedbubble) || {};
       const minR = parseFloat(packedOpts.minSize || 15) / 2;
       const maxR = parseFloat(packedOpts.maxSize || 55) / 2;
-      const grad = gradientColors(START_COL, END_COL, 100);
+      const grad = gradientColors(T.gradientStart, T.gradientEnd, 100);
       flat.forEach(b => {
         const t = (maxV === minV) ? 1 : Math.sqrt((b.p.y - minV) / (maxV - minV));
         b.r = minR + t * (maxR - minR);
@@ -5504,10 +6117,10 @@ Charts.pie = function (container, opts) {
           // Use white text on dark fill, dark on light
           const [rr,gg,bb] = hex2rgb(b._fillColor);
           const L = 0.299*rr + 0.587*gg + 0.114*bb;
-          const col = L < 140 ? INV_TEXT : TITLE_COL;
+          const col = L < 140 ? T.inverseText : T.titleColor;
           txt(b.p.name, { x: b.x, y: b.y + 4, 'text-anchor': 'middle',
-            'font-size': Math.min(F_TIP, b.r * 0.42), 'font-weight': VAL_FW,
-            fill: col, 'font-family': FONT, style: 'pointer-events:none' }, gLabels);
+            'font-size': Math.min(T.tooltipSize, b.r * 0.42), 'font-weight': T.valueWeight,
+            fill: col, 'font-family': T.font, style: 'pointer-events:none' }, gLabels);
         }
       });
 
@@ -5522,11 +6135,11 @@ Charts.pie = function (container, opts) {
       let node;
       if (path) {
         node = el('path', { d: path, fill: fillColor,
-          stroke: INV_TEXT, 'stroke-width': hover ? 1.5 : 0.8 }, g);
+          stroke: T.inverseText, 'stroke-width': hover ? 1.5 : 0.8 }, g);
       } else {
         // circle
         node = el('circle', { cx, cy, r, fill: fillColor,
-          stroke: INV_TEXT, 'stroke-width': hover ? 1.5 : 0.8 }, g);
+          stroke: T.inverseText, 'stroke-width': hover ? 1.5 : 0.8 }, g);
       }
       node.classList.add('pt');
       node.setAttribute('data-si', si);
@@ -5574,23 +6187,24 @@ Charts.pie = function (container, opts) {
       if (!hasLegend) return;
       const startY = titleBlockH + 2;
       _legendLayout.rows.forEach((row, ri) => {
-        const rowStartX = HEAD_X;
+        const rowStartX = T.headingGutter;
         row.forEach(cell => {
           const s = seriesDefs.find(x => x.name === cell.item.name);
           if (!s) return;
           const x = rowStartX + cell.x;
-          const y = startY + ri * LEG_ROW;
+          const y = startY + ri * T.legendRowHeight;
           const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, gLegend);
-          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
-          el('rect', { x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
-            fill: s.visible ? s.color : DIM_COL }, gr);
-          txt(s.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW,
-            fill: s.visible ? (s.legendColor || TITLE_COL) : DIM_COL,
+          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
+          el('rect', { x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
+            fill: s.visible ? s.color : T.dimmed }, gr);
+          txt(s.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight,
+            fill: s.visible ? (s.legendColor || T.titleColor) : T.dimmed,
             'text-decoration': s.visible ? 'none' : 'line-through',
-            'font-family': FONT }, gr);
+            'font-family': T.font }, gr);
           gr.addEventListener('click', () => {
             s.visible = !s.visible;
+            life.emit('legendToggle', { series: s.name, visible: s.visible !== false, index: seriesDefs.indexOf(s) });
             render(); renderLegend();
           });
         });
@@ -5599,16 +6213,16 @@ Charts.pie = function (container, opts) {
 
     // Tooltip
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container.appendChild(tooltip);
 
     function showTip(s, p, ev) {
       const header = p.name || s.name;
-      let html = `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(header)}</div>`;
+      let html = `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(header)}</div>`;
       html += `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(s.color)};border-radius:50%;margin-right:6px"></span>`
-        + `x: <b style="color:${cssColor(TITLE_COL)}">${esc(addCommas(String(p.x)) + xSuffix)}</b>, `
-        + `y: <b style="color:${cssColor(TITLE_COL)}">${esc(addCommas(p.y) + ySuffix)}</b>`
-        + (p.z != null ? `, z: <b style="color:${cssColor(TITLE_COL)}">${esc(addCommas(String(p.z)) + s.valueSuffix)}</b>` : '')
+        + `x: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(String(p.x)) + xSuffix)}</b>, `
+        + `y: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(p.y) + ySuffix)}</b>`
+        + (p.z != null ? `, z: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(String(p.z)) + s.valueSuffix)}</b>` : '')
         + `</div>`;
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
@@ -5650,14 +6264,16 @@ Charts.pie = function (container, opts) {
         const s = seriesDefs[si];
         if (s) {
           const p = s.points[pi] || s.points.find(Boolean);
+          life.hover({ name: p.name || s.name, series: s.name, index: pi, x: p.x, y: p.y, z: p.z });
           showTip(s, p, ev);
         }
       } else {
         clearHover();
         hideTip();
+        life.hover(null);
       }
     });
-    life.on(svg, 'mouseleave', () => { clearHover(); hideTip(); });
+    life.on(svg, 'mouseleave', () => { clearHover(); hideTip(); life.hover(null); });
 
     const _origRender = render;
     render = function () { currentHover = null; _origRender(); };
@@ -5673,7 +6289,7 @@ Charts.pie = function (container, opts) {
     });
   }
 
-    Charts.scatter = Chart;
+  window.ChartsShared.register('scatter', Chart);
 })();
 
 
@@ -5722,33 +6338,6 @@ Charts.packedBubble = function (container, opts) {
   // Rough advance width. The engines all estimate rather than measure so that
   // layout is decided before anything is added to the DOM.
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -5758,58 +6347,16 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, NEG_COL, DEFAULT_COL, COLORS, GRID;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_VALUE;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_VALUE = t.valueSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -5819,8 +6366,8 @@ Charts.packedBubble = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const plot = (opts.plotOptions && opts.plotOptions.barList) ||
@@ -5853,22 +6400,22 @@ Charts.packedBubble = function (container, opts) {
 
     const colorByPoint = plot.colorByPoint === true;
     points.forEach((p, i) => {
-      if (!p.color) p.color = colorByPoint ? COLORS[i % COLORS.length]
-                                           : (series.color || DEFAULT_COL);
-      if (p.y < 0 && !colorByPoint && !(series.data[p.idx] || {}).color) p.color = NEG_COL;
+      if (!p.color) p.color = colorByPoint ? T.colors[i % T.colors.length]
+                                           : (series.color || T.defaultColor);
+      if (p.y < 0 && !colorByPoint && !(series.data[p.idx] || {}).color) p.color = T.belowThreshold;
     });
 
     const hasTitle = !!opts.title;
     const hasSub = !!opts.subtitle;
-    const titleX = HEAD_X;                       // shared left edge, as in bar.js
+    const titleX = T.headingGutter;                       // shared left edge, as in bar.js
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
     const marginR = 20, marginB = 16;
 
     // ── Row metrics ─────────────────────────────────────────────────────
@@ -5877,7 +6424,7 @@ Charts.packedBubble = function (container, opts) {
     // tighter than the row→row gap; that grouping is what lets the eye read
     // the pairs without any rule or axis to separate them.
     const n = points.length;
-    const labelH = Math.round(F_LABEL * 1.25);
+    const labelH = Math.round(T.labelSize * 1.25);
     const labelGap = 5;
     const baseRowGap = plot.rowGap != null ? plot.rowGap : 22;
     let rowGap = baseRowGap;
@@ -5898,7 +6445,7 @@ Charts.packedBubble = function (container, opts) {
     // it; otherwise grow the container to the content, which is what a list
     // of arbitrary length actually wants.
     const rowH = () => labelH + labelGap + barH + rowGap;
-    const chromeH = titleBlockH + PLOT_GAP + marginB;
+    const chromeH = titleBlockH + T.plotGap + marginB;
     // A height on the container is an instruction: fill it. Only when there is
     // no height to honour does the list grow to its own content. The previous
     // default was the other way round, which meant a 30-row list dropped into a
@@ -5959,14 +6506,14 @@ Charts.packedBubble = function (container, opts) {
     }
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     if (!n) return chartAPI(life, {
       opts: opts, typeName: "Bar list", getData: () => points });
@@ -5980,7 +6527,7 @@ Charts.packedBubble = function (container, opts) {
                                   : addCommas(v) + valueSuffix);
     let widestValue = 0;
     if (showValues) {
-      points.forEach(p => { widestValue = Math.max(widestValue, textW(fmt(p.y), F_VALUE, true)); });
+      points.forEach(p => { widestValue = Math.max(widestValue, textW(fmt(p.y), T.valueSize, true)); });
     }
 
     const valuePad = 8;
@@ -6006,11 +6553,11 @@ Charts.packedBubble = function (container, opts) {
     // A zero baseline only earns its keep when bars actually go both ways.
     if (minV < 0) {
       el('line', { x1: zeroX, y1: titleBlockH - 6, x2: zeroX, y2: H - marginB,
-        stroke: GRID, 'stroke-width': 1 }, gBars);
+        stroke: T.grid, 'stroke-width': 1 }, gBars);
     }
 
     // ── Rows ────────────────────────────────────────────────────────────
-    let y = titleBlockH + PLOT_GAP + topOffset;
+    let y = titleBlockH + T.plotGap + topOffset;
     // One anchor per bar, so `callouts: [{ name, text }]` can name a row.
     const barAnchors = [];
     // Bar + its label above it: the block a note must not cover.
@@ -6025,14 +6572,14 @@ Charts.packedBubble = function (container, opts) {
       // edge, so the pair reads as one unit. With no negatives that edge is
       // the content left margin, which is the plain left-aligned list.
       const labelX = Math.min(barX, zeroX);
-      txt(truncate(p.name, F_LABEL, contentR - labelX, false), {
-        x: labelX, y: y + F_LABEL, 'text-anchor': 'start',
-        'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+      txt(truncate(p.name, T.labelSize, contentR - labelX, false), {
+        x: labelX, y: y + T.labelSize, 'text-anchor': 'start',
+        'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font
       }, gLabels);
 
       // Anchor past the value label rather than on the bar end: the value is
       // already sitting there, and a leader through it reads as a strikethrough.
-      const valW = textW(fmt(p.y), F_VALUE, true) + valuePad * 2;
+      const valW = textW(fmt(p.y), T.valueSize, true) + valuePad * 2;
       barAnchors.push({ name: String(p.name),
         x: p.y < 0 ? barX - valW : barX + w + valW,
         y: barY + barH / 2 });
@@ -6050,11 +6597,11 @@ Charts.packedBubble = function (container, opts) {
       // without the reader having to guess where the bar stops.
       const vx = p.y < 0 ? barX - valuePad : barX + w + valuePad;
       if (showValues) txt(fmt(p.y), {
-        x: vx, y: barY + barH / 2 + F_VALUE * 0.36,
+        x: vx, y: barY + barH / 2 + T.valueSize * 0.36,
         'text-anchor': p.y < 0 ? 'end' : 'start',
-        'font-size': F_VALUE, 'font-weight': VAL_FW,
-        fill: plot.valueColor === 'series' ? p.color : VAL_COL,
-        'font-family': FONT
+        'font-size': T.valueSize, 'font-weight': T.valueWeight,
+        fill: plot.valueColor === 'series' ? p.color : T.valueColor,
+        'font-family': T.font
       }, gLabels);
 
       y += labelH + labelGap + barH + rowGap;
@@ -6079,7 +6626,7 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container.appendChild(tooltip);
 
     life.on(svg, 'mousemove', ev => {
@@ -6089,9 +6636,10 @@ Charts.packedBubble = function (container, opts) {
         if (!p) return;
         points.forEach(q => { if (q._node) q._node.style.opacity = '1'; });
         target.style.opacity = '0.85';
+        life.hover({ name: p.name, series: seriesName, index: points.indexOf(p), y: p.y });
         tooltip.innerHTML =
-          `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(seriesName)}</div>` +
-          `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(p.color)};border-radius:2px;margin-right:6px"></span>${esc(p.name)}: <b style="color:${cssColor(TITLE_COL)}">${esc(fmt(p.y))}</b></div>`;
+          `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(seriesName)}</div>` +
+          `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(p.color)};border-radius:2px;margin-right:6px"></span>${esc(p.name)}: <b style="color:${cssColor(T.titleColor)}">${esc(fmt(p.y))}</b></div>`;
         tooltip.style.display = 'block';
         const rect = svg.getBoundingClientRect();
         const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
@@ -6105,11 +6653,13 @@ Charts.packedBubble = function (container, opts) {
       } else {
         points.forEach(q => { if (q._node) q._node.style.opacity = '1'; });
         tooltip.style.display = 'none';
+        life.hover(null);
       }
     });
     life.on(svg, 'mouseleave', () => {
       points.forEach(q => { if (q._node) q._node.style.opacity = '1'; });
       tooltip.style.display = 'none';
+      life.hover(null);
     });
 
     // barList draws in one pass rather than from a render(), so a redraw is a
@@ -6122,7 +6672,7 @@ Charts.packedBubble = function (container, opts) {
     });
   }
 
-    Charts.barList = Chart;
+  window.ChartsShared.register('barList', Chart);
 })();
 
 // ─── barInsightTable ───────────────────────────────────────────────
@@ -6169,33 +6719,6 @@ Charts.packedBubble = function (container, opts) {
   // Heading metrics are derived in applyTheme() from the size + line-height
   // tokens, so a bigger titleSize opens up its own leading.
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -6205,58 +6728,16 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, SEC_COL, NEG_COL, DEFAULT_COL, COLORS, GRID;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      SEC_COL = t.secondaryColor;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_VALUE = t.valueSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -6266,8 +6747,8 @@ Charts.packedBubble = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     // The author's height is measured HERE, while the container is empty, and
     // not inside render(): by then this engine's own <svg> is already in the
@@ -6298,7 +6779,7 @@ Charts.packedBubble = function (container, opts) {
       name: s.name || 'Series ' + (si + 1),
       // Same rule as column/bar: one series is the theme's default color,
       // several walk the palette.
-      color: s.color || (nSeriesAll === 1 ? DEFAULT_COL : COLORS[si % COLORS.length]),
+      color: s.color || (nSeriesAll === 1 ? T.defaultColor : T.colors[si % T.colors.length]),
       data: s.data || [],
       visible: s.visible !== false
     }));
@@ -6351,7 +6832,7 @@ Charts.packedBubble = function (container, opts) {
       if (!Number.isFinite(pct)) return;
       const rounded = Math.abs(pct) >= 10 ? Math.round(pct) : Math.round(pct * 10) / 10;
       r.stat = (rounded > 0 ? '+' : '') + rounded + '%';
-      if (r.statColor == null && plot.statColorBySign) r.statColor = rounded < 0 ? NEG_COL : TITLE_COL;
+      if (r.statColor == null && plot.statColorBySign) r.statColor = rounded < 0 ? T.belowThreshold : T.titleColor;
     });
 
     const hasInsight = rows.some(r => r.insight || r.description);
@@ -6360,15 +6841,15 @@ Charts.packedBubble = function (container, opts) {
     // ── Title / subtitle ────────────────────────────────────────────────
     const hasTitle = !!opts.title;
     const hasSub = !!opts.subtitle;
-    const titleX = HEAD_X;
+    const titleX = T.headingGutter;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Legend layout (top row(s), auto-enabled when multi-series) ──────
     // Metrics, wrap rule and toggle behaviour are the column/bar legend's.
@@ -6376,7 +6857,7 @@ Charts.packedBubble = function (container, opts) {
       ? !!opts.legend.enabled : (seriesDefs.length > 1);
     function layoutLegend(items, availW) {
       const widths = items.map(it =>
-        LEG_ICON + LEG_ICON_GAP + Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+        T.legendIconSize + T.legendIconGap + Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       const rowsOut = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -6385,11 +6866,11 @@ Charts.packedBubble = function (container, opts) {
         curX += widths[i];
       }
       if (cur.length) rowsOut.push(cur);
-      return { rows: rowsOut, height: rowsOut.length * LEG_ROW };
+      return { rows: rowsOut, height: rowsOut.length * T.legendRowHeight };
     }
     const legendLayout = legendEnabled
-      ? layoutLegend(seriesDefs, W - HEAD_X * 2) : { rows: [], height: 0 };
-    const legendZone = legendLayout.height + PLOT_GAP;
+      ? layoutLegend(seriesDefs, W - T.headingGutter * 2) : { rows: [], height: 0 };
+    const legendZone = legendLayout.height + T.plotGap;
 
     // ── Column geometry ─────────────────────────────────────────────────
     // Four columns: row label, bars, insight text, stat. Widths are fractions
@@ -6420,10 +6901,10 @@ Charts.packedBubble = function (container, opts) {
     // ── Type scale ──────────────────────────────────────────────────────
     // Every size is a theme token or derived from one, so retuning titleSize
     // / labelSize / tickSize in the theme moves this chart with the rest.
-    const F_INSIGHT = plot.insightSize != null ? plot.insightSize : F_LABEL + 1.5;
-    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : F_TICK;
-    const F_STAT = plot.statSize != null ? plot.statSize : Math.round(F_TITLE * 1.5);
-    const LABEL_LH = Math.round(F_LABEL * 1.35);
+    const F_INSIGHT = plot.insightSize != null ? plot.insightSize : T.labelSize + 1.5;
+    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : T.tickSize;
+    const F_STAT = plot.statSize != null ? plot.statSize : Math.round(T.titleSize * 1.5);
+    const LABEL_LH = Math.round(T.labelSize * 1.35);
     const IN_LH = Math.round(F_INSIGHT * 1.3);
     const DESC_LH = Math.round(F_DESC * 1.35);
     const LABEL_LINES = plot.labelLines != null ? plot.labelLines : 2;
@@ -6439,7 +6920,7 @@ Charts.packedBubble = function (container, opts) {
     // column engine wraps its category names), insight headlines 2, the
     // description `descriptionLines`. Only the last line is ever ellipsised.
     rows.forEach(r => {
-      r.labelLines = wrapHeading(r.label, F_LABEL, wLabel, LABEL_LINES, CAT_FW >= 600);
+      r.labelLines = wrapHeading(r.label, T.labelSize, wLabel, LABEL_LINES, T.categoryWeight >= 600);
       r.insightLines = r.insight
         ? wrapHeading(r.insight, F_INSIGHT, wInsight, 2, true) : [];
       r.descLines = r.description
@@ -6448,13 +6929,13 @@ Charts.packedBubble = function (container, opts) {
 
     const container_ = container;
     const svg = el('svg', { xmlns: NS });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container_.appendChild(svg);
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
     container_.appendChild(tooltip);
 
     let bars = [], H = 0;
@@ -6542,10 +7023,10 @@ Charts.packedBubble = function (container, opts) {
       svg.setAttribute('height', H);
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-      titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-        'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+      titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+        'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
       subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-        'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
       // Legend — identical metrics and toggle behaviour to column/bar.
       if (legendEnabled) {
@@ -6554,19 +7035,20 @@ Charts.packedBubble = function (container, opts) {
           row.forEach(cell => {
             const s = cell.item;
             const x = titleX + cell.x;
-            const y = startY + ri * LEG_ROW;
+            const y = startY + ri * T.legendRowHeight;
             const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, svg);
-            el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
-            el('rect', { x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
-              fill: s.visible ? s.color : DIM_COL }, gr);
-            txt(s.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-              'font-size': F_LEG, 'font-weight': LEG_FW,
-              fill: s.visible ? CAT_COL : DIM_COL,
+            el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
+            el('rect', { x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
+              fill: s.visible ? s.color : T.dimmed }, gr);
+            txt(s.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+              'font-size': T.legendSize, 'font-weight': T.legendWeight,
+              fill: s.visible ? CAT_COL : T.dimmed,
               'text-decoration': s.visible ? 'none' : 'line-through',
-              'font-family': FONT }, gr);
+              'font-family': T.font }, gr);
             gr.addEventListener('click', () => {
               if (vis.length === 1 && s.visible) return;   // never hide the last one
               s.visible = !s.visible;
+              life.emit('legendToggle', { series: s.name, visible: s.visible !== false, index: seriesDefs.indexOf(s) });
               render();
             });
           });
@@ -6591,7 +7073,7 @@ Charts.packedBubble = function (container, opts) {
       const LBL_PAD = 8;
       let labelRoom = 0;
       if (showValues) {
-        values.forEach(v => { labelRoom = Math.max(labelRoom, textW(fmt(v), F_VALUE, true)); });
+        values.forEach(v => { labelRoom = Math.max(labelRoom, textW(fmt(v), T.valueSize, true)); });
         labelRoom += LBL_PAD;
       }
       const trackL = xBars + (minV < 0 ? labelRoom : 0);
@@ -6616,10 +7098,10 @@ Charts.packedBubble = function (container, opts) {
         // Row label — the category role, vertically centered against the whole
         // row rather than the bars, so it stays put when the insight text is
         // the tallest thing in the row.
-        let ly = mid - (r.labelLines.length - 1) * LABEL_LH / 2 + F_LABEL * 0.36;
+        let ly = mid - (r.labelLines.length - 1) * LABEL_LH / 2 + T.labelSize * 0.36;
         r.labelLines.forEach(ln => {
           txt(ln, { x: xLabel, y: ly, 'text-anchor': 'start',
-            'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gText);
+            'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gText);
           ly += LABEL_LH;
         });
 
@@ -6631,14 +7113,14 @@ Charts.packedBubble = function (container, opts) {
           if (!p) { by += barH + barGap; return; }
           const w = Math.max(1, scale(p.y));
           const bx = p.y < 0 ? zeroX - w : zeroX;
-          const color = p.color || (p.y < 0 && nSeries === 1 ? NEG_COL : seriesDefs[si].color);
+          const color = p.color || (p.y < 0 && nSeries === 1 ? T.belowThreshold : seriesDefs[si].color);
           const rect = el('rect', {
             x: bx, y: by, width: w, height: barH, fill: color,
             class: 'bit-bar', style: 'cursor:default;transition:opacity .15s'
           }, gBars);
           bars.push({ node: rect, row: r, series: seriesDefs[si], value: p.y, color });
           // Past the value label, for the same reason as barList.
-          const valW = showValues ? textW(fmt(p.y), F_VALUE, true) + LBL_PAD * 2 : 6;
+          const valW = showValues ? textW(fmt(p.y), T.valueSize, true) + LBL_PAD * 2 : 6;
           rowAnchors.push({ name: String(r.name != null ? r.name : r.label),
             series: seriesDefs[si].name,
             x: p.y < 0 ? bx - valW : bx + w + valW,
@@ -6647,9 +7129,9 @@ Charts.packedBubble = function (container, opts) {
           if (showValues) {
             // Value role, outside the bar end — as in barList.
             txt(fmt(p.y), {
-              x: p.y < 0 ? bx - LBL_PAD : bx + w + LBL_PAD, y: by + barH / 2 + F_VALUE * 0.36,
+              x: p.y < 0 ? bx - LBL_PAD : bx + w + LBL_PAD, y: by + barH / 2 + T.valueSize * 0.36,
               'text-anchor': p.y < 0 ? 'end' : 'start',
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font
             }, gText);
           }
           by += barH + barGap;
@@ -6662,12 +7144,12 @@ Charts.packedBubble = function (container, opts) {
           let ty = mid - blockH / 2 + F_INSIGHT * 0.9;
           r.insightLines.forEach(ln => {
             txt(ln, { x: xInsight, y: ty, 'text-anchor': 'start', 'font-size': F_INSIGHT,
-              'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gText);
+              'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, gText);
             ty += IN_LH;
           });
           r.descLines.forEach(ln => {
             txt(ln, { x: xInsight, y: ty, 'text-anchor': 'start', 'font-size': F_DESC,
-              'font-weight': TICK_FW, fill: SEC_COL, 'font-family': FONT }, gText);
+              'font-weight': T.tickWeight, fill: T.secondaryColor, 'font-family': T.font }, gText);
             ty += DESC_LH;
           });
         }
@@ -6679,12 +7161,12 @@ Charts.packedBubble = function (container, opts) {
           const sy = mid + F_STAT * 0.36 - noteH / 2;
           txt(truncate(r.stat, F_STAT, wStat, true), {
             x: contentR, y: sy, 'text-anchor': 'end', 'font-size': F_STAT,
-            'font-weight': VAL_FW, fill: r.statColor || VAL_COL, 'font-family': FONT
+            'font-weight': T.valueWeight, fill: r.statColor || T.valueColor, 'font-family': T.font
           }, gText);
           if (r.statNote) {
             txt(truncate(r.statNote, F_DESC, wStat, false), {
               x: contentR, y: sy + DESC_LH + 2, 'text-anchor': 'end',
-              'font-size': F_DESC, 'font-weight': TICK_FW, fill: SEC_COL, 'font-family': FONT
+              'font-size': F_DESC, 'font-weight': T.tickWeight, fill: T.secondaryColor, 'font-family': T.font
             }, gText);
           }
         }
@@ -6719,7 +7201,7 @@ Charts.packedBubble = function (container, opts) {
         y += r.h;
         if (dividers && ri < rows.length - 1) {
           el('line', { x1: contentL, y1: y, x2: contentR, y2: y,
-            stroke: GRID, 'stroke-width': 1 }, gBars);
+            stroke: T.grid, 'stroke-width': 1 }, gBars);
         }
       });
 
@@ -6734,11 +7216,12 @@ Charts.packedBubble = function (container, opts) {
       if (hit) {
         bars.forEach(b => { b.node.style.opacity = '1'; });
         hit.node.style.opacity = '0.85';
+        life.hover({ name: hit.row.label, series: hit.series.name, y: hit.value, stat: hit.row.stat });
         tooltip.innerHTML =
-          `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(hit.row.label)}</div>` +
-          `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(hit.color)};border-radius:2px;margin-right:6px"></span>${esc(hit.series.name)}: <b style="color:${cssColor(TITLE_COL)}">${esc(fmt(hit.value))}</b></div>` +
+          `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(hit.row.label)}</div>` +
+          `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(hit.color)};border-radius:2px;margin-right:6px"></span>${esc(hit.series.name)}: <b style="color:${cssColor(T.titleColor)}">${esc(fmt(hit.value))}</b></div>` +
           (hit.row.stat != null && hit.row.stat !== ''
-            ? `<div style="color:${cssColor(SEC_COL)};margin-top:2px">${esc(hit.row.insight || 'Change')}: <b style="color:${cssColor(TITLE_COL)}">${esc(hit.row.stat)}</b></div>` : '');
+            ? `<div style="color:${cssColor(T.secondaryColor)};margin-top:2px">${esc(hit.row.insight || 'Change')}: <b style="color:${cssColor(T.titleColor)}">${esc(hit.row.stat)}</b></div>` : '');
         tooltip.style.display = 'block';
         const rect = svg.getBoundingClientRect();
         const cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
@@ -6752,18 +7235,20 @@ Charts.packedBubble = function (container, opts) {
       } else {
         bars.forEach(b => { b.node.style.opacity = '1'; });
         tooltip.style.display = 'none';
+        life.hover(null);
       }
     });
     life.on(svg, 'mouseleave', () => {
       bars.forEach(b => { b.node.style.opacity = '1'; });
       tooltip.style.display = 'none';
+      life.hover(null);
     });
 
     return chartAPI(life, {
       opts: opts, typeName: "Bar insight table", getData: () => rows, redraw: render });
   }
 
-    Charts.barInsightTable = Chart;
+  window.ChartsShared.register('barInsightTable', Chart);
 })();
 
 // ─── waffle ────────────────────────────────────────────────────────
@@ -6809,33 +7294,6 @@ Charts.packedBubble = function (container, opts) {
   // Heading metrics are derived in applyTheme() from the size + line-height
   // tokens, so a bigger titleSize opens up its own leading.
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -6845,53 +7303,13 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, DEFAULT_COL, COLORS, GRID;
-  let CAT_COL, CAT_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
+      T = Object.freeze(resolveTheme(opts));
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -6901,8 +7319,8 @@ Charts.packedBubble = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const plot = (opts.plotOptions && opts.plotOptions.waffle) ||
@@ -6940,8 +7358,8 @@ Charts.packedBubble = function (container, opts) {
 
     points.forEach((p, i) => {
       if (!p.color) p.color = plot.colorByPoint === false
-        ? (series.color || COLORS[1] || DEFAULT_COL)
-        : (series.color || COLORS[(i + 1) % COLORS.length]);
+        ? (series.color || T.colors[1] || T.defaultColor)
+        : (series.color || T.colors[(i + 1) % T.colors.length]);
       p.filled = Math.max(0, Math.min(cells, Math.round(p.y / total * cells)));
     });
 
@@ -6954,13 +7372,13 @@ Charts.packedBubble = function (container, opts) {
     // like the table's own KPIs rather than a poster's, and no name under a
     // lone panel — the column header already says it. The grid takes the rest.
     const compact = !!(opts.chart && opts.chart.compact);
-    const titleX = compact ? 4 : HEAD_X;
-    const titleLines = hasTitle ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
-    const subLines = hasSub ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+    const titleX = compact ? 4 : T.headingGutter;
+    const titleLines = hasTitle ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
+    const subLines = hasSub ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Panel geometry ──────────────────────────────────────────────────
     // Panels split the content width evenly; the dot grid is sized to
@@ -6970,12 +7388,12 @@ Charts.packedBubble = function (container, opts) {
     if (!n) {
       const svg0 = el('svg', { xmlns: NS, width: W, height: titleBlockH,
         viewBox: `0 0 ${W} ${titleBlockH}` });
-      svg0.style.background = window.ChartsShared.canvasColor(opts, BG); svg0.style.display = 'block';
+      svg0.style.background = window.ChartsShared.canvasColor(opts, T.bg); svg0.style.display = 'block';
       container.appendChild(svg0);
-      titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-        'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg0));
+      titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+        'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg0));
       subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH,
-        'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg0));
+        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg0));
       return chartAPI(life, {
       opts: opts, typeName: "Waffle chart", getData: () => points });
     }
@@ -6993,9 +7411,9 @@ Charts.packedBubble = function (container, opts) {
     let gridW = gridCols * dot + (gridCols - 1) * gap;
     let gridH = gridRows * dot + (gridRows - 1) * gap;
 
-    const F_STAT = plot.statSize != null ? plot.statSize : (compact ? Math.round(F_TITLE * 1.5) : 34);
-    const F_NAME = plot.nameSize != null ? plot.nameSize : F_LABEL + 1;
-    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : F_LABEL;
+    const F_STAT = plot.statSize != null ? plot.statSize : (compact ? Math.round(T.titleSize * 1.5) : 34);
+    const F_NAME = plot.nameSize != null ? plot.nameSize : T.labelSize + 1;
+    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : T.labelSize;
     const DESC_LH = Math.round(F_DESC * 1.42);
 
     const statH = F_STAT + 14;
@@ -7025,7 +7443,7 @@ Charts.packedBubble = function (container, opts) {
     const containerH = container.clientHeight;
     const fixedH = (plot.autoHeight !== true && containerH > 0) ? containerH : 0;
     if (fixedH) {
-      const chrome = titleBlockH + PLOT_GAP + statH + (hideName ? 0 : 14) + nameH + descH + marginB;
+      const chrome = titleBlockH + T.plotGap + statH + (hideName ? 0 : 14) + nameH + descH + marginB;
       const hBudget = fixedH - chrome - (function () {
         let band = 0;
         (opts.callouts || []).forEach(co => {
@@ -7062,26 +7480,26 @@ Charts.packedBubble = function (container, opts) {
     // can give, and it has already shrunk as far as the box allows. If the
     // panel still does not fit, take the height it needs rather than clip the
     // description off the bottom — the same trade every other engine makes.
-    const naturalH = Math.round(titleBlockH + PLOT_GAP + calloutBand + bodyH + marginB);
+    const naturalH = Math.round(titleBlockH + T.plotGap + calloutBand + bodyH + marginB);
     const H = (fixedH && naturalH <= fixedH) ? fixedH : naturalH;
     if (fixedH && naturalH <= fixedH) delete container.dataset.chartsGrew;
     else { container.style.height = H + 'px'; container.dataset.chartsGrew = '1'; }
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     const fmt = v => (plot.format ? String(plot.format).replace('{y}', addCommas(v))
                                   : addCommas(v) + valueSuffix);
 
     const gPanels = el('g', {}, svg);
-    const top = titleBlockH + PLOT_GAP + calloutBand;
+    const top = titleBlockH + T.plotGap + calloutBand;
     const gridTop = top + statH;
 
     // ── Dividers: hairlines between panels, spanning the grid + label
@@ -7090,7 +7508,7 @@ Charts.packedBubble = function (container, opts) {
       for (let i = 1; i < n; i++) {
         const x = contentL + panelW * i;
         el('line', { x1: x, y1: gridTop - 8, x2: x, y2: top + bodyH - 4,
-          stroke: SEC_COL, 'stroke-width': 1, opacity: 0.55 }, gPanels);
+          stroke: T.secondaryColor, 'stroke-width': 1, opacity: 0.55 }, gPanels);
       }
     }
 
@@ -7107,7 +7525,7 @@ Charts.packedBubble = function (container, opts) {
       // Headline stat, centered over the grid.
       txt(fmt(p.y), {
         x: cx, y: top + F_STAT, 'text-anchor': 'middle',
-        'font-size': F_STAT, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT
+        'font-size': F_STAT, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font
       }, g);
 
       // Dot grid. Cells are indexed row-major from whichever end the fill
@@ -7138,12 +7556,12 @@ Charts.packedBubble = function (container, opts) {
       const nameY = gridTop + gridH + 14 + F_NAME;
       if (!hideName) txt(_clipLine(p.name, F_NAME, panelW - 8, true), {
         x: cx, y: nameY, 'text-anchor': 'middle',
-        'font-size': F_NAME, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT
+        'font-size': F_NAME, 'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font
       }, g);
 
       (descLinesPer[pi] || []).forEach((ln, li) => {
         txt(ln, { x: cx, y: nameY + 16 + li * DESC_LH, 'text-anchor': 'middle',
-          'font-size': F_DESC, fill: SUB_COL, 'font-family': FONT }, g);
+          'font-size': F_DESC, fill: T.subtitleColor, 'font-family': T.font }, g);
       });
 
       // Hit area for the whole panel, so hovering anywhere in it works.
@@ -7173,7 +7591,7 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(BG)};border:1px solid ${cssColor(TT_BORDER)};border-radius:4px;padding:6px 8px;font:${cssNumber(F_TIP)}px ${cssFont(FONT)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;max-width:260px;white-space:normal;z-index:10;`;
+    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;max-width:260px;white-space:normal;z-index:10;`;
     container.appendChild(tooltip);
 
     function clearHL() {
@@ -7184,16 +7602,17 @@ Charts.packedBubble = function (container, opts) {
       const target = ev.target;
       const isPanel = target && target.classList &&
         (target.classList.contains('waffle-hit') || target.classList.contains('waffle-dot'));
-      if (!isPanel) { clearHL(); tooltip.style.display = 'none'; return; }
+      if (!isPanel) { clearHL(); tooltip.style.display = 'none'; life.hover(null); return; }
       const idx = +target.getAttribute('data-idx');
       const p = points.find(q => q.idx === idx);
       if (!p) return;
       clearHL();
+      life.hover({ name: p.name, series: seriesName, index: p.idx, y: p.y });
       points.forEach(q => { if (q !== p) q._dots.forEach(d => { d.style.opacity = '0.45'; }); });
       tooltip.innerHTML =
-        `<div style="font-size:${cssNumber(F_TIP)}px;font-weight:${cssNumber(VAL_FW)};color:${cssColor(TITLE_COL)};margin-bottom:2px">${esc(seriesName)}</div>` +
-        `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(p.color)};border-radius:50%;margin-right:6px"></span>${esc(p.name)}: <b style="color:${cssColor(TITLE_COL)}">${esc(fmt(p.y))}</b></div>` +
-        (p.description ? `<div style="margin-top:3px;color:${cssColor(LABEL_COL)}">${esc(p.description)}</div>` : '');
+        `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(seriesName)}</div>` +
+        `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(p.color)};border-radius:50%;margin-right:6px"></span>${esc(p.name)}: <b style="color:${cssColor(T.titleColor)}">${esc(fmt(p.y))}</b></div>` +
+        (p.description ? `<div style="margin-top:3px;color:${cssColor(T.labelColor)}">${esc(p.description)}</div>` : '');
       tooltip.style.display = 'block';
       const rect = svg.getBoundingClientRect();
       const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
@@ -7206,7 +7625,7 @@ Charts.packedBubble = function (container, opts) {
       tooltip.style.left = tx + 'px';
       tooltip.style.top = ty + 'px';
     });
-    life.on(svg, 'mouseleave', () => { clearHL(); tooltip.style.display = 'none'; });
+    life.on(svg, 'mouseleave', () => { clearHL(); tooltip.style.display = 'none'; life.hover(null); });
 
     return chartAPI(life, {
       opts: opts, typeName: "Waffle chart",
@@ -7215,7 +7634,7 @@ Charts.packedBubble = function (container, opts) {
     });
   }
 
-    Charts.waffle = Chart;
+  window.ChartsShared.register('waffle', Chart);
 })();
 
 // ─── geofacet ──────────────────────────────────────────────────────
@@ -7293,91 +7712,21 @@ Charts.packedBubble = function (container, opts) {
   })();
 
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // Theme tokens are per chart, not per module: two charts with
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, START_COL, END_COL, INV_COL;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_CODE, F_VALUE;
-  let TT_BORDER, DIM_COL, HOVER_INK, TILE_COL, TILE_TRACK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      TILE_COL = t.tileSurface;
-      TILE_TRACK = t.tileTrack;
-      BG = t.bg;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      START_COL = t.gradientStart;
-      END_COL = t.gradientEnd;
-      INV_COL = t.inverseText;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_CODE = t.pointLabelSize;
-      F_VALUE = t.valueSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -7387,8 +7736,8 @@ Charts.packedBubble = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -7435,25 +7784,25 @@ Charts.packedBubble = function (container, opts) {
     const hasTitle = !!opts.title;
     const hasSub = !!opts.subtitle;
     const marginPx = 20;
-    const titleX = HEAD_X;
+    const titleX = T.headingGutter;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH, 'text-anchor': 'start',
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH, 'text-anchor': 'start',
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // ── Tile geometry ───────────────────────────────────────────────────
     // Grids are normalised to their own origin rather than assumed 1-based,
@@ -7463,7 +7812,7 @@ Charts.packedBubble = function (container, opts) {
     const rowMin = Math.min(...grid.map(g => g.row));
     const nCols = Math.max(...grid.map(g => g.col)) - colMin + 1;
     const nRows = Math.max(...grid.map(g => g.row)) - rowMin + 1;
-    const gridTop = titleBlockH + PLOT_GAP;
+    const gridTop = titleBlockH + T.plotGap;
     const availW = W - marginPx * 2;
     const availH = H - gridTop - marginPx;
     // One square cell size for both axes: the grid keeps its map shape at any
@@ -7490,29 +7839,29 @@ Charts.packedBubble = function (container, opts) {
     // 64px one, so a big tile was mostly empty. Let type keep growing with the
     // tile, just sub-linearly, so the content stays in proportion to its box.
     const k = Math.max(0.62, Math.min(1.55, tileW / 64));
-    const fCode = Math.round(F_CODE * k * 10) / 10;
-    const fValue = Math.round(F_VALUE * k * 10) / 10;
+    const fCode = Math.round(T.pointLabelSize * k * 10) / 10;
+    const fValue = Math.round(T.valueSize * k * 10) / 10;
     const roomForCode = tileW >= 34 && tileH >= 22;
     const roomForValue = showValues && tileW >= 26;
 
     const radius = plotOpts.borderRadius != null ? plotOpts.borderRadius : 6;
-    // A tile with data is a box on the canvas (TILE_COL); a tile with no data
+    // A tile with data is a box on the canvas (T.tileSurface); a tile with no data
     // is a hole in it (a shade toward bg), so the map's coverage reads at a
     // glance. The bar/ring track sits a step lighter than the tile it is on.
-    const emptyFill = mix(TILE_COL, BG, 0.6);
-    const trackFill = TILE_TRACK;
+    const emptyFill = mix(T.tileSurface, T.bg, 0.6);
+    const trackFill = T.tileTrack;
 
     // ── Interaction ─────────────────────────────────────────────────────
     // Same conventions as the other engines: a 4% black slot highlight behind
     // the hovered mark (column/bar), the mark itself easing to 0.85 opacity
     // (donut), and the shared cursor-following tooltip.
     const highlight = el('rect', { x: 0, y: 0, width: 0, height: 0, rx: radius,
-      fill: HOVER_INK, 'fill-opacity': 0.04,
+      fill: T.hoverInk, 'fill-opacity': 0.04,
       style: 'display:none;pointer-events:none' }, svg);
 
     const tip = document.createElement('div');
-    tip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' + cssNumber(F_TIP) + 'px ' + cssFont(FONT) +
+    tip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' + cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
       ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tip);
 
@@ -7550,8 +7899,8 @@ Charts.packedBubble = function (container, opts) {
       if (!rec || !isFinite(rec.value)) {
         if (showEmpty && roomForCode) {
           txt(label, { x: x + tileW / 2, y: y + tileH / 2 + fCode / 3, 'text-anchor': 'middle',
-            'font-size': fCode, 'font-weight': CAT_FW, fill: lighten(SEC_COL, 0.75),
-            'font-family': FONT }, grp);
+            'font-size': fCode, 'font-weight': T.categoryWeight, fill: lighten(T.secondaryColor, 0.75),
+            'font-family': T.font }, grp);
         }
         return;
       }
@@ -7562,47 +7911,47 @@ Charts.packedBubble = function (container, opts) {
       let hitRect, mark;   // `mark` is the element that reacts to hover
 
       if (variant === 'heat') {
-        const fill = mix(lighten(END_COL, 0.7), START_COL === '#000000' ? END_COL : START_COL, f);
-        const ink = luminance(fill) > 0.55 ? LABEL_COL : INV_COL;
+        const fill = mix(lighten(T.gradientEnd, 0.7), T.gradientStart === '#000000' ? T.gradientEnd : T.gradientStart, f);
+        const ink = luminance(fill) > 0.55 ? T.labelColor : T.inverseText;
         hitRect = mark = el('rect', { x, y, width: tileW, height: tileH, rx: radius, fill }, grp);
         const stacked = roomForCode && tileH >= fCode + fValue + 10;
         if (roomForCode) {
           txt(label, { x: x + tileW / 2, y: y + tileH / 2 - (stacked ? 4 : -fCode / 3),
-            'text-anchor': 'middle', 'font-size': fCode, 'font-weight': VAL_FW, fill: ink,
-            'font-family': FONT }, grp);
+            'text-anchor': 'middle', 'font-size': fCode, 'font-weight': T.valueWeight, fill: ink,
+            'font-family': T.font }, grp);
         }
         if (showValues && (stacked || (!roomForCode && roomForValue))) {
           txt(valueText, { x: x + tileW / 2,
             y: y + tileH / 2 + (stacked ? fValue + 2 : fValue / 3), 'text-anchor': 'middle',
-            'font-size': fValue + (stacked ? 2 : 0), 'font-weight': VAL_FW, fill: ink,
-            'font-family': FONT }, grp);
+            'font-size': fValue + (stacked ? 2 : 0), 'font-weight': T.valueWeight, fill: ink,
+            'font-family': T.font }, grp);
         }
 
       } else if (variant === 'gauge') {
         const cx = x + tileW / 2, cy = y + tileH / 2;
         const ring = Math.max(3, tileW * 0.09);
         const r = tileW / 2 - ring / 2 - 4;
-        el('rect', { x, y, width: tileW, height: tileH, rx: radius, fill: TILE_COL }, grp);
+        el('rect', { x, y, width: tileW, height: tileH, rx: radius, fill: T.tileSurface }, grp);
         el('circle', { cx, cy, r, fill: 'none', stroke: trackFill, 'stroke-width': ring }, grp);
         const circ = 2 * Math.PI * r;
-        mark = el('circle', { cx, cy, r, fill: 'none', stroke: END_COL, 'stroke-width': ring,
+        mark = el('circle', { cx, cy, r, fill: 'none', stroke: T.gradientEnd, 'stroke-width': ring,
           'stroke-linecap': 'round', 'stroke-dasharray': `${circ * f} ${circ}`,
           transform: `rotate(-90 ${cx} ${cy})` }, grp);
         // Inside a ring there is far less room than in a full tile.
         const ringRoom = tileW >= 54;
         if (ringRoom) {
           txt(label, { x: cx, y: cy - 3, 'text-anchor': 'middle', 'font-size': fCode - 1,
-            'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, grp);
+            'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, grp);
         }
         if (showValues && tileW >= 34) {
           txt(valueText, { x: cx, y: cy + (ringRoom ? 11 : fValue / 3), 'text-anchor': 'middle',
-            'font-size': fValue, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT }, grp);
+            'font-size': fValue, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font }, grp);
         }
         hitRect = el('rect', { x, y, width: tileW, height: tileH, rx: radius,
           fill: 'transparent' }, grp);
 
       } else { // 'bar'
-        el('rect', { x, y, width: tileW, height: tileH, rx: radius, fill: TILE_COL }, grp);
+        el('rect', { x, y, width: tileW, height: tileH, rx: radius, fill: T.tileSurface }, grp);
         const padX = Math.max(3, Math.round(8 * k));
         const barH = Math.max(5, Math.min(24, tileH * 0.24));
         // Code and value sit on one line above the bar; both are dropped once the
@@ -7621,14 +7970,14 @@ Charts.packedBubble = function (container, opts) {
         if (showRow) {
           const rowY = blockTop + fCode;
           txt(label, { x: x + padX, y: rowY, 'text-anchor': 'start', 'font-size': fCode,
-            'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, grp);
+            'font-weight': T.categoryWeight, fill: CAT_COL, 'font-family': T.font }, grp);
           if (showValues) txt(valueText, { x: x + tileW - padX, y: rowY, 'text-anchor': 'end',
-            'font-size': fValue, 'font-weight': VAL_FW, fill: VAL_COL, 'font-family': FONT }, grp);
+            'font-size': fValue, 'font-weight': T.valueWeight, fill: T.valueColor, 'font-family': T.font }, grp);
         }
         el('rect', { x: x + padX, y: barY, width: barW, height: barH, rx: 2,
           fill: trackFill }, grp);
         mark = el('rect', { x: x + padX, y: barY, width: Math.max(1.5, barW * f), height: barH, rx: 2,
-          fill: f > 0.5 ? END_COL : START_COL }, grp);
+          fill: f > 0.5 ? T.gradientEnd : T.gradientStart }, grp);
         hitRect = el('rect', { x, y, width: tileW, height: tileH, rx: radius,
           fill: 'transparent' }, grp);
       }
@@ -7638,10 +7987,10 @@ Charts.packedBubble = function (container, opts) {
       const entry = { code: g.code, name: rec.name || g.name || g.code, value: v, grp, x, y };
       cells.push(entry);
 
-      const tipHtml = '<div style="font-size:' + F_TIP + 'px;font-weight:' + VAL_FW + ';color:' + cssColor(TITLE_COL) +
+      const tipHtml = '<div style="font-size:' + T.tooltipSize + 'px;font-weight:' + T.valueWeight + ';color:' + cssColor(T.titleColor) +
         ';margin-bottom:2px">' + esc(entry.name) + '</div>' +
-        '<div style="color:' + cssColor(LABEL_COL) + '">' + esc(seriesName) + ': ' +
-        '<b style="color:' + cssColor(TITLE_COL) + '">' + esc(valueText) + '</b></div>';
+        '<div style="color:' + cssColor(T.labelColor) + '">' + esc(seriesName) + ': ' +
+        '<b style="color:' + cssColor(T.titleColor) + '">' + esc(valueText) + '</b></div>';
 
       function enter(evt) {
         mark.style.opacity = '0.85';
@@ -7650,11 +7999,12 @@ Charts.packedBubble = function (container, opts) {
         highlight.setAttribute('width', cell);
         highlight.setAttribute('height', cell);
         highlight.style.display = 'block';
+        life.hover({ name: entry.name, code: entry.code, series: seriesName, value: entry.value });
         showTip(tipHtml, evt);
       }
       hitRect.addEventListener('mouseenter', enter);
       hitRect.addEventListener('mousemove', enter);
-      hitRect.addEventListener('mouseleave', () => { mark.style.opacity = '1'; hideTip(); });
+      hitRect.addEventListener('mouseleave', () => { mark.style.opacity = '1'; hideTip(); life.hover(null); });
     });
 
     // `callouts: [{ code, text, color }]` — `code` is the region code, the
@@ -7679,7 +8029,7 @@ Charts.packedBubble = function (container, opts) {
 
   Chart.grids = { us: US_GRID };
 
-    Charts.geofacet = Chart;
+  window.ChartsShared.register('geofacet', Chart);
 })();
 
 // ─── radar ─────────────────────────────────────────────────────────
@@ -7728,33 +8078,6 @@ Charts.packedBubble = function (container, opts) {
   // Refusal panel: drawn in place of the chart when the options describe
   // something a radar cannot honestly show. Returns the same stub API
   // shape as Chart() so callers do not blow up on .redraw().
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   function Chart(container, opts) {
     // The chart's own number formatter, shadowing the shared default.
     // Grouping and the decimal separator are conventions, not constants:
@@ -7764,79 +8087,19 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, GRID, AXIS, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, HIGHLIGHT, CALLOUT_C, INV_TEXT, COLORS;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_INLINE;
-  let AXIS_W, GRID_W, LINE_W, TICK_L, TICK_W;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_POINT_LBL, F_NOTICE, F_VALUE;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
-  let SPINE_W;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      HIGHLIGHT = t.highlight;
-      CALLOUT_C = t.callout;
-      INV_TEXT = t.inverseText;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      F_POINT_LBL = t.pointLabelSize;
-      F_NOTICE = t.noticeSize;
-      F_VALUE = t.valueSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_INLINE = t.inlineSize;
-      AXIS_W = t.axisWidth;
-      GRID_W = t.gridWidth;
-      LINE_W = t.lineWidth;
-      TICK_L = t.tickLength;
-      TICK_W = t.tickWidth;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
-    function applyRadarTheme() {
-      const t = resolveTheme(opts);
-      SPINE_W = t.spineWidth;
-    }
 
 
     function errorChart(container, W, H, opts, headline, detail) {
@@ -7844,14 +8107,14 @@ Charts.packedBubble = function (container, opts) {
         console.warn('[charts-lib radar] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: 20, y, 'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL,
-            'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: 20, y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
+            'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
@@ -7860,16 +8123,16 @@ Charts.packedBubble = function (container, opts) {
       // The detail sits below however many lines the headline actually took: at a
       // fixed 26px it lands on top of the second line whenever the headline wraps,
       // which is exactly when the message is longest and most needed. The wrap is
-      // measured at F_NOTICE too - it was measuring at a hardcoded 13 and drawing
+      // measured at T.noticeSize too - it was measuring at a hardcoded 13 and drawing
       // at the token, so a themed noticeSize wrapped to the wrong width.
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': F_SUB,
-          'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
+          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       // Mirrors the real radar API: a refused chart must not advertise methods
       // the drawn one lacks, or feature-detection on the handle lies.
@@ -7880,15 +8143,14 @@ Charts.packedBubble = function (container, opts) {
       });
     }
     applyTheme();
-    applyRadarTheme();
     opts = opts || {};
     if (typeof container === 'string') container = document.getElementById(container);
     container.innerHTML = '';
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -7921,20 +8183,20 @@ Charts.packedBubble = function (container, opts) {
     const hasTitle = !!opts.title;
     const hasSub = !!opts.subtitle;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Series ──────────────────────────────────────────────────────────
     // Values pair with axes BY POSITION, exactly as a column chart's data
     // pairs with its categories. A short series leaves gaps rather than
     // wrapping around, so a missing measurement reads as missing.
     const seriesDefs = seriesRaw.map((s, i) => {
-      const color = s.color || COLORS[i % COLORS.length];
+      const color = s.color || T.colors[i % T.colors.length];
       const values = cats.map((_, ci) => pointY((s.data || [])[ci]));
       return {
         name: s.name || 'Series ' + (i + 1),
@@ -7942,7 +8204,7 @@ Charts.packedBubble = function (container, opts) {
         visible: s.visible !== false,
         fillOpacity: s.fillOpacity != null ? s.fillOpacity
           : (plotOpts.fillOpacity != null ? plotOpts.fillOpacity : 0.16),
-        lineWidth: s.lineWidth != null ? s.lineWidth : Math.max(1.5, LINE_W - 1),
+        lineWidth: s.lineWidth != null ? s.lineWidth : Math.max(1.5, T.lineWidth - 1),
         dashStyle: s.dashStyle,
         valueSuffix: s.valueSuffix || valueSuffix
       };
@@ -7954,8 +8216,8 @@ Charts.packedBubble = function (container, opts) {
     const legendEnabled = (opts.legend && opts.legend.enabled != null)
       ? !!opts.legend.enabled : seriesDefs.length > 1;
     function layoutLegend(items, availW) {
-      const widths = items.map(it => LEG_ICON + LEG_ICON_GAP +
-        Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+      const widths = items.map(it => T.legendIconSize + T.legendIconGap +
+        Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       const rows = [];
       let cur = [], curX = 0;
       for (let i = 0; i < items.length; i++) {
@@ -7964,10 +8226,10 @@ Charts.packedBubble = function (container, opts) {
         curX += widths[i];
       }
       if (cur.length) rows.push(cur);
-      return { rows: rows, height: rows.length * LEG_ROW };
+      return { rows: rows, height: rows.length * T.legendRowHeight };
     }
     const legendLayout = legendEnabled
-      ? layoutLegend(seriesDefs, W - HEAD_X * 2) : { rows: [], height: 0 };
+      ? layoutLegend(seriesDefs, W - T.headingGutter * 2) : { rows: [], height: 0 };
     const legendZone = legendLayout.height;
 
     // ── Scale ───────────────────────────────────────────────────────────
@@ -7999,7 +8261,7 @@ Charts.packedBubble = function (container, opts) {
     // narrower axis binds, so a radar is safe in any grid cell — the same
     // contract the donut, waffle and geofacet keep.
     const MARGIN = 22;
-    const chartTop = titleBlockH + legendZone + PLOT_GAP;
+    const chartTop = titleBlockH + legendZone + T.plotGap;
     const chartBottom = H - MARGIN;
     const chartLeft = MARGIN, chartRight = W - MARGIN;
     const chartW = chartRight - chartLeft, chartH = chartBottom - chartTop;
@@ -8010,12 +8272,12 @@ Charts.packedBubble = function (container, opts) {
     const widestCat = cats.reduce((a, c) => Math.max(a, c.length), 0);
     const LABEL_GAP = 10;
     const sidePad = Math.max(46, Math.min(chartW * 0.28,
-      widestCat * F_LABEL * 0.58 + LABEL_GAP));
+      widestCat * T.labelSize * 0.58 + LABEL_GAP));
     // The spoke that carries the value ticks needs its axis name pushed out
     // past the outermost tick, or the scale's top number and the axis' name
     // land on the same two lines of pixels.
-    const TICK_LANE = plotOpts.axisLabels === false ? 0 : F_TICK + 3;
-    const vertPad = F_LABEL * 2.2 + LABEL_GAP + TICK_LANE;
+    const TICK_LANE = plotOpts.axisLabels === false ? 0 : T.tickSize + 3;
+    const vertPad = T.labelSize * 2.2 + LABEL_GAP + TICK_LANE;
     const R = Math.max(40, Math.min((chartW - sidePad * 2) / 2, (chartH - vertPad * 2) / 2));
     // Axis names shrink before they clip. A radar's corners ARE its subject —
     // "Reliab…" names nothing — and unlike a bar row a name here has no second
@@ -8024,10 +8286,10 @@ Charts.packedBubble = function (container, opts) {
     const catScale = (function () {
       const longest = cats.reduce((a, c) =>
         Math.max(a, Math.max.apply(null, String(c).split(/\s+/).map(w => w.length))), 0);
-      const need = longest * F_LABEL * 0.58;
+      const need = longest * T.labelSize * 0.58;
       return Math.max(0.78, Math.min(1, (sidePad - 4) / Math.max(1, need)));
     })();
-    const F_CAT = F_LABEL * catScale;
+    const F_CAT = T.labelSize * catScale;
     const cx = chartLeft + chartW / 2;
     const cy = chartTop + chartH / 2;
 
@@ -8059,17 +8321,17 @@ Charts.packedBubble = function (container, opts) {
     }
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    const titleX = HEAD_X;
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'text-anchor': 'start', 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-      fill: TITLE_COL, 'font-family': FONT }, svg));
+    const titleX = T.headingGutter;
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'text-anchor': 'start', 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+      fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH,
-      'text-anchor': 'start', 'font-size': F_SUB, 'font-weight': SUB_FW,
-      fill: SUB_COL, 'font-family': FONT }, svg));
+      'text-anchor': 'start', 'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight,
+      fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     const gGrid = el('g', null, svg);
     const gHover = el('g', null, svg);
@@ -8102,8 +8364,8 @@ Charts.packedBubble = function (container, opts) {
         if (r <= 0.5) return;
         const outer = i === ticks.length - 1;
         el('path', { d: ringPath(r), fill: 'none',
-          stroke: outer ? AXIS : GRID,
-          'stroke-width': outer ? SPINE_W : GRID_W,
+          stroke: outer ? T.axis : T.grid,
+          'stroke-width': outer ? T.spineWidth : T.gridWidth,
           'stroke-linejoin': 'round' }, gGrid);
       });
       // Spokes carry the axes themselves, so they are drawn in the gridline
@@ -8111,7 +8373,7 @@ Charts.packedBubble = function (container, opts) {
       cats.forEach((_, i) => {
         const a = angleOf(i);
         el('line', { x1: cx, y1: cy, x2: cx + Math.cos(a) * R, y2: cy + Math.sin(a) * R,
-          stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+          stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
       });
 
       // Value ticks ride the 12 o'clock spoke. A halo in the canvas colour
@@ -8124,9 +8386,9 @@ Charts.packedBubble = function (container, opts) {
           const r = radiusOf(t);
           const node = txt(fmt(t), {
             x: cx + Math.cos(aUp) * r + 5,
-            y: cy + Math.sin(aUp) * r + F_TICK * 0.36,
-            'text-anchor': 'start', 'font-size': F_TICK, 'font-weight': TICK_FW,
-            fill: TICK_COL, 'font-family': FONT, stroke: BG, 'stroke-width': 3
+            y: cy + Math.sin(aUp) * r + T.tickSize * 0.36,
+            'text-anchor': 'start', 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+            fill: T.tickColor, 'font-family': T.font, stroke: T.bg, 'stroke-width': 3
           }, gGrid);
           node.setAttribute('paint-order', 'stroke');
         });
@@ -8147,8 +8409,8 @@ Charts.packedBubble = function (container, opts) {
         const y0 = ly + (uy < -0.25 ? -blockH : (uy > 0.25 ? F_CAT * 0.8 : F_CAT * 0.34));
         lines.forEach((ln, li) => txt(ln, {
           x: lx, y: y0 + li * (F_CAT * 1.2), 'text-anchor': anchor,
-          'font-size': F_CAT, 'font-weight': CAT_FW, fill: CAT_COL,
-          'font-family': FONT
+          'font-size': F_CAT, 'font-weight': T.categoryWeight, fill: CAT_COL,
+          'font-family': T.font
         }, gAxisLbl));
       });
     }
@@ -8192,7 +8454,7 @@ Charts.packedBubble = function (container, opts) {
             if (v == null) return;
             const p = pointAt(i, v);
             el('circle', { cx: p[0], cy: p[1], r: 3.4, fill: s.color,
-              stroke: BG, 'stroke-width': 1.4 }, gSeries);
+              stroke: T.bg, 'stroke-width': 1.4 }, gSeries);
             markerRects.push({ x: p[0] - 8, y: p[1] - 8, w: 16, h: 16 });
           });
         }
@@ -8215,25 +8477,25 @@ Charts.packedBubble = function (container, opts) {
       el('path', {
         d: 'M ' + cx + ' ' + cy + ' L ' + p1[0] + ' ' + p1[1] +
            ' A ' + R + ' ' + R + ' 0 ' + large + ' 1 ' + p2[0] + ' ' + p2[1] + ' Z',
-        fill: HOVER_INK, 'fill-opacity': 0.05, stroke: 'none'
+        fill: T.hoverInk, 'fill-opacity': 0.05, stroke: 'none'
       }, gHover);
       el('line', { x1: cx, y1: cy, x2: cx + Math.cos(a) * R, y2: cy + Math.sin(a) * R,
-        stroke: HOVER_INK, 'stroke-opacity': 0.35, 'stroke-width': TICK_W }, gHover);
+        stroke: T.hoverInk, 'stroke-opacity': 0.35, 'stroke-width': T.tickWidth }, gHover);
     }
 
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(F_TIP) + 'px ' + cssFont(FONT) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tooltip);
 
     function showTooltip(idx, ev) {
       const rows = seriesDefs.filter(s => s.visible).map(s =>
         '<div><span style="display:inline-block;width:9px;height:9px;background:' + cssColor(s.color) +
         ';border-radius:2px;margin-right:6px"></span>' + esc(s.name) +
-        ': <b style="color:' + cssColor(TITLE_COL) + '">' + esc(fmt(s.values[idx], s)) + '</b></div>').join('');
+        ': <b style="color:' + cssColor(T.titleColor) + '">' + esc(fmt(s.values[idx], s)) + '</b></div>').join('');
       tooltip.innerHTML =
-        '<div style="font-size:' + F_TIP + 'px;font-weight:' + VAL_FW + ';color:' + cssColor(TITLE_COL) +
+        '<div style="font-size:' + T.tooltipSize + 'px;font-weight:' + T.valueWeight + ';color:' + cssColor(T.titleColor) +
         ';margin-bottom:2px">' + esc(cats[idx]) + '</div>' + rows;
       tooltip.style.display = 'block';
       const rect = svg.getBoundingClientRect();
@@ -8256,17 +8518,21 @@ Charts.packedBubble = function (container, opts) {
       if (dist > R + 18 || dist < 6) {
         if (hoverIdx !== -1) { hoverIdx = -1; renderHover(); }
         tooltip.style.display = 'none';
+        life.hover(null);
         return;
       }
       let a = Math.atan2(dy, dx) - (-Math.PI / 2 + startA) + step / 2;
       a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
       const idx = Math.floor(a / step) % cats.length;
       if (idx !== hoverIdx) { hoverIdx = idx; renderHover(); }
+      life.hover({ name: cats[idx], index: idx,
+        points: seriesDefs.filter(s => s.visible).map(s => ({ series: s.name, y: s.values[idx] })) });
       showTooltip(idx, ev);
     });
     life.on(svg, 'mouseleave', () => {
       hoverIdx = -1; renderHover();
       tooltip.style.display = 'none';
+      life.hover(null);
     });
 
     // ── Callouts ────────────────────────────────────────────────────────
@@ -8312,19 +8578,20 @@ Charts.packedBubble = function (container, opts) {
         row.forEach(cell => {
           const s = seriesDefs.find(x => x.name === cell.item.name);
           if (!s) return;
-          const x = HEAD_X + cell.x;
-          const y = startY + ri * LEG_ROW;
+          const x = T.headingGutter + cell.x;
+          const y = startY + ri * T.legendRowHeight;
           const gr = el('g', { class: 'lg-item', style: 'cursor:pointer' }, gLegend);
-          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: LEG_ROW - 2, fill: 'transparent' }, gr);
-          el('rect', { x: x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
-            fill: s.visible ? s.color : DIM_COL }, gr);
-          txt(s.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW,
-            fill: s.visible ? (s.legendColor || TITLE_COL) : DIM_COL,
+          el('rect', { x: x - 2, y: y - 2, width: cell.w, height: T.legendRowHeight - 2, fill: 'transparent' }, gr);
+          el('rect', { x: x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
+            fill: s.visible ? s.color : T.dimmed }, gr);
+          txt(s.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight,
+            fill: s.visible ? (s.legendColor || T.titleColor) : T.dimmed,
             'text-decoration': s.visible ? 'none' : 'line-through',
-            'font-family': FONT }, gr);
+            'font-family': T.font }, gr);
           gr.addEventListener('click', () => {
             s.visible = !s.visible;
+            life.emit('legendToggle', { series: s.name, visible: s.visible !== false, index: seriesDefs.indexOf(s) });
             renderSeries(); renderCallouts(); renderLegend();
           });
         });
@@ -8338,12 +8605,17 @@ Charts.packedBubble = function (container, opts) {
     return chartAPI(life, {
       opts: opts, typeName: "Radar chart",
       redraw: () => { render(); renderLegend(); },
+      // One keyboard stop per spoke, at its outer end.
+      keyTargets: () => cats.map((c, i) => {
+        const a = -Math.PI / 2 + startA + i * step;
+        return { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R, r: 8 };
+      }),
       getData: () => seriesDefs,
       getSeries: () => seriesDefs
     });
   }
 
-    Charts.radar = Chart;
+  window.ChartsShared.register('radar', Chart);
 })();
 
 // ─── dumbbell ──────────────────────────────────────────
@@ -8390,33 +8662,6 @@ Charts.packedBubble = function (container, opts) {
   // Rough advance width. The engines all estimate rather than measure so that
   // layout is decided before anything is added to the DOM.
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   // ── Tokens this engine needs beyond the shared block ────────────────
   // (the prelude above is the same in every engine; these are the value-axis
   // and direction roles a dumbbell uses and a bar list has no need of)
@@ -8479,73 +8724,19 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, NEG_COL, DEFAULT_COL, COLORS, GRID;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_VALUE;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
-  let AXIS_COL, GRID_W, SPINE_W, F_TICK, F_NOTICE, MUTED, ABOVE_COL, BELOW_COL;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_VALUE = t.valueSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
-    function applyExtraTheme() {
-      const t = resolveTheme(opts);
-      AXIS_COL = t.axis;
-      GRID_W = t.gridWidth;
-      SPINE_W = t.spineWidth;
-      F_TICK = t.tickSize;
-      F_NOTICE = t.noticeSize;
-      MUTED = t.muted;
-      ABOVE_COL = t.aboveThreshold;
-      BELOW_COL = t.belowThreshold;
-    }
 
 
     function errorChart(container, W, H, opts, headline, detail) {
@@ -8553,14 +8744,14 @@ Charts.packedBubble = function (container, opts) {
         console.warn('[charts-lib dumbbell] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL,
-            'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
+            'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
@@ -8569,14 +8760,14 @@ Charts.packedBubble = function (container, opts) {
       // The detail sits below however many lines the headline actually took: at a
       // fixed 26px it lands on top of the second line whenever the headline wraps,
       // which is exactly when the message is longest and most needed.
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': F_SUB,
-          'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
+          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       return chartAPI(createLifecycle(container), {
       opts: opts, typeName: "Dumbbell chart",
@@ -8586,15 +8777,14 @@ Charts.packedBubble = function (container, opts) {
     }
 
     applyTheme();
-    applyExtraTheme();
     opts = opts || {};
     if (typeof container === 'string') container = document.getElementById(container);
     container.innerHTML = '';
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H0 = container.clientHeight || 400;
@@ -8622,8 +8812,8 @@ Charts.packedBubble = function (container, opts) {
     const cats = (opts.xAxis && opts.xAxis.categories) || [];
     const sA = allSeries[0], sB = allSeries[1];
     const nameA = sA.name || 'Series 1', nameB = sB.name || 'Series 2';
-    const colA = sA.color || COLORS[0] || DEFAULT_COL;
-    const colB = sB.color || COLORS[1] || DEFAULT_COL;
+    const colA = sA.color || T.colors[0] || T.defaultColor;
+    const colB = sB.color || T.colors[1] || T.defaultColor;
     const dataA = readSeries(sA, cats), dataB = readSeries(sB, cats);
 
     // Rows pair up by position — the two series describe the same categories in
@@ -8677,7 +8867,7 @@ Charts.packedBubble = function (container, opts) {
     const dotR = dotSize / 2;
     const rodW = plot.connectorWidth != null ? plot.connectorWidth : 4;
     const rowGap = plot.rowGap != null ? plot.rowGap : 18;
-    const rodColor = plot.connectorColor || MUTED;
+    const rodColor = plot.connectorColor || T.muted;
 
     const fmt = v => (plot.format ? String(plot.format).replace('{y}', addCommas(v))
                                   : valuePrefix + addCommas(v) + valueSuffix);
@@ -8694,15 +8884,15 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Heading ─────────────────────────────────────────────────────────
     const hasTitle = !!opts.title, hasSub = !!opts.subtitle;
-    const titleX = compact ? 4 : HEAD_X;
+    const titleX = compact ? 4 : T.headingGutter;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Legend ──────────────────────────────────────────────────────────
     // On unless refused: with two states, the legend is the only thing that
@@ -8714,22 +8904,22 @@ Charts.packedBubble = function (container, opts) {
     const legendRows = [];
     if (legendEnabled) {
       const widths = legItems.map(it =>
-        LEG_ICON + LEG_ICON_GAP + Math.ceil(String(it.name).length * F_LEG * 0.55) + LEG_GAP);
+        T.legendIconSize + T.legendIconGap + Math.ceil(String(it.name).length * T.legendSize * 0.55) + T.legendGap);
       let cur = [], curX = 0;
       for (let i = 0; i < legItems.length; i++) {
-        if (cur.length && curX + widths[i] > W - HEAD_X * 2) { legendRows.push(cur); cur = []; curX = 0; }
+        if (cur.length && curX + widths[i] > W - T.headingGutter * 2) { legendRows.push(cur); cur = []; curX = 0; }
         cur.push({ item: legItems[i], x: curX, w: widths[i] });
         curX += widths[i];
       }
       if (cur.length) legendRows.push(cur);
     }
-    const legendZone = legendRows.length * LEG_ROW;
+    const legendZone = legendRows.length * T.legendRowHeight;
 
     // ── Vertical rhythm ─────────────────────────────────────────────────
     const marginR = compact ? 4 : 20, marginB = compact ? 4 : 14;
-    const axisH = compact ? 0 : F_TICK + 12;        // tick labels under the plot
-    const topY = titleBlockH + legendZone + PLOT_GAP;
-    const rowMin = Math.max(dotSize + 4, F_LABEL * 1.2);
+    const axisH = compact ? 0 : T.tickSize + 12;        // tick labels under the plot
+    const topY = titleBlockH + legendZone + T.plotGap;
+    const rowMin = Math.max(dotSize + 4, T.labelSize * 1.2);
     let rowH = rowMin + rowGap;
 
     // Height: honour an explicit container height by fitting the rows into it;
@@ -8761,29 +8951,29 @@ Charts.packedBubble = function (container, opts) {
     }
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'text-anchor': 'start', 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-      fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'text-anchor': 'start', 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+      fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH,
-      'text-anchor': 'start', 'font-size': F_SUB, 'font-weight': SUB_FW,
-      fill: SUB_COL, 'font-family': FONT }, svg));
+      'text-anchor': 'start', 'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight,
+      fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     if (legendEnabled) {
       const gLeg = el('g', {}, svg);
       const startY = titleBlockH + 2;
       legendRows.forEach((row, ri) => {
         row.forEach(cell => {
-          const x = HEAD_X + cell.x, y = startY + ri * LEG_ROW;
+          const x = T.headingGutter + cell.x, y = startY + ri * T.legendRowHeight;
           // A round swatch, because the mark it stands for is a dot.
-          el('circle', { cx: x + LEG_ICON / 2, cy: y + 2 + LEG_ICON / 2, r: LEG_ICON / 2,
+          el('circle', { cx: x + T.legendIconSize / 2, cy: y + 2 + T.legendIconSize / 2, r: T.legendIconSize / 2,
             fill: cell.item.color }, gLeg);
-          txt(cell.item.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW, fill: TITLE_COL,
-            'font-family': FONT }, gLeg);
+          txt(cell.item.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight, fill: T.titleColor,
+            'font-family': T.font }, gLeg);
         });
       });
     }
@@ -8807,11 +8997,11 @@ Charts.packedBubble = function (container, opts) {
     // rod, and the change column on the right. All reserved before anything is
     // drawn, so a long name or a long number cannot push a dot off the canvas.
     const widestValue = showValues
-      ? rows.reduce((m, r) => Math.max(m, textW(fmt(r.a), F_VALUE, true),
-                                          textW(fmt(r.b), F_VALUE, true)), 0)
+      ? rows.reduce((m, r) => Math.max(m, textW(fmt(r.a), T.valueSize, true),
+                                          textW(fmt(r.b), T.valueSize, true)), 0)
       : 0;
     const widestDelta = showDelta
-      ? rows.reduce((m, r) => Math.max(m, textW(deltaText(r), F_VALUE, true)), 0)
+      ? rows.reduce((m, r) => Math.max(m, textW(deltaText(r), T.valueSize, true)), 0)
       : 0;
     const valuePad = 8, deltaPad = 18;
 
@@ -8826,7 +9016,7 @@ Charts.packedBubble = function (container, opts) {
     const rightEdge = W - marginR - calloutGutter;
 
     const rowLabels = layoutRowLabels(rows.map(r => r.name),
-      W * 0.34 - titleX - 10, rowH, F_LABEL);
+      W * 0.34 - titleX - 10, rowH, T.labelSize);
     const hideLabels = compact && rows.length === 1 && plot.rowLabels !== true;
     const labelGutter = hideLabels ? 0 : Math.round(rowLabelWidth(rowLabels)) + 14;
 
@@ -8850,7 +9040,7 @@ Charts.packedBubble = function (container, opts) {
       const inRange = ticks.filter(t => t >= axMin - 1e-9 && t <= axMax + 1e-9);
       for (let stride = 1; stride <= inRange.length; stride++) {
         const kept = inRange.filter((_, i) => i % stride === 0);
-        const need = kept.reduce((s, t) => s + textW(fmt(t), F_TICK, false) + 10, 0);
+        const need = kept.reduce((s, t) => s + textW(fmt(t), T.tickSize, false) + 10, 0);
         if (need <= trackW || kept.length <= 2) return kept;
       }
       return inRange;
@@ -8860,17 +9050,17 @@ Charts.packedBubble = function (container, opts) {
     if (!compact) visTicks.forEach(t => {
       const x = sx(t);
       if (showGrid) el('line', { x1: x, y1: plotTop, x2: x, y2: plotBot,
-        stroke: GRID, 'stroke-width': GRID_W }, gAxis);
-      txt(fmt(t), { x: x, y: plotBot + F_TICK + 8, 'text-anchor': 'middle',
-        'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL,
-        'font-family': FONT }, gAxis);
+        stroke: T.grid, 'stroke-width': T.gridWidth }, gAxis);
+      txt(fmt(t), { x: x, y: plotBot + T.tickSize + 8, 'text-anchor': 'middle',
+        'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor,
+        'font-family': T.font }, gAxis);
     });
     if (!compact) el('line', { x1: plotL, y1: plotBot, x2: plotL + trackW, y2: plotBot,
-      stroke: AXIS_COL, 'stroke-width': SPINE_W }, gAxis);
+      stroke: T.axis, 'stroke-width': T.spineWidth }, gAxis);
     // A zero rule earns its keep only when the scale actually crosses zero.
     if (axMin < 0 && axMax > 0) {
       el('line', { x1: sx(0), y1: plotTop, x2: sx(0), y2: plotBot,
-        stroke: AXIS_COL, 'stroke-width': SPINE_W, opacity: 0.55 }, gAxis);
+        stroke: T.axis, 'stroke-width': T.spineWidth, opacity: 0.55 }, gAxis);
     }
 
     // Arrowheads are opt-in. One marker per rod colour, and the ids carry a
@@ -8881,7 +9071,7 @@ Charts.packedBubble = function (container, opts) {
       : r.delta > 0 ? 'P' : r.delta < 0 ? 'M' : 'N');
     if (showArrow) {
       const defs = el('defs', {}, svg);
-      [[uid + 'P', ABOVE_COL], [uid + 'M', BELOW_COL], [uid + 'N', rodColor]]
+      [[uid + 'P', T.aboveThreshold], [uid + 'M', T.belowThreshold], [uid + 'N', rodColor]]
         .forEach(pair => {
           const mk = el('marker', { id: pair[0], viewBox: '0 0 10 10', refX: 8, refY: 5,
             markerWidth: 4.5, markerHeight: 4.5, orient: 'auto-start-reverse',
@@ -8907,13 +9097,13 @@ Charts.packedBubble = function (container, opts) {
       const l0 = cy - (lns.length - 1) * rowLabels.lh / 2 + rowLabels.font * 0.34;
       if (!hideLabels) lns.forEach((ln, li) => txt(ln, {
         x: titleX, y: l0 + li * rowLabels.lh, 'text-anchor': 'start',
-        'font-size': rowLabels.font, 'font-weight': CAT_FW, fill: CAT_COL,
-        'font-family': FONT }, gText));
+        'font-size': rowLabels.font, 'font-weight': T.categoryWeight, fill: CAT_COL,
+        'font-family': T.font }, gText));
 
       // The rod, drawn between the two dot centres and under them, so the dots
       // cap it rather than sitting on a line that runs through them.
       const rodCol = connectorBySign
-        ? (r.delta > 0 ? ABOVE_COL : r.delta < 0 ? BELOW_COL : rodColor)
+        ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : rodColor)
         : rodColor;
       if (hi - lo > 0.5) {
         const attrs = { x1: lo, y1: cy, x2: hi, y2: cy, stroke: rodCol,
@@ -8937,12 +9127,12 @@ Charts.packedBubble = function (container, opts) {
         const loIsA = xa <= xb;
         const loVal = loIsA ? r.a : r.b, hiVal = loIsA ? r.b : r.a;
         const loCol = loIsA ? r.colA : r.colB, hiCol = loIsA ? r.colB : r.colA;
-        txt(fmt(loVal), { x: lo - dotR - valuePad, y: cy + F_VALUE * 0.36,
-          'text-anchor': 'end', 'font-size': F_VALUE, 'font-weight': VAL_FW,
-          fill: valueColorMode === 'series' ? loCol : VAL_COL, 'font-family': FONT }, gText);
-        txt(fmt(hiVal), { x: hi + dotR + valuePad, y: cy + F_VALUE * 0.36,
-          'text-anchor': 'start', 'font-size': F_VALUE, 'font-weight': VAL_FW,
-          fill: valueColorMode === 'series' ? hiCol : VAL_COL, 'font-family': FONT }, gText);
+        txt(fmt(loVal), { x: lo - dotR - valuePad, y: cy + T.valueSize * 0.36,
+          'text-anchor': 'end', 'font-size': T.valueSize, 'font-weight': T.valueWeight,
+          fill: valueColorMode === 'series' ? loCol : T.valueColor, 'font-family': T.font }, gText);
+        txt(fmt(hiVal), { x: hi + dotR + valuePad, y: cy + T.valueSize * 0.36,
+          'text-anchor': 'start', 'font-size': T.valueSize, 'font-weight': T.valueWeight,
+          fill: valueColorMode === 'series' ? hiCol : T.valueColor, 'font-family': T.font }, gText);
       }
 
       // The change, in its own right-hand column, right-aligned so signs and
@@ -8950,10 +9140,10 @@ Charts.packedBubble = function (container, opts) {
       // the ends of the rods.
       if (showDelta) {
         const dc = deltaColorBySign
-          ? (r.delta > 0 ? ABOVE_COL : r.delta < 0 ? BELOW_COL : SEC_COL)
-          : VAL_COL;
-        txt(deltaText(r), { x: rightEdge, y: cy + F_VALUE * 0.36, 'text-anchor': 'end',
-          'font-size': F_VALUE, 'font-weight': VAL_FW, fill: dc, 'font-family': FONT }, gText);
+          ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : T.secondaryColor)
+          : T.valueColor;
+        txt(deltaText(r), { x: rightEdge, y: cy + T.valueSize * 0.36, 'text-anchor': 'end',
+          'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: dc, 'font-family': T.font }, gText);
       }
 
       // Anchor past everything already sitting at the row's right end, so a
@@ -9000,9 +9190,9 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(F_TIP) + 'px ' + cssFont(FONT) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tooltip);
 
     function clearHover() {
@@ -9015,19 +9205,20 @@ Charts.packedBubble = function (container, opts) {
       if (target && target.classList && target.classList.contains('db-row')) {
         const r = rows[+target.getAttribute('data-idx')];
         if (!r) return;
+        life.hover({ name: r.name, index: rows.indexOf(r), a: r.a, b: r.b, delta: r.delta });
         rows.forEach(q => { if (q._hit) q._hit.setAttribute('fill', 'transparent'); });
-        target.setAttribute('fill', HOVER_INK);
+        target.setAttribute('fill', T.hoverInk);
         target.setAttribute('fill-opacity', '0.045');
         const dot = c => '<span style="display:inline-block;width:9px;height:9px;background:' +
           cssColor(c) + ';border-radius:50%;margin-right:6px"></span>';
         const dCol = deltaColorBySign
-          ? (r.delta > 0 ? ABOVE_COL : r.delta < 0 ? BELOW_COL : TITLE_COL) : TITLE_COL;
+          ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : T.titleColor) : T.titleColor;
         tooltip.innerHTML =
-          '<div style="font-size:' + F_TIP + 'px;font-weight:' + VAL_FW + ';color:' + cssColor(TITLE_COL) +
+          '<div style="font-size:' + T.tooltipSize + 'px;font-weight:' + T.valueWeight + ';color:' + cssColor(T.titleColor) +
             ';margin-bottom:3px">' + esc(r.name) + '</div>' +
-          '<div>' + dot(r.colA) + esc(nameA) + ': <b style="color:' + cssColor(TITLE_COL) + '">' + esc(fmt(r.a)) + '</b></div>' +
-          '<div>' + dot(r.colB) + esc(nameB) + ': <b style="color:' + cssColor(TITLE_COL) + '">' + esc(fmt(r.b)) + '</b></div>' +
-          '<div style="margin-top:3px;color:' + cssColor(SEC_COL) + '">Change: <b style="color:' + cssColor(dCol) + '">' +
+          '<div>' + dot(r.colA) + esc(nameA) + ': <b style="color:' + cssColor(T.titleColor) + '">' + esc(fmt(r.a)) + '</b></div>' +
+          '<div>' + dot(r.colB) + esc(nameB) + ': <b style="color:' + cssColor(T.titleColor) + '">' + esc(fmt(r.b)) + '</b></div>' +
+          '<div style="margin-top:3px;color:' + cssColor(T.secondaryColor) + '">Change: <b style="color:' + cssColor(dCol) + '">' +
             esc(deltaText(r)) + '</b></div>';
         tooltip.style.display = 'block';
         const rect = svg.getBoundingClientRect();
@@ -9039,9 +9230,9 @@ Charts.packedBubble = function (container, opts) {
         if (ty + th > H - 4) ty = H - th - 4;
         tooltip.style.left = tx + 'px';
         tooltip.style.top = ty + 'px';
-      } else clearHover();
+      } else { clearHover(); life.hover(null); }
     });
-    life.on(svg, 'mouseleave', clearHover);
+    life.on(svg, 'mouseleave', () => { clearHover(); life.hover(null); });
 
     return chartAPI(life, {
       opts: opts, typeName: "Dumbbell chart",
@@ -9050,7 +9241,7 @@ Charts.packedBubble = function (container, opts) {
     });
   }
 
-    Charts.dumbbell = Chart;
+  window.ChartsShared.register('dumbbell', Chart);
 })();
 
 // ─── histogram ────────────────────────────────────────
@@ -9105,33 +9296,6 @@ Charts.packedBubble = function (container, opts) {
   // Rough advance width. The engines all estimate rather than measure so that
   // layout is decided before anything is added to the DOM.
   // ---------------- main ----------------
-  // ── callouts ────────────────────────────────────────────────────────────
-  // A callout is an anchor dot on the mark, a leader, and a paragraph box.
-  // The block is shared by every engine (each is its own IIFE) so a note reads
-  // the same everywhere, but *where* the box goes is the engine's call: a
-  // column chart puts its notes in a band above the bars, a horizontal bar
-  // chart in the gutter past the bar ends, a scatter in the emptiest corner
-  // near the point. Passing the marks in as `obstacles` is what keeps a box
-  // off the data instead of merely off the other boxes.
-  //
-  //   drawCallouts(g, items, bounds, {
-  //     mode: 'above' | 'right' | 'radial' | 'auto',
-  //     obstacles: [{ x, y, w, h }],   // rects the box must not cover
-  //     center: { x, y },              // radial mode: what to push away from
-  //     gutter: 12                     // band/gutter thickness for above/right
-  //   })
-  //
-  // Placement stays deterministic — candidates are tried in a fixed order —
-  // so re-rendering the same data puts every box back where it was.
-          // clearance between a box and anything else
-  const CALLOUT_LEAD = 14;        // shortest leader worth drawing
-
-  // Total area of a rect that lands on top of anything it should not.
-  // Leader from the anchor to the box. Straight when the box sits diagonally
-  // from the mark; an elbow when it sits squarely above or beside it, so the
-  // line reads as a pointer rather than as another data mark.
-  // Match a callout to a named thing: `name`, `category`, `point`, `code` and
-  // `label` are all accepted so the key reads naturally per chart type.
   // ── Tokens beyond the shared block ──────────────────────────────────
   // Round a raw bin width up to something a reader can hold in their head —
   // 1, 2, 2.5, 5 or 10 times a power of ten. A histogram whose bins are
@@ -9162,72 +9326,19 @@ Charts.packedBubble = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, NEG_COL, DEFAULT_COL, COLORS, GRID;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_VALUE;
-  let TT_BORDER, DIM_COL, HOVER_INK;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, TOP_AXIS_BAND;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
-  let AXIS_COL, GRID_W, SPINE_W, F_TICK, F_NOTICE, MUTED, ANNOT;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      DIM_COL = t.dimmed;
-      HOVER_INK = t.hoverInk;
-      BG = t.bg;
-      GRID = t.grid;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
-      COLORS = t.colors;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      TOP_AXIS_BAND = t.topAxisBand;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_VALUE = t.valueSize;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
 
-    function applyExtraTheme() {
-      const t = resolveTheme(opts);
-      AXIS_COL = t.axis;
-      GRID_W = t.gridWidth;
-      SPINE_W = t.spineWidth;
-      F_TICK = t.tickSize;
-      F_NOTICE = t.noticeSize;
-      MUTED = t.muted;
-      ANNOT = t.callout;
-    }
 
 
     function errorChart(container, W, H, opts, headline, detail) {
@@ -9235,14 +9346,14 @@ Charts.packedBubble = function (container, opts) {
         console.warn('[charts-lib histogram] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-            fill: TITLE_COL, 'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
@@ -9251,14 +9362,14 @@ Charts.packedBubble = function (container, opts) {
       // The detail sits below however many lines the headline actually took: at a
       // fixed 26px it lands on top of the second line whenever the headline wraps,
       // which is exactly when the message is longest and most needed.
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': F_SUB,
-          'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
+          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       return chartAPI(createLifecycle(container), {
       opts: opts, typeName: "Histogram",
@@ -9272,15 +9383,14 @@ Charts.packedBubble = function (container, opts) {
     }
 
     applyTheme();
-    applyExtraTheme();
     opts = opts || {};
     if (typeof container === 'string') container = document.getElementById(container);
     container.innerHTML = '';
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 400;
@@ -9407,40 +9517,40 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Heading ─────────────────────────────────────────────────────────
     const hasTitle = !!opts.title, hasSub = !!opts.subtitle;
-    const titleX = HEAD_X;
+    const titleX = T.headingGutter;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'text-anchor': 'start', 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-      fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'text-anchor': 'start', 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+      fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH,
-      'text-anchor': 'start', 'font-size': F_SUB, 'font-weight': SUB_FW,
-      fill: SUB_COL, 'font-family': FONT }, svg));
+      'text-anchor': 'start', 'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight,
+      fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // ── Geometry ────────────────────────────────────────────────────────
     // Same margins Charts.column uses, so a histogram and a column chart on
     // one page sit on the same baselines.
     const showValues = dlEnabled(plot.dataLabels, true);
-    const axisTitleH = xAxis.title ? F_TICK + 12 : 0;
-    const footH = (dropped || outside) ? F_TICK + 10 : 0;
+    const axisTitleH = xAxis.title ? T.tickSize + 12 : 0;
+    const footH = (dropped || outside) ? T.tickSize + 10 : 0;
     // Compact: a cell in something else draws no value axis — no tick labels,
     // no gridlines. The bin edges on x stay — they are what each bar counts, and so do the value labels.
     const compact = !!(opts.chart && opts.chart.compact);
     const M = {
       l: compact ? 14 : 62, r: 20,
-      t: titleBlockH + PLOT_GAP + (compact ? 8 : 0),
+      t: titleBlockH + T.plotGap + (compact ? 8 : 0),
       b: 40 + axisTitleH + footH
     };
     const IW = Math.max(40, W - M.l - M.r);
@@ -9470,7 +9580,7 @@ Charts.packedBubble = function (container, opts) {
       ((xAxis.plotLines || []).filter(pl => pl && pl.value != null).length);
     let yTop = mode === 'cumulative' ? 100 : (peak * headroom || 1);
     if (statLabelCount && mode !== 'cumulative' && peak > 0) {
-      const bandPx = statLabelCount * (F_TICK + 4) + 10;
+      const bandPx = statLabelCount * (T.tickSize + 4) + 10;
       if (bandPx < IH * 0.6) yTop = Math.max(yTop, peak * IH / (IH - bandPx));
     }
     // A count axis is whole numbers or it is lying: "2.5 values fell in this
@@ -9505,14 +9615,14 @@ Charts.packedBubble = function (container, opts) {
     if (!compact) yTicks.forEach(v => {
       const y = yScale(v);
       el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y,
-        stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+        stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
       txt(fmtV(v), { x: titleX, y: y + 4, 'text-anchor': 'start',
-        'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL,
-        'font-family': FONT }, gAxes);
+        'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor,
+        'font-family': T.font }, gAxes);
     });
     const y0 = yScale(0);
     el('line', { x1: M.l, y1: y0, x2: M.l + IW, y2: y0,
-      stroke: LABEL_COL, 'stroke-width': SPINE_W }, gAxes);
+      stroke: T.labelColor, 'stroke-width': T.spineWidth }, gAxes);
 
     // X labels sit at bin EDGES, not bin centres: an edge is a number in the
     // data's own units that the reader can check a value against, whereas a
@@ -9524,7 +9634,7 @@ Charts.packedBubble = function (container, opts) {
     const edgeStride = (function () {
       for (let s = 1; s <= edges.length; s++) {
         const kept = edges.filter((_, i) => i % s === 0);
-        const need = kept.reduce((a, e) => a + textW(fmtX(e), F_TICK, false) + 10, 0);
+        const need = kept.reduce((a, e) => a + textW(fmtX(e), T.tickSize, false) + 10, 0);
         if (need <= IW || kept.length <= 2) return s;
       }
       return 1;
@@ -9532,19 +9642,19 @@ Charts.packedBubble = function (container, opts) {
     edges.forEach((e, i) => {
       if (i % edgeStride) return;
       txt(fmtX(e), { x: sx(e), y: M.t + IH + 16, 'text-anchor': 'middle',
-        'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL,
-        'font-family': FONT }, gAxes);
+        'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor,
+        'font-family': T.font }, gAxes);
     });
     if (xAxis.title) {
-      txt(xAxis.title, { x: M.l + IW / 2, y: M.t + IH + 16 + F_TICK + 10,
-        'text-anchor': 'middle', 'font-size': F_TICK, 'font-weight': CAT_FW,
-        fill: CAT_COL, 'font-family': FONT }, gAxes);
+      txt(xAxis.title, { x: M.l + IW / 2, y: M.t + IH + 16 + T.tickSize + 10,
+        'text-anchor': 'middle', 'font-size': T.tickSize, 'font-weight': T.categoryWeight,
+        fill: CAT_COL, 'font-family': T.font }, gAxes);
     }
 
     // ── Bars ────────────────────────────────────────────────────────────
     const gBars = el('g', {}, svg);
     const gText = el('g', {}, svg);
-    const barColor = plot.color || (series && series.color) || DEFAULT_COL;
+    const barColor = plot.color || (series && series.color) || T.defaultColor;
     const gap = plot.barGap != null ? plot.barGap : 1;
     const barRects = [], anchors = [];
 
@@ -9576,14 +9686,14 @@ Charts.packedBubble = function (container, opts) {
         const v = valueOf(b);
         if (!v) return;
         const s = fmtV(v);
-        const tw = textW(s, F_VALUE, true);
+        const tw = textW(s, T.valueSize, true);
         const cx = (sx(b.from) + sx(b.to)) / 2;
         if (tw > b._w + gap + 2) return;             // wider than its own bin
         if (cx - tw / 2 < lastRight + 3) return;     // would touch its neighbour
         lastRight = cx + tw / 2;
         txt(s, { x: cx, y: yScale(v) - 6, 'text-anchor': 'middle',
-          'font-size': F_VALUE, 'font-weight': VAL_FW, fill: VAL_COL,
-          'font-family': FONT }, gText);
+          'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.valueColor,
+          'font-family': T.font }, gText);
       });
     }
 
@@ -9599,7 +9709,7 @@ Charts.packedBubble = function (container, opts) {
     function statRule(value, label, dash) {
       if (!(value >= xLo && value <= xHi)) return;
       const x = sx(value);
-      el('line', { x1: x, y1: M.t, x2: x, y2: y0, stroke: ANNOT,
+      el('line', { x1: x, y1: M.t, x2: x, y2: y0, stroke: T.callout,
         'stroke-width': 1.4, 'stroke-dasharray': dash }, gText);
       // Rounded to the bin width's own precision plus one digit. A mean quoted
       // to six figures on bins ten wide claims a resolution the chart does not
@@ -9608,21 +9718,21 @@ Charts.packedBubble = function (container, opts) {
       const dot = wStr.indexOf('.');
       const dp = Math.min(4, (dot < 0 ? 0 : wStr.length - dot - 1) + 1);
       const s = (label ? label + ' ' : '') + fmtX(+value.toFixed(dp));
-      const tw = textW(s, F_TICK, true);
+      const tw = textW(s, T.tickSize, true);
       const flip = x + 6 + tw > M.l + IW;
       const lx = flip ? x - 6 : x + 6;
       const left = flip ? lx - tw : lx, right = flip ? lx : lx + tw;
-      let ly = M.t + F_TICK + 2;
-      const step = F_TICK + 4;
+      let ly = M.t + T.tickSize + 2;
+      const step = T.tickSize + 4;
       while (statLabels.some(p => ly < p.y + step && ly > p.y - step &&
                                   left < p.right + 4 && right > p.left - 4)) {
         ly += step;
-        if (ly > M.t + IH - step) { ly = M.t + F_TICK + 2; break; }
+        if (ly > M.t + IH - step) { ly = M.t + T.tickSize + 2; break; }
       }
       statLabels.push({ y: ly, left: left, right: right });
       txt(s, { x: lx, y: ly, 'text-anchor': flip ? 'end' : 'start',
-        'font-size': F_TICK, 'font-weight': VAL_FW, fill: ANNOT,
-        'font-family': FONT }, gText);
+        'font-size': T.tickSize, 'font-weight': T.valueWeight, fill: T.callout,
+        'font-family': T.font }, gText);
     }
     if (plot.mean) statRule(mean, plot.meanLabel || 'Mean', '4 3');
     if (plot.median) statRule(median, plot.medianLabel || 'Median', '2 3');
@@ -9640,8 +9750,8 @@ Charts.packedBubble = function (container, opts) {
       if (dropped) bits.push(dropped + ' non-numeric value' + (dropped > 1 ? 's' : ''));
       if (outside) bits.push(outside + ' outside the axis range');
       txt('Not counted: ' + bits.join(' · '), { x: titleX, y: H - 10,
-        'text-anchor': 'start', 'font-size': F_TICK, 'font-weight': TICK_FW,
-        fill: SEC_COL, 'font-family': FONT }, gText);
+        'text-anchor': 'start', 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.secondaryColor, 'font-family': T.font }, gText);
     }
 
     // ── Callouts ────────────────────────────────────────────────────────
@@ -9673,9 +9783,9 @@ Charts.packedBubble = function (container, opts) {
 
     // ── Tooltip ─────────────────────────────────────────────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(F_TIP) + 'px ' + cssFont(FONT) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tooltip);
 
     function clearHover() {
@@ -9687,6 +9797,7 @@ Charts.packedBubble = function (container, opts) {
       if (target && target.classList && target.classList.contains('hist-bar')) {
         const b = bins[+target.getAttribute('data-idx')];
         if (!b) return;
+        life.hover({ name: fmtX(b.from) + ' – ' + fmtX(b.to), index: b.i, from: b.from, to: b.to, count: b.n, percent: b.pct });
         clearHover();
         target.style.opacity = '0.85';
         // The interval is stated the way it is counted: closed on the left,
@@ -9694,12 +9805,12 @@ Charts.packedBubble = function (container, opts) {
         const closed = b.i === count - 1;
         const range = fmtX(b.from) + ' – ' + fmtX(b.to) + (closed ? '' : ' (exclusive)');
         tooltip.innerHTML =
-          '<div style="font-size:' + F_TIP + 'px;font-weight:' + VAL_FW + ';color:' + cssColor(TITLE_COL) +
+          '<div style="font-size:' + T.tooltipSize + 'px;font-weight:' + T.valueWeight + ';color:' + cssColor(T.titleColor) +
             ';margin-bottom:2px">' + esc(range) + '</div>' +
           '<div>' + esc(addCommas(b.n)) + ' of ' + esc(addCommas(total)) +
-            ' <span style="color:' + cssColor(SEC_COL) + '">(' + esc(addCommas(+b.pct.toFixed(1))) + '%)</span></div>' +
+            ' <span style="color:' + cssColor(T.secondaryColor) + '">(' + esc(addCommas(+b.pct.toFixed(1))) + '%)</span></div>' +
           (mode === 'cumulative'
-            ? '<div style="color:' + cssColor(SEC_COL) + '">' + esc(addCommas(+b.cum.toFixed(1))) +
+            ? '<div style="color:' + cssColor(T.secondaryColor) + '">' + esc(addCommas(+b.cum.toFixed(1))) +
               '% at or below ' + esc(fmtX(b.to)) + '</div>' : '');
         tooltip.style.display = 'block';
         const rect = svg.getBoundingClientRect();
@@ -9710,9 +9821,9 @@ Charts.packedBubble = function (container, opts) {
         if (ty < 4) ty = py + 16;
         tooltip.style.left = tx + 'px';
         tooltip.style.top = ty + 'px';
-      } else clearHover();
+      } else { clearHover(); life.hover(null); }
     });
-    life.on(svg, 'mouseleave', clearHover);
+    life.on(svg, 'mouseleave', () => { clearHover(); life.hover(null); });
 
     const getBins = () => bins.map(b => ({ from: b.from, to: b.to, count: b.n,
                                           percent: b.pct, cumulative: b.cum }));
@@ -9743,7 +9854,7 @@ Charts.packedBubble = function (container, opts) {
     }
   }
 
-    Charts.histogram = Chart;
+  window.ChartsShared.register('histogram', Chart);
 })();
 
 
@@ -9781,7 +9892,7 @@ Charts.histogramCumulative = function (container, opts) {
  *  - Data labels on by default, dropped individually where they will not fit
  *  - Hover highlight + tooltip, callouts in the band above the bars
  *
- * THE AXIS ALWAYS INCLUDES ZERO. Every bar in a waterfall is read against the
+ * THE T.axis ALWAYS INCLUDES ZERO. Every bar in a waterfall is read against the
  * zero line — the deltas as distances from it, the totals as heights from it —
  * so a cropped axis does not merely exaggerate here, it makes the totals lie
  * about their own size. yAxis.min/max are honoured but cannot cut zero out.
@@ -9878,64 +9989,16 @@ Charts.histogramCumulative = function (container, opts) {
     // themes have to be able to share a page, and a redraw or a hover has to
     // use the theme this chart was built with rather than whichever one was
     // applied last. See resolveTheme in _shared.js.
-  let BG, GRID, AXIS, TITLE_COL, SUB_COL, LABEL_COL, SEC_COL, POS_COL, NEG_COL, DEFAULT_COL;
-  let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-  let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE, F_TIP, F_NOTICE, F_POINT_LBL;
-  let TT_BORDER, MUTED;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
-  let PLOT_GAP, SPINE_W, GRID_W, CONN_COL, CONN_W;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+  let CAT_COL;
   let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      TT_BORDER = t.tooltipBorder;
-      MUTED = t.muted;
-      BG = t.bg;
-      GRID = t.grid;
-      AXIS = t.axis;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      LABEL_COL = t.labelColor;
-      SEC_COL = t.secondaryColor;
-      POS_COL = t.aboveThreshold;
-      NEG_COL = t.belowThreshold;
-      DEFAULT_COL = t.defaultColor;
+      T = Object.freeze(resolveTheme(opts));
       // Shared text roles — see the hierarchy comment in theme.js.
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      F_NOTICE = t.noticeSize;
-      F_POINT_LBL = t.pointLabelSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_VALUE = t.valueSize;
-      SPINE_W = t.spineWidth;
-      GRID_W = t.gridWidth;
-      CONN_COL = t.connectorLine;
-      CONN_W = t.connectorWidth;
+      CAT_COL = T.categoryColor;
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     // Refusal / empty panel, same shape as the other engines'.
@@ -9944,14 +10007,14 @@ Charts.histogramCumulative = function (container, opts) {
         console.warn('[charts-lib waterfall] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-            fill: TITLE_COL, 'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
@@ -9959,14 +10022,14 @@ Charts.histogramCumulative = function (container, opts) {
       const cy = Math.max(y + 20, H / 2 - 10);
       // The detail sits below however many lines the headline actually took, so
       // a wrapped headline does not have the explanation drawn through it.
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
-          'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
+          'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       return chartAPI(createLifecycle(container), {
         opts: opts, typeName: 'Waterfall',
@@ -9982,8 +10045,8 @@ Charts.histogramCumulative = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -10077,15 +10140,15 @@ Charts.histogramCumulative = function (container, opts) {
 
     // ── Heading ─────────────────────────────────────────────────────────
     const hasTitle = !!opts.title, hasSub = !!opts.subtitle;
-    const titleX = HEAD_X;
+    const titleX = T.headingGutter;
     const titleLines = hasTitle
-      ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
+      ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
     const subLines = hasSub
-      ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+      ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (hasTitle ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (hasSub ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Legend ──────────────────────────────────────────────────────────
     // Three roles rather than three series, and it does not toggle: hiding
@@ -10094,42 +10157,42 @@ Charts.histogramCumulative = function (container, opts) {
     // actually uses more than one role.
     const roles = [];
     if (steps.some(s => s.kind === 'delta' && s.y >= 0)) {
-      roles.push({ name: plot.increaseLabel || 'Increase', color: plot.upColor || POS_COL });
+      roles.push({ name: plot.increaseLabel || 'Increase', color: plot.upColor || T.aboveThreshold });
     }
     if (steps.some(s => s.kind === 'delta' && s.y < 0)) {
-      roles.push({ name: plot.decreaseLabel || 'Decrease', color: plot.downColor || NEG_COL });
+      roles.push({ name: plot.decreaseLabel || 'Decrease', color: plot.downColor || T.belowThreshold });
     }
     if (steps.some(s => s.kind !== 'delta')) {
-      roles.push({ name: plot.totalLabel || 'Total', color: plot.sumColor || DEFAULT_COL });
+      roles.push({ name: plot.totalLabel || 'Total', color: plot.sumColor || T.defaultColor });
     }
     const legendEnabled = (opts.legend && opts.legend.enabled != null)
       ? !!opts.legend.enabled : roles.length > 1;
     const legendRows = (function () {
       if (!legendEnabled) return { rows: [], height: 0 };
-      const availW = W - HEAD_X * 2;
+      const availW = W - T.headingGutter * 2;
       const rows = [];
       let cur = [], curX = 0;
       roles.forEach(r => {
-        const w = LEG_ICON + LEG_ICON_GAP + Math.ceil(textW(r.name, F_LEG, false)) + LEG_GAP;
+        const w = T.legendIconSize + T.legendIconGap + Math.ceil(textW(r.name, T.legendSize, false)) + T.legendGap;
         if (cur.length && curX + w > availW) { rows.push(cur); cur = []; curX = 0; }
         cur.push({ role: r, x: curX });
         curX += w;
       });
       if (cur.length) rows.push(cur);
-      return { rows: rows, height: rows.length * LEG_ROW };
+      return { rows: rows, height: rows.length * T.legendRowHeight };
     })();
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'text-anchor': 'start', 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-      fill: TITLE_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'text-anchor': 'start', 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+      fill: T.titleColor, 'font-family': T.font }, svg));
     subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * SUB_LH,
-      'text-anchor': 'start', 'font-size': F_SUB, 'font-weight': SUB_FW,
-      fill: SUB_COL, 'font-family': FONT }, svg));
+      'text-anchor': 'start', 'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight,
+      fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // ── Geometry ────────────────────────────────────────────────────────
     // The same margins Charts.column uses, so a waterfall and a column chart
@@ -10137,13 +10200,13 @@ Charts.histogramCumulative = function (container, opts) {
     const n = steps.length;
     const showValues = dlEnabled(plot.dataLabels, true);
     const catLayout = layoutCategoryAxis(steps.map(s => s.name), Math.max(40, W - 82),
-      F_LABEL, Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
+      T.labelSize, Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
     // Compact: a cell in something else draws no value axis — no tick labels,
     // no gridlines. The category labels stay, and so do the value labels.
     const compact = !!(opts.chart && opts.chart.compact);
     const M = {
       l: compact ? 14 : 62, r: 20,
-      t: titleBlockH + legendRows.height + PLOT_GAP + (compact ? 8 : 0),
+      t: titleBlockH + legendRows.height + T.plotGap + (compact ? 8 : 0),
       b: Math.max(26, catLayout.height)
     };
     const IW = Math.max(40, W - M.l - M.r);
@@ -10199,25 +10262,25 @@ Charts.histogramCumulative = function (container, opts) {
     if (!compact) yTicks.forEach(v => {
       const y = yScale(v);
       el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y,
-        stroke: GRID, 'stroke-width': GRID_W }, gGrid);
+        stroke: T.grid, 'stroke-width': T.gridWidth }, gGrid);
       txt(fmtV(v), { x: titleX, y: y + 4, 'text-anchor': 'start',
-        'font-size': F_TICK, 'font-weight': TICK_FW, fill: TICK_COL,
-        'font-family': FONT }, gGrid);
+        'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor,
+        'font-family': T.font }, gGrid);
     });
     // The spine is on zero, not at the foot of the plot: with a negative step
     // in the data the bars cross it, and a line drawn anywhere else would read
     // as the baseline they are measured from.
     el('line', { x1: M.l, y1: y0, x2: M.l + IW, y2: y0,
-      stroke: LABEL_COL, 'stroke-width': SPINE_W }, gGrid);
+      stroke: T.labelColor, 'stroke-width': T.spineWidth }, gGrid);
 
     // ── Bars ────────────────────────────────────────────────────────────
     const slot = IW / n;
     const gapRatio = plot.pointPadding != null ? Math.max(0, Math.min(0.6, +plot.pointPadding)) : 0.3;
     const barW = Math.max(2, Math.min(slot * (1 - gapRatio), plot.maxPointWidth || 72));
     const centerX = i => M.l + (i + 0.5) * slot;
-    const colorOf = s => s.color || (s.kind !== 'delta' ? (plot.sumColor || DEFAULT_COL)
-                                   : s.y >= 0 ? (plot.upColor || POS_COL)
-                                              : (plot.downColor || NEG_COL));
+    const colorOf = s => s.color || (s.kind !== 'delta' ? (plot.sumColor || T.defaultColor)
+                                   : s.y >= 0 ? (plot.upColor || T.aboveThreshold)
+                                              : (plot.downColor || T.belowThreshold));
     const barRects = [];
 
     steps.forEach(s => {
@@ -10247,7 +10310,7 @@ Charts.histogramCumulative = function (container, opts) {
         // meets the next bar exactly where that bar starts.
         const level = yScale(a.total);
         el('line', { x1: a._x, x2: b._x + barW, y1: level, y2: level,
-          stroke: plot.connectorColor || CONN_COL, 'stroke-width': CONN_W,
+          stroke: plot.connectorColor || T.connectorLine, 'stroke-width': T.connectorWidth,
           'stroke-dasharray': plot.connectorDash || '3 3', 'stroke-opacity': 0.75 }, gConn);
       }
     }
@@ -10264,22 +10327,22 @@ Charts.histogramCumulative = function (container, opts) {
         const down = s.kind === 'delta' ? s.y < 0 : s.y < 0;
         const label = s.kind === 'delta' && plot.showSign !== false
           ? fmtDelta(s.y, s.i === 0) : fmtV(s.y);
-        const tw = textW(label, F_VALUE, true);
+        const tw = textW(label, T.valueSize, true);
         const cx = centerX(s.i);
         if (tw > slot - 2) return;                   // wider than its own slot
         if (cx - tw / 2 < lastRight + 3) return;     // would touch its neighbour
         lastRight = cx + tw / 2;
-        txt(label, { x: cx, y: down ? s._bot + F_VALUE + 4 : s._top - 6,
-          'text-anchor': 'middle', 'font-size': F_VALUE,
-          'font-weight': s.kind === 'delta' ? VAL_FW : TITLE_FW,
-          fill: s.kind === 'delta' ? VAL_COL : TITLE_COL, 'font-family': FONT }, gText);
+        txt(label, { x: cx, y: down ? s._bot + T.valueSize + 4 : s._top - 6,
+          'text-anchor': 'middle', 'font-size': T.valueSize,
+          'font-weight': s.kind === 'delta' ? T.valueWeight : T.titleWeight,
+          fill: s.kind === 'delta' ? T.valueColor : T.titleColor, 'font-family': T.font }, gText);
       });
     }
 
     // ── Category labels ─────────────────────────────────────────────────
     (function () {
-      const a = { 'font-size': catLayout.font, 'font-weight': CAT_FW, fill: CAT_COL,
-                  'font-family': FONT };
+      const a = { 'font-size': catLayout.font, 'font-weight': T.categoryWeight, fill: CAT_COL,
+                  'font-family': T.font };
       const lh = catLayout.font * 1.25;
       const yTop = M.t + IH + 16;
       catLayout.ticks.forEach((tk, k) => {
@@ -10302,12 +10365,12 @@ Charts.histogramCumulative = function (container, opts) {
       const v = Math.max(yMin, Math.min(yMax, +pl.value));
       const y = yScale(v);
       el('line', { x1: M.l, x2: M.l + IW, y1: y, y2: y,
-        stroke: pl.color || AXIS, 'stroke-width': pl.width || 1.5,
+        stroke: pl.color || T.axis, 'stroke-width': pl.width || 1.5,
         'stroke-dasharray': DASH[pl.dashStyle || 'ShortDash'] || '4 2' }, gAxes);
       if (pl.label && pl.label.text) {
         txt(pl.label.text, { x: M.l + IW, y: y - 5, 'text-anchor': 'end',
-          'font-size': F_POINT_LBL, 'font-weight': VAL_FW, fill: pl.color || AXIS,
-          'font-family': FONT }, gAxes);
+          'font-size': T.pointLabelSize, 'font-weight': T.valueWeight, fill: pl.color || T.axis,
+          'font-family': T.font }, gAxes);
       }
     });
 
@@ -10316,13 +10379,13 @@ Charts.histogramCumulative = function (container, opts) {
       const startY = titleBlockH + 2;
       legendRows.rows.forEach((row, ri) => {
         row.forEach(cell => {
-          const x = HEAD_X + cell.x;
-          const y = startY + ri * LEG_ROW;
-          el('rect', { x: x, y: y + 2, width: LEG_ICON, height: LEG_ICON, rx: 2,
+          const x = T.headingGutter + cell.x;
+          const y = startY + ri * T.legendRowHeight;
+          el('rect', { x: x, y: y + 2, width: T.legendIconSize, height: T.legendIconSize, rx: 2,
             fill: cell.role.color }, gLegend);
-          txt(cell.role.name, { x: x + LEG_ICON + LEG_ICON_GAP, y: y + 12,
-            'font-size': F_LEG, 'font-weight': LEG_FW, fill: TITLE_COL,
-            'font-family': FONT }, gLegend);
+          txt(cell.role.name, { x: x + T.legendIconSize + T.legendIconGap, y: y + 12,
+            'font-size': T.legendSize, 'font-weight': T.legendWeight, fill: T.titleColor,
+            'font-family': T.font }, gLegend);
         });
       });
     }
@@ -10351,9 +10414,9 @@ Charts.histogramCumulative = function (container, opts) {
 
     // ── Tooltip ─────────────────────────────────────────────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(F_TIP) + 'px ' + cssFont(FONT) +
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
       ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tooltip);
 
@@ -10366,31 +10429,34 @@ Charts.histogramCumulative = function (container, opts) {
       const target = ev.target;
       if (!(target && target.classList && target.classList.contains('wf-bar'))) {
         clearHover();
+        life.hover(null);
         return;
       }
       const s = steps[+target.getAttribute('data-idx')];
       if (!s) return;
+      life.hover({ name: s.name, index: s.i, change: s.kind === 'delta' ? s.y : null,
+        total: +s.total.toPrecision(12), kind: s.kind });
       clearHover();
       target.style.opacity = '0.85';
       // A delta says what it changed and where that left the balance; a total
       // says what it is. The share is against the balance the step started
       // from, which is the number a reader is comparing it with.
-      const head = '<div style="font-size:' + cssNumber(F_TIP) + 'px;font-weight:' + cssNumber(VAL_FW) +
-        ';color:' + cssColor(TITLE_COL) + ';margin-bottom:2px">' + esc(s.name) + '</div>';
+      const head = '<div style="font-size:' + cssNumber(T.tooltipSize) + 'px;font-weight:' + cssNumber(T.valueWeight) +
+        ';color:' + cssColor(T.titleColor) + ';margin-bottom:2px">' + esc(s.name) + '</div>';
       let body;
       if (s.kind === 'delta') {
         const pct = s.base !== 0 ? (s.y / Math.abs(s.base)) * 100 : null;
-        body = '<div style="color:' + cssColor(colorOf(s)) + ';font-weight:' + cssNumber(VAL_FW) + '">' +
+        body = '<div style="color:' + cssColor(colorOf(s)) + ';font-weight:' + cssNumber(T.valueWeight) + '">' +
             esc(fmtDelta(s.y, s.i === 0)) +
-            (pct != null ? ' <span style="color:' + cssColor(SEC_COL) + ';font-weight:400">(' +
+            (pct != null ? ' <span style="color:' + cssColor(T.secondaryColor) + ';font-weight:400">(' +
               esc((pct > 0 ? '+' : '') + addCommas(+pct.toFixed(1))) + '%)</span>' : '') +
           '</div>' +
-          '<div style="color:' + cssColor(SEC_COL) + '">Running total ' +
+          '<div style="color:' + cssColor(T.secondaryColor) + '">Running total ' +
             esc(fmtV(+s.total.toPrecision(12))) + '</div>';
       } else {
-        body = '<div style="font-weight:' + cssNumber(VAL_FW) + ';color:' + cssColor(TITLE_COL) + '">' +
+        body = '<div style="font-weight:' + cssNumber(T.valueWeight) + ';color:' + cssColor(T.titleColor) + '">' +
           esc(fmtV(+s.y.toPrecision(12))) + '</div>' +
-          '<div style="color:' + cssColor(MUTED) + '">' +
+          '<div style="color:' + cssColor(T.muted) + '">' +
           'Running total' + '</div>';
       }
       tooltip.innerHTML = head + body;
@@ -10404,7 +10470,7 @@ Charts.histogramCumulative = function (container, opts) {
       tooltip.style.left = tx + 'px';
       tooltip.style.top = ty + 'px';
     });
-    life.on(svg, 'mouseleave', clearHover);
+    life.on(svg, 'mouseleave', () => { clearHover(); life.hover(null); });
 
     // The steps are the waterfall's data, and they are what the accessible
     // table publishes: the change, what kind of step it was, and where the
@@ -10435,7 +10501,7 @@ Charts.histogramCumulative = function (container, opts) {
     });
   }
 
-    Charts.waterfall = Chart;
+  window.ChartsShared.register('waterfall', Chart);
 })();
 
 // ─── sankey ───────────────────────────────────────────
@@ -10495,47 +10561,15 @@ Charts.histogramCumulative = function (container, opts) {
   function Chart(container, opts) {
     const addCommas = makeNumberFormatter(resolveTheme(opts));
     // Theme tokens are per chart, not per module — see resolveTheme in _shared.js.
-    let BG, TITLE_COL, SUB_COL, SEC_COL, MUTED, TT_BORDER, COLORS, DROP_COL, GRID, GRID_W;
-    let CAT_COL, CAT_FW, TICK_COL, TICK_FW, VAL_COL, VAL_FW;
-    let FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE, F_TIP, F_NOTICE;
-    let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, PLOT_GAP;
+    let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+    let COLORS;
     let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      BG = t.bg;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      SEC_COL = t.secondaryColor;
-      MUTED = t.muted;
-      DROP_COL = t.belowThreshold;
-      GRID = t.grid;
-      GRID_W = t.gridWidth;
-      TT_BORDER = t.tooltipBorder;
-      COLORS = t.colors && t.colors.length ? t.colors : [t.defaultColor];
-      CAT_COL = t.categoryColor;
-      CAT_FW = t.categoryWeight;
-      TICK_COL = t.tickColor;
-      TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor;
-      VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_LABEL = t.labelSize;
-      F_TICK = t.tickSize;
-      F_VALUE = t.valueSize;
-      F_TIP = t.tooltipSize;
-      F_NOTICE = t.noticeSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      PLOT_GAP = t.plotGap;
+      T = Object.freeze(resolveTheme(opts));
+      COLORS = T.colors && T.colors.length ? T.colors : [T.defaultColor];
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     // Refusal / empty panel, same shape as the other engines'.
@@ -10544,27 +10578,27 @@ Charts.histogramCumulative = function (container, opts) {
         console.warn('[charts-lib sankey] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-            fill: TITLE_COL, 'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
       }
       const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
       headLines.forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE, 'font-weight': TITLE_FW,
-          fill: TITLE_COL, 'font-family': FONT }, svg);
+        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+          fill: T.titleColor, 'font-family': T.font }, svg);
       });
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
-          'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg);
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
+        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
+          'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
       });
       return chartAPI(createLifecycle(container), {
         opts: Object.assign({}, opts, { series: null }), typeName: 'Sankey',
@@ -10580,8 +10614,8 @@ Charts.histogramCumulative = function (container, opts) {
     container.innerHTML = '';
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     const W = container.clientWidth || 800;
     const H = container.clientHeight || 500;
@@ -10671,22 +10705,22 @@ Charts.histogramCumulative = function (container, opts) {
     nodes.forEach(n => columns[n.col].push(n));
 
     // ── Heading ─────────────────────────────────────────────────────────
-    const titleLines = opts.title ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
-    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+    const titleLines = opts.title ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
+    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (titleLines.length ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
-    subLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: subY0 + i * SUB_LH,
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+    subLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: subY0 + i * SUB_LH,
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     // ── Geometry ────────────────────────────────────────────────────────
     // Stage names, one per column, left to right. `stages` at the top of the
@@ -10695,8 +10729,8 @@ Charts.histogramCumulative = function (container, opts) {
     const stageList = [opts.stages, (opts.series && opts.series[0] || {}).stages, plot.stages, plot.columnLabels]
       .filter(Array.isArray)[0] || null;
     const colLabels = stageList && stageList.some(v => v != null && v !== '') ? stageList : null;
-    const colHeadH = colLabels ? F_LABEL + 16 : 0;
-    const M = { l: HEAD_X, r: HEAD_X, t: titleBlockH + PLOT_GAP + colHeadH, b: 16 };
+    const colHeadH = colLabels ? T.labelSize + 16 : 0;
+    const M = { l: T.headingGutter, r: T.headingGutter, t: titleBlockH + T.plotGap + colHeadH, b: 16 };
     const IW = Math.max(60, W - M.l - M.r);
     const IH = Math.max(40, H - M.t - M.b);
     const nodeW = plot.nodeWidth != null ? Math.max(2, +plot.nodeWidth) : 12;
@@ -10808,7 +10842,7 @@ Charts.histogramCumulative = function (container, opts) {
     const levelColor = c => RAMP[nCols > 1 ? Math.round(c * (RAMP.length - 1) / (nCols - 1)) : 0];
     nodes.forEach((n, i) => { n._i = i; });
     nodes.slice().sort((a, b) => a.col - b.col || a.depth - b.depth).forEach(n => {
-      if (n.synthetic) { n._color = DROP_COL; return; }
+      if (n.synthetic) { n._color = T.belowThreshold; return; }
       if (n.color) { n._color = n.color; return; }
       if (colorBy === 'level') { n._color = levelColor(n.col); return; }
       if (colorBy === 'node') { n._color = COLORS[n._i % COLORS.length]; return; }
@@ -10822,10 +10856,10 @@ Charts.histogramCumulative = function (container, opts) {
     const linkOpacity = plot.linkOpacity != null ? +plot.linkOpacity : 0.35;
     const gDefs = el('defs', {}, svg);
     const linkFill = l => {
-      if (l.synthetic) return DROP_COL;
+      if (l.synthetic) return T.belowThreshold;
       if (l.color) return l.color;
       if (linkMode === 'target') return l.target._color;
-      if (linkMode === 'neutral') return MUTED;
+      if (linkMode === 'neutral') return T.muted;
       if (linkMode === 'gradient') {
         const id = 'sk-grad-' + (++gradientId);
         const g = el('linearGradient', { id: id, gradientUnits: 'userSpaceOnUse',
@@ -10855,14 +10889,14 @@ Charts.histogramCumulative = function (container, opts) {
         const first = c === 0, last = c === nCols - 1 && nCols > 1;
         const x = first ? colX(c) : last ? colX(c) + nodeW : colX(c) + nodeW / 2;
         const room = (first || last ? spacing * 0.5 : spacing) - 12;
-        const name = ellipsize(String(lab), Math.max(3, Math.floor(room / (F_LABEL * 0.6))));
-        const t = txt(name, { x: x, y: baseY, 'font-size': F_LABEL, 'font-weight': VAL_FW,
-          fill: TITLE_COL, 'font-family': FONT,
+        const name = ellipsize(String(lab), Math.max(3, Math.floor(room / (T.labelSize * 0.6))));
+        const t = txt(name, { x: x, y: baseY, 'font-size': T.labelSize, 'font-weight': T.valueWeight,
+          fill: T.titleColor, 'font-family': T.font,
           'text-anchor': first ? 'start' : last ? 'end' : 'middle' }, gText);
         if (name !== String(lab)) el('title', {}, t).textContent = String(lab);
       });
       el('line', { x1: M.l, x2: M.l + IW, y1: baseY + 7, y2: baseY + 7,
-        stroke: GRID, 'stroke-width': GRID_W }, gText);
+        stroke: T.grid, 'stroke-width': T.gridWidth }, gText);
     }
 
     // ── Bands ───────────────────────────────────────────────────────────
@@ -10902,15 +10936,15 @@ Charts.histogramCumulative = function (container, opts) {
         col.slice().sort((a, b) => a.y0 - b.y0).forEach(n => {
           const x = right ? n.x1 + 6 : n.x0 - 6;
           const anchor = right ? 'start' : 'end';
-          const name = ellipsize(n.name, Math.max(3, Math.floor(maxW / (F_LABEL * 0.58))));
+          const name = ellipsize(n.name, Math.max(3, Math.floor(maxW / (T.labelSize * 0.58))));
           const val = showVal ? fmtV(n.value) + (n.synthetic ? ' · ' + pct(n.value, n.reached) : '') : '';
-          const nameCol = n.synthetic ? DROP_COL : CAT_COL;
-          const twoLines = showVal && n.h >= F_LABEL + F_VALUE + 2;
-          const blockH = twoLines ? F_LABEL + F_VALUE + 4 : F_LABEL + 2;
+          const nameCol = n.synthetic ? T.belowThreshold : T.categoryColor;
+          const twoLines = showVal && n.h >= T.labelSize + T.valueSize + 2;
+          const blockH = twoLines ? T.labelSize + T.valueSize + 4 : T.labelSize + 2;
           const cy = (n.y0 + n.y1) / 2;
           let top = cy - blockH / 2;
-          const lw = twoLines ? Math.max(textW(name, F_LABEL, true), textW(val, F_VALUE, false))
-            : textW(name, F_LABEL, true) + (val ? 5 + textW(val, F_LABEL, false) : 0);
+          const lw = twoLines ? Math.max(textW(name, T.labelSize, true), textW(val, T.valueSize, false))
+            : textW(name, T.labelSize, true) + (val ? 5 + textW(val, T.labelSize, false) : 0);
           const bx0 = right ? x : x - lw, bx1 = right ? x + lw : x;
           const hit = t => labelBoxes.find(lb => bx0 < lb.x1 && bx1 > lb.x0 && t < lb.y1 + 2 && t + blockH > lb.y0 - 2);
           if (n.synthetic) {
@@ -10923,19 +10957,19 @@ Charts.histogramCumulative = function (container, opts) {
           } else if (top < lastBottom + 2 || hit(top)) return;
           lastBottom = Math.max(lastBottom, top + blockH);
           labelBoxes.push({ x0: bx0, x1: bx1, y0: top, y1: top + blockH });
-          const halo = { stroke: BG, 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke' };
+          const halo = { stroke: T.bg, 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke' };
           if (twoLines) {
-            txt(name, Object.assign({ x: x, y: top + F_LABEL - 1, 'text-anchor': anchor,
-              'font-size': F_LABEL, 'font-weight': CAT_FW, fill: nameCol, 'font-family': FONT }, halo), gText);
-            txt(val, Object.assign({ x: x, y: top + F_LABEL + F_VALUE + 2, 'text-anchor': anchor,
-              'font-size': F_VALUE, 'font-weight': VAL_FW, fill: SEC_COL, 'font-family': FONT }, halo), gText);
+            txt(name, Object.assign({ x: x, y: top + T.labelSize - 1, 'text-anchor': anchor,
+              'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: nameCol, 'font-family': T.font }, halo), gText);
+            txt(val, Object.assign({ x: x, y: top + T.labelSize + T.valueSize + 2, 'text-anchor': anchor,
+              'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: T.secondaryColor, 'font-family': T.font }, halo), gText);
           } else {
-            const t = txt('', Object.assign({ x: x, y: top + blockH / 2 + F_LABEL * 0.36, 'text-anchor': anchor,
-              'font-size': F_LABEL, 'font-family': FONT }, halo), gText);
-            const a = el('tspan', { 'font-weight': CAT_FW, fill: nameCol }, t);
+            const t = txt('', Object.assign({ x: x, y: top + blockH / 2 + T.labelSize * 0.36, 'text-anchor': anchor,
+              'font-size': T.labelSize, 'font-family': T.font }, halo), gText);
+            const a = el('tspan', { 'font-weight': T.categoryWeight, fill: nameCol }, t);
             a.textContent = name;
             if (val) {
-              const b = el('tspan', { 'font-weight': VAL_FW, fill: SEC_COL, dx: 5 }, t);
+              const b = el('tspan', { 'font-weight': T.valueWeight, fill: T.secondaryColor, dx: 5 }, t);
               b.textContent = val;
             }
           }
@@ -10945,17 +10979,17 @@ Charts.histogramCumulative = function (container, opts) {
 
     // ── Tooltip + hover ─────────────────────────────────────────────────
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(BG) +
-      ';border:1px solid ' + cssColor(TT_BORDER) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(F_TIP) + 'px ' + cssFont(FONT) +
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
       ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
     container.appendChild(tooltip);
 
-    const line = (label, value, strong) => '<div style="color:' + cssColor(strong ? TITLE_COL : SEC_COL) +
-      ';font-weight:' + cssNumber(strong ? VAL_FW : 400) + '">' + esc(label) +
-      (value != null ? ' <span style="color:' + cssColor(TITLE_COL) + ';font-weight:' + cssNumber(VAL_FW) + '">' +
+    const line = (label, value, strong) => '<div style="color:' + cssColor(strong ? T.titleColor : T.secondaryColor) +
+      ';font-weight:' + cssNumber(strong ? T.valueWeight : 400) + '">' + esc(label) +
+      (value != null ? ' <span style="color:' + cssColor(T.titleColor) + ';font-weight:' + cssNumber(T.valueWeight) + '">' +
         esc(value) + '</span>' : '') + '</div>';
-    const head = (s, color) => '<div style="font-weight:' + cssNumber(VAL_FW) + ';color:' + cssColor(TITLE_COL) +
+    const head = (s, color) => '<div style="font-weight:' + cssNumber(T.valueWeight) + ';color:' + cssColor(T.titleColor) +
       ';margin-bottom:2px">' + (color ? '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;' +
       'margin-right:6px;background:' + cssColor(color) + '"></span>' : '') + esc(s) + '</div>';
 
@@ -10975,13 +11009,15 @@ Charts.histogramCumulative = function (container, opts) {
     life.on(svg, 'mousemove', ev => {
       const t = ev.target;
       const cls = t && t.getAttribute && t.getAttribute('class');
-      if (cls !== 'sk-link' && cls !== 'sk-node') { clearHover(); return; }
+      if (cls !== 'sk-link' && cls !== 'sk-node') { clearHover(); life.hover(null); return; }
       let html;
       if (cls === 'sk-link') {
         const l = links[+t.getAttribute('data-idx')];
+        life.hover({ kind: 'link', name: l.source.name + ' → ' + l.target.name, index: links.indexOf(l),
+          from: l.source.name, to: l.target.name, weight: l.value, synthetic: !!l.synthetic });
         focus(new Set([l]), new Set([l.source, l.target]));
         html = l.synthetic
-          ? head(l.source.name + ': ' + DROP_WORD.toLowerCase(), DROP_COL) + line('', fmtV(l.value), true) +
+          ? head(l.source.name + ': ' + DROP_WORD.toLowerCase(), T.belowThreshold) + line('', fmtV(l.value), true) +
             line(pct(l.value, l.source.inValue) + ' of what reaches ' + l.source.name + ' goes no further')
           : head(l.source.name + ' → ' + l.target.name) +
           line('', fmtV(l.value), true) +
@@ -10989,9 +11025,11 @@ Charts.histogramCumulative = function (container, opts) {
           line(pct(l.value, l.target.inValue) + ' of what reaches ' + l.target.name);
       } else {
         const n = nodes[+t.getAttribute('data-idx')];
+        life.hover({ kind: 'node', name: n.name, series: 'node', index: nodes.indexOf(n),
+          in: n.inValue, out: n.outValue, value: n.value, synthetic: !!n.synthetic });
         if (n.synthetic) {
           focus(new Set(n.inLinks), new Set([n].concat(n.parents)));
-          html = head(DROP_WORD, DROP_COL) + line('', fmtV(n.value), true) +
+          html = head(DROP_WORD, T.belowThreshold) + line('', fmtV(n.value), true) +
             line(pct(n.value, n.reached) + ' of what reaches this level goes no further');
           if (n.parents.length > 1) {
             n.inLinks.slice().sort((a, b) => b.value - a.value).forEach(l => {
@@ -11029,7 +11067,7 @@ Charts.histogramCumulative = function (container, opts) {
       tooltip.style.left = tx + 'px';
       tooltip.style.top = ty + 'px';
     }
-    life.on(svg, 'mouseleave', clearHover);
+    life.on(svg, 'mouseleave', () => { clearHover(); life.hover(null); });
 
     // The links are the data a reader would tabulate: what moved from where to
     // where. They are what the accessible table publishes.
@@ -11050,8 +11088,540 @@ Charts.histogramCumulative = function (container, opts) {
     });
   }
 
-    Charts.sankey = Chart;
+  window.ChartsShared.register('sankey', Chart);
 })();
+
+// ─── heatmap / calendarHeatmap ───────────────────────
+
+/*
+ * Heatmap engine — a value per cell of a grid whose two directions are
+ * ORDERED, drawn as colour.
+ *
+ *   Charts.heatmap          a matrix: xAxis.categories left to right,
+ *                           yAxis.categories top to bottom (hour × weekday,
+ *                           week × cohort, bin × bin)
+ *   Charts.calendarHeatmap  one cell per day: weeks as columns, weekdays as
+ *                           rows, a band per calendar year
+ *
+ * Colour is the least precise encoding a chart has, so this chart is for the
+ * PATTERN — the busy afternoons, the quiet weekends, the week the numbers
+ * turned — and leaves exact figures to the tooltip, and to the in-cell labels
+ * when every one of them fits. A grid of two sets of unrelated names is a
+ * table with highlight: 'scale', which prints the numbers; validate() warns.
+ *
+ * Design language shared with the rest of charts-lib:
+ *  - Cream bg, Inter, top-left title/subtitle at the same metrics as the other
+ *    engines; the row labels start at the same headingGutter
+ *  - The same value → colour scale as table's `scale` cells (scaleColor in
+ *    _shared.js): the series ramp light → dark, or diverging through the
+ *    threshold pair when the values cross zero, zero itself the neutral tile
+ *    surface. One scale, so a shade means the same thing in both exhibits.
+ *  - A colour key under the heading, with the ends of the domain (and zero,
+ *    when it diverges) printed on it; hovering a cell marks its place there
+ *  - The ink on a filled cell is whichever of titleColor / inverseText
+ *    contrasts more with that fill
+ *
+ * A BLANK IS NOT ZERO. A cell with no value — absent from the data, or null —
+ * is drawn as an outline with no fill and takes no part in the colour scale,
+ * so it neither reads as "nothing happened" nor drags the ramp towards zero.
+ * A calendar day OUTSIDE the data's range — before its first day or after its
+ * last, where a band runs on to a whole month or year — is a third thing: not
+ * missing, just not asked about. It takes a faint fill and no outline, so the
+ * outline keeps meaning "this day had no value".
+ *
+ * Sizing follows the library rule: a height on the container is filled (rows
+ * stretch in a matrix; a calendar keeps square days, so it fills the width
+ * and sits at the top), no height grows to the content, and nothing is ever
+ * clipped — rows too short for their labels grow the chart instead.
+ *
+ * REFUSALS (shared with Charts.validate via heatmapGrid in _shared.js): more
+ * than one series, two values for one cell or day, a value that is not a
+ * number, a matrix without both axes named, calendar values weekly or
+ * coarser, and a calendar over more than four years.
+ */
+(function () {
+  // Helpers shared by every engine — see engines/_shared.js.
+  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle,
+          el, txt, esc, wrapHeading, textW, truncate, layoutCategoryAxis, monthNames,
+          heatmapGrid, scaleColor, mix, contrast, NS } = window.ChartsShared;
+
+  const TITLE_LINES = 2, SUB_LINES = 3;
+  const DAY_MS = 86400000;
+  const EN_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const KEY_BAR = 8;          // height of the colour key's bar
+  const KEY_MAX = 240;        // and the widest it gets
+  const LABEL_GAP = 8;        // air between a row label and its first cell
+  // A day's size is whatever the width and (when there is one) the height
+  // allow, up to this. Without a limit a short span in a box with no height
+  // turns into a handful of giant tiles: one month across 780px is 140px days
+  // and a chart over 1,100px tall. A day carries no text, so size past this
+  // adds space, not information.
+  const CAL_CELL_MAX = 30;
+  const CAL_CELL_MIN = 5;     // and a filled height never squeezes it below this
+  const BAND_GAP = 14;        // air between two years of a calendar
+
+  /** Short weekday names, Sunday first, in the theme's locale. */
+  function weekdayNames(t) {
+    if (!t.locale) return EN_WEEKDAYS;
+    try {
+      const f = new Intl.DateTimeFormat(t.locale, { weekday: 'short', timeZone: 'UTC' });
+      // 1 January 2023 was a Sunday.
+      return EN_WEEKDAYS.map((_, i) => f.format(new Date(Date.UTC(2023, 0, 1 + i))));
+    } catch (e) {
+      return EN_WEEKDAYS;
+    }
+  }
+
+  const dayOf = (y, m, d) => Math.floor(Date.UTC(y, m, d) / DAY_MS);
+  // Epoch day 0, 1 January 1970, was a Thursday.
+  const dowOf = k => ((k + 4) % 7 + 7) % 7;
+
+  function Chart(container, opts) {
+    // The chart's own number formatter, shadowing the shared default:
+    // theme.locale picks the convention, theme.numberFormat overrides it.
+    const addCommas = makeNumberFormatter(resolveTheme(opts));
+    let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+    let TITLE_LH, SUB_LH;
+
+    function applyTheme() {
+      T = Object.freeze(resolveTheme(opts));
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
+    }
+
+    applyTheme();
+    opts = opts || {};
+    const plot = (opts.plotOptions && opts.plotOptions.heatmap) || {};
+    const calendar = plot.layout === 'calendar';
+    const typeName = calendar ? 'Calendar heatmap' : 'Heatmap';
+
+    // Refusal panel, same shape as the other engines'.
+    function errorChart(W, H, headline, detail) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[charts-lib ' + (calendar ? 'calendarHeatmap' : 'heatmap') + '] ' + headline + ' ' + detail);
+      }
+      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
+      svg.style.display = 'block';
+      container.appendChild(svg);
+      let y = 34;
+      if (opts.title) {
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
+          y += TITLE_LH;
+        });
+        y += 10;
+      }
+      const cy = Math.max(y + 20, H / 2 - 10);
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
+      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
+        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
+        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
+        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
+      return chartAPI(createLifecycle(container), {
+        opts: Object.assign({}, opts, { series: null }), typeName: typeName,
+        getData: function () { return []; },
+        extras: { error: headline }
+      });
+    }
+
+    if (typeof container === 'string') container = document.getElementById(container);
+    container.innerHTML = '';
+    // Owns every chart-lifetime listener so destroy() can undo them.
+    const life = createLifecycle(container);
+    container.style.position = 'relative';
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
+
+    // A height this engine wrote on an earlier render is not an instruction
+    // from the author, so it is cleared before measuring — otherwise redraw()
+    // would read back its own output and switch from growing to filling.
+    if (container.dataset.chartsGrew === '1') container.style.height = '';
+    const authoredH = container.clientHeight;
+    const fillHeight = plot.autoHeight !== true && authoredH > 0;
+    const W = container.clientWidth || 800;
+
+    // ── Input ───────────────────────────────────────────────────────────
+    const grid = heatmapGrid(opts, calendar ? 'calendar' : 'matrix');
+    if (grid.errors.length) {
+      const first = grid.errors[0];
+      const cut = first.indexOf(' — ');
+      return errorChart(W, authoredH || 320,
+        cut > 0 ? first.slice(0, cut) : first,
+        cut > 0 ? first.charAt(cut + 3).toUpperCase() + first.slice(cut + 4)
+          : 'Charts.validate("' + (calendar ? 'calendarHeatmap' : 'heatmap') + '", config) says what it needs.');
+    }
+    const series0 = (opts.series && opts.series[0]) || {};
+    const seriesName = series0.name != null ? String(series0.name) : '';
+    const filled = grid.cells.filter(c => c.value !== null);
+
+    // ── Formatting ──────────────────────────────────────────────────────
+    // The sign goes outside the prefix, as in the waterfall: "−$230".
+    const tt = opts.tooltip || {};
+    const prefix = plot.valuePrefix != null ? plot.valuePrefix : (tt.valuePrefix || '');
+    const suffix = plot.valueSuffix != null ? plot.valueSuffix : (tt.valueSuffix || '');
+    const decimals = plot.decimals != null ? plot.decimals : tt.valueDecimals;
+    const fmtV = v => (v < 0 ? '−' : '') + prefix +
+      addCommas(decimals != null ? Math.abs(v).toFixed(decimals) : +Math.abs(v).toPrecision(12)) + suffix;
+
+    // ── Colour ──────────────────────────────────────────────────────────
+    // colorAxis.min / max pin the domain, so two heatmaps can share a scale;
+    // a value outside a pinned domain takes the end colour.
+    const ca = opts.colorAxis || {};
+    let lo = Infinity, hi = -Infinity;
+    filled.forEach(c => { lo = Math.min(lo, c.value); hi = Math.max(hi, c.value); });
+    if (ca.min != null && isFinite(+ca.min)) lo = +ca.min;
+    if (ca.max != null && isFinite(+ca.max)) hi = +ca.max;
+    if (lo > hi) { const s = lo; lo = hi; hi = s; }
+    const domain = { lo: lo, hi: hi };
+    const diverging = lo < 0 && hi > 0;
+    const scaleOpts = { color: plot.color, upColor: plot.upColor, downColor: plot.downColor, floor: 0.12 };
+    // Zero on a diverging scale is the midpoint: the neutral tile surface,
+    // which is still a fill — unlike a cell with no data, which has none.
+    const fillOf = v => scaleColor(T, domain, v, scaleOpts) || T.tileSurface;
+    const inkOn = f => (contrast(f, T.inverseText) > contrast(f, T.titleColor) ? T.inverseText : T.titleColor);
+
+    // ── Heading ─────────────────────────────────────────────────────────
+    const titleLines = opts.title ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
+    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
+    const titleBlockH = (titleLines.length ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
+                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
+
+    // The colour key: the series name, then a bar the width of the domain
+    // with its ends (and zero) printed beneath. Off with legend.enabled false.
+    const showKey = !(opts.legend && opts.legend.enabled === false);
+    const keyH = showKey ? KEY_BAR + 6 + T.tickSize + 4 : 0;
+    const gridTop = titleBlockH + (showKey ? keyH + T.plotGap - 4 : T.plotGap - 6);
+
+    // ── Layout ──────────────────────────────────────────────────────────
+    // Each layout returns the cells to draw — { x, y, w, h, cell } with
+    // `cell` null for a hole — the labels around them, and the height.
+    const layout = calendar ? layoutCalendar() : layoutMatrix();
+    const H = layout.H;
+    if (H !== authoredH) {
+      container.style.height = H + 'px';
+      container.dataset.chartsGrew = '1';
+    } else {
+      delete container.dataset.chartsGrew;
+    }
+
+    function layoutMatrix() {
+      const nx = grid.xCats.length, ny = grid.yCats.length;
+      // Row labels are never dropped or thinned: each row owns its own line.
+      // An extreme name is shortened, never the list.
+      const maxLab = Math.max(40, Math.round(W * 0.3));
+      const yLabels = grid.yCats.map(c => truncate(c, T.tickSize, maxLab, false));
+      const labW = yLabels.reduce((a, s) => Math.max(a, textW(s, T.tickSize, false)), 0);
+      const left = T.headingGutter + labW + LABEL_GAP;
+      const plotW = Math.max(nx * 2, W - 20 - left);
+      const cw = plotW / nx;
+      // Column labels as every category axis lays them out: numbered and
+      // temporal runs thin by stride, named ones wrap, stagger or rotate.
+      const xLay = layoutCategoryAxis(grid.xCats, plotW, T.tickSize, 96, monthNames(T));
+      const chrome = gridTop + xLay.height + 4;
+      const rowMin = T.tickSize + 4;
+      let rh = fillHeight ? (authoredH - chrome) / ny : Math.max(rowMin, Math.min(36, cw));
+      if (rh < rowMin) rh = rowMin;
+      const Hm = fillHeight ? Math.max(authoredH, Math.ceil(chrome + ny * rh)) : Math.ceil(chrome + ny * rh);
+      const gap = Math.min(cw, rh) >= 10 ? 2 : 1;
+      const byKey = new Map(grid.cells.map(c => [c.x + '|' + c.y, c]));
+      const boxes = [];
+      for (let r = 0; r < ny; r++) {
+        for (let q = 0; q < nx; q++) {
+          boxes.push({ x: left + q * cw + gap / 2, y: gridTop + r * rh + gap / 2, w: cw - gap, h: rh - gap,
+            cell: byKey.get(q + '|' + r) || null });
+        }
+      }
+      const gridBottom = gridTop + ny * rh;
+      return {
+        H: Hm, left: left, boxes: boxes,
+        draw(svg) {
+          const g = el('g', { class: 'hm-axis' }, svg);
+          yLabels.forEach((s, r) => txt(s, { x: left - LABEL_GAP, y: gridTop + r * rh + rh / 2 + T.tickSize * 0.35,
+            'text-anchor': 'end', 'font-size': T.tickSize, 'font-weight': T.tickWeight, fill: T.tickColor,
+            'font-family': T.font }, g));
+          xLay.ticks.forEach((tk, k) => {
+            const x = left + (tk.i + 0.5) * cw, yTop = gridBottom + 16;
+            const lh = xLay.font * 1.25;
+            const y0 = yTop + (xLay.stagger && k % 2 ? lh : 0);
+            tk.lines.forEach((ln, li) => {
+              const t = txt(ln, { x: x, y: y0 + li * lh, 'text-anchor': xLay.rotate ? 'end' : 'middle',
+                'font-size': xLay.font, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, g);
+              if (xLay.rotate) t.setAttribute('transform', 'rotate(-' + xLay.rotate + ' ' + x + ' ' + yTop + ')');
+            });
+          });
+        },
+        label: c => c.yName + ', ' + c.xName
+      };
+    }
+
+    function layoutCalendar() {
+      const cells = grid.cells;   // sorted by day
+      const weekStart = plot.weekStart === 0 ? 0 : 1;   // Monday unless told otherwise
+      const rowOf = k => (dowOf(k) - weekStart + 7) % 7;
+      const WD = weekdayNames(T);
+      const M = monthNames(T);
+      const a = cells[0], b = cells[cells.length - 1];
+      // Up to a year of data is one continuous band of whole months, so a
+      // rolling twelve months is not split at New Year. Longer spans take a
+      // band per calendar year, January to December, so the months line up
+      // and one year reads against the next.
+      const bands = [];
+      if (b.day - a.day <= 370) {
+        bands.push({ start: dayOf(a.y, a.m, 1), end: dayOf(b.y, b.m + 1, 0), year: null });
+      } else {
+        for (let y = a.y; y <= b.y; y++) bands.push({ start: dayOf(y, 0, 1), end: dayOf(y, 11, 31), year: y });
+      }
+      const colOf = (band, k) => Math.floor((k - band.start + rowOf(band.start)) / 7);
+      bands.forEach(band => { band.weeks = colOf(band, band.end) + 1; });
+      const maxWeeks = bands.reduce((m, band) => Math.max(m, band.weeks), 0);
+
+      const multi = bands.length > 1;
+      const wdW = WD.reduce((m, s) => Math.max(m, textW(s, T.tickSize, false)), 0);
+      const yearW = multi ? textW('0000', T.tickSize, true) : 0;
+      const left = T.headingGutter + Math.max(wdW, yearW) + LABEL_GAP;
+      const monthRow = T.tickSize + 8;
+      const gaps = (bands.length - 1) * BAND_GAP;
+      const chrome = gridTop + 8;
+      const widthCell = Math.min((W - 20 - left) / maxWeeks, plot.cellSize || CAL_CELL_MAX);
+      let cell = widthCell;
+      if (fillHeight) {
+        // Days stay square, so height can only shrink them — to a floor, past
+        // which the chart grows rather than lose a week off the bottom.
+        const fitCell = (authoredH - chrome - gaps - bands.length * monthRow) / (7 * bands.length);
+        cell = Math.min(widthCell, Math.max(fitCell, Math.min(widthCell, CAL_CELL_MIN)));
+      }
+      const contentH = bands.length * (monthRow + 7 * cell) + gaps;
+      const Hc = fillHeight ? Math.max(authoredH, Math.ceil(chrome + contentH)) : Math.ceil(chrome + contentH);
+      const gap = cell >= 10 ? 2 : 1;
+
+      const byDay = new Map(cells.map(c => [c.day, c]));
+      const boxes = [];
+      let top = gridTop;
+      bands.forEach(band => {
+        band.top = top;
+        const y0 = top + monthRow;
+        for (let k = band.start; k <= band.end; k++) {
+          boxes.push({ x: left + colOf(band, k) * cell + gap / 2, y: y0 + rowOf(k) * cell + gap / 2,
+            w: cell - gap, h: cell - gap, cell: byDay.get(k) || null, out: k < a.day || k > b.day });
+        }
+        top += monthRow + 7 * cell + BAND_GAP;
+      });
+
+      return {
+        H: Hc, left: left, boxes: boxes,
+        draw(svg) {
+          const g = el('g', { class: 'hm-axis' }, svg);
+          const font = cell >= T.tickSize + 2 ? T.tickSize : Math.min(T.tickSize, Math.max(8, 2 * cell - 2));
+          bands.forEach(band => {
+            // Weekdays are a sequence, so when a row is too short for its own
+            // label every other one is named and the reader fills the rest.
+            for (let r = 0; r < 7; r++) {
+              if (cell < T.tickSize + 2 && r % 2) continue;
+              txt(WD[(r + weekStart) % 7], { x: left - LABEL_GAP,
+                y: band.top + monthRow + r * cell + cell / 2 + font * 0.35, 'text-anchor': 'end',
+                'font-size': font, 'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, g);
+            }
+            if (band.year != null) {
+              txt(String(band.year), { x: T.headingGutter, y: band.top + T.tickSize, 'text-anchor': 'start',
+                'font-size': T.tickSize, 'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font }, g);
+            }
+            // A month is named over its first full week. Months are a time
+            // axis, so one that would collide with the last is left unnamed.
+            const crosses = band.year == null && a.y !== b.y;
+            let lastEnd = -Infinity;
+            for (let d = new Date(band.start * DAY_MS); d.getTime() <= band.end * DAY_MS;
+                 d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
+              const k = Math.floor(d.getTime() / DAY_MS);
+              const col = colOf(band, k) + (rowOf(k) === 0 ? 0 : 1);
+              if (col >= band.weeks) continue;
+              const name = crosses && d.getUTCMonth() === 0 ? String(d.getUTCFullYear()) : M[d.getUTCMonth()];
+              const w = textW(name, T.tickSize, false);
+              const x = Math.min(left + col * cell, W - 4 - w);
+              if (x < lastEnd + 6) continue;
+              lastEnd = x + w;
+              txt(name, { x: x, y: band.top + T.tickSize, 'text-anchor': 'start', 'font-size': T.tickSize,
+                'font-weight': T.tickWeight, fill: T.tickColor, 'font-family': T.font }, g);
+            }
+          });
+        },
+        label: c => WD[dowOf(c.day)] + ', ' + M[c.m] + ' ' + c.d + ', ' + c.y
+      };
+    }
+
+    // ── Draw ────────────────────────────────────────────────────────────
+    const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
+    svg.style.display = 'block';
+    container.appendChild(svg);
+
+    titleLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'text-anchor': 'start', 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
+      'font-family': T.font }, svg));
+    subLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: subY0 + i * SUB_LH, 'text-anchor': 'start',
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
+
+    // The key. Its gradient is sampled from the same function the cells are
+    // painted with, so the two cannot disagree.
+    let keyMark = null, keyAt = null, keyX = 0, keyW = 0;
+    if (showKey) {
+      const g = el('g', { class: 'hm-key' }, svg);
+      const barY = titleBlockH;
+      let x = T.headingGutter;
+      if (seriesName) {
+        txt(seriesName, { x: x, y: barY + KEY_BAR, 'text-anchor': 'start', 'font-size': T.legendSize,
+          'font-weight': T.legendWeight, fill: T.labelColor, 'font-family': T.font }, g);
+        x += textW(seriesName, T.legendSize, true) + 10;
+      }
+      keyX = x;
+      keyW = Math.max(60, Math.min(KEY_MAX, W - 20 - x));
+      const id = 'hm-key-' + Math.random().toString(36).slice(2, 9);
+      const grad = el('linearGradient', { id: id, x1: 0, x2: 1, y1: 0, y2: 0 }, el('defs', {}, g));
+      const STOPS = 12;
+      for (let i = 0; i <= STOPS; i++) {
+        const v = lo + (hi - lo) * i / STOPS;
+        el('stop', { offset: (i / STOPS * 100).toFixed(1) + '%', 'stop-color': fillOf(v) }, grad);
+      }
+      el('rect', { x: keyX, y: barY, width: keyW, height: KEY_BAR, rx: 2, fill: 'url(#' + id + ')' }, g);
+      const tickY = barY + KEY_BAR + 4 + T.tickSize;
+      const at = keyAt = v => keyX + (hi === lo ? 0 : (v - lo) / (hi - lo) * keyW);
+      const ends = [{ v: lo, anchor: 'start' }];
+      if (hi !== lo) ends.push({ v: hi, anchor: 'end' });
+      // Zero sits where it falls, and only if it clears both ends' labels.
+      if (diverging) {
+        const zx = at(0), zw = textW('0', T.tickSize, false);
+        if (zx - zw / 2 > keyX + textW(fmtV(lo), T.tickSize, false) + 6 &&
+            zx + zw / 2 < keyX + keyW - textW(fmtV(hi), T.tickSize, false) - 6) ends.push({ v: 0, anchor: 'middle' });
+      }
+      ends.forEach(e => txt(fmtV(e.v), { x: e.anchor === 'start' ? keyX : e.anchor === 'end' ? keyX + keyW : at(0),
+        y: tickY, 'text-anchor': e.anchor, 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.tickColor, 'font-family': T.font }, g));
+      // Where the hovered cell's value sits on the key: a tick across the
+      // bar, haloed in the canvas colour so it reads on any shade.
+      keyMark = el('rect', { x: 0, y: barY - 3, width: 3, height: KEY_BAR + 6, rx: 1, fill: T.titleColor,
+        stroke: T.bg, 'stroke-width': 1, style: 'display:none;pointer-events:none' }, g);
+    }
+
+    layout.draw(svg);
+
+    // In-cell values, matrix only, and all or none: a grid where some cells
+    // carry a number and their neighbours do not reads as missing data.
+    const boxes = layout.boxes;
+    const dl = plot.dataLabels;
+    const wantLabels = !calendar && dl !== false && !(dl && dl.enabled === false);
+    const labelsFit = wantLabels && boxes.length > 0 && boxes.every(bx => !bx.cell || bx.cell.value === null ||
+      (textW(fmtV(bx.cell.value), T.valueSize, false) + 6 <= bx.w && bx.h >= T.valueSize + 4));
+
+    const radius = Math.min(3, Math.min(boxes[0].w, boxes[0].h) * 0.18);
+    const gCells = el('g', {}, svg);
+    const drawn = [];
+    // Days outside the data's range: a step fainter than the neutral tile
+    // surface, which is zero on a diverging scale, so the two cannot be confused.
+    const outFill = mix(T.tileSurface, T.bg, 0.5);
+    boxes.forEach(bx => {
+      const c = bx.cell;
+      if (bx.out) {
+        el('rect', { class: 'hm-out', x: bx.x, y: bx.y, width: bx.w, height: bx.h, rx: radius, fill: outFill }, gCells);
+        return;
+      }
+      if (!c || c.value === null) {
+        el('rect', { class: 'hm-empty', x: bx.x + 0.5, y: bx.y + 0.5, width: Math.max(0, bx.w - 1), height: Math.max(0, bx.h - 1),
+          rx: radius, fill: 'none', stroke: T.grid, 'stroke-width': 1 }, gCells);
+        return;
+      }
+      const f = fillOf(c.value);
+      const r = el('rect', { class: 'hm-cell', x: bx.x, y: bx.y, width: bx.w, height: bx.h, rx: radius, fill: f,
+        'data-i': drawn.length }, gCells);
+      r.style.cursor = 'pointer';
+      drawn.push({ cell: c, box: bx, fill: f });
+      if (labelsFit) {
+        txt(fmtV(c.value), { x: bx.x + bx.w / 2, y: bx.y + bx.h / 2 + T.valueSize * 0.35, 'text-anchor': 'middle',
+          'font-size': T.valueSize, 'font-weight': T.tickWeight, fill: inkOn(f), 'font-family': T.font,
+          'pointer-events': 'none' }, gCells);
+      }
+    });
+
+    // ── Tooltip + hover ─────────────────────────────────────────────────
+    const outline = el('rect', { x: 0, y: 0, width: 0, height: 0, rx: radius + 1, fill: 'none', stroke: T.hoverInk,
+      'stroke-width': 1.5, style: 'display:none;pointer-events:none' }, svg);
+    const tooltip = document.createElement('div');
+    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
+      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
+    container.appendChild(tooltip);
+
+    function showTip(ev, html) {
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+      const rect = svg.getBoundingClientRect();
+      const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+      let tx = px + 14, ty = py - th - 12;
+      if (tx + tw > W - 4) tx = px - tw - 14;
+      if (ty < 4) ty = py + 16;
+      tooltip.style.left = tx + 'px';
+      tooltip.style.top = ty + 'px';
+    }
+    function clearHover() {
+      tooltip.style.display = 'none';
+      outline.style.display = 'none';
+      if (keyMark) keyMark.style.display = 'none';
+    }
+
+    life.on(svg, 'mousemove', ev => {
+      const t = ev.target;
+      if (!t || !t.classList || !t.classList.contains('hm-cell')) { clearHover(); life.hover(null); return; }
+      const i = +t.getAttribute('data-i');
+      const d = drawn[i], c = d.cell, bx = d.box;
+      const name = layout.label(c);
+      outline.setAttribute('x', bx.x - 1); outline.setAttribute('y', bx.y - 1);
+      outline.setAttribute('width', bx.w + 2); outline.setAttribute('height', bx.h + 2);
+      outline.style.display = 'block';
+      if (keyMark) {
+        keyMark.setAttribute('x', Math.max(keyX, Math.min(keyX + keyW, keyAt(c.value))) - 1.5);
+        keyMark.style.display = 'block';
+      }
+      life.hover(calendar
+        ? { name: c.date, series: seriesName || 'Value', index: i, date: c.date, value: c.value }
+        : { name: name, series: seriesName || 'Value', index: i, row: c.yName, column: c.xName, value: c.value });
+      showTip(ev, '<div style="font-weight:' + cssNumber(T.valueWeight) + ';color:' + cssColor(T.titleColor) +
+        ';margin-bottom:2px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:' +
+        cssColor(d.fill) + '"></span>' + esc(name) + '</div><div style="color:' + cssColor(T.labelColor) + '">' +
+        (seriesName ? esc(seriesName) + ': ' : '') + '<b style="color:' + cssColor(T.titleColor) + '">' +
+        esc(fmtV(c.value)) + '</b></div>');
+    });
+    life.on(svg, 'mouseleave', () => { clearHover(); life.hover(null); });
+
+    // What the accessible table publishes, and what getData() hands back:
+    // the cells that hold a value, in reading order.
+    const getData = () => drawn.map(d => (calendar
+      ? { date: d.cell.date, value: d.cell.value }
+      : { row: d.cell.yName, column: d.cell.xName, value: d.cell.value }));
+
+    return chartAPI(life, {
+      // Withheld for the reason sankey withholds it: the generic describer
+      // would read [x, y, value] triples as [x, y] points.
+      opts: Object.assign({}, opts, { series: null }),
+      typeName: typeName,
+      getData: getData,
+      redraw: () => { life.release(); Chart(container, opts); }
+    });
+  }
+
+  window.ChartsShared.register('heatmap', Chart);
+})();
+
+
+Charts.calendarHeatmap = function (container, opts) {
+  opts = opts || {}; opts.plotOptions = opts.plotOptions || {};
+  opts.plotOptions.heatmap = Object.assign({}, opts.plotOptions.heatmap, { layout: 'calendar' });
+  return Charts.heatmap(container, opts);
+};
 
 // ─── table ────────────────────────────────────────────
 
@@ -11110,7 +11680,7 @@ Charts.histogramCumulative = function (container, opts) {
   // Helpers shared by every engine — see engines/_shared.js.
   const { makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
           wrapHeading, textW, cssColor, tableProblems, tableIsBlank, allocateWidths,
-          parseColor, mix, contrast, NS } = window.ChartsShared;
+          scaleColor, contrast, NS } = window.ChartsShared;
 
   const TITLE_LINES = 2, SUB_LINES = 3;
   const PAD_X = 8;           // text inset inside a cell
@@ -11127,28 +11697,13 @@ Charts.histogramCumulative = function (container, opts) {
 
   function Chart(container, opts) {
     const addCommas = makeNumberFormatter(resolveTheme(opts));
-    let BG, GRID, AXIS, TITLE_COL, SUB_COL, SEC_COL, LABEL_COL, POS_COL, NEG_COL, MUTED, INVERSE, HOVER_INK, RAMP;
-    let CAT_COL, CAT_FW, TICK_FW, FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE, F_NOTICE;
-    let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, PLOT_GAP, SPINE_W, GRID_W;
+    let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
     let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      BG = t.bg; GRID = t.grid; AXIS = t.axis;
-      TITLE_COL = t.titleColor; SUB_COL = t.subtitleColor; SEC_COL = t.secondaryColor;
-      LABEL_COL = t.labelColor;
-      POS_COL = t.aboveThreshold; NEG_COL = t.belowThreshold;
-      MUTED = t.muted; RAMP = (t.colors && t.colors.length > 2) ? t.colors.slice(1) : (t.colors && t.colors.length ? t.colors : [t.defaultColor]); INVERSE = t.inverseText; HOVER_INK = t.hoverInk;
-      CAT_COL = t.categoryColor; CAT_FW = t.categoryWeight; TICK_FW = t.tickWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize; F_SUB = t.subtitleSize; F_LABEL = t.labelSize;
-      F_TICK = t.tickSize; F_VALUE = t.valueSize; F_NOTICE = t.noticeSize;
-      TITLE_FW = t.titleWeight; SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop; HEAD_SUB_GAP = t.headingSubGap; HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter; PLOT_GAP = t.plotGap;
-      SPINE_W = t.spineWidth; GRID_W = t.gridWidth;
+      T = Object.freeze(resolveTheme(opts));
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     // Refusal panel, same shape as the other engines'.
@@ -11157,25 +11712,25 @@ Charts.histogramCumulative = function (container, opts) {
         console.warn('[charts-lib table] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-            fill: TITLE_COL, 'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
       }
       const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
-      headLines.forEach((l, i) => txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE,
-        'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => txt(l, {
-        x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
-        'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
+      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
+        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
+        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
+        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
       return chartAPI(createLifecycle(container), {
         opts: opts, typeName: 'Table',
         getData: function () { return []; },
@@ -11189,8 +11744,8 @@ Charts.histogramCumulative = function (container, opts) {
     container.innerHTML = '';
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     // Measured while the container is still empty — see barinsighttable.js for
     // why an svg already in the DOM would be mistaken for an authored height.
@@ -11259,47 +11814,23 @@ Charts.histogramCumulative = function (container, opts) {
       if (!numeric(v)) return null;
       if (h === 'sign') {
         // Exactly on the threshold is neither side of it, so it takes no fill.
-        return v > threshold ? (col.upColor || POS_COL) : v < threshold ? (col.downColor || NEG_COL) : null;
+        return v > threshold ? (col.upColor || T.aboveThreshold) : v < threshold ? (col.downColor || T.belowThreshold) : null;
       }
-      if (h === 'scale') {
-        const d = col.domain;
-        if (d.lo < 0 && d.hi > 0) {
-          // Diverging: the intensity is the distance from zero, so a colour
-          // means the same size in either direction.
-          // Zero is the midpoint, and like a sign cell on its threshold it
-          // takes no fill rather than a box the colour of the canvas.
-          if (v === 0) return null;
-          const m = Math.max(-d.lo, d.hi);
-          return mix(BG, v >= 0 ? (col.upColor || POS_COL) : (col.downColor || NEG_COL), Math.abs(v) / m);
-        }
-        // Sequential. The larger the magnitude, the further along the series
-        // ramp: the lightest step for the smallest, s2 for the largest. The
-        // lightest step is still a visible fill, so the smallest value does
-        // not read as a cell with no data.
-        const t = d.hi === d.lo ? 1 : (v - d.lo) / (d.hi - d.lo);
-        const k = d.hi > 0 ? t : 1 - t;
-        if (col.color) return mix(BG, col.color, 0.12 + 0.88 * k);
-        return rampAt(k);
-      }
+      // Sequential along the series ramp, or diverging through zero when the
+      // column crosses it; zero is the midpoint and, like a sign cell on its
+      // threshold, takes no fill. See scaleColor in _shared.js.
+      if (h === 'scale') return scaleColor(T, col.domain, v, col);
       return null;
     }
-    // The series palette read light → dark, interpolated between its steps.
-    function rampAt(k) {
-      const stops = RAMP.slice().reverse();
-      if (stops.length === 1) return stops[0];
-      const p = Math.max(0, Math.min(1, k)) * (stops.length - 1);
-      const i = Math.min(stops.length - 2, Math.floor(p));
-      return mix(stops[i], stops[i + 1], p - i);
-    }
-    const inkOn = fill => (contrast(fill, INVERSE) > contrast(fill, TITLE_COL) ? INVERSE : TITLE_COL);
+    const inkOn = fill => (contrast(fill, T.inverseText) > contrast(fill, T.titleColor) ? T.inverseText : T.titleColor);
 
     // ── Heading ─────────────────────────────────────────────────────────
-    const titleLines = opts.title ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
-    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+    const titleLines = opts.title ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
+    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (titleLines.length ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Column groups ───────────────────────────────────────────────────
     // Consecutive columns with the same `group` form one span. A group that
@@ -11344,11 +11875,11 @@ Charts.histogramCumulative = function (container, opts) {
       : Math.max(longestWord(name, size, bold), textW(name, size, bold) * 0.55);
 
     columns.forEach(c => {
-      const cells = widest(c.texts, F_VALUE, false);
-      const headMin = longestWord(c.name, F_TICK, false);
-      const headMax = headerWant(c.name, F_TICK, false);
+      const cells = widest(c.texts, T.valueSize, false);
+      const headMin = longestWord(c.name, T.tickSize, false);
+      const headMax = headerWant(c.name, T.tickSize, false);
       if (c.wraps) {
-        const words = c.texts.reduce((a, t) => Math.max(a, longestWord(t, F_VALUE, false)), 0);
+        const words = c.texts.reduce((a, t) => Math.max(a, longestWord(t, T.valueSize, false)), 0);
         c.minW = Math.max(words, headMin, Math.min(cells, TEXT_MIN));
         c.maxW = Math.max(c.minW, headMax, Math.min(cells, TEXT_MAX));
         c.cap = c.maxW;
@@ -11375,21 +11906,21 @@ Charts.histogramCumulative = function (container, opts) {
         const have = g.cols.reduce((a, c) => a + c[key], 0) + inner;
         if (want > have) g.cols.forEach(c => { c[key] += (want - have) / g.cols.length; });
       };
-      need('minW', longestWord(g.name, F_LABEL, true) + PAD_X * 2);
-      need('maxW', headerWant(g.name, F_LABEL, true) + PAD_X * 2);
+      need('minW', longestWord(g.name, T.labelSize, true) + PAD_X * 2);
+      need('maxW', headerWant(g.name, T.labelSize, true) + PAD_X * 2);
       g.cols.forEach(c => { c.maxW = Math.max(c.maxW, c.minW); c.cap = Math.max(c.cap, c.maxW); });
     });
 
     const labelHeader = plot.labelHeader != null ? String(plot.labelHeader) : '';
     const groupNames = rows.filter(r => r.group != null).map(r => r.group);
     const labelMin = Math.ceil(Math.max(60,
-      rows.reduce((a, r) => Math.max(a, longestWord(r.name, F_LABEL, false)), 0),
-      groupNames.reduce((a, g) => Math.max(a, longestWord(g, F_LABEL, true)), 0),
-      longestWord(labelHeader, F_TICK, false)) + PAD_X);
+      rows.reduce((a, r) => Math.max(a, longestWord(r.name, T.labelSize, false)), 0),
+      groupNames.reduce((a, g) => Math.max(a, longestWord(g, T.labelSize, true)), 0),
+      longestWord(labelHeader, T.tickSize, false)) + PAD_X);
     const labelMax = Math.max(labelMin, Math.ceil(Math.max(
-      widest(rows.map(r => r.name), F_LABEL, false),
-      widest(groupNames, F_LABEL, true),
-      textW(labelHeader, F_TICK, false)) + PAD_X * 2));
+      widest(rows.map(r => r.name), T.labelSize, false),
+      widest(groupNames, T.labelSize, true),
+      textW(labelHeader, T.tickSize, false)) + PAD_X * 2));
 
     // A gutter after the labels, as in reportTable, so a long label does not
     // read as the first cell; and a label that fits on one line in modest room
@@ -11399,42 +11930,42 @@ Charts.histogramCumulative = function (container, opts) {
     const gaps = columns.reduce((a, c) => a + c.gapBefore, 0) + labelGap;
     const widths = allocateWidths(
       [{ min: labelFloor, max: labelMax }].concat(columns.map(c => ({ min: c.minW, max: c.maxW, cap: c.cap }))),
-      W - HEAD_X * 2 - gaps);
+      W - T.headingGutter * 2 - gaps);
     const labelW = widths[0];
     columns.forEach((c, k) => { c.w = widths[k + 1]; });
     const contentW = Math.ceil(labelW + columns.reduce((a, c) => a + c.w, 0) + gaps);
     // Wider than the container only if it must be. The widths above are
     // ceiled, so a table that fits can come out a pixel over; that is not a
     // reason to show a scrollbar.
-    const SW = contentW + HEAD_X * 2 > W + 2 ? contentW + HEAD_X * 2 : W;
-    let x = HEAD_X + labelW + labelGap;
+    const SW = contentW + T.headingGutter * 2 > W + 2 ? contentW + T.headingGutter * 2 : W;
+    let x = T.headingGutter + labelW + labelGap;
     columns.forEach(c => { x += c.gapBefore; c.x = x; x += c.w; });
     colGroups.forEach(g => { g.x = g.cols[0].x; g.w = g.cols[g.cols.length - 1].x + g.cols[g.cols.length - 1].w - g.x; });
-    const tableR = HEAD_X + contentW;
+    const tableR = T.headingGutter + contentW;
 
     // ── Heights ─────────────────────────────────────────────────────────
-    const LH = Math.round(F_VALUE * 1.3);
+    const LH = Math.round(T.valueSize * 1.3);
     colGroups.forEach(g => {
-      g.lines = g.name != null ? wrapHeading(g.name, F_LABEL, Math.max(20, g.w - PAD_X * 2), 2, true) : [];
+      g.lines = g.name != null ? wrapHeading(g.name, T.labelSize, Math.max(20, g.w - PAD_X * 2), 2, true) : [];
     });
     columns.forEach(c => {
-      c.head = c.name != null ? wrapHeading(c.name, F_TICK, Math.max(20, c.w - PAD_X * 2), HEAD_LINES, false) : [];
+      c.head = c.name != null ? wrapHeading(c.name, T.tickSize, Math.max(20, c.w - PAD_X * 2), HEAD_LINES, false) : [];
     });
     const groupHeadH = hasColGroups ? Math.max(...colGroups.map(g => g.lines.length)) * LH + 14 : 0;
     const colHeadLines = Math.max(1, ...columns.map(c => c.head.length));
     const colHeadH = colHeadLines * LH + 10;
-    const ROW_MIN = Math.round(F_VALUE * 2.9);
+    const ROW_MIN = Math.round(T.valueSize * 2.9);
     rows.forEach(r => {
-      r.lines = wrapHeading(r.name, F_LABEL, Math.max(20, labelW - PAD_X * 2), 3, false);
+      r.lines = wrapHeading(r.name, T.labelSize, Math.max(20, labelW - PAD_X * 2), 3, false);
       r.cells = columns.map((c, k) => c.wraps
-        ? wrapHeading(c.texts[r.i], F_VALUE, Math.max(20, c.w - PAD_X * 2), CELL_LINES, false)
+        ? wrapHeading(c.texts[r.i], T.valueSize, Math.max(20, c.w - PAD_X * 2), CELL_LINES, false)
         : [c.texts[r.i]]);
       const most = Math.max(r.lines.length, ...r.cells.map(l => l.length));
       r.h = Math.max(ROW_MIN, most * LH + 16);
     });
-    const GROUP_ROW = Math.round(F_LABEL * 2.8);
+    const GROUP_ROW = Math.round(T.labelSize * 2.8);
     const groupStarts = rows.filter((r, k) => r.group != null && (k === 0 || rows[k - 1].group !== r.group));
-    const headTop = titleBlockH + PLOT_GAP;
+    const headTop = titleBlockH + T.plotGap;
     const bodyTop = headTop + groupHeadH + colHeadH;
     const bodyH = () => rows.reduce((a, r) => a + r.h, 0) + groupStarts.length * GROUP_ROW;
     const BOTTOM = 20;
@@ -11460,14 +11991,14 @@ Charts.histogramCumulative = function (container, opts) {
     container.style.overflowY = SW > W ? 'hidden' : '';
 
     const svg = el('svg', { xmlns: NS, width: SW, height: H, viewBox: '0 0 ' + SW + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     container.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
-    subLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: subY0 + i * SUB_LH,
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+    subLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: subY0 + i * SUB_LH,
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     const anchorX = (c, align) => align === 'right' ? c.x + c.w - PAD_X
       : align === 'center' ? c.x + c.w / 2 : c.x + PAD_X;
@@ -11482,9 +12013,9 @@ Charts.histogramCumulative = function (container, opts) {
         const one = g.cols.length === 1;
         const align = one ? (g.cols[0].headerAlign || g.cols[0].align) : 'center';
         const gx = one ? anchorX(g.cols[0], align) : g.x + g.w / 2;
-        const y0 = headTop + groupHeadH - 14 - (g.lines.length - 1) * LH + F_LABEL * 0.8;
+        const y0 = headTop + groupHeadH - 14 - (g.lines.length - 1) * LH + T.labelSize * 0.8;
         g.lines.forEach((ln, li) => txt(ln, { x: gx, y: y0 + li * LH, 'text-anchor': ANCHOR[align],
-          'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gHead));
+          'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font }, gHead));
       });
     }
     // Column headers sit on the rule, bottom-aligned, so a one-line header and
@@ -11494,15 +12025,15 @@ Charts.histogramCumulative = function (container, opts) {
       const align = c.headerAlign || c.align;
       const n = c.head.length;
       c.head.forEach((ln, li) => txt(ln, { x: anchorX(c, align), y: headBase - (n - 1 - li) * LH,
-        'text-anchor': ANCHOR[align], 'font-size': F_TICK, 'font-weight': TICK_FW,
-        fill: SEC_COL, 'font-family': FONT }, gHead));
+        'text-anchor': ANCHOR[align], 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.secondaryColor, 'font-family': T.font }, gHead));
     });
     if (labelHeader) {
-      txt(labelHeader, { x: HEAD_X, y: headBase, 'font-size': F_TICK, 'font-weight': TICK_FW,
-        fill: SEC_COL, 'font-family': FONT }, gHead);
+      txt(labelHeader, { x: T.headingGutter, y: headBase, 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.secondaryColor, 'font-family': T.font }, gHead);
     }
-    el('line', { x1: HEAD_X, x2: tableR, y1: bodyTop, y2: bodyTop,
-      stroke: AXIS, 'stroke-width': SPINE_W }, gHead);
+    el('line', { x1: T.headingGutter, x2: tableR, y1: bodyTop, y2: bodyTop,
+      stroke: T.axis, 'stroke-width': T.spineWidth }, gHead);
 
     // ── Body ────────────────────────────────────────────────────────────
     const gHover = el('g', {}, svg);
@@ -11515,26 +12046,26 @@ Charts.histogramCumulative = function (container, opts) {
         // Between groups the rule is heavier than between rows: the heading
         // below it starts a new set, not the next line of the same one.
         if (k > 0 && plot.rowGroupDivider !== false) {
-          el('line', { x1: HEAD_X, x2: tableR, y1: y, y2: y,
-            stroke: MUTED, 'stroke-width': GRID_W * 1.5 }, gRules);
+          el('line', { x1: T.headingGutter, x2: tableR, y1: y, y2: y,
+            stroke: T.muted, 'stroke-width': T.gridWidth * 1.5 }, gRules);
         }
-        txt(r.group, { x: HEAD_X, y: y + GROUP_ROW - F_LABEL * 0.75, 'font-size': F_LABEL,
-          'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gCells);
+        txt(r.group, { x: T.headingGutter, y: y + GROUP_ROW - T.labelSize * 0.75, 'font-size': T.labelSize,
+          'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font }, gCells);
         y += GROUP_ROW;
         stripe = 0;
       }
       r.y = y;
-      r._hover = el('rect', { x: HEAD_X, y: y, width: contentW, height: r.h,
-        fill: striped && stripe % 2 ? GRID : HOVER_INK,
+      r._hover = el('rect', { x: T.headingGutter, y: y, width: contentW, height: r.h,
+        fill: striped && stripe % 2 ? T.grid : T.hoverInk,
         'fill-opacity': striped && stripe % 2 ? 0.45 : 0, 'data-row': k, class: 'tb-row' }, gHover);
       // What the row goes back to after a hover: the stripe, or nothing.
-      r._rest = striped && stripe % 2 ? { fill: GRID, opacity: 0.45 } : { fill: HOVER_INK, opacity: 0 };
+      r._rest = striped && stripe % 2 ? { fill: T.grid, opacity: 0.45 } : { fill: T.hoverInk, opacity: 0 };
       stripe++;
 
       const mid = y + r.h / 2;
-      const top = mid - ((r.lines.length - 1) * LH) / 2 + F_LABEL * 0.36;
-      r.lines.forEach((ln, li) => txt(ln, { x: HEAD_X, y: top + li * LH, 'font-size': F_LABEL,
-        'font-weight': TICK_FW, fill: LABEL_COL, 'font-family': FONT, 'pointer-events': 'none' }, gCells));
+      const top = mid - ((r.lines.length - 1) * LH) / 2 + T.labelSize * 0.36;
+      r.lines.forEach((ln, li) => txt(ln, { x: T.headingGutter, y: top + li * LH, 'font-size': T.labelSize,
+        'font-weight': T.tickWeight, fill: T.labelColor, 'font-family': T.font, 'pointer-events': 'none' }, gCells));
 
       columns.forEach(c => {
         const v = r.src[c.key];
@@ -11544,18 +12075,18 @@ Charts.histogramCumulative = function (container, opts) {
           el('rect', { x: c.x + PILL_X, y: y + PILL_Y, width: c.w - PILL_X * 2,
             height: r.h - PILL_Y * 2, fill: fill, 'pointer-events': 'none' }, gCells);
         }
-        const ink = fill && plot.pills !== false ? inkOn(fill) : (blank ? SEC_COL : (fill || LABEL_COL));
+        const ink = fill && plot.pills !== false ? inkOn(fill) : (blank ? T.secondaryColor : (fill || T.labelColor));
         const lines = r.cells[c.i];
-        const y0 = mid - ((lines.length - 1) * LH) / 2 + F_VALUE * 0.36;
+        const y0 = mid - ((lines.length - 1) * LH) / 2 + T.valueSize * 0.36;
         lines.forEach((ln, li) => txt(ln, { x: anchorX(c, c.align), y: y0 + li * LH,
-          'text-anchor': ANCHOR[c.align], 'font-size': F_VALUE, 'font-weight': c.bold ? CAT_FW : TICK_FW,
-          fill: ink, 'font-family': FONT, 'pointer-events': 'none' }, gCells));
+          'text-anchor': ANCHOR[c.align], 'font-size': T.valueSize, 'font-weight': c.bold ? T.categoryWeight : T.tickWeight,
+          fill: ink, 'font-family': T.font, 'pointer-events': 'none' }, gCells));
       });
 
       y += r.h;
       const lastInGroup = k === rows.length - 1 || rows[k + 1].group !== r.group;
       if (!lastInGroup || k === rows.length - 1) {
-        el('line', { x1: HEAD_X, x2: tableR, y1: y, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gRules);
+        el('line', { x1: T.headingGutter, x2: tableR, y1: y, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gRules);
       }
     });
 
@@ -11565,7 +12096,7 @@ Charts.histogramCumulative = function (container, opts) {
     if (plot.columnGroupDivider !== false && hasColGroups) {
       colGroups.slice(1).forEach(g => {
         const gx = g.x - GROUP_GAP / 2;
-        el('line', { x1: gx, x2: gx, y1: headTop, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gRules);
+        el('line', { x1: gx, x2: gx, y1: headTop, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gRules);
       });
     }
 
@@ -11588,7 +12119,7 @@ Charts.histogramCumulative = function (container, opts) {
       unhover();
       if (!r) return;
       hovered = r;
-      r._hover.setAttribute('fill', HOVER_INK);
+      r._hover.setAttribute('fill', T.hoverInk);
       r._hover.setAttribute('fill-opacity', 0.05);
     });
     life.on(svg, 'mouseleave', unhover);
@@ -11616,7 +12147,7 @@ Charts.histogramCumulative = function (container, opts) {
     });
   }
 
-    Charts.table = Chart;
+  window.ChartsShared.register('table', Chart);
 })();
 
 // ─── reportTable ──────────────────────────────────────
@@ -11670,7 +12201,7 @@ Charts.histogramCumulative = function (container, opts) {
   // Helpers shared by every engine — see engines/_shared.js.
   const { makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
           wrapHeading, textW, cssColor, reportTableProblems, tableIsBlank, allocateWidths,
-          mix, contrast, NS } = window.ChartsShared;
+          scaleColor, mix, contrast, NS } = window.ChartsShared;
 
   const TITLE_LINES = 2, SUB_LINES = 3;
   const PAD_X = 8;           // text inset inside a cell
@@ -11708,33 +12239,15 @@ Charts.histogramCumulative = function (container, opts) {
   function Chart(container, opts, rowFloor) {
     rowFloor = rowFloor || {};
     const addCommas = makeNumberFormatter(resolveTheme(opts));
-    let BG, GRID, AXIS, TITLE_COL, SUB_COL, SEC_COL, LABEL_COL, POS_COL, NEG_COL, MUTED, INVERSE, HOVER_INK, RAMP, COLORS;
-    let CAT_COL, CAT_FW, TICK_FW, VAL_COL, VAL_FW, FONT, F_TITLE, F_SUB, F_LABEL, F_TICK, F_VALUE, F_NOTICE;
-    let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, PLOT_GAP, SPINE_W, GRID_W;
-    let TITLE_LH, SUB_LH, F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
+    let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
+    let COLORS;
+    let TITLE_LH, SUB_LH;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      BG = t.bg; GRID = t.grid; AXIS = t.axis;
-      TITLE_COL = t.titleColor; SUB_COL = t.subtitleColor; SEC_COL = t.secondaryColor;
-      LABEL_COL = t.labelColor;
-      POS_COL = t.aboveThreshold; NEG_COL = t.belowThreshold;
-      MUTED = t.muted; INVERSE = t.inverseText; HOVER_INK = t.hoverInk;
-      COLORS = t.colors && t.colors.length ? t.colors : [t.defaultColor];
-      RAMP = COLORS.length > 2 ? COLORS.slice(1) : COLORS;
-      CAT_COL = t.categoryColor; CAT_FW = t.categoryWeight; TICK_FW = t.tickWeight;
-      VAL_COL = t.valueColor; VAL_FW = t.valueWeight;
-      FONT = t.font;
-      F_TITLE = t.titleSize; F_SUB = t.subtitleSize; F_LABEL = t.labelSize;
-      F_TICK = t.tickSize; F_VALUE = t.valueSize; F_NOTICE = t.noticeSize;
-      TITLE_FW = t.titleWeight; SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop; HEAD_SUB_GAP = t.headingSubGap; HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter; PLOT_GAP = t.plotGap;
-      SPINE_W = t.spineWidth; GRID_W = t.gridWidth;
-      F_LEG = t.legendSize; LEG_FW = t.legendWeight; LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap; LEG_ICON = t.legendIconSize; LEG_ICON_GAP = t.legendIconGap;
+      T = Object.freeze(resolveTheme(opts));
+      COLORS = T.colors && T.colors.length ? T.colors : [T.defaultColor];
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     // Refusal panel, same shape as the other engines'.
@@ -11743,25 +12256,25 @@ Charts.histogramCumulative = function (container, opts) {
         console.warn('[charts-lib reportTable] ' + headline + ' ' + detail);
       }
       const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       svg.style.display = 'block';
       container.appendChild(svg);
       let y = 34;
       if (opts.title) {
-        wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: HEAD_X, y: y, 'font-size': F_TITLE, 'font-weight': TITLE_FW,
-            fill: TITLE_COL, 'font-family': FONT }, svg);
+        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
+          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
+            fill: T.titleColor, 'font-family': T.font }, svg);
           y += TITLE_LH;
         });
         y += 10;
       }
       const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, F_NOTICE, W - 40, 2, true);
-      headLines.forEach((l, i) => txt(l, { x: HEAD_X, y: cy + i * 18, 'font-size': F_NOTICE,
-        'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
-      wrapHeading(detail, F_SUB, W - 40, 4, false).forEach((l, i) => txt(l, {
-        x: HEAD_X, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
-        'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
+      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
+        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
+        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
+        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
       return chartAPI(createLifecycle(container), {
         opts: opts, typeName: 'Report table',
         getData: function () { return []; },
@@ -11775,8 +12288,8 @@ Charts.histogramCumulative = function (container, opts) {
     container.innerHTML = '';
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
 
     if (container.dataset.chartsGrew === '1') container.style.height = '';
     const authoredH = container.clientHeight;
@@ -11823,10 +12336,10 @@ Charts.histogramCumulative = function (container, opts) {
     // ── Cell content, per kind ──────────────────────────────────────────
     // Each cell is read once into a small record, so measuring and drawing
     // agree on what is in it.
-    const F_INSIGHT = plot.insightSize != null ? plot.insightSize : F_LABEL + 1.5;
-    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : F_TICK;
-    const F_STAT = plot.statSize != null ? plot.statSize : Math.round(F_TITLE * 1.5);
-    const LH = Math.round(F_VALUE * 1.3);
+    const F_INSIGHT = plot.insightSize != null ? plot.insightSize : T.labelSize + 1.5;
+    const F_DESC = plot.descriptionSize != null ? plot.descriptionSize : T.tickSize;
+    const F_STAT = plot.statSize != null ? plot.statSize : Math.round(T.titleSize * 1.5);
+    const LH = Math.round(T.valueSize * 1.3);
     const INS_LH = Math.round(F_INSIGHT * 1.3);
     const DESC_LH = Math.round(F_DESC * 1.4);
     const descLines = plot.descriptionLines != null ? plot.descriptionLines : 3;
@@ -11850,27 +12363,12 @@ Charts.histogramCumulative = function (container, opts) {
       });
       c.domain = d;
     });
-    function rampAt(k) {
-      const stops = RAMP.slice().reverse();
-      if (stops.length === 1) return stops[0];
-      const p = Math.max(0, Math.min(1, k)) * (stops.length - 1);
-      const i = Math.min(stops.length - 2, Math.floor(p));
-      return mix(stops[i], stops[i + 1], p - i);
-    }
     function scaleFill(col, v) {
       if (!col.colorByScale || !numeric(v)) return null;
-      const d = col.domain;
-      if (d.lo < 0 && d.hi > 0) {
-        if (v === 0) return null;
-        const m = Math.max(-d.lo, d.hi);
-        return mix(BG, v > 0 ? (col.upColor || POS_COL) : (col.downColor || NEG_COL), Math.abs(v) / m);
-      }
-      const t = d.hi === d.lo ? 1 : (v - d.lo) / (d.hi - d.lo);
-      const k = d.hi > 0 ? t : 1 - t;
-      return col.color ? mix(BG, col.color, 0.12 + 0.88 * k) : rampAt(k);
+      return scaleColor(T, col.domain, v, col);
     }
     const ownFill = v => (v != null && typeof v === 'object' && v.fill ? cssColor(v.fill, null) : null);
-    const inkOn = fill => (contrast(fill, INVERSE) > contrast(fill, TITLE_COL) ? INVERSE : TITLE_COL);
+    const inkOn = fill => (contrast(fill, T.inverseText) > contrast(fill, T.titleColor) ? T.inverseText : T.titleColor);
 
     function readCell(col, v, row) {
       switch (col.kind) {
@@ -11890,12 +12388,12 @@ Charts.histogramCumulative = function (container, opts) {
           const fill = ownFill(o) || scaleFill(col, val);
           // On a fill the stat takes the contrasting ink; a sign tint would
           // fight the fill for the same job.
-          let color = o.color || (fill ? inkOn(fill) : (col.colorByScale ? VAL_COL : (col.color || VAL_COL)));
+          let color = o.color || (fill ? inkOn(fill) : (col.colorByScale ? T.valueColor : (col.color || T.valueColor)));
           if (!o.color && !fill && col.colorBySign && numeric(val)) {
-            color = val > 0 ? (col.upColor || POS_COL) : val < 0 ? (col.downColor || NEG_COL) : VAL_COL;
+            color = val > 0 ? (col.upColor || T.aboveThreshold) : val < 0 ? (col.downColor || T.belowThreshold) : T.valueColor;
           }
           return { stat: fmt(col, val, row, showSign), note: o.note != null ? String(o.note) : '',
-            color: tableIsBlank(val) && !fill ? SEC_COL : cssColor(color, VAL_COL), blank: tableIsBlank(val), fill: fill };
+            color: tableIsBlank(val) && !fill ? T.secondaryColor : cssColor(color, T.valueColor), blank: tableIsBlank(val), fill: fill };
         }
         default:   // chart
           return { blank: v == null };
@@ -12051,7 +12549,7 @@ Charts.histogramCumulative = function (container, opts) {
     // A single unnamed series stands for no legend entry, so while a legend is
     // showing it must not wear one of the legend's colours: the first palette
     // step past the named ones, or the muted tone once the palette runs out.
-    const loneColor = seriesColors.size < COLORS.length ? COLORS[seriesColors.size] : MUTED;
+    const loneColor = seriesColors.size < COLORS.length ? COLORS[seriesColors.size] : T.muted;
     chartCols.forEach(c => {
       c.configs.forEach(cfg => {
         if (!cfg || !Array.isArray(cfg.series)) return;
@@ -12086,7 +12584,7 @@ Charts.histogramCumulative = function (container, opts) {
     // a small key beside the pie instead — swatch, name and value per slice,
     // in the slice's own colour from the table-wide slice map.
     const keyAt = plot.sliceKeyAt != null ? +plot.sliceKeyAt : KEY_SLICES;
-    const F_KEY = F_TICK;
+    const F_KEY = T.tickSize;
     const KEY_LH = Math.round(F_KEY * 1.45);
     chartCols.forEach(c => {
       if (!SLICED[c.chart.type]) return;
@@ -12110,12 +12608,12 @@ Charts.histogramCumulative = function (container, opts) {
     function widestText(list, size, bold) { return list.reduce((a, t) => Math.max(a, textW(t, size, bold)), 0); }
 
     // ── Heading ─────────────────────────────────────────────────────────
-    const titleLines = opts.title ? wrapHeading(opts.title, F_TITLE, W - HEAD_X * 2, TITLE_LINES, true) : [];
-    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, F_SUB, W - HEAD_X * 2, SUB_LINES, false) : [];
-    const subY0 = HEAD_TOP + F_TITLE
-      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + F_SUB + HEAD_SUB_GAP : 0);
+    const titleLines = opts.title ? wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true) : [];
+    const subLines = opts.subtitle ? wrapHeading(opts.subtitle, T.subtitleSize, W - T.headingGutter * 2, SUB_LINES, false) : [];
+    const subY0 = T.headingPadTop + T.titleSize
+      + (titleLines.length ? (titleLines.length - 1) * TITLE_LH + T.subtitleSize + T.headingSubGap : 0);
     const titleBlockH = (titleLines.length ? TITLE_LH + 3 + (titleLines.length - 1) * TITLE_LH : 0)
-                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + HEAD_GAP;
+                      + (subLines.length ? SUB_LH + 6 + (subLines.length - 1) * SUB_LH : 0) + T.headingGap;
 
     // ── Legend ──────────────────────────────────────────────────────────
     // Same metrics as the column/bar legend. Not clickable: toggling a series
@@ -12129,14 +12627,14 @@ Charts.histogramCumulative = function (container, opts) {
     {
       let row = [], x = 0;
       legendItems.forEach(it => {
-        const w = LEG_ICON + LEG_ICON_GAP + textW(it.name, F_LEG, false);
-        if (row.length && x + w > W - HEAD_X * 2) { legendRows.push(row); row = []; x = 0; }
+        const w = T.legendIconSize + T.legendIconGap + textW(it.name, T.legendSize, false);
+        if (row.length && x + w > W - T.headingGutter * 2) { legendRows.push(row); row = []; x = 0; }
         row.push({ item: it, x: x });
-        x += w + LEG_GAP;
+        x += w + T.legendGap;
       });
       if (row.length) legendRows.push(row);
     }
-    const legendH = legendRows.length * LEG_ROW;
+    const legendH = legendRows.length * T.legendRowHeight;
 
     // ── Column groups ───────────────────────────────────────────────────
     const colGroups = [];
@@ -12165,8 +12663,8 @@ Charts.histogramCumulative = function (container, opts) {
       : Math.max(longestWord(name, size, bold), textW(name, size, bold) * 0.55);
 
     columns.forEach(c => {
-      const headMin = longestWord(c.name, F_TICK, false);
-      const headMax = headerWant(c.name, F_TICK, false);
+      const headMin = longestWord(c.name, T.tickSize, false);
+      const headMax = headerWant(c.name, T.tickSize, false);
       const words = (list, size, bold) => list.reduce((a, t) => Math.max(a, longestWord(t, size, bold)), 0);
       if (c.kind === 'chart') {
         c.minW = Math.max(c.chart.type === 'pie' || c.chart.type === 'donut' ? PIE_MIN : CHART_MIN, headMin);
@@ -12187,8 +12685,8 @@ Charts.histogramCumulative = function (container, opts) {
         c.cap = c.maxW;
       } else {   // text
         const texts = c.cells.map(x => x.text);
-        const cells = widest(texts, F_VALUE, false);
-        c.minW = Math.max(words(texts, F_VALUE, false), headMin, Math.min(cells, TEXT_MIN));
+        const cells = widest(texts, T.valueSize, false);
+        c.minW = Math.max(words(texts, T.valueSize, false), headMin, Math.min(cells, TEXT_MIN));
         c.maxW = Math.max(c.minW, headMax, Math.min(cells, TEXT_MAX));
         c.cap = c.maxW;
       }
@@ -12205,8 +12703,8 @@ Charts.histogramCumulative = function (container, opts) {
         const have = g.cols.reduce((a, c) => a + c[key], 0) + inner;
         if (want > have) g.cols.forEach(c => { c[key] += (want - have) / g.cols.length; });
       };
-      need('minW', longestWord(g.name, F_LABEL, true) + PAD_X * 2);
-      need('maxW', headerWant(g.name, F_LABEL, true) + PAD_X * 2);
+      need('minW', longestWord(g.name, T.labelSize, true) + PAD_X * 2);
+      need('maxW', headerWant(g.name, T.labelSize, true) + PAD_X * 2);
       g.cols.forEach(c => { c.maxW = Math.max(c.maxW, c.minW); c.cap = Math.max(c.cap, c.maxW); });
     });
 
@@ -12217,18 +12715,18 @@ Charts.histogramCumulative = function (container, opts) {
     // each ask for their own measure, prose capped at the insight width.
     const rich = rows.filter(r => r.rich);
     const labelMin = !hasLabels ? 0 : Math.ceil(Math.max(60,
-      rows.reduce((a, r) => Math.max(a, longestWord(r.name, r.rich ? F_INSIGHT : F_LABEL, r.rich)), 0),
+      rows.reduce((a, r) => Math.max(a, longestWord(r.name, r.rich ? F_INSIGHT : T.labelSize, r.rich)), 0),
       rich.reduce((a, r) => Math.max(a, longestWord(r.body, F_DESC, false)), 0),
       rich.length ? Math.min(TEXT_MIN, Math.max(widest(rich.map(r => r.name), F_INSIGHT, true),
         widest(rich.map(r => r.body), F_DESC, false))) : 0,
-      groupNames.reduce((a, g) => Math.max(a, longestWord(g, F_LABEL, true)), 0),
-      longestWord(labelHeader, F_TICK, false)) + PAD_X);
+      groupNames.reduce((a, g) => Math.max(a, longestWord(g, T.labelSize, true)), 0),
+      longestWord(labelHeader, T.tickSize, false)) + PAD_X);
     const labelMax = !hasLabels ? 0 : Math.max(labelMin, Math.ceil(Math.max(
-      widest(rows.filter(r => !r.rich).map(r => r.name), F_LABEL, false),
+      widest(rows.filter(r => !r.rich).map(r => r.name), T.labelSize, false),
       Math.min(INSIGHT_MAX, widest(rich.map(r => r.name), F_INSIGHT, true)),
       Math.min(INSIGHT_MAX, widest(rich.map(r => r.body), F_DESC, false)),
-      widest(groupNames, F_LABEL, true),
-      textW(labelHeader, F_TICK, false)) + PAD_X * 2));
+      widest(groupNames, T.labelSize, true),
+      textW(labelHeader, T.tickSize, false)) + PAD_X * 2));
 
     // The labels name the rows; the columns are what the rows say. A clear
     // gutter keeps a long label from reading as the first cell of the row.
@@ -12241,27 +12739,27 @@ Charts.histogramCumulative = function (container, opts) {
     const widths = allocateWidths(
       [{ min: labelFloor, max: labelMax, cap: labelMax }]
         .concat(columns.map(c => ({ min: c.minW, max: c.maxW, cap: c.cap, first: c.first }))),
-      W - HEAD_X * 2 - gaps);
+      W - T.headingGutter * 2 - gaps);
     const labelW = widths[0];
     columns.forEach((c, k) => { c.w = widths[k + 1]; });
     const contentW = Math.ceil(labelW + columns.reduce((a, c) => a + c.w, 0) + gaps);
-    const SW = contentW + HEAD_X * 2 > W + 2 ? contentW + HEAD_X * 2 : W;
-    let x = HEAD_X + labelW + labelGap;
+    const SW = contentW + T.headingGutter * 2 > W + 2 ? contentW + T.headingGutter * 2 : W;
+    let x = T.headingGutter + labelW + labelGap;
     columns.forEach(c => { x += c.gapBefore; c.x = x; x += c.w; });
     colGroups.forEach(g => { g.x = g.cols[0].x; g.w = g.cols[g.cols.length - 1].x + g.cols[g.cols.length - 1].w - g.x; });
-    const tableR = HEAD_X + contentW;
+    const tableR = T.headingGutter + contentW;
 
     // ── Heights ─────────────────────────────────────────────────────────
     colGroups.forEach(g => {
-      g.lines = g.name != null ? wrapHeading(g.name, F_LABEL, Math.max(20, g.w - PAD_X * 2), 2, true) : [];
+      g.lines = g.name != null ? wrapHeading(g.name, T.labelSize, Math.max(20, g.w - PAD_X * 2), 2, true) : [];
     });
     columns.forEach(c => {
-      c.head = c.name != null ? wrapHeading(c.name, F_TICK, Math.max(20, c.w - PAD_X * 2), HEAD_LINES, false) : [];
+      c.head = c.name != null ? wrapHeading(c.name, T.tickSize, Math.max(20, c.w - PAD_X * 2), HEAD_LINES, false) : [];
     });
     const groupHeadH = hasColGroups ? Math.max(...colGroups.map(g => g.lines.length)) * LH + 14 : 0;
     const colHeadLines = Math.max(1, ...columns.map(c => c.head.length));
     const colHeadH = colHeadLines * LH + 10;
-    const ROW_MIN = Math.round(F_VALUE * 2.9);
+    const ROW_MIN = Math.round(T.valueSize * 2.9);
     const chartRow = plot.rowHeight != null ? +plot.rowHeight : CHART_ROW;
 
     // Lay out one cell's lines at its final width; returns its content height.
@@ -12277,7 +12775,7 @@ Charts.histogramCumulative = function (container, opts) {
         cell.noteLines = cell.note ? wrapHeading(cell.note, F_DESC, inner, 2, false) : [];
         return F_STAT * 1.15 + cell.noteLines.length * DESC_LH;
       }
-      cell.lines = wrapHeading(cell.text, F_VALUE, inner, CELL_LINES, false);
+      cell.lines = wrapHeading(cell.text, T.valueSize, inner, CELL_LINES, false);
       return cell.lines.length * LH;
     }
     rows.forEach(r => {
@@ -12289,7 +12787,7 @@ Charts.histogramCumulative = function (container, opts) {
         r.lines = [];
         content = r.headLines.length * INS_LH + (r.bodyLines.length ? 3 + r.bodyLines.length * DESC_LH : 0);
       } else {
-        r.lines = labelW ? wrapHeading(r.name, F_LABEL, labelInner, 3, false) : [];
+        r.lines = labelW ? wrapHeading(r.name, T.labelSize, labelInner, 3, false) : [];
         content = r.lines.length * LH;
       }
       let hasChart = false;
@@ -12302,10 +12800,10 @@ Charts.histogramCumulative = function (container, opts) {
       });
       r.h = Math.max(ROW_MIN, content + PAD_Y * 2, hasChart ? chartRow : 0, rowFloor[r.i] || 0);
     });
-    const GROUP_ROW = Math.round(F_LABEL * 2.8);
+    const GROUP_ROW = Math.round(T.labelSize * 2.8);
     const groupStarts = rows.filter((r, k) => r.group != null && (k === 0 || rows[k - 1].group !== r.group));
-    const legendTop = titleBlockH + (legendH ? PLOT_GAP / 2 : 0);
-    const headTop = legendTop + legendH + PLOT_GAP;
+    const legendTop = titleBlockH + (legendH ? T.plotGap / 2 : 0);
+    const headTop = legendTop + legendH + T.plotGap;
     const bodyTop = headTop + groupHeadH + colHeadH;
     const bodyH = () => rows.reduce((a, r) => a + r.h, 0) + groupStarts.length * GROUP_ROW;
     const BOTTOM = 20;
@@ -12331,22 +12829,22 @@ Charts.histogramCumulative = function (container, opts) {
     stage.style.cssText = 'position:relative;width:' + SW + 'px;height:' + H + 'px;';
     container.appendChild(stage);
     const svg = el('svg', { xmlns: NS, width: SW, height: H, viewBox: '0 0 ' + SW + ' ' + H });
-    svg.style.background = window.ChartsShared.canvasColor(opts, BG);
+    svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     svg.style.display = 'block';
     stage.appendChild(svg);
 
-    titleLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: HEAD_TOP + F_TITLE + i * TITLE_LH,
-      'font-size': F_TITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, svg));
-    subLines.forEach((ln, i) => txt(ln, { x: HEAD_X, y: subY0 + i * SUB_LH,
-      'font-size': F_SUB, 'font-weight': SUB_FW, fill: SUB_COL, 'font-family': FONT }, svg));
+    titleLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: T.headingPadTop + T.titleSize + i * TITLE_LH,
+      'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
+    subLines.forEach((ln, i) => txt(ln, { x: T.headingGutter, y: subY0 + i * SUB_LH,
+      'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
 
     legendRows.forEach((row, ri) => {
-      const cy = legendTop + ri * LEG_ROW + LEG_ROW / 2;
+      const cy = legendTop + ri * T.legendRowHeight + T.legendRowHeight / 2;
       row.forEach(({ item, x }) => {
-        el('rect', { x: HEAD_X + x, y: cy - LEG_ICON / 2, width: LEG_ICON, height: LEG_ICON,
+        el('rect', { x: T.headingGutter + x, y: cy - T.legendIconSize / 2, width: T.legendIconSize, height: T.legendIconSize,
           rx: 2, fill: item.color }, svg);
-        txt(item.name, { x: HEAD_X + x + LEG_ICON + LEG_ICON_GAP, y: cy + F_LEG * 0.36,
-          'font-size': F_LEG, 'font-weight': LEG_FW, fill: LABEL_COL, 'font-family': FONT }, svg);
+        txt(item.name, { x: T.headingGutter + x + T.legendIconSize + T.legendIconGap, y: cy + T.legendSize * 0.36,
+          'font-size': T.legendSize, 'font-weight': T.legendWeight, fill: T.labelColor, 'font-family': T.font }, svg);
       });
     });
 
@@ -12362,9 +12860,9 @@ Charts.histogramCumulative = function (container, opts) {
         const one = g.cols.length === 1;
         const align = one ? (g.cols[0].headerAlign || g.cols[0].align) : 'center';
         const gx = one ? anchorX(g.cols[0], align) : g.x + g.w / 2;
-        const y0 = headTop + groupHeadH - 14 - (g.lines.length - 1) * LH + F_LABEL * 0.8;
+        const y0 = headTop + groupHeadH - 14 - (g.lines.length - 1) * LH + T.labelSize * 0.8;
         g.lines.forEach((ln, li) => txt(ln, { x: gx, y: y0 + li * LH, 'text-anchor': ANCHOR[align],
-          'font-size': F_LABEL, 'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gHead));
+          'font-size': T.labelSize, 'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font }, gHead));
       });
     }
     const headBase = bodyTop - 8;
@@ -12372,15 +12870,15 @@ Charts.histogramCumulative = function (container, opts) {
       const align = c.headerAlign || c.align;
       const n = c.head.length;
       c.head.forEach((ln, li) => txt(ln, { x: anchorX(c, align), y: headBase - (n - 1 - li) * LH,
-        'text-anchor': ANCHOR[align], 'font-size': F_TICK, 'font-weight': TICK_FW,
-        fill: SEC_COL, 'font-family': FONT }, gHead));
+        'text-anchor': ANCHOR[align], 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.secondaryColor, 'font-family': T.font }, gHead));
     });
     if (labelHeader) {
-      txt(labelHeader, { x: HEAD_X, y: headBase, 'font-size': F_TICK, 'font-weight': TICK_FW,
-        fill: SEC_COL, 'font-family': FONT }, gHead);
+      txt(labelHeader, { x: T.headingGutter, y: headBase, 'font-size': T.tickSize, 'font-weight': T.tickWeight,
+        fill: T.secondaryColor, 'font-family': T.font }, gHead);
     }
-    el('line', { x1: HEAD_X, x2: tableR, y1: bodyTop, y2: bodyTop,
-      stroke: AXIS, 'stroke-width': SPINE_W }, gHead);
+    el('line', { x1: T.headingGutter, x2: tableR, y1: bodyTop, y2: bodyTop,
+      stroke: T.axis, 'stroke-width': T.spineWidth }, gHead);
 
     // ── Body ────────────────────────────────────────────────────────────
     const gHover = el('g', {}, svg);
@@ -12408,25 +12906,25 @@ Charts.histogramCumulative = function (container, opts) {
     }
 
     function drawCell(c, cell, r, top, mid) {
-      const common = { 'font-family': FONT, 'pointer-events': 'none' };
+      const common = { 'font-family': T.font, 'pointer-events': 'none' };
       // On a fill, every line of the cell takes the contrasting ink; the
       // secondary lines stay a step quieter through opacity, not a grey that
       // may vanish into the fill.
       const ink = cell.fill ? inkOn(cell.fill) : null;
-      const quiet = ink ? { fill: ink, 'fill-opacity': 0.8 } : { fill: SEC_COL };
+      const quiet = ink ? { fill: ink, 'fill-opacity': 0.8 } : { fill: T.secondaryColor };
       if (c.kind === 'insight') {
         const h = cell.headLines.length * INS_LH + (cell.bodyLines.length ? 3 + cell.bodyLines.length * DESC_LH : 0);
         drawFill(c, cell, r, mid);
         let ty = mid - h / 2;
         cell.headLines.forEach(ln => {
           txt(ln, Object.assign({ x: anchorX(c, c.align), y: ty + INS_LH * 0.78, 'text-anchor': ANCHOR[c.align],
-            'font-size': F_INSIGHT, 'font-weight': CAT_FW, fill: ink || (cell.blank ? SEC_COL : CAT_COL) }, common), gCells);
+            'font-size': F_INSIGHT, 'font-weight': T.categoryWeight, fill: ink || (cell.blank ? T.secondaryColor : T.categoryColor) }, common), gCells);
           ty += INS_LH;
         });
         if (cell.bodyLines.length) ty += 3;
         cell.bodyLines.forEach(ln => {
           txt(ln, Object.assign({ x: anchorX(c, c.align), y: ty + DESC_LH * 0.74, 'text-anchor': ANCHOR[c.align],
-            'font-size': F_DESC, 'font-weight': TICK_FW }, quiet, common), gCells);
+            'font-size': F_DESC, 'font-weight': T.tickWeight }, quiet, common), gCells);
           ty += DESC_LH;
         });
         return;
@@ -12436,11 +12934,11 @@ Charts.histogramCumulative = function (container, opts) {
         drawFill(c, cell, r, mid);
         let ty = mid - h / 2 + F_STAT * 0.9;
         txt(cell.stat, Object.assign({ x: anchorX(c, c.align), y: ty, 'text-anchor': ANCHOR[c.align],
-          'font-size': F_STAT, 'font-weight': VAL_FW, fill: cell.color }, common), gCells);
+          'font-size': F_STAT, 'font-weight': T.valueWeight, fill: cell.color }, common), gCells);
         ty += F_STAT * 0.25;
         cell.noteLines.forEach(ln => {
           txt(ln, Object.assign({ x: anchorX(c, c.align), y: ty + DESC_LH * 0.74, 'text-anchor': ANCHOR[c.align],
-            'font-size': F_DESC, 'font-weight': TICK_FW }, quiet, common), gCells);
+            'font-size': F_DESC, 'font-weight': T.tickWeight }, quiet, common), gCells);
           ty += DESC_LH;
         });
         return;
@@ -12448,8 +12946,8 @@ Charts.histogramCumulative = function (container, opts) {
       if (c.kind === 'chart') {
         const cfg = c.configs[r.i];
         if (!cfg) {
-          txt(blankText, Object.assign({ x: c.x + c.w / 2, y: mid + F_VALUE * 0.36, 'text-anchor': 'middle',
-            'font-size': F_VALUE, fill: SEC_COL }, common), gCells);
+          txt(blankText, Object.assign({ x: c.x + c.w / 2, y: mid + T.valueSize * 0.36, 'text-anchor': 'middle',
+            'font-size': T.valueSize, fill: T.secondaryColor }, common), gCells);
           return;
         }
         const key = c.keys && c.keys[r.i];
@@ -12465,9 +12963,9 @@ Charts.histogramCumulative = function (container, opts) {
             const valW = textW(it.value, F_KEY, true);
             const room = Math.max(10, keyW - KEY_SWATCH - KEY_GAP * 2 - valW - PAD_X);
             txt(truncateText(it.name, F_KEY, room), Object.assign({ x: kx + KEY_SWATCH + KEY_GAP, y: ky + F_KEY * 0.36,
-              'font-size': F_KEY, 'font-weight': TICK_FW, fill: LABEL_COL }, common), gCells);
+              'font-size': F_KEY, 'font-weight': T.tickWeight, fill: T.labelColor }, common), gCells);
             txt(it.value, Object.assign({ x: c.x + c.w - PAD_X, y: ky + F_KEY * 0.36, 'text-anchor': 'end',
-              'font-size': F_KEY, 'font-weight': VAL_FW, fill: VAL_COL }, common), gCells);
+              'font-size': F_KEY, 'font-weight': T.valueWeight, fill: T.valueColor }, common), gCells);
             ky += KEY_LH;
           });
           chartBoxes.push({ col: c, row: r, cfg: cfg, x: c.x, y: top + PILL_Y, w: c.w - keyW, h: r.h - PILL_Y * 2 });
@@ -12478,28 +12976,28 @@ Charts.histogramCumulative = function (container, opts) {
       }
       // text
       drawFill(c, cell, r, mid);
-      const y0 = mid - ((cell.lines.length - 1) * LH) / 2 + F_VALUE * 0.36;
+      const y0 = mid - ((cell.lines.length - 1) * LH) / 2 + T.valueSize * 0.36;
       cell.lines.forEach((ln, li) => txt(ln, Object.assign({ x: anchorX(c, c.align), y: y0 + li * LH,
-        'text-anchor': ANCHOR[c.align], 'font-size': F_VALUE, 'font-weight': TICK_FW,
-        fill: ink || SEC_COL }, common), gCells));
+        'text-anchor': ANCHOR[c.align], 'font-size': T.valueSize, 'font-weight': T.tickWeight,
+        fill: ink || T.secondaryColor }, common), gCells));
     }
 
     rows.forEach((r, k) => {
       if (groupStarts.indexOf(r) >= 0) {
         if (k > 0 && plot.rowGroupDivider !== false) {
-          el('line', { x1: HEAD_X, x2: tableR, y1: y, y2: y,
-            stroke: MUTED, 'stroke-width': GRID_W * 1.5 }, gRules);
+          el('line', { x1: T.headingGutter, x2: tableR, y1: y, y2: y,
+            stroke: T.muted, 'stroke-width': T.gridWidth * 1.5 }, gRules);
         }
-        txt(r.group, { x: HEAD_X, y: y + GROUP_ROW - F_LABEL * 0.75, 'font-size': F_LABEL,
-          'font-weight': CAT_FW, fill: CAT_COL, 'font-family': FONT }, gCells);
+        txt(r.group, { x: T.headingGutter, y: y + GROUP_ROW - T.labelSize * 0.75, 'font-size': T.labelSize,
+          'font-weight': T.categoryWeight, fill: T.categoryColor, 'font-family': T.font }, gCells);
         y += GROUP_ROW;
         stripe = 0;
       }
       r.y = y;
-      r._hover = el('rect', { x: HEAD_X, y: y, width: contentW, height: r.h,
-        fill: striped && stripe % 2 ? GRID : HOVER_INK,
+      r._hover = el('rect', { x: T.headingGutter, y: y, width: contentW, height: r.h,
+        fill: striped && stripe % 2 ? T.grid : T.hoverInk,
         'fill-opacity': striped && stripe % 2 ? 0.45 : 0, 'data-row': k, class: 'tb-row' }, gHover);
-      r._rest = striped && stripe % 2 ? { fill: GRID, opacity: 0.45 } : { fill: HOVER_INK, opacity: 0 };
+      r._rest = striped && stripe % 2 ? { fill: T.grid, opacity: 0.45 } : { fill: T.hoverInk, opacity: 0 };
       stripe++;
 
       const mid = y + r.h / 2;
@@ -12509,27 +13007,27 @@ Charts.histogramCumulative = function (container, opts) {
         const h = r.headLines.length * INS_LH + (r.bodyLines.length ? 3 + r.bodyLines.length * DESC_LH : 0);
         let ty = mid - h / 2;
         r.headLines.forEach(ln => {
-          txt(ln, { x: HEAD_X, y: ty + INS_LH * 0.78, 'font-size': F_INSIGHT, 'font-weight': CAT_FW,
-            fill: CAT_COL, 'font-family': FONT, 'pointer-events': 'none' }, gCells);
+          txt(ln, { x: T.headingGutter, y: ty + INS_LH * 0.78, 'font-size': F_INSIGHT, 'font-weight': T.categoryWeight,
+            fill: T.categoryColor, 'font-family': T.font, 'pointer-events': 'none' }, gCells);
           ty += INS_LH;
         });
         if (r.bodyLines.length) ty += 3;
         r.bodyLines.forEach(ln => {
-          txt(ln, { x: HEAD_X, y: ty + DESC_LH * 0.74, 'font-size': F_DESC, 'font-weight': TICK_FW,
-            fill: SEC_COL, 'font-family': FONT, 'pointer-events': 'none' }, gCells);
+          txt(ln, { x: T.headingGutter, y: ty + DESC_LH * 0.74, 'font-size': F_DESC, 'font-weight': T.tickWeight,
+            fill: T.secondaryColor, 'font-family': T.font, 'pointer-events': 'none' }, gCells);
           ty += DESC_LH;
         });
       }
-      const top = mid - ((r.lines.length - 1) * LH) / 2 + F_LABEL * 0.36;
-      r.lines.forEach((ln, li) => txt(ln, { x: HEAD_X, y: top + li * LH, 'font-size': F_LABEL,
-        'font-weight': TICK_FW, fill: LABEL_COL, 'font-family': FONT, 'pointer-events': 'none' }, gCells));
+      const top = mid - ((r.lines.length - 1) * LH) / 2 + T.labelSize * 0.36;
+      r.lines.forEach((ln, li) => txt(ln, { x: T.headingGutter, y: top + li * LH, 'font-size': T.labelSize,
+        'font-weight': T.tickWeight, fill: T.labelColor, 'font-family': T.font, 'pointer-events': 'none' }, gCells));
 
       columns.forEach(c => drawCell(c, c.cells[r.i], r, y, mid));
 
       y += r.h;
       const lastInGroup = k === rows.length - 1 || rows[k + 1].group !== r.group;
       if (plot.dividers !== false && (!lastInGroup || k === rows.length - 1)) {
-        el('line', { x1: HEAD_X, x2: tableR, y1: y, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gRules);
+        el('line', { x1: T.headingGutter, x2: tableR, y1: y, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gRules);
       }
     });
 
@@ -12539,7 +13037,7 @@ Charts.histogramCumulative = function (container, opts) {
     if (plot.columnGroupDivider !== false && hasColGroups) {
       colGroups.slice(1).forEach(g => {
         const gx = g.x - GROUP_GAP / 2;
-        el('line', { x1: gx, x2: gx, y1: headTop, y2: y, stroke: GRID, 'stroke-width': GRID_W }, gRules);
+        el('line', { x1: gx, x2: gx, y1: headTop, y2: y, stroke: T.grid, 'stroke-width': T.gridWidth }, gRules);
       });
     }
 
@@ -12602,7 +13100,7 @@ Charts.histogramCumulative = function (container, opts) {
       unhover();
       if (!r) return;
       hovered = r;
-      r._hover.setAttribute('fill', HOVER_INK);
+      r._hover.setAttribute('fill', T.hoverInk);
       r._hover.setAttribute('fill-opacity', 0.05);
     });
     life.on(svg, 'mouseleave', unhover);
@@ -12639,7 +13137,7 @@ Charts.histogramCumulative = function (container, opts) {
     });
   }
 
-    Charts.reportTable = Chart;
+  window.ChartsShared.register('reportTable', Chart);
 })();
 
 // ─── panels ─────────────────────────────────────────
@@ -12699,36 +13197,13 @@ Charts.histogramCumulative = function (container, opts) {
     // different themes have to be able to share a page, and a redraw or a
     // hover has to use the theme this chart was built with rather than
     // whichever one was applied last. See resolveTheme in _shared.js.
-  let BG, TITLE_COL, SUB_COL, SEC_COL;
-  let FONT, F_TITLE, F_SUB;
+  let T;   // the resolved theme, frozen: T.titleColor, T.font, ...
   let TITLE_LH, SUB_LH;
-  let TITLE_FW, SUB_FW, HEAD_TOP, HEAD_SUB_GAP, HEAD_GAP, HEAD_X, F_TIP;
-  let F_LEG, LEG_FW, LEG_ROW, LEG_GAP, LEG_ICON, LEG_ICON_GAP;
 
     function applyTheme() {
-      const t = resolveTheme(opts);
-      BG = t.bg;
-      TITLE_COL = t.titleColor;
-      SUB_COL = t.subtitleColor;
-      SEC_COL = t.secondaryColor;
-      FONT = t.font;
-      F_TITLE = t.titleSize;
-      F_SUB = t.subtitleSize;
-      F_TIP = t.tooltipSize;
-      TITLE_FW = t.titleWeight;
-      SUB_FW = t.subtitleWeight;
-      TITLE_LH = Math.round(F_TITLE * (t.titleLineHeight != null ? t.titleLineHeight : 1.24));
-      SUB_LH = Math.round(F_SUB * (t.subtitleLineHeight != null ? t.subtitleLineHeight : 1.34));
-      HEAD_TOP = t.headingPadTop;
-      HEAD_SUB_GAP = t.headingSubGap;
-      HEAD_GAP = t.headingGap;
-      HEAD_X = t.headingGutter;
-      F_LEG = t.legendSize;
-      LEG_FW = t.legendWeight;
-      LEG_ROW = t.legendRowHeight;
-      LEG_GAP = t.legendGap;
-      LEG_ICON = t.legendIconSize;
-      LEG_ICON_GAP = t.legendIconGap;
+      T = Object.freeze(resolveTheme(opts));
+      TITLE_LH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+      SUB_LH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
     }
 
     applyTheme();
@@ -12738,8 +13213,8 @@ Charts.histogramCumulative = function (container, opts) {
     // Owns every chart-lifetime listener so destroy() can undo them.
     const life = createLifecycle(container);
     container.style.position = 'relative';
-    container.style.fontFamily = FONT;
-    container.style.background = window.ChartsShared.canvasColor(opts, BG);
+    container.style.fontFamily = T.font;
+    container.style.background = window.ChartsShared.canvasColor(opts, T.bg);
     // The composition owns its own height: the heading plus whatever the
     // rows come to. A height set on the outer container would fight that.
     container.style.height = 'auto';
@@ -12753,8 +13228,8 @@ Charts.histogramCumulative = function (container, opts) {
     const specs = (opts.charts || opts.panels || []).filter(Boolean);
 
     const titleX = 20, marginR = 20, marginB = 4;
-    const F_GTITLE = plot.titleSize != null ? plot.titleSize : F_TITLE + 5;
-    const F_GSUB = plot.subtitleSize != null ? plot.subtitleSize : F_SUB + 1;
+    const F_GTITLE = plot.titleSize != null ? plot.titleSize : T.titleSize + 5;
+    const F_GSUB = plot.subtitleSize != null ? plot.subtitleSize : T.subtitleSize + 1;
     const GT_LH = Math.round(F_GTITLE * 1.25), GS_LH = Math.round(F_GSUB * 1.35);
 
     const hasTitle = !!opts.title, hasSub = !!opts.subtitle;
@@ -12772,14 +13247,14 @@ Charts.histogramCumulative = function (container, opts) {
       const headH = (hasTitle ? y0 + 8 + (titleLines.length - 1) * GT_LH : 14)
                   + (hasSub ? 14 + subLines.length * GS_LH : 0) + 10;
       const head = el('svg', { xmlns: NS, width: W, height: headH, viewBox: `0 0 ${W} ${headH}` });
-      head.style.background = window.ChartsShared.canvasColor(opts, BG);
+      head.style.background = window.ChartsShared.canvasColor(opts, T.bg);
       head.style.display = 'block';
       container.appendChild(head);
 
       titleLines.forEach((ln, i) => txt(ln, { x: titleX, y: y0 + i * GT_LH, 'text-anchor': 'start',
-        'font-size': F_GTITLE, 'font-weight': TITLE_FW, fill: TITLE_COL, 'font-family': FONT }, head));
+        'font-size': F_GTITLE, 'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, head));
       subLines.forEach((ln, i) => txt(ln, { x: titleX, y: subY0 + i * GS_LH, 'text-anchor': 'start',
-        'font-size': F_GSUB, fill: SUB_COL, 'font-family': FONT }, head));
+        'font-size': F_GSUB, fill: T.subtitleColor, 'font-family': T.font }, head));
     }
 
     if (!specs.length) {
@@ -12817,7 +13292,7 @@ Charts.histogramCumulative = function (container, opts) {
           // auto-height panel next to a fixed one looking deliberate.
           const sep = document.createElement('div');
           sep.style.cssText = `flex:0 0 ${separators ? 1 : 0}px;align-self:stretch;` +
-            `margin:0 ${gap / 2}px;background:${cssColor(separators ? SEC_COL : 'transparent')};` +
+            `margin:0 ${gap / 2}px;background:${cssColor(separators ? T.secondaryColor : 'transparent')};` +
             (separators ? 'opacity:0.5;' : '');
           row.appendChild(sep);
         }
@@ -12835,7 +13310,7 @@ Charts.histogramCumulative = function (container, opts) {
         const factory = window.Charts && window.Charts[type];
         if (typeof factory !== 'function') {
           cell.innerHTML =
-            `<div style="font:${cssNumber(F_TIP)}px ${cssFont(FONT)};color:${cssColor(SUB_COL)};padding:8px">Unknown chart type “${
+            `<div style="font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};color:${cssColor(T.subtitleColor)};padding:8px">Unknown chart type “${
               String(type).replace(/[<&>]/g, '')}”</div>`;
           made.push(null);
           return;
@@ -12874,7 +13349,7 @@ Charts.histogramCumulative = function (container, opts) {
     });
   }
 
-    Charts.panels = Chart;
+  window.ChartsShared.register('panels', Chart);
 })();
 
 
@@ -12893,6 +13368,15 @@ Charts.meta = {
     "spanRule": "Use `grid-column: span 2` for the wide families. Never `1 / -1`: that means 'every track', which reads as 2-of-2 on a two-column grid and silently becomes 3-of-3 when a third column appears.",
     "heightRule": "A height on the container is an instruction to fill it; no height means grow to content. Be consistent across a grid or rows will not align.",
     "preferPanels": "When charts belong to one exhibit, use Charts.panels instead of a hand-rolled grid: one shared title, up to 4 across, and every panel gets the same height."
+  },
+  "events": {
+    "$comment": "Subscribe with handle.on(type, fn) or config.events: { type: fn }. Listeners survive resizes and update().",
+    "render": "{ reason: init | resize | fonts | update }",
+    "hover": "{ name, series?, index?, ...values } once per mark the pointer enters; shared-tooltip charts give points[]",
+    "hoverEnd": "the detail of the hover that ended",
+    "click": "the hover detail of what was clicked; nothing over empty space",
+    "legendToggle": "{ series, visible, index }",
+    "destroy": "{}"
   },
   "charts": {
     "line": {
@@ -12918,8 +13402,13 @@ Charts.meta = {
       "notes": "Dates as categories are accepted; names are not.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries",
         "addPoint",
         "shift"
@@ -12944,8 +13433,13 @@ Charts.meta = {
       "notes": "Category labels are never dropped; crowding is solved by wrapping, staggering then rotating.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -12966,8 +13460,13 @@ Charts.meta = {
       "notes": "Its value axis is labelled ABOVE the plot, so it reserves topAxisBand and its left gutter is sized to its row labels. Its plot therefore starts lower and further right than the other axis charts.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -12991,8 +13490,13 @@ Charts.meta = {
       "notes": "Long category names are free here — they are not squeezed into a left gutter.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "dumbbell": {
@@ -13020,8 +13524,13 @@ Charts.meta = {
       "notes": "Rows pair up by position, not by name.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "histogram": {
@@ -13049,8 +13558,13 @@ Charts.meta = {
       "notes": "null, '' and booleans are counted out rather than coerced, and named in a footnote. Bars touch because the axis is continuous.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -13078,8 +13592,13 @@ Charts.meta = {
       "notes": "Identical to histogram except the y-axis.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -13105,8 +13624,13 @@ Charts.meta = {
       "notes": "Y-axis always runs 0 to 100%.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getBins",
         "getStats"
       ]
@@ -13139,8 +13663,13 @@ Charts.meta = {
       "notes": "The value axis always includes zero: every bar is read against it, and a cropped axis would make the totals misreport their own size.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSteps",
         "getTotal"
       ]
@@ -13177,10 +13706,96 @@ Charts.meta = {
       "notes": "Every column shares one pixels-per-unit scale, so node heights compare across columns; a node is as tall as the larger of its in- and outflow, and whatever a stage receives but does not pass on flows into a counter-coloured 'Unaccounted' node in the next column, with its amount and share.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getLinks",
         "getNodes"
+      ]
+    },
+    "heatmap": {
+      "purpose": "A value per cell of a grid whose two directions are ordered — hour × weekday, week × cohort, bin × bin — drawn as colour, so the pattern is the reading.",
+      "data": "series[0].data as [x, y, value] or { x, y, value }, x and y a category name or its index; xAxis.categories name the columns left to right, yAxis.categories the rows top to bottom",
+      "requires": [
+        "exactly one series",
+        "xAxis.categories and yAxis.categories, in reading order",
+        "at most one value per cell"
+      ],
+      "refuses": [
+        "more than one series — a cell holds one colour, so a second series would paint over the first; one heatmap per measure in panels",
+        "two values for the same cell — the chart would show whichever came last; aggregate first",
+        "a non-numeric value — null means no data and is drawn as an empty outline, never as zero",
+        "a cell naming a row or column not in the categories"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 25+ columns",
+      "keyOptions": [
+        "colorAxis.min/max (pin the domain so two heatmaps share a scale)",
+        "plotOptions.heatmap.color (one hue instead of the ramp)",
+        "plotOptions.heatmap.upColor|downColor (the diverging pair)",
+        "plotOptions.heatmap.dataLabels: false",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false (hides the colour key)",
+        "plotOptions.heatmap.autoHeight"
+      ],
+      "notes": "Colour is the least precise encoding there is: use this for the pattern across ordered rows and columns. Two sets of unrelated names is table with highlight: scale, which prints the numbers — validate() warns. Values crossing zero diverge through aboveThreshold/belowThreshold, the same scale table uses. In-cell numbers are drawn only when every one of them fits.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "calendarHeatmap": {
+      "purpose": "One cell per day — weeks as columns, weekdays as rows — so weekly rhythm and the days that broke it show at a glance.",
+      "data": "series[0].data as [date, value] or { date, value }; date a timestamp, a Date, or \"YYYY-MM-DD\"",
+      "requires": [
+        "exactly one series",
+        "daily values — at most one per day",
+        "at most four calendar years"
+      ],
+      "refuses": [
+        "more than one series — one heatmap per measure in panels",
+        "two values for the same day — aggregate first",
+        "values weekly or coarser — a calendar would be mostly empty days; use line with a datetime axis, or column",
+        "more than four calendar years — each day becomes a speck; use line, or one calendarHeatmap per year in panels"
+      ],
+      "selfSizing": true,
+      "aspect": "grid",
+      "minWidth": 480,
+      "minHeight": 200,
+      "gridSpan": 2,
+      "gridSpanWhen": "1 for three months or less",
+      "keyOptions": [
+        "plotOptions.heatmap.weekStart: 1 (Monday) | 0 (Sunday)",
+        "plotOptions.heatmap.cellSize (largest day, default 30)",
+        "colorAxis.min/max",
+        "plotOptions.heatmap.color",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false"
+      ],
+      "notes": "Days stay square, so a calendar fills the WIDTH and sits at the top of a tall box; give it no height and it grows to its bands. Up to a year of data is one continuous band of whole months; longer spans take a band per calendar year. Days with no value are drawn as empty outlines, never as zero; days outside the data's range (a band's lead-in and run-out) take a faint fill and no outline. A Date object is read in local time, a timestamp in UTC.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "table": {
@@ -13214,8 +13829,13 @@ Charts.meta = {
       "notes": "Numbers are never truncated: headers and row labels wrap, and a table wider than its container scrolls sideways. A blank is drawn as a dash and left out of the colour scale — it is not zero.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getRows"
       ]
     },
@@ -13251,8 +13871,13 @@ Charts.meta = {
       "notes": "Chart cells drop their own title and legend; named series are shown once above the table. line/column/bar/dumbbell cells in one column share a value scale unless sharedScale: false.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getRows",
         "charts"
       ]
@@ -13276,8 +13901,13 @@ Charts.meta = {
       "notes": "Four columns of content need the width; with 2+ series the stat writes itself as the change from first to last.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "waffle": {
@@ -13302,8 +13932,13 @@ Charts.meta = {
       "notes": "Spare height grows the DOT, not the gaps — the value is the number of dots, and a dot is one unit at any size.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "radar": {
@@ -13333,8 +13968,13 @@ Charts.meta = {
       "notes": "The scale starts at zero and is shared by every axis — on a radial scale a cropped baseline multiplies the AREA of a difference, and per-axis scales make the shape meaningless. Mixed units want normalising to a common index first. Past ~4 series the polygons overlap into mush; use panels of small radars instead.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -13360,8 +14000,13 @@ Charts.meta = {
       "notes": "The ring grows until the narrower axis binds, so it is safe in any cell. Auto-shows a legend at 2+ wedges, which makes it start lower than a legend-less neighbour.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "pie": {
@@ -13384,8 +14029,13 @@ Charts.meta = {
       "notes": "Alias of donut with innerSize 0.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "scatter": {
@@ -13407,8 +14057,13 @@ Charts.meta = {
       "notes": "Point labels only draw for points that carry a name.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -13428,8 +14083,13 @@ Charts.meta = {
       "notes": "z maps to AREA, not radius.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -13447,8 +14107,13 @@ Charts.meta = {
       "notes": "Cluster positions are settled by simulation and move slightly between renders.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "getSeries"
       ]
     },
@@ -13476,8 +14141,13 @@ Charts.meta = {
       "notes": "Tiles stay square and cap at maxTileSize, centring the leftover as margin, so it fits a single cell at 480px and does not need extra width.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
-        "getData"
+        "getData",
+        "toSVG",
+        "toPNG"
       ]
     },
     "panels": {
@@ -13503,8 +14173,13 @@ Charts.meta = {
       "notes": "Prefer this over a hand-rolled grid when charts belong together. panelHeight reaches the self-sizing types too, so a row's panels end on one line.",
       "api": [
         "redraw",
+        "update",
+        "on",
+        "off",
         "destroy",
         "getData",
+        "toSVG",
+        "toPNG",
         "charts",
         "panels"
       ]
@@ -13575,6 +14250,14 @@ Charts.validate = function (type, config) {
   if (type === "sankey") {
     errors = errors.concat(window.ChartsShared.sankeyProblems(config));
   }
+  if (type === "heatmap" || type === "calendarHeatmap") {
+    // The same reading the engine draws its refusal panel from.
+    var hmPlot = (config.plotOptions && config.plotOptions.heatmap) || {};
+    var hm = window.ChartsShared.heatmapGrid(config,
+      type === "calendarHeatmap" || hmPlot.layout === "calendar" ? "calendar" : "matrix");
+    errors = errors.concat(hm.errors);
+    warnings = warnings.concat(hm.warnings);
+  }
   if (type === "table") {
     // The same function the engine draws its refusal panel from.
     errors = errors.concat(window.ChartsShared.tableProblems(config));
@@ -13596,7 +14279,7 @@ Charts.validate = function (type, config) {
 // --- load order ---------------------------------------------------
 if (!Charts.theme && typeof console !== "undefined" && console.warn) {
   console.warn("charts.js: Charts.theme is missing, so the built-in defaults are in use. " +
-    "Load theme.js before charts.js to apply the design system.");
+    "Load theme.js first, or use charts.bundle.js / charts.min.js, to apply the design system.");
 }
 
 
@@ -13610,3 +14293,5 @@ if (!Charts.theme && typeof console !== "undefined" && console.warn) {
     };
   });
 })();
+
+Charts.version = "1.0.0";

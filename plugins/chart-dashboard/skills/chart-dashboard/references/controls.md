@@ -29,6 +29,13 @@ Wiring completely means three things, and the third is the one that gets missed:
      return (handles[id] = factory(id, config));
    }
    ```
+
+   A redrawn chart plays its entry animation again. When only the numbers
+   change and the chart type and options stay the same,
+   `handles[id].update({ title, series })` redraws in place instead and moves
+   each bar and dot to its new value. `update()` *merges*, though: a key left
+   out of the patch keeps its old value, so any change of shape or options goes
+   through `draw()`. See `chart-api.md` § Chart lifecycle.
 2. **Every dependent panel re-renders**, including KPI tiles and any note that
    quotes a number. A grid where two panels respond to the filter and four don't
    is the same broken-trust failure in a subtler form.

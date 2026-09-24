@@ -49,7 +49,8 @@
     packedBubble: 'Packed bubbles', histogram: 'Histogram', histogramPercent: 'Histogram (%)',
     histogramCumulative: 'Cumulative histogram', scatter: 'Scatter', bubble: 'Bubble',
     waterfall: 'Waterfall', sankey: 'Sankey', reportTable: 'Report table',
-    barInsightTable: 'Bar insight table', panels: 'Panels', geofacet: 'Map grid'
+    barInsightTable: 'Bar insight table', panels: 'Panels', geofacet: 'Map grid',
+    heatmap: 'Heatmap', calendarHeatmap: 'Calendar heatmap'
   };
   var name = function (t) { return NAMES[t] || t; };
 
