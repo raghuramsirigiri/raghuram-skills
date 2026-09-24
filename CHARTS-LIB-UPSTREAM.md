@@ -2,14 +2,16 @@
 
 The skill ships a copy of `charts-lib` in
 `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/`, built from
-`svg-charts/charts-lib`. That copy currently carries a change the upstream
-library doesn't have yet. Apply each one in `svg-charts`, rebuild, and re-sync
-the copy, so that syncing the library again doesn't silently remove behaviour
-the skill depends on.
+`svg-charts/charts-lib`. When the skill needs a library change, it is written
+up here until it lands in `svg-charts`; then the copy is re-synced and the
+section is deleted, so that syncing the library again never silently removes
+behaviour the skill depends on.
+
+**Nothing is outstanding.** The copy is identical to upstream, and the table
+below is empty.
 
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
-| 1 | Packed bubbles honour a point's own `color` | `engines/scatter.js` | applied in the skill copy | Editor Style tab, "Bubble colours" |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -19,91 +21,12 @@ comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-note
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
-**Last synced** from `svg-charts` commit `c8588bd` (2026-09-23,
-`charts-lib` 1.0.0: `centerText` takes a bare string, formerly change 2 here;
-before it `185de6f`: heatmap and calendarHeatmap, chart handles with
-`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation).
+**Last synced** from `svg-charts` commit `81a9833` (2026-09-23, `charts-lib`
+1.0.0): packed bubbles honour a point's own `color`, formerly change 1 here.
+Before it, `c8588bd`: `centerText` takes a bare string, formerly change 2.
+Before that, `185de6f`: heatmap and calendarHeatmap, chart handles with
+`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation.
 See *Syncing the copy* at the bottom for how, and what to check afterwards.
-
----
-
-## 1. Packed bubbles honour a point's own `color`
-
-<!-- check: applied; file: charts.js; needle: b.p.color || -->
-
-### Problem
-
-`Charts.packedBubble` ignores `color` on a data point. With one series,
-every bubble is shaded from the size gradient (`gradientStart` →
-`gradientEnd`). With several series, every bubble takes its series colour.
-So this config draws "a" in the gradient colour, not red:
-
-```js
-Charts.packedBubble('el', {
-  series: [{ name: 'Mentions', data: [{ name: 'a', y: 5, color: '#B31B38' }, ['b', 9]] }]
-});
-```
-
-Every other per-mark chart already honours a point's `color`: donut and pie
-slices, waffle panels, bar list rows, and column and bar points.
-
-### Why the skill needs it
-
-The editable-page editor (`assets/page-editor.js`) offers per-bubble colours
-on the Style tab. `ChartConvert.style.markColour('packedBubble', …)` writes
-`{ name, y, color }` onto the point. Without this change the config is saved
-but the drawn bubble doesn't change colour.
-
-### Change
-
-`charts-lib/engines/scatter.js`, in the packed-bubble layout, where each
-bubble's fill is chosen:
-
-```diff
-       flat.forEach(b => {
-         const t = (maxV === minV) ? 1 : Math.sqrt((b.p.y - minV) / (maxV - minV));
-         b.r = minR + t * (maxR - minR);
--        b._fillColor = (n === 1) ? grad[Math.min(99, Math.floor(t * 99))] : b.s.color;
-+        // A bubble's own color wins; otherwise one series is shaded by size
-+        // and several series take their series color.
-+        b._fillColor = b.p.color || ((n === 1) ? grad[Math.min(99, Math.floor(t * 99))] : b.s.color);
-       });
-```
-
-`b.p` is the point as normalised earlier in the same file. An object point
-is copied with `Object.assign({}, d)`, so `color` is already on it. Array
-points (`[name, value]`) have no colour and keep today's behaviour.
-
-### Apply and verify
-
-1. Make the edit above in `svg-charts/charts-lib/engines/scatter.js`.
-2. Rebuild and run the library tests:
-   ```bash
-   cd svg-charts/charts-lib
-   node _build.js
-   node --test test/*.test.js
-   ```
-   All 270 tests passed with this change applied.
-3. Suggested new test: a single-series packed bubble with one point carrying
-   `color` draws that bubble's `<circle>` with that fill. The other bubbles
-   keep their gradient fills.
-4. Worth adding to the README's packed-bubble section: *a point's `color`
-   overrides the size gradient (one series) or the series colour (several)*.
-5. Re-sync the skill's copy (*Syncing the copy* below) and confirm it
-   matches: after that, `diff -rq` between the two `charts-lib` folders
-   should report only the files that exist upstream alone (README, engines,
-   tests, `esm/`, `types/`, `charts.bundle.js`, `charts.min.js`,
-   `charts.d.ts`, and so on).
-6. Remove this section from this note.
-
-### Current state
-
-- **Skill copy** (`plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js`):
-  includes the change. First committed on `feat/editable-pages` as
-  `7582126`, and re-applied by hand after the sync to `svg-charts` `185de6f`
-  (the engine line is unchanged upstream, so the diff above still applies).
-- **`svg-charts`**: unchanged as of `185de6f`. Copying a fresh `charts.js`
-  into the skill without re-applying this change removes per-bubble colours.
 
 ---
 
