@@ -2629,6 +2629,19 @@ var Charts = window.Charts = window.Charts || {};
    * `o` may carry upColor / downColor / color (one hue instead of the ramp),
    * and `floor`, the least intensity a diverging non-zero value gets.
    */
+  /*
+   * A donut's centerText, normalised. It takes { value, label, valueFontSize,
+   * color }, or a bare string or number as shorthand for { value }. `true`, or
+   * an object without `value`, draws the ring's total. null, undefined, false
+   * and '' draw nothing.
+   */
+  function centerTextOf(ct) {
+    if (ct == null || ct === false || ct === '') return null;
+    if (typeof ct === 'object') return ct;
+    if (typeof ct === 'string' || typeof ct === 'number') return { value: ct };
+    return {};
+  }
+
   function scaleColor(T, d, v, o) {
     o = o || {};
     if (d.lo < 0 && d.hi > 0) {
@@ -3423,7 +3436,7 @@ var Charts = window.Charts = window.Charts || {};
     calloutOverlap: calloutOverlap, measureCalloutBox: measureCalloutBox, drawCalloutBox: drawCalloutBox, drawCalloutLeader: drawCalloutLeader,
     drawCallouts: drawCallouts,
     tableProblems: tableProblems, tableIsBlank: tableIsBlank, allocateWidths: allocateWidths,
-    parseColor: parseColor, mix: mix, contrast: contrast, scaleColor: scaleColor,
+    parseColor: parseColor, mix: mix, contrast: contrast, scaleColor: scaleColor, centerTextOf: centerTextOf,
     isTransparent: isTransparent, canvasColor: canvasColor,
     reportTableProblems: reportTableProblems, REPORT_KINDS: REPORT_KINDS, REPORT_EXCLUDED: REPORT_EXCLUDED,
     sankeyGraph: sankeyGraph, sankeyProblems: sankeyProblems,
@@ -5434,7 +5447,7 @@ Charts.bar = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, calloutKey, drawCallouts, measureText, NS } = window.ChartsShared;
+  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, calloutKey, drawCallouts, measureText, centerTextOf, NS } = window.ChartsShared;
   // ── Heading wrapping ────────────────────────────────────────────────
   // Titles wrap to at most 2 lines, subtitles to at most 3; whatever does
   // not fit is clipped with an ellipsis. Widths are estimated (not measured)
@@ -6246,8 +6259,8 @@ Charts.bar = function (container, opts) {
       })();
 
       // Center label
-      if (plotOpts.centerText) {
-        const ct = plotOpts.centerText;
+      const ct = centerTextOf(plotOpts.centerText);
+      if (ct) {
         const cyC = isSemi ? cy - 20 : cy;
         const lines = String(ct.value != null ? ct.value : total).split('\n');
         lines.forEach((ln, i) => {
@@ -14718,7 +14731,7 @@ Charts.meta = {
         "innerSize",
         "startAngle/endAngle",
         "variableRadius",
-        "centerText",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
         "showPercentages"
       ],
       "notes": "The ring grows until the narrower axis binds, so it is safe in any cell. Auto-shows a legend at 2+ wedges, which makes it start lower than a legend-less neighbour.",
@@ -14747,7 +14760,7 @@ Charts.meta = {
       "gridSpan": 1,
       "keyOptions": [
         "startAngle/endAngle",
-        "centerText",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
         "showPercentages"
       ],
       "notes": "Alias of donut with innerSize 0.",
