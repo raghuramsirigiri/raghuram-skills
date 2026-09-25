@@ -52,7 +52,7 @@
       "name": "decisions-only",
       "source": "./plugins/decisions-only",
       "description": "Pull only the decisions and commitments out of a meeting transcript, recap or notes — what was chosen, who owns what, by when — and nothing else. Not a summary: it discards everything that binds nobody. Paste in, answer out; no tenant, connector or admin approval needed.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "Raghuram Sirigiri"
       },

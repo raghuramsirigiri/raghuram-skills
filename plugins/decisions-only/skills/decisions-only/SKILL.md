@@ -71,6 +71,10 @@ Ask "where did D2 come from?" or "why isn't X in here?" to see the transcript be
 
 (Rows trimmed above for length — a real run lists every item the counts claim.)
 
+The trace line names `D2` only because this output has a D2. With one decision it names
+`D1`; with none, `C1`; after *"Nothing was decided"* it is *Ask "why isn't X in here?" to
+see the transcript behind the answer.* Never cite a handle the reader can't find.
+
 Counts in the headings are deliberate: `## Decisions (0)` is information, a blank section
 looks like a bug.
 
