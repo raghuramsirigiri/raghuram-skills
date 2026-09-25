@@ -143,6 +143,33 @@
         "sense-check",
         "before-you-send"
       ]
+    },
+    {
+      "name": "exec-brief",
+      "source": "./plugins/exec-brief",
+      "description": "Boil a long email thread, chat, status report or document down to one bottom-line sentence, at most three points and one ask — paste-ready for your manager or exec. Cuts everything that doesn't change what the reader does, and never firms up a date, figure or cause the source leaves open. Paste in, answer out; no connector or admin approval needed.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "exec-brief",
+        "executive-summary",
+        "bluf",
+        "tldr",
+        "briefing",
+        "managing-up",
+        "email-thread",
+        "status-report",
+        "stakeholder-update",
+        "leadership",
+        "communication",
+        "outlook",
+        "teams",
+        "summarization",
+        "productivity"
+      ]
     }
   ]
 }
