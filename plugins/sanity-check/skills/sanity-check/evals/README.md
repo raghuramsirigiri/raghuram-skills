@@ -17,3 +17,12 @@ trap (that convention must not excuse a 182.0 reconciliation gap). `sales-2026-0
 defects respectively — they are the false-positive tests, and the more important ones.
 `pack-2026-11-clean.xlsx` should return a clean verdict and nothing else. Never feed a `.KEY.md`
 in with a fixture.
+
+Added 2026-09-24 so every eval runs against a real file:
+
+- `sales-2026-08.xlsx` (eval 5) — copied byte-identical from `whats-changed`'s evals, paired
+  with `sales-2026-09.xlsx` to test that two files still get a sanity check, not a variance
+  report.
+- `revenue-summary-q3-2026.xlsx` (eval 6) — seven typed revenue lines summing to 2,318, a
+  typed total of 2,365 (47 apart), and the note "All figures rounded to the nearest £1k."
+  Otherwise clean. The note must not excuse a gap 47× the rounding step.

@@ -32,7 +32,10 @@
     {
       "id": 2,
       "name": "nothing-was-decided",
-      "prompt": "Can you pull the decisions out of this? [paste a pure status-update meeting: each person reports progress, nobody chooses anything, nobody takes an action]",
+      "prompt": "Can you pull the decisions out of this?",
+      "files": [
+        "skills/decisions-only/evals/transcript-status-update.md"
+      ],
       "expected_output": "One line stating that nothing was decided and nobody committed to anything. No tables, no padding.",
       "runs": 3,
       "assertions": [
@@ -45,7 +48,10 @@
     {
       "id": 3,
       "name": "no-speaker-labels",
-      "prompt": "[the quarterly-review transcript with every speaker name stripped] What came out of this?",
+      "prompt": "Turn 1: \"What came out of this?\" Turn 2, only if the run asks about attribution: \"No idea who said what — just go ahead.\"",
+      "files": [
+        "skills/decisions-only/evals/transcript-quarterly-review-unlabelled.md"
+      ],
       "expected_output": "One clarifying question about attribution, then the normal output with owners unassigned.",
       "runs": 3,
       "assertions": [
@@ -58,7 +64,10 @@
     {
       "id": 4,
       "name": "very-short-thread",
-      "prompt": "quick one — six-line Teams thread where a lead says 'going with option A, I'll raise the PR today' and two people say ok. What was decided?",
+      "prompt": "quick one — what was decided here?",
+      "files": [
+        "skills/decisions-only/evals/thread-short.md"
+      ],
       "expected_output": "One decision, one commitment, no flags. Proportionate to the input.",
       "runs": 3,
       "assertions": [
@@ -71,13 +80,17 @@
     {
       "id": 5,
       "name": "false-consensus-trap",
-      "prompt": "[a transcript whose only candidate is a run of agreement about a principle — 'we're all aligned that quality matters', 'totally', 'agreed' — with no option ever closed] What did we decide?",
+      "prompt": "What did we decide?",
+      "files": [
+        "skills/decisions-only/evals/transcript-principle-alignment.md"
+      ],
       "expected_output": "Nothing decided. The agreement run must not be reported as a decision.",
       "runs": 3,
       "assertions": [
         "Reports no decisions",
         "Does not treat sequential assent as consensus on a course of action",
-        "Does not emit a Needs chasing section — an agreed principle with no action is not one of the four flag triggers"
+        "Does not emit a Needs chasing section — an agreed principle with no action is not one of the four flag triggers",
+        "Does not report Ravi's protect-the-hardening-sprint idea as a decision — Grace held it for the afternoon (a deferral)"
       ]
     },
     {

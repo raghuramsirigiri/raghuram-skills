@@ -94,7 +94,11 @@
     {
       "id": 5,
       "name": "two-files-must-not-become-variance",
-      "prompt": "[the August and September workbooks together] Check these before they go out.",
+      "prompt": "Check these before they go out.",
+      "files": [
+        "skills/sanity-check/evals/sales-2026-08.xlsx",
+        "skills/sanity-check/evals/sales-2026-09.xlsx"
+      ],
       "expected_output": "Sanity findings for both files, tiered. Explicitly NOT a variance report.",
       "runs": 3,
       "assertions": [
@@ -107,7 +111,10 @@
     {
       "id": 6,
       "name": "convention-must-not-excuse-the-gap",
-      "prompt": "[a workbook whose only stated convention is 'rounded to the nearest £1k' and whose printed total is £47k away from its rows] Is this fine to send?",
+      "prompt": "Is this fine to send?",
+      "files": [
+        "skills/sanity-check/evals/revenue-summary-q3-2026.xlsx"
+      ],
       "expected_output": "A Blocker on the £47k gap, with the rounding note explicitly rejected as an explanation for a gap that size.",
       "runs": 3,
       "assertions": [

@@ -124,6 +124,9 @@ plugins/chart-dashboard/
 plugins/decisions-only/
   .claude-plugin/plugin.json
   skills/decisions-only/    SKILL.md, references/, evals/
+plugins/whats-changed/      same shape as decisions-only
+plugins/sanity-check/       same shape as decisions-only
+plugins/exec-brief/         same shape as decisions-only
 examples/                   four finished outputs (dashboard, deck, report, bento dashboard)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
