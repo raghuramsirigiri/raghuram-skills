@@ -14,6 +14,9 @@
       "assertions": [
         "BLUF leads with the go-live slip and the approval needed — not with training progress",
         "2 Nov is qualified as conditional on mock #3 reconciling on Fri 9 Oct; nowhere does the brief say it will go live on 2 Nov unqualified",
+        "The BLUF sentence itself qualifies 2 Nov (planned / target / likely / not guaranteed) — a bare \"moved to 2 Nov\" in the BLUF fails even if a point carries the condition",
+        "The condition is not strengthened: \"can't guarantee until\" must not become \"holds only if\"",
+        "Nothing precedes the BLUF — no \"Here's the short version\", no divider",
         "The cost is £38.4k (or £38,400); £30k and 'about £40k' appear nowhere",
         "The consequence of missing Fri 25 Sep — next Stockline slot mid-January 2027 — appears in BLUF, a point, or the ask",
         "Exactly one ask: approve releasing £38.4k from the operations contingency by Fri 25 Sep",
@@ -62,7 +65,8 @@
         "BLUF carries the move from Mon 5 Oct to Tue 6 Oct",
         "The reason (Irish entity bank feed) is either absent or stated as the source states it — never embellished",
         "Ask is 'No ask — for information.' — 'don't promise numbers on Monday' is guidance, not a request of the reader, and is acceptable folded into the BLUF",
-        "Output is not longer than the source"
+        "Output is not longer than the source",
+        "Closing line reads \"where does the BLUF come from?\" — it does not cite a P2 that doesn't exist"
       ]
     },
     {
@@ -94,7 +98,9 @@
         "The ask's date stays Fri 25 Sep — no earlier deadline is invented",
         "Urgency is carried by sourced facts: the 25 Sep change-order deadline and the mid-January 2027 fallback",
         "Adds no unsourced severity — no 'critical', 'project at risk of failure', 'customer impact' claims beyond what the thread says",
-        "The 2 Nov date keeps its condition in the reworded version"
+        "The 2 Nov date keeps its condition in the reworded version",
+        "The revision opens with one line on what changed and ends at the trace line — no commentary after it",
+        "Does not move the ask to the 1:1 or any date earlier than Fri 25 Sep, even as a flagged suggestion"
       ]
     },
     {
@@ -113,7 +119,8 @@
         "Turn 3 leads with Fidelity — M10's full sentence beside the brief's wording — and holds the conditional; it does not remove the condition or soften the slip",
         "Turn 4 quotes 'Root cause not yet known' from M2, shows Raj's unit-of-measure remark only as an attributed guess, and states no cause of its own",
         "Follow-up turns do not repeat the closing line",
-        "No summary of the thread beyond the evidence messages"
+        "No summary of the thread beyond the evidence messages",
+        "If the rejected option is added back after turn 2, it goes in as a clause and does not displace the mid-January consequence (rank 3)"
       ]
     }
   ]

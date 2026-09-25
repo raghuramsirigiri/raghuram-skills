@@ -30,14 +30,15 @@ Ask "where does P2 come from?" or "why did you leave out X?" to see the source b
 ```
 
 It names the two questions this skill gets most — one about what was kept, one about what was
-cut — so the reader learns both exist. It follows a no-points brief and a *No ask* brief too.
+cut — so the reader learns both exist. It follows a *No ask* brief too. A brief with no points has no P2, so there the line reads
+*"where does the BLUF come from?"* in place of *"where does P2 come from?"*.
 
 Follow-up replies — the traces themselves — do **not** repeat it.
 
 ## The trace block — for a line that is in the brief
 
 ```markdown
-### P1 — New date holds only if the load test passes on 3 Mar
+### P1 — Supplier won't commit to 16 Mar until the load test passes on 3 Mar
 
 **Source**
 > M7 · Amir (supplier) · Thu 5 Feb — "We're confident in 16 Mar but can't commit until the second load test is through on the 3rd."
@@ -46,7 +47,9 @@ Follow-up replies — the traces themselves — do **not** repeat it.
 - Gate: without it Dana would treat 16 Mar as fixed. Rank 1 — a condition on the BLUF.
 
 **Fidelity**
-- "confident … can't commit until" → *holds only if*. Certainty kept; nothing firmed up.
+- "confident … can't commit until" → *"confident" … won't commit until*. Both halves kept.
+  Writing *holds only if* would be wrong: it turns a withheld commitment into a pass/fail
+  condition the supplier never stated.
 
 **What would change it**
 - A later message confirming the date unconditionally. There is none; M9 and M10 don't

@@ -68,6 +68,10 @@ passes; keep the top three at most.
 
 A point that restates the BLUF or the ask fails the gate — it changes nothing.
 
+**Qualifiers travel with every mention.** If a date or figure is conditional, each sentence
+that states it carries the qualifier — the BLUF first of all. The condition itself can live in
+a point; the word *likely*, *target* or *planned* cannot be left behind in the BLUF.
+
 ## Always cut
 
 | Cut | Tell | Why |
@@ -75,7 +79,7 @@ A point that restates the BLUF or the ask fails the gate — it changes nothing.
 | Chronology | "On Monday… then Tuesday…" | The reader wants the state, not the route. |
 | Who said what | Attributions of positions | Only a decision-maker's name survives, and only when it matters to the ask. |
 | A settled argument or blame | "park it", "both teams own it" | Reopening it upward restarts it. |
-| A rejected option | "we looked at X, not viable" | History — **unless** the reader would otherwise propose it; then one clause, as rejected, with the source's reason. |
+| A rejected option | "we looked at X, not viable" | History — **unless** the reader would otherwise propose it; then one clause on an existing point, as rejected, with the source's reason. It ranks at most 4 and never displaces a rank 1–3 point. |
 | Thanks, praise, morale | "great work everyone" | Doesn't change a decision. |
 | Side topics | a different subject in the same thread | Not the brief's subject. |
 | Process | meetings held, calls set up, who's cc'd | The reader doesn't care how. |

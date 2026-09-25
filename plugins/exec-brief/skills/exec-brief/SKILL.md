@@ -56,7 +56,7 @@ skill; do not improvise them.
 ```markdown
 **The Leeds switchover is likely to slip three weeks to 16 Mar, and releasing £22k from contingency needs your sign-off by Wed 11 Feb.**
 
-- P1 The new date holds only if the second load test passes on 3 Mar — the supplier won't commit before then.
+- P1 The supplier is "confident" in 16 Mar but won't commit to it until the second load test passes on 3 Mar.
 - P2 £22k covers 11 extra supplier days at £2,000/day; no other budget line moves.
 - P3 Without sign-off by 11 Feb the supplier releases our March slot; the next one is May.
 
@@ -73,10 +73,17 @@ product, not an omission to apologise for.)
 - **BLUF** in bold, ≤ 30 words. **Points** `P1–P3`, ≤ 25 words each. **Ask** one action.
 - `Check before sending` appears **only** when a trigger in the reference fires; otherwise the
   line is omitted entirely.
-- The fixed trace line ends the output, and nothing follows it.
+- The fixed trace line ends the output, and nothing follows it. When the brief has no points,
+  the line reads *"where does the BLUF come from?"* in place of *"where does P2 come from?"*.
 
-Output lands in chat as copyable markdown. Write a file only if asked. No subject line, no
-greeting, no sign-off unless asked — the user pastes this into their own message.
+Output lands in chat as copyable markdown. Write a file only if asked. **Nothing before the
+BLUF** — no "Here's the short version", no divider. No subject line, no greeting, no sign-off
+unless asked — the user pastes this into their own message.
+
+**When asked to revise** ("more urgent", "shorter", "softer"): one line saying what changed,
+then the full revised brief, then the trace line — nothing after it. The revision obeys every
+rule below; a request for urgency is met with the source's own deadline and consequence, not
+adjectives and not an earlier date.
 
 ## Rules
 
@@ -86,8 +93,10 @@ greeting, no sign-off unless asked — the user pastes this into their own messa
 - **Three points is a ceiling, not a target.** Two true points beat three with padding. A
   source with one piece of news gets a BLUF, an ask and no points.
 - **Never firm anything up.** Keep the source's certainty word-for-word in spirit: *likely*,
-  *if*, *subject to*, *estimate*, *target* survive into the brief. A condition on a date
-  travels with the date.
+  *if*, *subject to*, *estimate*, *target* survive into the brief. **Every sentence that states
+  an uncertain date carries its qualifier — the BLUF included.** A condition spelled out in P1
+  does not excuse a bare "moved to 16 Mar" in the BLUF; the BLUF is the line that gets repeated.
+  Don't strengthen the qualifier either: *"won't commit until"* is not *"holds only if"*.
 - **Never soften or bury bad news.** If the thread's news is a slip, an overspend or a
   failure, the BLUF says so first — however upbeat the last message is.
 - **Never supply a cause.** Causes come from the source, attributed. A cause someone
@@ -96,10 +105,13 @@ greeting, no sign-off unless asked — the user pastes this into their own messa
 - **Figures as the source states them** — its latest version, its precision, its unit. No
   rounding that changes what a reader would repeat. No figure the source doesn't contain.
 - **Never invent an ask, an owner or a deadline.** *No ask — for information.* is a complete
-  answer. A request that needs a date the source doesn't give keeps "no date given".
+  answer. A request that needs a date the source doesn't give keeps "no date given". Never
+  bring the source's deadline forward — not even flagged as a suggestion. If the user wants
+  an earlier internal date, they add it themselves.
 - **Don't take sides in a settled argument.** Resolved blame, disagreements and rejected
   options are history. A rejected option returns only if the reader would otherwise propose
-  it — and then as rejected, with the reason the source gives.
+  it — then as a clause on an existing point, rejected, with the source's reason. It ranks at
+  most 4 and **never displaces a rank 1–3 point.**
 - **Short source, short brief.** If the source is already under about 80 words, return a
   BLUF and the ask, no points. The brief must never be longer than the source.
 
