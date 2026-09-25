@@ -56,7 +56,7 @@ skill; do not improvise them.
 ```markdown
 **The Leeds switchover is likely to slip three weeks to 16 Mar, and releasing £22k from contingency needs your sign-off by Wed 11 Feb.**
 
-- P1 The supplier is "confident" in 16 Mar but won't commit to it until the second load test passes on 3 Mar.
+- P1 The supplier is "confident" in 16 Mar but can't commit to it until the second load test passes on 3 Mar.
 - P2 £22k covers 11 extra supplier days at £2,000/day; no other budget line moves.
 - P3 Without sign-off by 11 Feb the supplier releases our March slot; the next one is May.
 
@@ -96,7 +96,7 @@ adjectives and not an earlier date.
   *if*, *subject to*, *estimate*, *target* survive into the brief. **Every sentence that states
   an uncertain date carries its qualifier — the BLUF included.** A condition spelled out in P1
   does not excuse a bare "moved to 16 Mar" in the BLUF; the BLUF is the line that gets repeated.
-  Don't strengthen the qualifier either: *"won't commit until"* is not *"holds only if"*.
+  Don't strengthen the qualifier either: *"can't commit until"* is not *"holds only if"*, nor *"won't commit until"* — can't is a limit, won't is a choice.
 - **Never soften or bury bad news.** If the thread's news is a slip, an overspend or a
   failure, the BLUF says so first — however upbeat the last message is.
 - **Never supply a cause.** Causes come from the source, attributed. A cause someone

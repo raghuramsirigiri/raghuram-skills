@@ -33,12 +33,15 @@ It names the two questions this skill gets most — one about what was kept, one
 cut — so the reader learns both exist. It follows a *No ask* brief too. A brief with no points has no P2, so there the line reads
 *"where does the BLUF come from?"* in place of *"where does P2 come from?"*.
 
-Follow-up replies — the traces themselves — do **not** repeat it.
+Follow-up replies — the traces themselves — do **not** repeat it. The one exception: when a
+trace corrects the brief and shows it again in full, that corrected brief ends with the line,
+because it is a brief the user will copy. A trace that leaves the brief unchanged never
+reprints it.
 
 ## The trace block — for a line that is in the brief
 
 ```markdown
-### P1 — Supplier won't commit to 16 Mar until the load test passes on 3 Mar
+### P1 — Supplier can't commit to 16 Mar until the load test passes on 3 Mar
 
 **Source**
 > M7 · Amir (supplier) · Thu 5 Feb — "We're confident in 16 Mar but can't commit until the second load test is through on the 3rd."
@@ -47,7 +50,8 @@ Follow-up replies — the traces themselves — do **not** repeat it.
 - Gate: without it Dana would treat 16 Mar as fixed. Rank 1 — a condition on the BLUF.
 
 **Fidelity**
-- "confident … can't commit until" → *"confident" … won't commit until*. Both halves kept.
+- "confident … can't commit until" → *"confident" … can't commit until*. Both halves kept, and
+  *can't* stays *can't* — *won't* would turn a stated limit into a choice.
   Writing *holds only if* would be wrong: it turns a withheld commitment into a pass/fail
   condition the supplier never stated.
 
