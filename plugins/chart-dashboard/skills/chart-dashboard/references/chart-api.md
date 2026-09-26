@@ -12,6 +12,7 @@
   - [Bar insight table (`Charts.barInsightTable`)](#bar-insight-table-chartsbarinsighttable)
   - [Histogram (`Charts.histogram`, `Charts.histogramPercent`, `Charts.histogramCumulative`)](#histogram-chartshistogram-chartshistogrampercent-chartshistogramcumulative)
   - [Waffle (`Charts.waffle`)](#waffle-chartswaffle)
+  - [Table (`Charts.table`)](#table-chartstable)
   - [Report table (`Charts.reportTable`)](#report-table-chartsreporttable)
   - [Panels (`Charts.panels`)](#panels-chartspanels)
   - [Radar (`Charts.radar`)](#radar-chartsradar)
@@ -69,6 +70,7 @@ legend interactions — no canvas, no external framework.
 | `Charts.histogramPercent` | Same bins, y-axis as a share of the total.                             |
 | `Charts.histogramCumulative` | Same bins, y-axis running 0 → 100%.                                 |
 | `Charts.waffle`       | Part-of-whole dot grids; one panel per statistic, headline stat + caption.  |
+| `Charts.table`        | Exact numbers a reader looks up: grouped rows, spanning column headers, cells coloured by sign or on a scale. |
 | `Charts.reportTable`  | Table whose columns are `text`, `insight`, `kpi` or `chart` cells (a real chart per row). |
 | `Charts.panels`       | Compositor: up to 4 charts of any type side by side under one shared title. |
 | `Charts.radar`        | One closed polygon per series over the same named axes; the reading is the shape. Three axes minimum. |
@@ -469,6 +471,67 @@ Charts.waffle('chart', {
 - **Color**: walks the series palette per panel; `series.color` or a point `color` overrides, `colorByPoint: false` gives every panel one color.
 - **Negative values are clamped to zero** — a part-of-whole grid can't show them honestly, same rule as the donut.
 - **Other**: `dividers: false` drops the vertical rules, `panelPadding` sets the gutter inside each panel.
+
+### Table (`Charts.table`)
+
+Exact numbers a reader will look up rather than estimate. Rows can be grouped
+under headings, columns under a spanning header, and a column can colour its
+cells by value. Reach for it when each row carries several measures and the
+reader needs the figures themselves, not their shape (`chart-selection.md`).
+
+```js
+Charts.table('container', {
+  title: 'Backend is the only department growing into FY 2026',
+  subtitle: 'Headcount and budget · USD m',
+  columns: [
+    { key: 'hc25', name: 'Headcount',  group: 'FY 2025' },
+    { key: 'b25',  name: 'Budget',     group: 'FY 2025', prefix: '$', suffix: 'M', decimals: 1,
+      highlight: 'scale', scale: 'budget' },
+    { key: 'g25',  name: 'YoY growth', group: 'FY 2025', suffix: '%', decimals: 1, showSign: true,
+      highlight: 'sign' },
+    { key: 'b26',  name: 'Budget',     group: 'FY 2026', prefix: '$', suffix: 'M', decimals: 1,
+      highlight: 'scale', scale: 'budget' }
+  ],
+  rows: [
+    { group: 'Software', name: 'Backend',  hc25: 450, b25: 31.5, g25: 8.2,  b26: 34.5 },
+    { group: 'Software', name: 'Frontend', hc25: 210, b25: 14.0, g25: -1.3, b26: 13.8 },
+    { group: 'Hardware', name: 'Chips',    hc25: 85,  b25: 12.5, g25: -4.1, b26: 11.0 }
+  ]
+});
+```
+
+- **Columns**: `key` (required, unique), `name`, `group` (consecutive columns
+  with the same group share a spanning header), `align` (numbers default right,
+  text left), `headerAlign`, `prefix`, `suffix`, `decimals`, `showSign`,
+  `format(value, row)`, `width` (a floor, never a cap), `bold`, `wrap` (a column
+  with no numbers wraps its text to ~340px a line; a column with any number
+  never wraps).
+- **Rows**: `name`, optional `group`, and one value per column key. A row group
+  must be one contiguous run — sort the rows first.
+- **`highlight`**: `'sign'` fills above/below `plotOptions.table.threshold`
+  (default 0) with `aboveThreshold` / `belowThreshold`. `'scale'` walks the
+  series ramp (lightest for the smallest value), or diverges through the
+  threshold pair when the domain crosses zero. A function `(value, row, column)`
+  returning a colour or null does anything else. Cell ink is picked by contrast
+  with the fill. Colour a column only when the pattern is part of the finding;
+  a table where every column is shaded has no emphasis left.
+- **`scale: 'id'`** gives several columns one colour domain, so the same amount
+  is the same shade in each. Columns sharing a scale must share a unit
+  (`prefix`/`suffix`) or the table is refused.
+- **Blanks** (`null`, `''`, `NaN`) draw as `–` (`plotOptions.table.blank`), take
+  no fill and are left out of the scale. A blank is not zero.
+- **Never truncates a number.** Headers and row labels wrap; if the numbers
+  still do not fit, the table keeps its natural width and the container scrolls.
+- **Column groups are all or nothing**: any `group` means every column needs
+  one, or the table is refused; a lone qualifier goes in the column name.
+- **Also**: `plotOptions.table.striped`, `rowGroupDivider` (true),
+  `columnGroupDivider` (true), `labelHeader`, `labelGap` (28px gutter after the
+  row labels), `pills` (false colours the text instead of a fill).
+- **Sizing**: grows to its rows with no container height; given a taller one,
+  the rows open up to half again their height and the rest is blank. Put it in a
+  `<div class="bento flow">` row — see `layout.md` § Tables size themselves. It
+  needs about 480px; with four or fewer data columns one grid track holds it.
+- **Returns** the standard handle plus `getRows()`.
 
 ### Report table (`Charts.reportTable`)
 
