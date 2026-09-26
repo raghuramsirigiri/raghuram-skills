@@ -513,8 +513,11 @@ Charts.table('container', {
   series ramp (lightest for the smallest value), or diverges through the
   threshold pair when the domain crosses zero. A function `(value, row, column)`
   returning a colour or null does anything else. Cell ink is picked by contrast
-  with the fill. Colour a column only when the pattern is part of the finding;
-  a table where every column is shaded has no emphasis left.
+  with the fill. Colour a column only when the pattern is part of the finding.
+  That is usually one or two columns, the ones the title is about. Shading
+  every measure column turns the table into a heatmap with no emphasis left;
+  if the reader needs each region's standing on every measure, a rank column
+  or sorted rows say it without colour.
 - **`scale: 'id'`** gives several columns one colour domain, so the same amount
   is the same shade in each. Columns sharing a scale must share a unit
   (`prefix`/`suffix`) or the table is refused.

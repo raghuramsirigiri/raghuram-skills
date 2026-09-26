@@ -119,9 +119,17 @@ first. That is the right answer only when each item really is one number.
 
 Some signs that you are in rows two to four: the user pasted a table with three
 or more numeric columns; they wrote a comment against each row; or they said
-*scorecard*, *QBR*, *P&L*, *KPI review*, *vs target* or *by line item*. Charts
-summarise and tables let the reader look things up. Many pages need both: a
-chart that states the finding, then a table beneath it holding the figures.
+*scorecard*, *QBR*, *P&L*, *KPI review*, *vs target* or *by line item*.
+
+**A table is not a free extra under a chart.** Add one beside a chart only
+when at least one of these holds:
+- the rows carry measures that no panel on the page shows;
+- the reader's job is to look up their own row (a regional manager, a finance
+  reviewer).
+
+A table that reprints the numbers a chart already draws is padding, just as a
+padded panel is. One series over time, a single ranking, or a comparison
+already on the page does not need a table of the same values under it.
 
 | The data is… | Use | charts-lib call |
 |:--|:--|:--|

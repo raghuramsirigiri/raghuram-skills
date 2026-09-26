@@ -126,6 +126,12 @@ slide deck.
    standard types can be correct, but you should reach it on purpose, not by
    default.
 
+   The same check applies in reverse. **A table that reprints what a chart
+   already draws is padding.** One trend, one ranking, or a comparison the
+   charts already make does not need a table of the same numbers underneath.
+   Add a table only when its rows carry measures no panel shows, or the reader
+   is there to look up their own row.
+
    One sizing rule the grid doesn't enforce for you: **tables size themselves.**
    `table`, `reportTable` and `barInsightTable` are as tall as their rows, so
    they go in a content-sized `<div class="bento flow">` row, never in a fixed

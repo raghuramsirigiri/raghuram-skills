@@ -47,7 +47,7 @@ through** — if your data's shape isn't here, build the row that fits it.
 | A few big findings, long tail of detail | one `w12` statement panel, then `w4`s — decreasing weight down the page |
 | A scorecard or review: many metrics, each with a trend, a target or a note | `reportTable` (or `barInsightTable` when each row is one number and a sentence) in a `bento flow` row **first**. The charts that explain the misses come after it |
 | A matrix the reader will look up: regions × metrics, line items × periods | `table` in a flow row, with `highlight:'scale'` only on the columns whose pattern matters. Add a chart above it only for the one pattern worth stating as a title |
-| A finding, plus the figures behind it | the chart(s) that state the finding first, then a `table` in a flow row closing the page, where the reader goes to check a number |
+| A finding, plus measures the charts don't show | the chart(s) that state the finding first, then a `table` in a flow row closing the page. Only when its rows carry figures no panel draws, or the reader's job is to look up their own row. A table that reprints a chart's series is padding |
 
 Two rules constrain whatever you build:
 
