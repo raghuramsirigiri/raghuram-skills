@@ -42,7 +42,8 @@
         "Output is a single short line",
         "Does not invent a decision from a status update",
         "Does not substitute a summary of what was discussed",
-        "Does not apologise for the empty result or offer to summarise instead unless asked"
+        "Does not apologise for the empty result or offer to summarise instead unless asked",
+        "Ends with exactly \"Ask \\\"why isn't X in here?\\\" to see the transcript behind the answer.\" — no D2, which does not exist"
       ]
     },
     {
@@ -58,7 +59,9 @@
         "Asks at most one question, about who was in the room",
         "Still finds the 4 decisions after the answer",
         "Shows owners as unassigned rather than guessing from speaker order",
-        "Does not ask about format, length, tone or audience"
+        "Does not ask about format, length, tone or audience",
+        "Commitment owners are all — unassigned, including the revised-plan commitment addressed to Tom by name: no \"Tom (asked by name)\" or similar in the Who column",
+        "No currency symbol is added to the \"sixty K\" figure"
       ]
     },
     {
@@ -74,7 +77,8 @@
         "Exactly one decision and one commitment",
         "Does not inflate two acknowledgements into separate decisions",
         "No Needs chasing section when there is nothing to chase",
-        "Output is shorter than the input"
+        "Output is shorter than the input",
+        "The closing line cites D1, not D2 — there is only one decision"
       ]
     },
     {
@@ -90,7 +94,8 @@
         "Reports no decisions",
         "Does not treat sequential assent as consensus on a course of action",
         "Does not emit a Needs chasing section — an agreed principle with no action is not one of the four flag triggers",
-        "Does not report Ravi's protect-the-hardening-sprint idea as a decision — Grace held it for the afternoon (a deferral)"
+        "Does not report Ravi's protect-the-hardening-sprint idea as a decision — Grace held it for the afternoon (a deferral)",
+        "Ends with the no-handle closing line (\"…behind the answer.\"), not one citing D2"
       ]
     },
     {

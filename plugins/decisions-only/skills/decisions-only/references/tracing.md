@@ -24,9 +24,18 @@ The output ends with exactly this line, and nothing follows it:
 Ask "where did D2 come from?" or "why isn't X in here?" to see the transcript behind any line.
 ```
 
-It names the two questions this skill gets most, so the reader learns both exist. It follows
-the one-line *"Nothing was decided"* answer too — that is the answer most likely to be
-disputed.
+It names the two questions this skill gets most, so the reader learns both exist.
+
+**The handle in it must exist in the output.** Use `D2` when there are two or more
+decisions; otherwise the last handle the output does have — `D1`, then `C1`. After the
+one-line *"Nothing was decided"* answer there are no handles at all, and the line becomes:
+
+```
+Ask "why isn't X in here?" to see the transcript behind the answer.
+```
+
+That answer is the one most likely to be disputed, so it still gets a line. Everything
+else about the line is fixed — only the handle changes.
 
 Follow-up replies — the traces themselves — do **not** repeat it. It is said once, under the
 output, where the reader first needs it.

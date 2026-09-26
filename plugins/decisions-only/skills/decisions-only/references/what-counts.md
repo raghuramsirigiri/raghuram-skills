@@ -75,6 +75,14 @@ Flag it under *Needs chasing*.
 spoke — the person who raised a task is usually not the one who takes it, and a guessed
 name is worse than a blank because it stops anyone from chasing it.
 
+**Asked by name is not an owner.** "Leo, can you send the vendor list?" names who was
+*asked*. The commitment exists only when someone *accepts*, and the owner is whoever the
+transcript shows accepting. If the acceptance has no speaker label — captions with no
+attribution, a reply marked `Speaker 3` — the owner is `— unassigned`, however obvious the
+guess. Say who was asked in the *Needs chasing* line (`asked of Leo; the reply accepting it
+is unattributed`), never in the *Who* column. Never write `Leo (asked by name)` or
+`Leo (probably)` as an owner — a qualified guess is still a guess.
+
 **Date implied, not stated.** Resolve relative dates against the meeting date if the
 transcript carries one — "Thursday" in a Tuesday 15 Sep meeting is Thu 17 Sep. With no
 meeting date, keep the phrase verbatim. Never invent a specific date.
@@ -84,6 +92,11 @@ naming a *window* — "end of the month", "by Q3", "in the next couple of weeks"
 **even when the meeting date is known**, and fires *Needs chasing* trigger 2. Converting "end
 of the month" to 30 Sep invents a deadline nobody set; the speaker may mean the last working
 day, the month-end close, or roughly then.
+
+**Figures as spoken.** "Forty K" is `40K`, not `$40K` or `£40,000`. Never add a currency,
+unit or precision the transcript doesn't state — a symbol added to a spoken number is an
+invented fact, and the wrong one will be repeated. If the currency matters to the decision
+and nobody said it, leave it out; it is not a *Needs chasing* flag.
 
 **Conditional decisions.** "If finance approves, we go with B." Record it with the
 condition attached, in the decision text. Dropping the condition converts a contingency
