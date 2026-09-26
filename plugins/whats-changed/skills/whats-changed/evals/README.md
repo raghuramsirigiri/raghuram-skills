@@ -15,3 +15,20 @@ clean-shape pair; `sales-pack-2026-08.pptx` / `-09.pptx` test decks, native char
 picture-of-a-chart slide and a top-5 truncation; `sales-pack-2026-08.pdf` tests £0.1m
 rounding against a £k workbook; `-08-scanned.pdf` has no text layer at all.
 `sales.KEY.md` and `sales-pack.KEY.md` grade them — never feed a key in with a fixture.
+
+Added 2026-09-24 so every eval runs against a real file:
+
+- `ops-costs-2026-08.xlsx` / `-09.xlsx` (eval 2) — ten cost lines, September = August with
+  ±0.5% jitter. Total −3.4 on 1,284.4 (−0.26%); largest line Salaries −4.1.
+  **Known spec gap:** the absolute gate is 5% of the *total* change, so on a near-zero total
+  Salaries (121% of the move) clears it. Read literally, `materiality.md` yields a driver
+  here; the eval expects the flat one-liner. Until the gate gets a floor for a flat total,
+  expect this eval to fail — it is testing the spec, not only the skill.
+- `regional-sales-aug-sep-2026.xlsx` (eval 6) — one sheet, `Aug` / `Sep` / typed `Variance`.
+  Two stale variances: East says +4.8 (arithmetic +1.8), West says −9.7 (arithmetic −15.7).
+  The Variance column is typed throughout, so no hardcoded-cell flag applies; its `SUM` total
+  (+37.5 vs +28.5) disagrees only as a consequence of the two rows — one flag line or two is
+  tolerated for trigger 10, as long as East and West are both named. Net move +28.5, so the
+  absolute gate is 1.4.
+- `cost-centres-2026-08.xlsx` (title `£000s`) / `-09.xlsx` (title `£`, values ×1000) (eval
+  7) — identical cost-centre labels; the only difference that matters is the unit.

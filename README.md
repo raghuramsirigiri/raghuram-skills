@@ -107,6 +107,11 @@ pulls in the others:
 | --- | --- |
 | `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report or deck. |
 | `decisions-only` | A meeting transcript → the decisions and commitments, and nothing else. |
+| `whats-changed` | This period's numbers against last period's → what moved, by how much, and the few lines that explain the total. |
+| `sanity-check` | One spreadsheet, deck or PDF → the mistakes that would embarrass you, ranked into what blocks sending. |
+| `exec-brief` | A long thread or document → one bottom-line sentence, at most three points, and one ask. |
+
+Install any of them the same way — `/plugin install <name>@raghuram-skills`.
 
 ### Claude Code — manual install
 
