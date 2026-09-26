@@ -129,7 +129,9 @@ negative. That is information, not a bug — which is why the column is not call
   sentence and drop the second.
 - **Rank or don't report.** An unranked list of everything that changed is the problem the
   workbook already has. If the drivers can't be ranked, say why.
-- **Flat is a valid answer.** *"Revenue is flat within 1%; no line moved more than £3k"* is
+- **Flat is a valid answer.** When the total moves less than 1%, the absolute gate switches
+  to 1% of the prior total (`materiality.md` §1) — otherwise noise clears it. *"Revenue is
+  flat within 1%; no line moved more than £3k"* is
   true and useful. Never manufacture drivers to fill the table.
 - **Say less than you were asked for when the source can't support more.** A coarse PDF
   against a fine workbook yields a thin report; that is the honest output.

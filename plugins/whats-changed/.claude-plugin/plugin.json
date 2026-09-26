@@ -1,7 +1,7 @@
 {
   "name": "whats-changed",
   "description": "Compare this period's numbers against last period's and say what moved, by how much, and which two or three lines explain the total. Reads workbooks, CSVs, PowerPoint decks, PDFs and Word docs. Ranks the drivers, splits rate from volume, and refuses to invent a cause the source doesn't state.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "Raghuram Sirigiri"
   },

@@ -34,6 +34,40 @@ being tiny — report it with the rate in words (`+250% on a £2k base`), never 
 percentage that implies significance. `Kiosks` moved more in percentage terms and is
 correctly excluded: 0.1% of the total is not a driver of anything.
 
+### When the total is flat
+
+The absolute gate is a share of the total's movement, so it shrinks with it. When the total
+barely moves, 5% of almost nothing is a bar that ordinary noise clears — and a line that
+drifted £2k in a flat month would lead the report as a driver.
+
+**So: if the total moved by less than 1% of its prior value, the absolute gate changes.** A
+line is then reportable on the absolute gate only if its change is **≥ 1% of the prior
+total** — big enough that it alone would have moved the total by 1%. The relative gate is
+unchanged. Decide which mode applies **before** testing any line, and say which in the
+trace.
+
+**Worked example.** Prior total £2,500k, current £2,492k: −£8k, −0.3%. Flat mode; the bar is
+£25k.
+
+| Line | Prior | Current | Change | Normal bar (5% × 8 = 0.4) | Flat bar (25) | Reportable |
+| --- | --- | --- | --- | --- | --- | --- |
+| Payroll | 1,610 | 1,604 | −6 | clears | fails | **no** |
+| Premises | 240 | 241 | +1 | clears | fails | **no** |
+| Freight | 310 | 344 | +34 | clears | clears | **yes** |
+| Fuel | 190 | 157 | −33 | clears | clears | **yes** |
+| all other movements (6 rows) | 150 | 146 | −4 | — | fails | no |
+
+Rows sum: −6 +1 +34 −33 −4 = −8 ✓.
+
+Payroll and Premises are noise and the report says so. Freight and Fuel are real movements
+that happened to cancel — exactly what a flat headline would otherwise hide.
+
+- **Nothing clears in flat mode** → the one-line flat answer (§5), naming the largest movement.
+- **Something clears** → a normal report under a flat headline: *"Total costs are flat
+  (−£8k, −0.3%), but Freight (+£34k) and Fuel (−£33k) moved in opposite directions."* In flat
+  mode, replace the `% of total move` column with `% of prior total` — shares of a near-zero
+  movement run into the thousands of percent and mean nothing.
+
 ## 2. `all other movements`
 
 Every row failing both gates is aggregated into **one** row at the foot of the drivers
@@ -146,7 +180,9 @@ finding, and never extend it to a line it wasn't written about.
 - **A number appears only in prose** ("closed just under £1.8m") → quote the sentence; do
   not parse it into the table.
 - **Nothing clears a gate** → say so in one line and stop. *"Revenue is flat within 1%; no
-  line moved more than £3k."*
+  line moved more than £3k."* When the total moved less than 1%, test the lines against the
+  flat-mode bar in §1 first — the normal absolute gate always finds something in a flat
+  month.
 
 ## 6. Flags — a closed list of ten
 

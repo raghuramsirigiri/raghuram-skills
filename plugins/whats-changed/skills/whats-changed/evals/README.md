@@ -20,10 +20,9 @@ Added 2026-09-24 so every eval runs against a real file:
 
 - `ops-costs-2026-08.xlsx` / `-09.xlsx` (eval 2) — ten cost lines, September = August with
   ±0.5% jitter. Total −3.4 on 1,284.4 (−0.26%); largest line Salaries −4.1.
-  **Known spec gap:** the absolute gate is 5% of the *total* change, so on a near-zero total
-  Salaries (121% of the move) clears it. Read literally, `materiality.md` yields a driver
-  here; the eval expects the flat one-liner. Until the gate gets a floor for a flat total,
-  expect this eval to fail — it is testing the spec, not only the skill.
+  The 5%-of-total-move gate used to let Salaries (121% of the move) through; since
+  2026-09-24 a total moving < 1% switches the absolute gate to 1% of the prior total (12.8
+  here), so nothing clears and the answer is the flat one-liner naming Salaries −4.1.
 - `regional-sales-aug-sep-2026.xlsx` (eval 6) — one sheet, `Aug` / `Sep` / typed `Variance`.
   Two stale variances: East says +4.8 (arithmetic +1.8), West says −9.7 (arithmetic −15.7).
   The Variance column is typed throughout, so no hardcoded-cell flag applies; its `SUM` total
