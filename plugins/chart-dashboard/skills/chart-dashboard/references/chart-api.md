@@ -570,7 +570,9 @@ Charts.reportTable('container', {
 Not an engine — a compositor. One shared title/subtitle, the width split into up
 to four panels per line, each handed to whichever factory you name. Use it when
 a bar and a donut are **one** exhibit with one headline, not two panels in the
-dashboard grid.
+dashboard grid. When to reach for it (small multiples, a before/after pair, two
+cuts that prove one claim) is in `chart-selection.md` § When several charts are
+one exhibit.
 
 ```js
 Charts.panels('chart', {
@@ -590,7 +592,7 @@ Charts.panels('chart', {
 });
 ```
 
-- **Panels**: `charts: [...]` (alias `panels:`). Each entry is an ordinary chart config plus `type` — any factory on the namespace (`line`, `column`, `bar`, `barList`, `barInsightTable`, `waffle`, `donut`, `pie`, `scatter`, `bubble`, `packedBubble`, `geofacet`) — and an optional per-panel `height`. Everything else passes through untouched, so a panel is configured exactly as it would be standalone, keeping its own title, legend and tooltip.
+- **Panels**: `charts: [...]` (alias `panels:`). Each entry is an ordinary chart config plus `type` — the name of any factory on the namespace (`line`, `column`, `dumbbell`, `histogram`, `radar`, `heatmap`, `waffle`, `donut` and the rest; `column` when omitted; an unknown name draws a notice in that panel) — and an optional per-panel `height`. Tables (`table`, `reportTable`) and a nested `panels` are exhibits in their own right and belong in the grid, not inside a panel. Everything else passes through untouched, so a panel is configured exactly as it would be standalone, keeping its own title, legend and tooltip.
 - **Columns**: `columns` (default: the number of charts, capped at **4** — past four a panel is too narrow to read). Extra charts wrap onto further rows, so a 2×2 is just `columns: 2`.
 - **Separators**: hairlines between panels, on by default; `separators: false` turns them off.
 - **Heading**: the group title is a size up from a panel's own title (`titleSize`, `subtitleSize` override).

@@ -277,7 +277,10 @@ slide deck.
 
 ## Rules that keep output good
 
-- One idea per panel. A panel whose title needs "and" is two panels.
+- One idea per panel. A panel whose title needs "and" to join two separate
+  claims is two panels. When the "and" joins two halves of one claim that only
+  the pair can prove, it is one exhibit: `Charts.panels` under one title
+  (`chart-selection.md` § When several charts are one exhibit).
 - Lead with the finding that matters most: if one trend is the reason the page
   exists, give it the wide top-left cell (`w8 h2`). If nothing dominates — three
   equally important measures, say — don't manufacture a hero; equal panels are

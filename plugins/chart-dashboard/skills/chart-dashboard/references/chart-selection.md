@@ -8,6 +8,7 @@ Which chart the data allows, and which one shows the finding.
 - [First: what is one item of this data?](#first-what-is-one-item-of-this-data)
 - [Choosing between the three bar treatments](#choosing-between-the-three-bar-treatments)
 - [Choosing among the specialist charts](#choosing-among-the-specialist-charts)
+- [When several charts are one exhibit](#when-several-charts-are-one-exhibit)
 - [Anti-patterns](#anti-patterns)
 - [Emphasis](#emphasis)
   - [The three heuristics](#the-three-heuristics)
@@ -233,6 +234,34 @@ title.
   if you would sort the rows or columns to make it readable, the order is doing
   no work — it is a table.
 
+## When several charts are one exhibit
+
+`Charts.panels` puts two to four charts under one title. That title is a claim
+none of the charts proves alone. Use it for:
+
+- **Small multiples.** The same measure, on the same kind of chart, split by
+  segment, region or product: *"Only the West kept growing after the price
+  change"* over four regional lines. Every panel must use the same scale. Set
+  `yAxis.min`/`max` identically on each one, or they will fit themselves and
+  read as equal. This is also the alternative to a filter when the comparison
+  *is* the finding (`controls.md`).
+- **A before/after or plan/actual pair** where each side needs its own chart
+  type, or has too many categories for a dumbbell.
+- **Two cuts of one claim.** *"Enterprise is 70% of ARR and all of the growth"*
+  becomes a donut of the share beside a column of the growth. Split into two
+  grid cells, the second one's title would only repeat the first's.
+- **A profile past three radars.** Small radars in panels, one per profile.
+
+Don't use it for charts that each stand on their own: those go in separate grid
+cells, each with its own title. Nor is it a way to fit more on the page. SKILL.md's rule that
+*"a panel whose title needs 'and' is two panels"* is about separate claims. An
+"and" that joins two halves of **one** claim, which only the pair can prove, is
+what `panels` is for.
+
+The test: take the group title away. If each chart's own title still says
+everything, they are separate cells. If the reader loses the point, they are
+one exhibit.
+
 ## Anti-patterns
 
 - **A line over named categories** — browsers, regions, departments, SKUs.
@@ -251,7 +280,10 @@ title.
 - Dual axes. Split into two panels instead (`Charts.panels` keeps them under
   one headline).
 - `Charts.panels` as a second grid. It groups charts that are one exhibit; a
-  panel that stands on its own belongs in the dashboard grid, not nested.
+  panel that stands on its own belongs in the dashboard grid, not nested (see
+  § When several charts are one exhibit for when it *is* the right call).
+- Small multiples on independent scales — each panel fits itself, and a region
+  half the size of another draws bars of the same height.
 - A waffle for anything that isn't a share of a whole — negatives are clamped
   to zero, and comparing two waffles is worse than comparing two bars.
 - Truncated y-axis on a column chart (bar length must encode the value).

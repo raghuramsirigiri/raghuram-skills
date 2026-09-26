@@ -30,7 +30,7 @@ panel plan from step 1 and answer three questions in order:
 3. **What does the reader need second** — the breakdown of the hero, its driver,
    or a different measure entirely?
 
-The answer to (1) picks an opening; (2) and (3) size it. Below are seven
+The answer to (1) picks an opening; (2) and (3) size it. Below are eleven
 openings that fall out of common shapes. They are worked examples of the
 derivation, **not a menu to pick from at random and not a set to cycle
 through** — if your data's shape isn't here, build the row that fits it.
@@ -45,6 +45,9 @@ through** — if your data's shape isn't here, build the row that fits it.
 | Distribution or spread is the point | `w6` histogram/box + `w6` scatter; the shape and the relationship together |
 | Geography leads | `w8` geofacet + `w4 h2` ranked list of the same measure |
 | A few big findings, long tail of detail | one `w12` statement panel, then `w4`s — decreasing weight down the page |
+| A scorecard or review: many metrics, each with a trend, a target or a note | `reportTable` (or `barInsightTable` when each row is one number and a sentence) in a `bento flow` row **first**. The charts that explain the misses come after it |
+| A matrix the reader will look up: regions × metrics, line items × periods | `table` in a flow row, with `highlight:'scale'` only on the columns whose pattern matters. Add a chart above it only for the one pattern worth stating as a title |
+| A finding, plus the figures behind it | the chart(s) that state the finding first, then a `table` in a flow row closing the page, where the reader goes to check a number |
 
 Two rules constrain whatever you build:
 
@@ -100,8 +103,9 @@ row height (340px, or 696px with `.h2`) gives them one, so the engine stretches
 each row by a capped amount and leaves the rest as a blank band under the last
 row. Picking `h2` because "a table needs room" is the reflex that causes it.
 
-- Put them in a **separate content-sized row**, after (or between) the fixed
-  grids:
+- Put them in a **separate content-sized row**, before, after or between the
+  fixed grids. A flow row can open the page when the table *is* the finding,
+  as with a scorecard:
   ```html
   <div class="bento flow">
     <div class="cell w8"><div class="chart" id="c6"></div></div>
