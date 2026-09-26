@@ -44,6 +44,13 @@ Marcus's "you own the invite" / "Happily" can reasonably be read *either* as par
 This is a genuine gray area and it's in the fixture deliberately — what fails is silently
 dropping the ownership altogether, so that D4 lists no one as responsible for acting on it.
 
+Sarah's *"Send it to me directly, I'll fold it into the pack"* is a real commitment the key
+originally missed: a named person, an action, no date. Runs may list it (Sarah → fold the
+revised cost model into the board pack → not stated) **with** a *Needs chasing* line for the
+missing date, or leave it out as incidental to C1. **Both pass.** Added 2026-09-25 after 3 of
+6 clean runs reported it — the transcript supports it; the key didn't. Commitment count is
+therefore 3–5, and flags move with it: one line per flagged row, as always.
+
 ## Near-misses — expect 0 of these in the output
 
 | # | Line | Why it must be excluded |
