@@ -21,10 +21,12 @@ comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-note
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
-**Last synced** from `svg-charts` commit `81a9833` (2026-09-23, `charts-lib`
-1.0.0): packed bubbles honour a point's own `color`, formerly change 1 here.
-Before it, `c8588bd`: `centerText` takes a bare string, formerly change 2.
-Before that, `185de6f`: heatmap and calendarHeatmap, chart handles with
+**Last synced** from `svg-charts` commit `c196b94` (2026-09-27, `charts-lib`
+1.0.0): column and bar labels and tooltips keep a negative value's sign
+(dropped only under `tooltip.absoluteX`), formerly change 3 here. Before it,
+`81a9833`: packed bubbles honour a point's own `color`, formerly change 1.
+Before that, `c8588bd`: `centerText` takes a bare string, formerly change 2.
+And before that, `185de6f`: heatmap and calendarHeatmap, chart handles with
 `update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation.
 See *Syncing the copy* at the bottom for how, and what to check afterwards.
 

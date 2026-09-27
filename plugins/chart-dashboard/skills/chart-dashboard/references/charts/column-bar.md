@@ -7,8 +7,13 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
 - **Stacking**: `plotOptions.column.stacking: 'normal' | 'percent'`
 - **Padding**: `pointPadding`, `groupPadding`
 - **3D effect**: `chart: { options3d: { enabled: true, depth: 40 } }`
-- **Negative values**: bars flip below zero baseline; `negativeColor` overrides bar color for negatives
-- **Population pyramid**: horizontal bar + a series with all-negative values + `tooltip.absoluteX:true`
+- **Negative values**: bars flip below zero baseline; `negativeColor` overrides bar color for negatives.
+  Data labels and tooltips show the value with its sign (`-2.5`), and so does
+  `{y}` in `dataLabels.format`.
+- **Population pyramid**: horizontal bar + a series with all-negative values + `tooltip.absoluteX:true`.
+  The flag drops the sign from the value-axis ticks (horizontal bar), data
+  labels and tooltips, so the mirrored side reads as positive counts. Without
+  it, that side is shown signed.
 - **Data labels**: **on by default** — above the bar (column) or at the right
   end (bar), with automatic contrast text color. In a **stacked** chart they
   move inside each segment, since above a segment is where the next one sits,
