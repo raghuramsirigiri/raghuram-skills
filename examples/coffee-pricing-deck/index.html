@@ -225,10 +225,21 @@
   .l-split .fig { height:78%; }
   .l-split.flip .fig { order:2; }
 
-  /* Media-led — the chart argues, a narrow column annotates. */
-  .l-media { display:grid; grid-template-columns:1.85fr 1fr; gap:40px; }
+  /* Media-led — the chart is the larger half, the reading column beside it. */
+  .l-media { display:grid; grid-template-columns:1.6fr 1fr; gap:40px; }
   .l-media.flip .fig { order:2; }
   .l-media .words { align-self:start; padding-top:4px; }
+
+  /* The reading column beside a chart (l-split, l-media) holds as much as the
+     claim needs: a heading, one or two paragraphs, and a bulleted list when
+     the reading is several parallel points. */
+  .words .body + .body { margin-top:12px; }
+  .pts { margin:16px 0 0; padding:0; list-style:none; font-size:16px;
+    line-height:1.5; color:var(--muted); }
+  .pts li { position:relative; padding-left:20px; margin-top:8px; }
+  .pts li::before { content:''; position:absolute; left:2px; top:.62em;
+    width:6px; height:6px; border-radius:50%; background:var(--ink); }
+  .pts li b { color:var(--ink); font-weight:700; }
 
   /* Full-bleed figure — one chart across the whole slide, claim above, reading
      below. The right layout when the shape of the data is the argument and
@@ -416,11 +427,12 @@
       <div class="part">What a price change would do <span class="num">Part 2</span></div>
       <div class="row">The quarter in four numbers <span class="num">08</span></div>
       <div class="row">Two increases, modelled <span class="num">09</span></div>
-      <div class="row">Who leaves, and when <span class="num">10</span></div>
-      <div class="row">What subscribers told us <span class="num">11</span></div>
+      <div class="row">Every plan, before and after <span class="num">10</span></div>
+      <div class="row">Who leaves, and when <span class="num">11</span></div>
+      <div class="row">What subscribers told us <span class="num">12</span></div>
       <div class="part">The ask <span class="num">Part 3</span></div>
-      <div class="row">Sequencing across the quarter <span class="num">13</span></div>
-      <div class="row">What we need decided this week <span class="num">14</span></div>
+      <div class="row">Sequencing across the quarter <span class="num">14</span></div>
+      <div class="row">What we need decided this week <span class="num">15</span></div>
     </div>
   </section></div>
 
@@ -440,6 +452,13 @@
       <p class="body">The price we pay per pound has moved in one direction since
         the 2024 harvest, and the forward book is set through August. Nothing in
         the sourcing plan brings it back down this year.</p>
+      <p class="body">It is also the biggest single reason contribution per box
+        fell: $1.30 of the $1.84 drop, and the only cost line still rising.</p>
+      <ul class="pts">
+        <li><b>$3.18 → $4.48</b> per pound, Mar 2024 to Dec 2025</li>
+        <li>Up in every one of the last eight quarters</li>
+        <li>Forward book fixed through August 2026</li>
+      </ul>
     </div>
   </section></div>
 
@@ -463,6 +482,11 @@
         box is up 1.4%, all of it mix — people choosing larger bags, not paying
         more for the same one.</p>
       <p class="body">We have grown into a thinner margin rather than out of it.</p>
+      <ul class="pts">
+        <li><b>36,000 → 48,200</b> active subscribers</li>
+        <li>Revenue per box indexed at <b>101.4</b> against 100</li>
+        <li>Plan price unchanged since 2023</li>
+      </ul>
     </div>
   </section></div>
 
@@ -499,7 +523,13 @@
     </div>
   </section></div>
 
-  <!-- 10 · Media-led: who leaves -->
+  <!-- 10 · Table: every plan, before and after -->
+  <div class="page"><section class="slide l-table" data-title="By plan">
+    <h2>A $2 increase restores contribution on every plan</h2>
+    <figure class="fig auto"><div class="chart" id="c-plans"></div></figure>
+  </section></div>
+
+  <!-- 11 · Media-led: who leaves -->
   <div class="page"><section class="slide l-media" data-title="Who leaves">
     <figure class="fig">
       <div class="chart" id="c-churn"></div>
@@ -509,10 +539,17 @@
       <p class="body">Modelled churn uplift in the three months after an increase,
         by tenure. Subscribers past their first year barely move; the exposure is
         concentrated in accounts under six months old.</p>
+      <p class="body">That is where the six weeks of notice and the sourcing
+        note have to do their work.</p>
+      <ul class="pts">
+        <li><b>0–3 months</b> — 5.8% → 8.4%, the largest rise</li>
+        <li><b>3–6 months</b> — 4.1% → 5.6%</li>
+        <li><b>A year or more</b> — up 0.3 points or less</li>
+      </ul>
     </div>
   </section></div>
 
-  <!-- 11 · Quote -->
+  <!-- 12 · Quote -->
   <div class="page"><section class="slide l-quote" data-title="Verbatim">
     <div class="mark">&ldquo;</div>
     <div>
@@ -522,13 +559,13 @@
     </div>
   </section></div>
 
-  <!-- 12 · Section divider -->
+  <!-- 13 · Section divider -->
   <div class="page"><section class="slide l-section dark" data-title="Part 3">
     <div class="no">03</div>
     <h2>The ask</h2>
   </section></div>
 
-  <!-- 13 · Timeline -->
+  <!-- 14 · Timeline -->
   <div class="page"><section class="slide l-timeline" data-title="Sequencing">
     <h2>Sequencing across the quarter</h2>
     <div class="tl">
@@ -543,14 +580,14 @@
     </div>
   </section></div>
 
-  <!-- 14 · Stat pair -->
+  <!-- 15 · Stat pair -->
   <div class="page"><section class="slide l-stat dark" data-title="Impact">
     <div class="f"><b>$4.12</b><span>contribution per box today</span></div>
     <div class="arrow micro"><hr>+$2.00 in March</div>
     <div class="f"><b>$5.87</b><span>contribution per box by Q3, after modelled churn</span></div>
   </section></div>
 
-  <!-- 15 · Closing statement -->
+  <!-- 16 · Closing statement -->
   <div class="page"><section class="slide l-statement dark" data-title="The ask">
     <p class="say">We are asking to raise the monthly plan by $2.00 in March &mdash;
       <em>and to decide it this week, so notice lands before the renewal run.</em></p>
@@ -15570,6 +15607,43 @@ Charts.column('c-opt-b', {
   yAxis: { max: 7 },
   plotOptions: { series: { dataLabels: { enabled: true } } },
   series: [{ name: 'Dollars', data: [4.12, 4.88, 5.02, 5.79] }]
+});
+
+/* Per plan, the shape and the figures in one exhibit: each row's contribution
+   trend as a line, today against after +$2 as bars, then the numbers. Colour
+   encodes one thing — today muted, after the increase a hue — and the trend
+   line is set to ink so it cannot pass for either. */
+const beforeAfter = (today, after) => ({ series: [
+  { name: 'Today',     data: [today], color: T.muted },
+  { name: 'After +$2', data: [after], color: T.colors[1] } ] });
+const trend = data => ({ series: [{ data: data, color: T.colors[0] }] });
+Charts.reportTable('c-plans', {
+  title: 'Contribution per box by plan',
+  subtitle: 'Quarterly contribution, Mar 2024 to Dec 2025 · today against Q3 2026 after +$2, net of modelled churn · dollars',
+  plotOptions: { reportTable: { rowHeight: 84 } },
+  columns: [
+    { key: 'trend', kind: 'chart', name: 'Last eight quarters', width: 260,
+      // Eight labels in an 84px cell collide; the shape is the point here and
+      // the kpi cells carry the figures.
+      chart: { type: 'line', xAxis: { categories: ['Mar 2024','Jun 2024','Sep 2024',
+        'Dec 2024','Mar 2025','Jun 2025','Sep 2025','Dec 2025'] },
+        plotOptions: { series: { dataLabels: { enabled: false } } } } },
+    { key: 'box', kind: 'chart', name: 'Per box', width: 240,
+      chart: { type: 'bar', plotOptions: { series: { dataLabels: { enabled: true } } } } },
+    { key: 'subs', kind: 'kpi', name: 'Subscribers' },
+    { key: 'gain', kind: 'kpi', name: 'Change per box', prefix: '$', decimals: 2,
+      colorBySign: true }
+  ],
+  rows: [
+    { name: 'Small bag', trend: trend([4.95, 4.80, 4.55, 4.30, 3.95, 3.60, 3.35, 3.10]),
+      box: beforeAfter(3.10, 4.80), subs: 9600,  gain: { value: 1.70, note: 'thinnest today' } },
+    { name: 'Standard',  trend: trend([5.90, 5.75, 5.45, 5.15, 4.80, 4.50, 4.25, 4.05]),
+      box: beforeAfter(4.05, 5.80), subs: 24100, gain: { value: 1.75, note: 'half of all boxes' } },
+    { name: 'Large bag', trend: trend([6.70, 6.55, 6.25, 5.95, 5.60, 5.30, 5.05, 4.85]),
+      box: beforeAfter(4.85, 6.60), subs: 11300, gain: 1.75 },
+    { name: 'Office',    trend: trend([7.05, 6.90, 6.60, 6.30, 5.95, 5.65, 5.40, 5.20]),
+      box: beforeAfter(5.20, 6.95), subs: 3200,  gain: 1.75 }
+  ]
 });
 
 /* The gap between two states per cohort: the dumbbell draws the uplift itself. */
