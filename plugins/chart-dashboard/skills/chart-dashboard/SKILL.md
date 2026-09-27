@@ -141,15 +141,29 @@ slide deck.
 
 5. **Choose a chart per panel** using `references/chart-selection.md` (start at
    § First: what is one item of this data?, not at the big table), then write
-   the config against `references/chart-api.md` (the full charts-lib API: every
-   factory, option, and theme token). Read that file before writing chart code —
-   don't guess option names.
+   the config against the API — don't guess option names. The API is split so
+   you read only what the page uses:
+   - `references/chart-api.md` — the core: the factory list, options shared by
+     every chart, sizing, title wrapping, interactions. Always read it.
+   - `references/charts/<type>.md` — one short file per engine (the table in
+     `chart-api.md` maps each factory to its file). Read the files for the
+     chart types in your plan, and no others.
+   - `references/charts/lifecycle.md` only when the page redraws charts (a
+     control, a resize handler); `references/charts/theme-tokens.md` only when
+     you recolour or name a theme token.
 
    For a single fact about one engine — what it refuses, whether it self-sizes,
-   how many grid tracks it wants, its minimum readable size — read
-   `assets/charts-lib/charts.manifest.json` instead of the whole API file. It is
-   the same index the library carries as `Charts.meta`, kept in step with the
-   code by the build, and it also holds the shared `plotBox` and `grid` rules.
+   how many grid tracks it wants, its minimum readable size — read its entry in
+   `assets/charts-lib/charts.manifest.json` rather than prose. It is the same
+   index the library carries as `Charts.meta`, kept in step with the code by the
+   build, and it also holds the shared `plotBox` and `grid` rules.
+
+   Don't read `assets/charts-lib/charts.js` (14,000 lines) to learn an option —
+   the references cover every one. Open it only to confirm a behaviour the
+   references don't describe, and then search it for the option name rather
+   than reading it whole. The finished pages in `examples/` are the same kind of
+   last resort: each inlines the whole library, so read them by searching for
+   the one pattern you need.
 
    **Check the chart's input contract first** (`chart-selection.md` § Input
    contract). Each engine accepts a particular kind of x and y, and a mismatch

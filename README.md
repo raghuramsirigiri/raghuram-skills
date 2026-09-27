@@ -331,7 +331,7 @@ half, though the type scale and spacing are best left alone.
 The default is a cream-and-ink print theme. In practice you don't write this
 yourself — ask for "a dark dashboard" or "use our brand colors, #FF6B35 primary"
 and Claude sets the tokens. The full list is in
-[`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md).
+[`references/charts/theme-tokens.md`](plugins/chart-dashboard/skills/chart-dashboard/references/charts/theme-tokens.md).
 
 Two bundled scripts build that block for you, both running the same OKLCH recipe —
 paper, a greyscale ink ramp, a seven-step series ramp, and separate `accent` /
@@ -466,7 +466,8 @@ plugins/chart-dashboard/skills/chart-dashboard/
 ├── tests/chart-convert.test.js     # every offered switch passes the library's validator
 ├── evals/evals.json                # deck-structure reproducibility prompts
 ├── references/
-│   ├── chart-api.md                # full library API — every factory and option
+│   ├── chart-api.md                # core library API — factories, shared options, sizing
+│   ├── charts/                     # one file per chart engine, plus lifecycle and theme tokens
 │   ├── chart-selection.md          # data shape → chart type, emphasis, anti-patterns
 │   ├── layout.md                   # picking the format; deriving the grid or the slide sequence
 │   ├── annotation.md               # callouts, plot bands, forecast vs. measured notation
@@ -505,7 +506,7 @@ needed.
   the numbers change.
 - **Options nesting.** Donut and pie options (`centerText`, `valueSuffix`,
   `variableRadius`, `startAngle`/`endAngle`, `showPercentages`) are read from
-  `plotOptions.pie`, not the top level. Documented in `references/chart-api.md`;
+  `plotOptions.pie`, not the top level. Documented in `references/charts/donut-pie.md`;
   the skill gets it right.
 
 ## Maintainer

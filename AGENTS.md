@@ -24,7 +24,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 1. Read [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md) and
    follow its workflow.
 2. Read these before writing chart code — do not guess option names:
-   - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — every factory and option
+   - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
    - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
    - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — deriving the grid from the findings; spans and page structure
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
