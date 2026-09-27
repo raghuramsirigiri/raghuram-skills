@@ -513,16 +513,11 @@
   <!-- 12 · Table -->
   <div class="page"><section class="slide l-table" data-title="Detail">
     <h2>Two segments carry the change</h2>
-    <table class="data">
-      <thead><tr><th>Segment</th><th class="n">Accounts</th>
-        <th class="n">Activation</th><th class="n">Change</th></tr></thead>
-      <tbody>
-        <tr class="mark"><td>Self-serve</td><td class="n">6,210</td><td class="n">68%</td><td class="n">+31 pts</td></tr>
-        <tr class="mark"><td>Small team</td><td class="n">3,940</td><td class="n">62%</td><td class="n">+24 pts</td></tr>
-        <tr><td>Mid-market</td><td class="n">1,680</td><td class="n">44%</td><td class="n">+3 pts</td></tr>
-        <tr><td>Enterprise</td><td class="n">650</td><td class="n">39%</td><td class="n">−1 pt</td></tr>
-      </tbody>
-    </table>
+    <!-- Figures the audience reads across a row go in Charts.table, not a
+         hand-built <table>: it formats, aligns and colours the numbers from
+         the data, and follows a brand recolour. Keep table.data for text-only
+         grids. .fig.auto lets the card wrap the rows. -->
+    <figure class="fig auto"><div class="chart" id="c-table"></div></figure>
   </section></div>
 
   <!-- 13 · Matrix -->
@@ -780,6 +775,24 @@ Charts.donut('c-o2', { title: 'Share of new accounts',
   plotOptions: { pie: { valueSuffix: '%' } },
   series: [{ name: 'Share', data: [
     { name: 'Self-serve', y: 55 }, { name: 'Team', y: 30 }, { name: 'Other', y: 15 } ] }] });
+
+/* A table is the right exhibit when the audience reads several figures per
+   row. Colour one column, the one the h2 is about: a scale on the change
+   makes the two segments that carry it the darkest cells. */
+Charts.table('c-table', {
+  title: 'Activation by segment',
+  columns: [
+    { key: 'accounts',   name: 'Accounts' },
+    { key: 'activation', name: 'Activation', suffix: '%' },
+    { key: 'change',     name: 'Change', suffix: ' pts', showSign: true, highlight: 'scale' }
+  ],
+  rows: [
+    { name: 'Self-serve', accounts: 6210, activation: 68, change: 31 },
+    { name: 'Small team', accounts: 3940, activation: 62, change: 24 },
+    { name: 'Mid-market', accounts: 1680, activation: 44, change: 3 },
+    { name: 'Enterprise', accounts: 650,  activation: 39, change: -1 }
+  ]
+});
 
 Charts.column('c-o3', { title: 'Support tickets per 100 accounts',
   legend: { enabled: false },

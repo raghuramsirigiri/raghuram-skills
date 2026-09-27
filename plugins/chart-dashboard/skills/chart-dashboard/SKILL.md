@@ -13,8 +13,18 @@ slide deck.
 ## Workflow
 
 1. **Extract the data.** Pull every number, category, and time series out of the
-   user's input into a short plan: for each planned panel note *title, chart
-   type, categories, series*. If the user gave a topic with no numbers, say
+   user's input into a short plan: for each planned panel note *title, data
+   shape, chart type, and the data it takes*. The data shape says what one item
+   carries: one number, a number per period, several measures, a number plus a
+   note, a trend plus a figure, a flow, or raw values. Write it down *before*
+   the chart type. If you don't, rows that carry several things get forced into
+   categories plus one series, and every one of them becomes a column chart. If
+   the user pasted a table with three or more numeric columns, wrote a note
+   against each row, or said *scorecard*, *QBR*, *P&L*, *KPI review* or *vs
+   target*, consider `table`, `barInsightTable` and `reportTable` first
+   (`chart-selection.md` § First: what is one item of this data?).
+
+   If the user gave a topic with no numbers, say
    plainly that figures are illustrative and label them as such on the page.
    Never silently invent numbers that read as real measurements.
 
@@ -107,6 +117,21 @@ slide deck.
    right only when a single trend really does lead and composition really is the
    second thing the reader needs.
 
+   The same check applies to the whole page. **If every panel is a line,
+   column, bar or donut, go back to your plan's data-shape notes.** Does any
+   finding have its own sentence per row (`barInsightTable`)? Is there a set of
+   figures the reader will look up rather than compare by eye (`table`), or a
+   metric list with a trend and a target on each row (`reportTable`)? Are two
+   or three charts really one exhibit (`panels`)? A page made only of the
+   standard types can be correct, but you should reach it on purpose, not by
+   default.
+
+   The same check applies in reverse. **A table that reprints what a chart
+   already draws is padding.** One trend, one ranking, or a comparison the
+   charts already make does not need a table of the same numbers underneath.
+   Add a table only when its rows carry measures no panel shows, or the reader
+   is there to look up their own row.
+
    One sizing rule the grid doesn't enforce for you: **tables size themselves.**
    `table`, `reportTable` and `barInsightTable` are as tall as their rows, so
    they go in a content-sized `<div class="bento flow">` row, never in a fixed
@@ -114,7 +139,8 @@ slide deck.
    `reportTable` chart column a `width` that fits its data, and choose the
    smallest span that holds the table (`layout.md` § Tables size themselves).
 
-5. **Choose a chart per panel** using `references/chart-selection.md`, then write
+5. **Choose a chart per panel** using `references/chart-selection.md` (start at
+   § First: what is one item of this data?, not at the big table), then write
    the config against `references/chart-api.md` (the full charts-lib API: every
    factory, option, and theme token). Read that file before writing chart code —
    don't guess option names.
@@ -257,7 +283,10 @@ slide deck.
 
 ## Rules that keep output good
 
-- One idea per panel. A panel whose title needs "and" is two panels.
+- One idea per panel. A panel whose title needs "and" to join two separate
+  claims is two panels. When the "and" joins two halves of one claim that only
+  the pair can prove, it is one exhibit: `Charts.panels` under one title
+  (`chart-selection.md` § When several charts are one exhibit).
 - Lead with the finding that matters most: if one trend is the reason the page
   exists, give it the wide top-left cell (`w8 h2`). If nothing dominates — three
   equally important measures, say — don't manufacture a hero; equal panels are

@@ -47,6 +47,9 @@
 
   .fig { margin:28px 0 32px; }
   .fig .chart { width:100%; height:380px; background:var(--paper); }
+  /* Tables (table, reportTable, barInsightTable) are as tall as their rows:
+     give them no height, or they stretch and leave a blank band. */
+  .fig .chart.flow { height:auto; }
   .fig figcaption { font-size:12px; color:var(--soft); margin-top:8px; padding-top:8px;
     border-top:1px dotted var(--rule); line-height:1.5; }
   .fig figcaption b { color:var(--ink); margin-right:6px; }
@@ -113,6 +116,21 @@
     </figure>
   </div>
 
+  <h2><span class="n">03</span>Third section</h2>
+  <p>When each row carries its own finding, give the row its own sentence.
+     This is not a bar chart with a caption per bar.</p>
+
+  <!-- A table-shaped figure. Pick by what each row carries (chart-selection.md
+       § First: what is one item of this data?):
+         a bar + a sentence + a number        → Charts.barInsightTable (below)
+         several measures to look up          → Charts.table
+         a trend + a figure + a note per row  → Charts.reportTable
+       The .flow class lets it size itself to its rows. -->
+  <figure class="fig">
+    <div class="chart flow" id="f4"></div>
+    <figcaption><b>Fig. 4</b> Interpretation.</figcaption>
+  </figure>
+
   <footer class="notes">
     <b>Sources.</b> … <b>Method.</b> … <b>Note.</b> Flag any illustrative figures here.
   </footer>
@@ -170,6 +188,18 @@ Charts.donut('f3', {
     { name: 'A', y: 46 }, { name: 'B', y: 28 },
     { name: 'C', y: 17 }, { name: 'Other', y: 9 }
   ]}]
+});
+
+Charts.barInsightTable('f4', {
+  title: 'Each line item, with what moved it',
+  subtitle: 'Units · change vs prior period',
+  xAxis: { categories: ['Line item A', 'Line item B', 'Line item C'] },
+  series: [{ name: 'Value', data: [46, 28, 17] }],
+  rows: [
+    { insight: 'Headline for this row', description: 'One sentence on why it moved.', stat: '+12%' },
+    { insight: 'Headline for this row', description: 'One sentence on why it moved.', stat: '−4%' },
+    { insight: 'Headline for this row', description: 'One sentence on why it moved.', stat: '+1%' }
+  ]
 });
 </script>
 </body>

@@ -125,13 +125,23 @@
          · a funnel / sequence  → w12 first
          · nothing dominates    → w4 · w4 · w4 of equal weight
          · geography leads      → w8 geofacet + w4 h2 ranked list
+         · a scorecard / review → reportTable in a "bento flow" row first
+         · rows carry several measures, a note, or a trend each
+                                → a table (table / barInsightTable /
+                                  reportTable) in a "bento flow" row
+         · one measure, several segments, and the comparison is the point
+                                → Charts.panels small multiples, one scale
        Full derivation, and the rule that a hero must be earned, in
        references/layout.md § Compose the grid from the findings.
        Spans: w4 w6 w8 w12 (columns), h2 (double height). One chart div per
        cell, ids in sync with the script below. Replace this whole block. -->
   <div class="bento">
-    <div class="cell w6"><div class="chart" id="c1"></div></div>
-    <div class="cell w6"><div class="chart" id="c2"></div></div>
+    <div class="cell w12"><div class="chart" id="c1"></div></div>
+  </div>
+  <!-- Tables size themselves to their rows, so they go in a content-sized
+       "bento flow" row, never a fixed cell or an h2. -->
+  <div class="bento flow">
+    <div class="cell w12"><div class="chart" id="c2"></div></div>
   </div>
 
   <footer class="notes">
@@ -173,14 +183,17 @@ Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2
      · a filtered dataset with one render() path (first paint included)
      · per-point emphasis so the picture agrees with the title
      · an action title recomputed from the filtered rows
+     · a chart that states the finding, then a table holding the figures —
+       pick the table type by what each row carries (chart-selection.md
+       § First: what is one item of this data?)
    Delete the filter bar above and the listener below if the page is static;
    keep the emphasis and the data labels either way. Chart options for every
    type are in references/chart-api.md — don't guess option names. */
 const DATA = [
-  { name: 'Cat A', region: 'North', value: 980 },
-  { name: 'Cat B', region: 'South', value: 740 },
-  { name: 'Cat C', region: 'North', value: 610 },
-  { name: 'Cat D', region: 'South', value: 420 }
+  { name: 'Cat A', region: 'North', value: 980, prior: 870 },
+  { name: 'Cat B', region: 'South', value: 740, prior: 760 },
+  { name: 'Cat C', region: 'North', value: 610, prior: 540 },
+  { name: 'Cat D', region: 'South', value: 420, prior: 450 }
 ];
 
 function readState() {
@@ -230,12 +243,23 @@ function render(state) {
     })) }]
   });
 
-  draw(Charts.column, 'c2', {
-    title: 'Volume by category and region',
-    subtitle: `Units · ${scope}`,
-    xAxis: { categories: rows.map(r => r.name) },
-    legend: { enabled: false },
-    series: [{ name: 'Units', data: rows.map(r => r.value) }]
+  // The lookup: several measures per row, so a table rather than grouped
+  // columns. Colour only the column whose pattern matters (sign of change).
+  draw(Charts.table, 'c2', {
+    title: 'Volume by category',
+    subtitle: `Units · this period vs prior · ${scope}`,
+    columns: [
+      { key: 'region', name: 'Region' },
+      { key: 'value',  name: 'Units' },
+      { key: 'prior',  name: 'Prior' },
+      { key: 'change', name: 'Change', suffix: '%', decimals: 1, showSign: true,
+        highlight: 'sign' }
+    ],
+    rows: rows.map(r => ({
+      name: r.name, region: r.region, value: r.value, prior: r.prior,
+      // Round in the data: the accessible table publishes the raw value.
+      change: r.prior ? Math.round(1000 * (r.value - r.prior) / r.prior) / 10 : null
+    }))
   });
 }
 

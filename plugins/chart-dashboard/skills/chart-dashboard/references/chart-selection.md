@@ -5,8 +5,10 @@ Which chart the data allows, and which one shows the finding.
 **Contents**
 
 - [Input contract — check this before the table](#input-contract--check-this-before-the-table)
+- [First: what is one item of this data?](#first-what-is-one-item-of-this-data)
 - [Choosing between the three bar treatments](#choosing-between-the-three-bar-treatments)
 - [Choosing among the specialist charts](#choosing-among-the-specialist-charts)
+- [When several charts are one exhibit](#when-several-charts-are-one-exhibit)
 - [Anti-patterns](#anti-patterns)
 - [Emphasis](#emphasis)
   - [The three heuristics](#the-three-heuristics)
@@ -43,6 +45,7 @@ table to see them against each other.
 | `sankey` | `[from, to, weight]` links, one series, forward-only | Weights ≥ 0 | Refusal panel on negative weights, self-links, loops |
 | `heatmap` | `[x, y, value]` cells, one series; **both** `xAxis.categories` and `yAxis.categories`, and both directions **ordered** (hour × weekday, cohort × week) | Numbers; `null` or an absent cell means no data and is drawn as an empty outline | Refusal panel on a second series, two values for one cell, a non-number, or a cell naming a row/column not in the categories; `validate()` warns on ≤24 cells or two unordered axes |
 | `calendarHeatmap` | `[date, value]`, **one value per day**, one series, ≤4 years | Numbers; `null` = no data | Refusal panel on weekly-or-coarser values (use `line`), two values for one day, or a span over four years |
+| `table` | `rows: [{ name, group?, <key>: value }]` against `columns: [{ key, … }]` | Numbers or text per cell; `null` for a blank | Refusal panel on a duplicate or missing `key`, column groups on some columns but not all, a row group split in two, or colour scales shared across units |
 | `reportTable` | Rows, with typed columns (`text`/`insight`/`kpi`/`chart`) | Per column kind | Refusal panel on a missing `kind`, a `number` kind, or an exhibit-type chart column |
 | `waffle` | Named categories, each a share of the *same* whole | Non-negative numbers ≤ `total` | Negatives silently clamped to zero |
 | `donut`, `pie` | Named categories that sum to a whole | Positive numbers only | Negative/non-finite wedges dropped, console warning, footnote |
@@ -99,6 +102,35 @@ unrelated percentages, has no honest drawing — the library drops or clamps the
 offending values rather than lying about them, which means your panel quietly
 loses data. Use a column chart with `negativeColor` instead.
 
+## First: what is one item of this data?
+
+Answer this before reading the table below. The table is ordered roughly by
+how common each chart is, so scanning it top-down finds a line or a column
+first. That is the right answer only when each item really is one number.
+
+| One item (one row, one category) carries… | Start from | Not |
+|:--|:--|:--|
+| One number, or one number per period | `column` / `bar` / `line` — the table below | — |
+| Several measures the reader will **look up** — a P&L, a headcount-and-budget grid, regions × metrics | `Charts.table` (colour by `sign` or `scale` where the pattern matters) | Grouped columns with 4+ series, or one column chart per measure |
+| One number **and its own sentence** — a KPI review, a note per line item | `Charts.barInsightTable` | A bar chart plus a caption explaining each bar |
+| A **trend** or mini-chart, plus a figure or a note — a scorecard, a QBR, metrics vs target | `Charts.reportTable` | A line panel per metric, or a line over metric names |
+| A flow, a bridge, or a distribution | `sankey` / `waterfall` / `histogram` — the table below | — |
+| Several charts that make **one** point under one headline — small multiples, a before/after pair | `Charts.panels` | Separate grid cells whose titles repeat the same claim |
+
+Some signs that you are in rows two to four: the user pasted a table with three
+or more numeric columns; they wrote a comment against each row; or they said
+*scorecard*, *QBR*, *P&L*, *KPI review*, *vs target* or *by line item*.
+
+**A table is not a free extra under a chart.** Add one beside a chart only
+when at least one of these holds:
+- the rows carry measures that no panel on the page shows;
+- the reader's job is to look up their own row (a regional manager, a finance
+  reviewer).
+
+A table that reprints the numbers a chart already draws is padding, just as a
+padded panel is. One series over time, a single ranking, or a comparison
+already on the page does not need a table of the same values under it.
+
 | The data is… | Use | charts-lib call |
 |:--|:--|:--|
 | A value over time, 1–4 series | line / spline | `Charts.line` (`type:'spline'` per series to smooth) — x must be dates or numbers, never names |
@@ -109,6 +141,7 @@ loses data. Use a column chart with `negativeColor` instead.
 | Comparison across ≤12 named categories | columns | `Charts.column` — the answer whenever x is a *name*, whether or not the numbers look like a trend |
 | Comparison across >12 categories, or long labels | horizontal bars | `Charts.bar` |
 | A ranked list, or very long category names | bar list (no axis) | `Charts.barList` + `sort:'desc'` |
+| Exact values the reader will look up, several measures per row | table | `Charts.table` — `highlight:'sign'` or `'scale'` on the columns whose pattern is the finding |
 | Each row needs a comparison **and** a sentence **and** a headline number | bar insight table | `Charts.barInsightTable` |
 | The **gap between two states** per category — before/after, plan/actual, ours/theirs | dumbbell | `Charts.dumbbell` — exactly two series; `sort:'delta'` ranks by the size of the change |
 | The **distribution** of a raw measurement — where values pile up, how long the tail is | histogram | `Charts.histogram` (or `histogramPercent` / `histogramCumulative`) — hand it the raw numbers, it bins them |
@@ -209,6 +242,34 @@ title.
   if you would sort the rows or columns to make it readable, the order is doing
   no work — it is a table.
 
+## When several charts are one exhibit
+
+`Charts.panels` puts two to four charts under one title. That title is a claim
+none of the charts proves alone. Use it for:
+
+- **Small multiples.** The same measure, on the same kind of chart, split by
+  segment, region or product: *"Only the West kept growing after the price
+  change"* over four regional lines. Every panel must use the same scale. Set
+  `yAxis.min`/`max` identically on each one, or they will fit themselves and
+  read as equal. This is also the alternative to a filter when the comparison
+  *is* the finding (`controls.md`).
+- **A before/after or plan/actual pair** where each side needs its own chart
+  type, or has too many categories for a dumbbell.
+- **Two cuts of one claim.** *"Enterprise is 70% of ARR and all of the growth"*
+  becomes a donut of the share beside a column of the growth. Split into two
+  grid cells, the second one's title would only repeat the first's.
+- **A profile past three radars.** Small radars in panels, one per profile.
+
+Don't use it for charts that each stand on their own: those go in separate grid
+cells, each with its own title. Nor is it a way to fit more on the page. SKILL.md's rule that
+*"a panel whose title needs 'and' is two panels"* is about separate claims. An
+"and" that joins two halves of **one** claim, which only the pair can prove, is
+what `panels` is for.
+
+The test: take the group title away. If each chart's own title still says
+everything, they are separate cells. If the reader loses the point, they are
+one exhibit.
+
 ## Anti-patterns
 
 - **A line over named categories** — browsers, regions, departments, SKUs.
@@ -227,7 +288,10 @@ title.
 - Dual axes. Split into two panels instead (`Charts.panels` keeps them under
   one headline).
 - `Charts.panels` as a second grid. It groups charts that are one exhibit; a
-  panel that stands on its own belongs in the dashboard grid, not nested.
+  panel that stands on its own belongs in the dashboard grid, not nested (see
+  § When several charts are one exhibit for when it *is* the right call).
+- Small multiples on independent scales — each panel fits itself, and a region
+  half the size of another draws bars of the same height.
 - A waffle for anything that isn't a share of a whole — negatives are clamped
   to zero, and comparing two waffles is worse than comparing two bars.
 - Truncated y-axis on a column chart (bar length must encode the value).
