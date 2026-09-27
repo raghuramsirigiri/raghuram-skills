@@ -161,24 +161,142 @@ const orderedCats = cats => {
   return false;
 };
 
-const badAxes = [];
-let lineCount = 0;
-for (const chunk of code.split('Charts.').slice(1)) {
-  if (!/^line\s*[(,]/.test(chunk)) continue;
-  lineCount++;
-  const id = (chunk.match(/^line\s*[(,]\s*'([^']+)'/) || [])[1] || '?';
-  const upToSeries = chunk.slice(0, chunk.indexOf('series:') + 1 || undefined);
-  const m = upToSeries.match(/categories:\s*\[([^\]]*)\]/);
-  if (!m) continue;                       // numeric or datetime x — nothing to check
-  const cats = m[1].split(',').map(c => c.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
-  if (!orderedCats(cats)) badAxes.push(id + ': ' + cats.slice(0, 4).join(', '));
+// A line is not only a Charts.line call. Charts.panels takes line panels in
+// its `charts:` (alias `panels:`) list, and a reportTable chart column with
+// `chart: { type: 'line' }` draws one line per row over the column's
+// categories — both render the same error panel, one level down. Configs are
+// read with a small literal parser rather than a regex, so a nested object
+// can be reached without guessing where it ends. Anything that isn't a plain
+// literal (a variable, a function call) comes back as UNKNOWN and is not checked.
+const UNKNOWN = Symbol('unknown');
+function parseLiteral(src, start) {
+  let i = start;
+  const ws = () => {
+    for (;;) {
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src.startsWith('//', i)) { while (i < src.length && src[i] !== '\n') i++; continue; }
+      return;
+    }
+  };
+  const str = () => {                     // returns the string, or UNKNOWN for `${…}`
+    const q = src[i++];
+    let out = '', dynamic = false;
+    while (i < src.length && src[i] !== q) {
+      if (src[i] === '\\') { out += src[i + 1]; i += 2; continue; }
+      if (q === '`' && src.startsWith('${', i)) { dynamic = true; i = skipBalanced(i + 1); continue; }
+      out += src[i++];
+    }
+    i++;
+    return dynamic ? UNKNOWN : out;
+  };
+  const skipBalanced = at => {            // src[at] is an opener; returns the index after its closer
+    const save = i;
+    let depth = 0, end = src.length;
+    for (i = at; i < src.length;) {
+      const ch = src[i];
+      if (ch === "'" || ch === '"' || ch === '`') { str(); continue; }
+      if (src.startsWith('//', i)) { ws(); continue; }
+      i++;
+      if ('{[('.includes(ch)) depth++;
+      else if ('}])'.includes(ch) && --depth === 0) { end = i; break; }
+    }
+    i = save;
+    return end;
+  };
+  const skipExpr = () => {                // an expression we don't evaluate: up to the next , } or ] at this depth
+    while (i < src.length && !',}]'.includes(src[i])) {
+      const ch = src[i];
+      if (ch === "'" || ch === '"' || ch === '`') str();
+      else if ('{[('.includes(ch)) i = skipBalanced(i);
+      else if (src.startsWith('//', i)) ws();
+      else i++;
+    }
+    return UNKNOWN;
+  };
+  const value = () => {
+    ws();
+    const ch = src[i];
+    let v;
+    if (ch === '{') {
+      i++; v = {};
+      for (ws(); i < src.length && src[i] !== '}'; ws()) {
+        if (src[i] === ',') { i++; continue; }
+        if (src.startsWith('...', i)) { i += 3; skipExpr(); continue; }
+        let key;
+        if (src[i] === "'" || src[i] === '"') key = str();
+        else { const m = /^[\w$]+/.exec(src.slice(i, i + 200)); if (!m) { skipExpr(); continue; } key = m[0]; i += key.length; }
+        ws();
+        if (src[i] === ':') { i++; v[key] = value(); }
+        else if (src[i] === '(') { i = skipBalanced(i); ws(); if (src[i] === '{') i = skipBalanced(i); v[key] = UNKNOWN; }
+        else v[key] = UNKNOWN;           // shorthand { data }
+      }
+      i++;
+    } else if (ch === '[') {
+      i++; v = [];
+      for (ws(); i < src.length && src[i] !== ']'; ws()) {
+        if (src[i] === ',') { i++; continue; }
+        v.push(value());
+      }
+      i++;
+    } else if (ch === "'" || ch === '"' || ch === '`') {
+      v = str();
+    } else {
+      const m = /^(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?|true|false|null)\b/i.exec(src.slice(i, i + 40));
+      if (!m) return skipExpr();
+      i += m[0].length;
+      v = JSON.parse(m[0].toLowerCase());
+    }
+    ws();
+    return ',}])'.includes(src[i]) || i >= src.length ? v : skipExpr();   // e.g. `[…].map(…)`
+  };
+  return value();
 }
-for (const c of specCharts) {
-  if (c.type !== 'line') continue;
-  lineCount++;
-  const cats = c.config.xAxis && Array.isArray(c.config.xAxis.categories) ? c.config.xAxis.categories.map(String) : null;
-  if (cats && !orderedCats(cats)) badAxes.push(c.id + ': ' + cats.slice(0, 4).join(', '));
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+const catsOf = cfg => {
+  const c = isObj(cfg) && isObj(cfg.xAxis) ? cfg.xAxis.categories : null;
+  return Array.isArray(c) && c.every(x => typeof x === 'string' || typeof x === 'number') ? c.map(String) : null;
+};
+// Every line a chart config will draw, as { label, cats } (cats null = nothing to check).
+function linesIn(type, cfg, id) {
+  if (type === 'line') return [{ label: id, cats: catsOf(cfg) }];
+  if (!isObj(cfg)) return [];
+  if (type === 'panels') {
+    const list = Array.isArray(cfg.charts) ? cfg.charts : Array.isArray(cfg.panels) ? cfg.panels : [];
+    return list.flatMap((p, k) => isObj(p) && p.type === 'line'
+      ? [{ label: id + ' › panel ' + (k + 1) + (typeof p.title === 'string' ? ' "' + p.title + '"' : ''), cats: catsOf(p) }]
+      : []);
+  }
+  if (type === 'reportTable') {
+    const cols = Array.isArray(cfg.columns) ? cfg.columns : [];
+    const rows = Array.isArray(cfg.rows) ? cfg.rows : [];
+    return cols.filter(c => isObj(c) && c.kind === 'chart' && isObj(c.chart) && c.chart.type === 'line')
+      .flatMap(c => {
+        const label = id + ' › column ' + (typeof c.key === 'string' ? c.key : '?');
+        const out = [{ label, cats: catsOf(c.chart) }];
+        // A row given as a full config can bring its own categories.
+        rows.forEach((r, k) => {
+          const cats = isObj(r) ? catsOf(r[c.key]) : null;
+          if (cats) out.push({ label: label + ' row ' + (typeof r.name === 'string' ? '"' + r.name + '"' : k + 1), cats, extra: true });
+        });
+        return out;
+      });
+  }
+  return [];
 }
+
+const found = [];
+// Both call shapes again: Charts.line('c1', {…}) and draw(Charts.line, 'c1', {…}).
+const LINE_CALL = /Charts\.(line|panels|reportTable)\s*[(,]\s*(?:'([^']*)'|"([^"]*)")\s*,\s*/g;
+for (const m of code.matchAll(LINE_CALL)) {
+  const at = m.index + m[0].length;
+  const id = m[2] || m[3];
+  const cfg = code[at] === '{' ? parseLiteral(code, at) : UNKNOWN;   // a variable config — count it, can't read it
+  found.push(...linesIn(m[1], cfg, id));
+}
+for (const c of specCharts) found.push(...linesIn(c.type, c.config, c.id));
+
+const badAxes = found.filter(l => l.cats && !orderedCats(l.cats)).map(l => l.label + ': ' + l.cats.slice(0, 4).join(', '));
+const lineCount = found.filter(l => !l.extra).length;
 if (!lineCount) ok('line x-axes ordered', 'no line charts on the page');
 else if (badAxes.length) {
   bad('line x-axes ordered',
