@@ -286,6 +286,45 @@ across a room, for about thirty seconds:
   separated only by lightness, which at projector distance reads as "some bars
   are darker" rather than as "these are the ones I mean".
 
+### The text beside a chart
+
+The reading column in `l-split` and `l-media` is not a caption slot. A single
+sentence beside a chart leaves a third of the slide empty and forces the
+presenter to say out loud what the slide should have said. Write as much as the
+claim needs to be believed, in this order, stopping when it is said:
+
+- the heading (`h2` in `l-split`, `h3` in `l-media`) — the claim;
+- one or two `.body` paragraphs — what the chart shows and why it follows;
+- a `<ul class="pts">` of parallel points — the figures, causes or caveats a
+  reader would otherwise have to dig out of the chart. `<b>` inside an item
+  sets its lead-in in ink.
+
+Stop at what fits above the footer at the slide's authored size. If the
+reading needs more than two paragraphs and five bullets, the slide is making
+two claims — split it rather than shrinking the type.
+
+**No decorative emphasis.** Headings take weight and size from the type scale
+and nothing else — no underline, no highlight bar. An underline under a heading
+reads as a link, and once it is on every slide it marks nothing. `l-steps`
+marks the leading step with `.on`, which inks its number; leave `.on` off when
+no step leads.
+
+### Tables on a slide
+
+A table slide earns its place when the audience reads several figures per row.
+When each row also has a *shape* — a trend over time, a before and after, a
+breakdown — use `Charts.reportTable`, not `Charts.table`: a `chart` column puts
+a small line or bar chart in every row, on a scale shared down the column, and
+`kpi` columns beside it state the figures the claim is about. The reader gets
+the shape and the number in one exhibit. Keep `Charts.table` for figures alone.
+
+For a report table on a 16:9 slide: four to six rows, `rowHeight` about 84 so
+the card clears the footer, and cell charts without axes. Name the bars with
+series rather than categories — two named series draw one legend above the
+table, where category labels in an 84px cell collapse into each other. Set a
+lone series' colour explicitly (`T.colors[0]` for ink); left unnamed it takes
+the next palette step, which can look like one of the legend's colours.
+
 ## All three
 
 - Colors come from `Charts.theme`, which is derived from `Charts.palette`. All
