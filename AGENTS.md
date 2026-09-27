@@ -44,7 +44,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 5. Stage the library beside your output while you build and verify it, then
    fold it in and ship one file:
    ```bash
-   node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html --stage   # verify against this
+   node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html --stage   # verify against this: run charts-lib/audit.js in the page (SKILL.md step 7)
    node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html           # inline, clean up, gate
    ```
 

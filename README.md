@@ -461,6 +461,7 @@ plugins/chart-dashboard/skills/chart-dashboard/
 ├── assets/charts-lib/              # the chart library (charts.js, theme.js, charts.css)
 ├── assets/page-runtime.js          # draws an editable page's charts; window.Page for the editor
 ├── assets/chart-convert.js         # switch a chart's type by converting its data
+├── assets/audit.js                 # layout audit run in the browser; JSON instead of screenshots
 ├── assets/page-editor.js           # the in-page editor: Edit page button, text in place, chart panel
 ├── assets/charts-lib/charts.manifest.json  # per-engine facts: data shape, refusals, sizing
 ├── tests/chart-convert.test.js     # every offered switch passes the library's validator
