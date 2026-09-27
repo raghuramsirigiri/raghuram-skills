@@ -197,6 +197,33 @@
         "copilot",
         "review"
       ]
+    },
+    {
+      "name": "chart-honesty",
+      "source": "./plugins/chart-honesty",
+      "description": "Check every chart in a PowerPoint deck, or charts described in chat, for the ways a chart misleads: wrong chart type, a truncated or dual axis, 3D, pie misuse, a title the data contradicts, missing units. Gives the fix for each. Every finding cites a setting or value from the file, and a picture of a chart is never estimated from pixels. Reviews charts that already exist; it doesn't pick or build a chart, and it never edits the deck.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "chart-review",
+        "chart-honesty",
+        "misleading-charts",
+        "truncated-axis",
+        "dual-axis",
+        "3d-charts",
+        "pie-charts",
+        "data-visualization",
+        "powerpoint",
+        "pptx",
+        "deck",
+        "presentation",
+        "board-pack",
+        "review",
+        "before-you-send"
+      ]
     }
   ]
 }
