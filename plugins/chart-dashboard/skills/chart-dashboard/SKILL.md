@@ -244,12 +244,19 @@ slide deck.
       ```bash
       node <skill-dir>/scripts/check-page.js index.html
       ```
-      It catches the four failures that do not throw and so survive a
+      It catches the failures that do not throw and so survive a
       confident-looking build: a panel whose chart was never wired (an empty
       box), a line over unordered categories (an error panel *inside* the
       chart), a page still pointing at `charts-lib/`, and anything else that
       reaches the network. Each one reads as a styling bug rather than the
-      missing wiring it is. Run it here without `--final` — the page is not
+      missing wiring it is. It also does the layout arithmetic a screenshot
+      would otherwise be taken for: a chart in a dashboard cell smaller than
+      its engine's minimum size (it names the `w`/`h` that fits), a title
+      too long for two lines at its cell width (the cut-off tail is usually
+      the finding), and donut options written at the top level, where the
+      engine ignores them. Fix these before opening a browser — each costs
+      one command, where finding the same thing there costs a screenshot and
+      a guess. Run it here without `--final` — the page is not
       inlined yet, and mid-build that is simply where you are.
    2. **The layout audit, in a browser.** Serve the page over a local HTTP
       server (not `file://`, so the scripts execute), open it at a desktop
