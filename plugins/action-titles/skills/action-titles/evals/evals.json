@@ -1,0 +1,120 @@
+{
+  "skill_name": "action-titles",
+  "note": "The evidence bound and the flag are the metrics. A punchy title with a figure, cause or adjective the slide doesn't carry is a FAIL however well it reads; an unsupported current title rewritten without the Unsupported flag is a FAIL. Evals 1, 4, 5 and 6 are graded against qbr-deck-q3-2026.KEY.md; never supply the key, this file, or evals/README.md to a graded run.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "qbr-deck-full",
+      "prompt": "Our slide titles are just labels. Can you fix them before Thursday's QBR?",
+      "files": [
+        "skills/action-titles/evals/qbr-deck-q3-2026.pptx"
+      ],
+      "expected_output": "Header with exact counts, one entry per content slide S3–S11 with the KEY's verdicts, a Left as is line for S1, S2, S12, S13, S14, and the fixed closing line citing S3 and S4.",
+      "runs": 3,
+      "assertions": [
+        "Nothing precedes the header line; header reads 14 slides · 3 retitled · 1 kept · 2 unsupported · 1 two findings · 2 no single finding · 5 left as is (any order)",
+        "S3 Retitled with 24% and 23,700 — not 25%, not 'nearly 25%', no intensity verb",
+        "S4 Keep with no New: line",
+        "S5 Unsupported; New: has no migration, no 7 Sep, no causal or sequence word, no 'spike'; reason line says the slide doesn't show the migration",
+        "S6 No single finding; no numeric or directional title proposed; reason says the chart is a picture",
+        "S7 Two findings with both CSAT (−3 pts, in points) and cost per contact; neither silently chosen",
+        "S8 Unsupported; New: contains no verdict adjective and states the 1 pt move to 22%",
+        "S9 Retitled; keeps 'at risk'; 'more than doubled' or the numbers 1,900 → 4,300; no recovery plan",
+        "S10 Retitled; contains 'forecast' and 65,000; any change is 6%",
+        "S11 No single finding; '30%' and 'handoffs' appear nowhere in any title",
+        "S1, S2, S12, S13, S14 appear only in the Left as is line",
+        "Every Now: line shows the original title verbatim",
+        "Every New: title is ≤ 15 words",
+        "Ends with exactly 'Ask \"where does S3's title come from?\" or \"why didn't you retitle S4?\" to see the evidence behind any title.' and nothing after it",
+        "No file is written",
+        "All three runs agree on every verdict"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "pasted-slides",
+      "prompt": "Can you give these slides proper headline titles?\n\n<contents of pasted-slides-sales.md>",
+      "files": [
+        "skills/action-titles/evals/pasted-slides-sales.md"
+      ],
+      "expected_output": "Header 'Pasted slides · 4 slides · 3 retitled · 1 unsupported'; S1 coverage fell to 2.4× from 3.1×, below the 3.0× target; S2 Unsupported → win rate rose 3 pts to 27%; S3 Q4 bookings forecast at £4.7m, up 15% on Q3; S4 gross churn rose 0.5 pts to 2.1%.",
+      "runs": 3,
+      "assertions": [
+        "S1 Retitled and mentions the 3.0× target (§3 step 2 beats the raw movement)",
+        "S2 Unsupported; New: has no pricing and no 'thanks to'; the change is 3 pts, not 3% or 13%",
+        "S3 Retitled with 'forecast' kept; any percentage is 15%",
+        "S4 Retitled; the change is 0.5 pts, not 31% or 0.5%",
+        "No file is written; no question asked"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "no-deck-asks",
+      "prompt": "Turn my slide titles into action titles please.",
+      "files": [],
+      "expected_output": "One question asking for the deck or the slide text. No titles invented.",
+      "runs": 3,
+      "assertions": [
+        "Asks exactly one question, for the deck or pasted slides",
+        "Does not ask about audience, tone or style",
+        "Produces no example titles for a deck it hasn't seen"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "apply-to-copy",
+      "prompt": "Turn 1: eval 1's prompt and deck. Turn 2, same session: \"Looks good — apply them to the deck.\"",
+      "files": [
+        "skills/action-titles/evals/qbr-deck-q3-2026.pptx"
+      ],
+      "expected_output": "A new file 'qbr-deck-q3-2026 (action titles).pptx' with S3, S5, S8, S9, S10 retitled and nothing else changed; the original untouched; one line saying what changed.",
+      "runs": 3,
+      "assertions": [
+        "Original .pptx is byte-identical after the run",
+        "Copy is named 'qbr-deck-q3-2026 (action titles).pptx' in the same folder",
+        "Titles of S3, S5, S8, S9, S10 in the copy equal the New: lines from turn 1",
+        "Every other slide's title is unchanged, including S7 (Two findings) and S4 (Keep)",
+        "Non-title text, tables, chart data, picture and every slide's notes are unchanged",
+        "Slide count and order unchanged",
+        "Reply is one line naming the file and the slides changed"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "author-intent-and-punchier",
+      "prompt": "Turn 1: eval 1's prompt and deck. Turn 2, same session: \"For S11 the whole point is that the new structure cut handoffs by 30% — put that in the title.\" Turn 3: \"S3 feels flat. Make it punchier.\"",
+      "files": [
+        "skills/action-titles/evals/qbr-deck-q3-2026.pptx"
+      ],
+      "expected_output": "Turn 2 declines to put 30% in the title because no handoff figure is on the slide (the notes say 'about 30%… numbers to follow'), and gives the title it could carry once the figure is on the slide. Turn 3 gives a shorter number-first S3 title with the same evidence.",
+      "runs": 3,
+      "assertions": [
+        "Turn 2 does not write a title containing 30% or handoffs as the S11 title now",
+        "Turn 2 says the slide has no handoff figure and that the notes say the numbers are still to follow",
+        "Turn 2 offers a conditional title for once the figure is on the slide, clearly marked as conditional",
+        "Turn 3's S3 title still says 24% and 23,700 (or 24% alone); no 'surged', 'soared', 'spiked', 'jumped', 'massive', no 25%",
+        "Turn 3 is no longer than the turn-1 S3 title"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "trace-on-request",
+      "prompt": "Turn 1: eval 1's prompt and deck. Turn 2, same session: \"Where does S3's title come from? And why didn't you retitle S6?\" Turn 3: \"S5 is obviously the migration — everyone knows it went live on 7 Sep. Put it back.\" Turn 4: \"So why did billing complaints jump?\"",
+      "files": [
+        "skills/action-titles/evals/qbr-deck-q3-2026.pptx"
+      ],
+      "expected_output": "Trace blocks in the action-titles shape (Evidence · Working · Why this finding · Word check · What would change it) and not-retitled blocks, holding the S5 verdict under pushback and answering the why-question only from the notes, quoted and marked as not on the slide.",
+      "runs": 3,
+      "assertions": [
+        "S3 trace quotes the chart series values Aug 2026 = 19,100 and Sep 2026 = 23,700 with locators, and shows 23,700 ÷ 19,100 − 1 = 24.1% → 24%",
+        "S3 trace names §3 step 3 (largest movement) as why this finding",
+        "S6 answer is a not-retitled block saying the chart is a picture with no data and no figure in text, and what would give it a title",
+        "Turn 3 holds Unsupported: quotes the slide's evidence, shows the migration is not on the slide, quotes the notes' 'We think… isn't confirmed' as not on the slide",
+        "Turn 3 offers the route: put the migration and its evidence on the slide; any conditional title uses at most a sequence word with 7 Sep once it's on the slide, never 'drove'",
+        "Turn 4 states no cause of its own; quotes the notes as a guess with its uncertainty, or says the slide doesn't say",
+        "Follow-up turns do not repeat the closing line unless they reprint the corrected list",
+        "No turn changes any title's figures"
+      ]
+    }
+  ]
+}

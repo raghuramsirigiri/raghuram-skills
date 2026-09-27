@@ -170,6 +170,33 @@
         "summarization",
         "productivity"
       ]
+    },
+    {
+      "name": "action-titles",
+      "source": "./plugins/action-titles",
+      "description": "Rewrite a deck's slide titles as the claim each slide proves — \"Orders rose 17% in March to 5,480\", not \"Orders\" — and flag every current title that claims more than its slide shows. Every number is on that slide; no cause, verdict or adjective the slide doesn't state. Reads .pptx or pasted slides; keeps the original title beside each suggestion; writes a retitled copy only when asked.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "action-titles",
+        "slide-titles",
+        "headlines",
+        "so-what",
+        "storyline",
+        "powerpoint",
+        "pptx",
+        "deck",
+        "presentation",
+        "qbr",
+        "board-pack",
+        "storytelling",
+        "executive-communication",
+        "copilot",
+        "review"
+      ]
     }
   ]
 }
