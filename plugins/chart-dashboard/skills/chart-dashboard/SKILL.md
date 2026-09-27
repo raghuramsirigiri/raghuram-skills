@@ -152,6 +152,17 @@ slide deck.
      control, a resize handler); `references/charts/theme-tokens.md` only when
      you recolour or name a theme token.
 
+   **Read them in one call, not one file per call.** Every tool call re-sends
+   the whole conversation so far, so ten small reads cost several times what
+   one combined read does. Once the plan names its chart types, fetch the core
+   and every chart file it needs together, along with any other reference this
+   step calls for:
+   ```bash
+   cd <skill-dir>/references && cat chart-api.md charts/line.md charts/table.md narrative.md
+   ```
+   The same goes for the earlier steps: read `chart-selection.md`,
+   `layout.md` and the template in one command rather than three.
+
    For a single fact about one engine — what it refuses, whether it self-sizes,
    how many grid tracks it wants, its minimum readable size — read its entry in
    `assets/charts-lib/charts.manifest.json` rather than prose. It is the same
