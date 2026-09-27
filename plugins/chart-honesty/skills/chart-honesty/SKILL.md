@@ -113,6 +113,8 @@ whole, and no commentary on its story or design.
 - **Line charts may start above zero.** The truncated-axis test is for bars, columns and
   areas. Flagging a line chart for it is a false alarm, and false alarms are how a review
   stops being read.
+- **Drawn against actual, and nothing else.** A distortion's size is the drawn ratio and the
+  actual difference. No further multiplier, and no guess at what the audience will conclude.
 - **Pushback alone moves nothing.** "It's deliberate", "it's house style" and "everyone knows
   the unit" don't change a test. The honest alternative is part of the answer.
 - **Review, don't rebuild.** Give the fix; don't edit the deck, redraw the chart, or propose a

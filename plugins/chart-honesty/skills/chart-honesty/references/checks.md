@@ -219,6 +219,11 @@ One line per finding, under its chart:
 - **What the file shows** uses the file's numbers and settings, not adjectives. *"The axis is
   set to start at 50; the tallest bar is drawn 1.9× the shortest for an 11% difference"*,
   never *"the axis is badly truncated"*.
+- **The size of a distortion has one form only:** the drawn ratio against the actual
+  difference, as §3 computes them (*"drawn 2.2× for an 8% difference"*). Never a number
+  derived from those two (*"overstates it 30-fold"*, *"about eight times"*), and never a
+  claim about what the audience will conclude (*"they'll think it doubled"*). This holds in
+  every reply, not just the review.
 - **The fix** is the test's fixed form above, filled in for this chart. One fix per finding.
 - No finding outside the seven: not colours, fonts, sorting, gridlines or chart junk. Those
   may be real, but they aren't this review.

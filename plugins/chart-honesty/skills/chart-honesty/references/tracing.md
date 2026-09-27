@@ -161,5 +161,7 @@ actually check the axis?"*.
 - **One chart per answer.** Traces and replies to pushback use the chart in question and its
   own slide and notes. Don't point to another slide's chart as a comparison or an argument
   (*"S5 shows its unit, so…"*), unless the user brings it up.
+- **Size a distortion only as drawn against actual** (`checks.md` §4), in prose as well as
+  in *Effect*. Pushback replies are where the temptation to dramatise it is strongest.
 - **Pushback alone moves nothing.** A finding clears when the file changes, or when the
   re-read shows the test didn't trip, never because the builder is sure.
