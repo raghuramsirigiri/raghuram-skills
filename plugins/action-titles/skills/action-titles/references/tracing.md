@@ -12,7 +12,7 @@ People who question a title are in one of three positions:
   title is flatter than their intent, or when their own title is flagged `Unsupported`.
 - **A reviewer — the manager, the finance partner, the person presenting it.** They check the
   figure before they say it out loud, and they ask *why* the number moved.
-- **The owner of a flagged slide.** *"Everyone knows it was the migration."*
+- **The owner of a flagged slide.** *"Everyone knows it was the courier switch."*
 
 All examples use invented names and figures.
 
@@ -105,11 +105,11 @@ shows it passes. For a structural slide, it names the §2 kind.
 | --- | --- |
 | **"Where does S3's title come from?"** / "Where's 17% from?" | The trace block. |
 | **"Why didn't you retitle S4?"** | The not-retitled block. If the slide *does* have a finding that passes §3–§5, the verdict was wrong: **retitle it** and say so first. |
-| **"That's not the point of this slide — it's about X."** | Check X against the slide. If the slide proves X, adopt it, show the word check, say so. If not, say exactly what's missing (*"the slide has no figure for handoffs"*), and give the title X would support **once that figure is on the slide**. Never write X now. |
-| **"It obviously was the migration — put it back."** (pushback on `Unsupported`) | Quote the old title and the slide's full evidence. Show the causal word has no source on the slide. If the notes carry the claim, quote them and say they aren't on the slide (and what they say about certainty). Hold the verdict. Offer the route: state the cause on the slide, with its evidence, and the title can carry it — at the certainty the slide states. |
+| **"That's not the point of this slide — it's about X."** | Check X against the slide. If the slide proves X, adopt it, show the word check, say so. If not, say exactly what's missing (*"the slide has no figure for repeat orders"*), and give the title X would support **once that figure is on the slide** — a conditional title that itself passes §5, ≤ 15 words included. Never write X now. |
+| **"It obviously was the courier switch — put it back."** (pushback on `Unsupported`) | Quote the old title and the slide's full evidence. Show the causal word has no source on the slide. If the notes carry the claim, quote them and say they aren't on the slide (and what they say about certainty). Hold the verdict. Offer the route: state the cause on the slide, with its evidence, and the title can carry it — at the certainty the slide states. Any conditional title offered passes §5, ≤ 15 words included. |
 | **"Doubled? It's not quite double."** / "Why 17% not 16%?" | *Working*: the exact ratio or change, the §5 range or rounding rule it falls in. If it's outside the range, **correct the title**. |
 | **"Make it punchier."** | Shorter and number-first, same evidence. Show what was cut. Refuse adjectives, intensity verbs and rounder numbers by naming the §5 rule — once, in a clause. |
-| **"Why did returns jump?"** / "What caused it?" | **Only what the slide states, quoted** — or *"The slide doesn't say why."* If the notes or the user's message offer a reason, quote it **as theirs**, with its own certainty (*"the notes say 'we think … not confirmed'"*). Never a cause of your own, however plausible. |
+| **"Why did returns jump?"** / "What caused it?" | **Only what the slide states, quoted** — or *"The slide doesn't say why."* If **that slide's** notes or the user's message offer a reason, quote it **as theirs**, with its own certainty (*"the notes say 'we think … not confirmed'"*). Don't search other slides for hints — plans, assumptions and recovery actions elsewhere are not causes. Never a cause of your own, however plausible. |
 | **"The figure's on slide 12, use it."** | Slides are evidence only for themselves (§1): a title that needs S12's figure fails when S3 is lifted into another deck. Offer to add the figure to S3 — then it can be titled. |
 | **"Can you do the subtitles too?"** | Out of scope: one line saying titles only, and that the moved-out qualifier (units, date range, source) is what a subtitle usually carries. Not a trace. |
 | **"Show all of it"** | One block per content slide in deck order — trace block for each *New:* line, not-retitled block for the rest — then the `Left as is` line with each slide's §2 kind. |
@@ -124,6 +124,10 @@ shows it passes. For a structural slide, it names the §2 kind.
   with the closing line.
 - **Quote, never paraphrase, in *Evidence*.** The author will compare it to their slide.
 - **Notes are evidence of what someone thinks, never of what the slide shows.** Quote them
-  only in *What would change it*, and in answers to *why*.
+  only in *What would change it*, and in answers to *why* — and only the traced slide's own
+  notes.
+- **One slide per trace.** Evidence, working and *What would change it* come from the traced
+  slide and its notes. Other slides' figures don't appear — not even as an aside — unless the
+  user brings them up.
 - **Pushback alone moves nothing.** A verdict changes when the slide changes, or when the
   re-read finds evidence the first pass missed — never because the author is sure.

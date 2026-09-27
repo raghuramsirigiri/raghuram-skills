@@ -5,8 +5,8 @@ description: Rewrite a deck's slide titles as the claim each slide proves — "O
 
 # Action titles
 
-A slide titled "Ticket Volume" makes the audience find the point. A slide titled "Tickets
-rose 12% in May to 8,900" hands it to them, and the chart underneath proves it. That is an
+A slide titled "Site Visits" makes the audience find the point. A slide titled "Site
+visits rose 12% in May to 8,900" hands it to them, and the chart underneath proves it. That is an
 **action title**, and a deck of them can be read from the titles alone.
 
 **The product is the evidence bound.** Anyone can write a punchy headline. Writing one that
@@ -85,6 +85,9 @@ Ask "where does S3's title come from?" or "why didn't you retitle S4?" to see th
   original stays visible), *New:* for every verdict except `Keep` and `No single finding`.
 - **A reason line only** for `Unsupported` (what the slide lacks), `Two findings` (split or
   pick) and `No single finding` (what would give it one). `Retitled` and `Keep` get none.
+  **Reason lines are written from the slide alone** — say what *kind* of evidence is missing
+  (*"a measured figure"*, *"the cause, stated on the slide"*), never a topic, figure or theory
+  taken from the speaker notes. The notes surface only when the user asks (see Tracing).
 - **Left as is** — one line listing structural slides by handle and kind. Omitted if none.
 - **The closing line** ends the output, nothing after it. It cites the **first** slide with a
   *New:* line and the **first** content slide without one (`Keep`, `No single finding`). If
@@ -126,7 +129,8 @@ Pasted slides get no file — the titles are already copyable.
   the honest answer, not a failure.
 - **User intent doesn't override evidence.** If the author says the point is X and the slide
   doesn't show X, say what's missing and what the title could say once it's added — don't
-  write X.
+  write X. A conditional title offered this way obeys every wording rule, the 15-word limit
+  included.
 - **"Punchier" means shorter and number-first** — never an adjective, an intensity verb or a
   rounder number.
 
