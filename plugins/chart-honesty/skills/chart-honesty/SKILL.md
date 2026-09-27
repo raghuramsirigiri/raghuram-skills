@@ -86,7 +86,9 @@ Ask "why is S2 flagged?" or "why is S3 clean?" to see the chart settings behind 
   *doughnut*, *combo (column + line)*, *3D column*…).
 - **`Fix`** gets one line per finding, in test order: `- <Test> — <what the file shows>.
   Fix: <fix>.` **`Clean`** gets no lines. **`Not checkable`** gets the one line above.
-- **Described charts** add `Not stated: <inputs>` under a chart when a test couldn't run.
+- **Described charts** add one bullet as the **last line of that chart's entry** when a test
+  couldn't run: `- Not stated: <input> (<test> not run).` For example, `- Not stated: axis
+  range (Truncated axis not run).` A chart whose tests all ran gets none.
 - Slides without a chart get no entry.
 - **The closing line** ends the output, and nothing comes after it. It cites the **first**
   `Fix` chart and the **first** `Clean` chart. If there's no `Clean` chart, the second half

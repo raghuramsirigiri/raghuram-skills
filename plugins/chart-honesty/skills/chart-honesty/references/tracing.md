@@ -53,7 +53,7 @@ reprints the list.
 > S2 · chart · value axis title "Parcels (thousands)"
 
 **Test**
-- Test 4, *Set*: column chart (length-encoded), min 50 > 0, every value ≥ 0 → trips.
+- Test 4 · Truncated axis, Set: column chart (length-encoded), min 50 > 0, every value ≥ 0 → trips.
 
 **Effect**
 - Drawn ratio: (63 − 50) ÷ (57 − 50) = 13 ÷ 7 = 1.86 → **1.9×**.
@@ -68,11 +68,17 @@ reprints the list.
 - A minimum of 0, or a line chart. Nothing else on the slide changes the test.
 ```
 
+Use these five headings **exactly as written**, in this order. The builder learns them once
+and reads every trace the same way. Name the test in *Test* as `Test <n> · <name>, <sub-rule>`
+(e.g. `Test 4 · Truncated axis, Set`), with the names from `checks.md` §3, not paraphrases.
+
 - **Read from the file**: every setting and value the test used, **as stored**, each with its
   locator. Say *set* or *auto* for every axis bound. Quote titles and text exactly.
 - **Test**: the test number and sub-rule (`W1`, `P2`, *Set*, *Auto*…), and the condition it
   met.
-- **Effect**: the arithmetic from §3 of `checks.md`, with the rounding named. For a title
+- **Effect**: the arithmetic from §3 of `checks.md`, with the rounding named. For a truncated
+  axis that is the drawn ratio and the actual difference, and nothing derived from them: no
+  *"30 times bigger"* or *"exaggerated by 2.5×"*. For a title
   contradiction: the claim, the values it's checked against, the result. For units: every
   place a unit could be, and what each holds.
 - **Fix**: the fixed fix, with where to click.
@@ -152,7 +158,8 @@ actually check the axis?"*.
 - **Notes are evidence of what someone wrote, never of what's on the chart.** Quote them
   only in a fix, in *What would clear it*, and in answers to *why*, and only the traced
   slide's own notes.
-- **One chart per trace.** Other slides' charts and figures don't appear unless the user
-  brings them up.
+- **One chart per answer.** Traces and replies to pushback use the chart in question and its
+  own slide and notes. Don't point to another slide's chart as a comparison or an argument
+  (*"S5 shows its unit, so…"*), unless the user brings it up.
 - **Pushback alone moves nothing.** A finding clears when the file changes, or when the
   re-read shows the test didn't trip, never because the builder is sure.
