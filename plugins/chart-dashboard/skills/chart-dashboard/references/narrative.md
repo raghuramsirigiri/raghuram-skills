@@ -47,7 +47,7 @@ per line, two lines). Past roughly 90 characters in a narrow cell the tail is
 ellipsized, which loses exactly the part carrying the finding. If a title won't
 fit that budget, the usual fix is that it's carrying two findings — split the
 panel — or that the qualifying detail belongs in the subtitle. Exact per-cell
-limits are in `chart-api.md`.
+limits are in `chart-api.md` § Titles and subtitles wrap.
 
 ## Where a finding goes: action title, insight column, or soft surface card
 

@@ -54,7 +54,8 @@ Then, in this repo:
    proposed one has landed upstream (then delete its section).
 2. Read upstream's `git log` and the diff of its agent docs
    (`.agents/skills/charts-lib/`) and `README.md` since the last sync, and
-   carry anything a page author needs into `references/chart-api.md`,
+   carry anything a page author needs into `references/chart-api.md` (shared
+   options) or `references/charts/<type>.md` (one engine),
    `references/chart-selection.md` and the manifest-driven parts of the
    editor (`assets/chart-convert.js`, `assets/page-editor.js`). A new chart
    type needs a selection entry, not just an API entry.

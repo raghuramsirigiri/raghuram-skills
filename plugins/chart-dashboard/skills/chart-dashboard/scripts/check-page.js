@@ -22,9 +22,14 @@
  * works as a gate in a script. Every check names the panel it is unhappy
  * about — the point is to tell you where to look, not to score the page.
  *
- * This does not replace opening the page. It cannot see overlap, a chart that
- * overflows its cell, or a colour that vanishes on the canvas. Where browser
- * tooling exists, use it as well; where it doesn't, this is the floor.
+ * It also sizes what it can from the markup alone: a chart in a dashboard
+ * cell smaller than its engine's minimum, a title too long for two lines at
+ * that width, donut options written where the engine never reads them — the
+ * problems a screenshot would otherwise be taken to find.
+ *
+ * This does not replace opening the page. It cannot see labels colliding,
+ * a deck slide outgrowing its frame, or a colour that vanishes on the canvas.
+ * Where browser tooling exists, use it as well; where it doesn't, this is the floor.
  *
  * No dependencies. Works on any Node 14+.
  */
@@ -303,6 +308,131 @@ else if (badAxes.length) {
     badAxes.join(' | ') + '  → use a column chart, or give each category its own series over a date axis');
 } else ok('line x-axes ordered', lineCount + ' line chart(s), all ordered');
 
+// ── 2b. charts fit their cells, and their titles fit the charts ──────
+// The failures a screenshot usually finds, caught from the markup instead:
+// a chart in a cell narrower or shorter than its engine can read at (the
+// manifest's minWidth/minHeight — below it labels crowd and collide), and a
+// title too long for two lines at that width, whose tail — usually the part
+// carrying the finding — is cut to "…". Both are arithmetic on the grid the
+// page declares, so they cost nothing to check before a browser opens.
+//
+// Only charts in a dashboard `.bento` cell are sized here: that grid is
+// declared in CSS (12 tracks, a fixed row height), so a cell's pixel size
+// follows from its w*/h* classes. Deck and report figures are laid out by
+// their own layouts and left to the browser audit. Sizes are at the page's
+// full width; the narrow-screen reflow is not what this is checking.
+let manifest = null;
+try { manifest = require('../assets/charts-lib/charts.manifest.json'); } catch (e) { /* skill moved; skip */ }
+const cssNum = (sel, prop) => {
+  const m = new RegExp('(?:^|[\\s}])' + sel.replace('.', '\\.') + '\\s*\\{[^}]*?\\b' + prop + '\\s*:\\s*(\\d+(?:\\.\\d+)?)px').exec(code);
+  return m ? +m[1] : null;
+};
+const grid = {
+  width: cssNum('.page', 'max-width'), pad: cssNum('.page', 'padding'),
+  row: cssNum('.bento', 'grid-auto-rows'), gap: cssNum('.bento', 'gap'), cellPad: cssNum('.cell', 'padding')
+};
+// A cell's inner size: w tracks and the gaps between them, less its padding.
+const cellPx = w => Math.round(w * (grid.width - 2 * grid.pad - 11 * grid.gap) / 12 + (w - 1) * grid.gap - 2 * grid.cellPad);
+const cellPy = h => Math.round(h * grid.row + (h - 1) * grid.gap - 2 * grid.cellPad);
+// Every chart the page draws, with the config literal when it is one.
+const ANY_CALL = /Charts\.(\w+)\s*[(,]\s*(?:'([^']*)'|"([^"]*)")\s*,\s*/g;
+const charts = [...code.matchAll(ANY_CALL)]
+  .filter(m => manifest && manifest.charts[m[1]])
+  .map(m => {
+    const at = m.index + m[0].length;
+    return { type: m[1], id: m[2] || m[3], cfg: code[at] === '{' ? parseLiteral(code, at) : UNKNOWN };
+  })
+  .concat(specCharts.filter(c => manifest && manifest.charts[c.type]).map(c => ({ type: c.type, id: c.id, cfg: c.config })));
+
+// The cell a chart sits in: nearest class="cell …" before its id, inside a
+// .bento grid and not inside a deck slide.
+function cellOf(id) {
+  const at = code.indexOf('id="' + id + '"');
+  if (at < 0) return null;
+  const cellAt = code.lastIndexOf('class="cell', at);
+  const gridAt = code.lastIndexOf('class="bento', at);
+  if (cellAt < 0 || gridAt < 0 || cellAt < gridAt || code.lastIndexOf('<section', at) > cellAt) return null;
+  const cls = (/^class="([^"]*)"/.exec(code.slice(cellAt)) || [])[1] || '';
+  const w = +((/\bw(\d+)\b/.exec(cls) || [])[1] || 0);
+  if (!w) return null;
+  const h = +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1);
+  const flow = /^class="bento[^"]*\bflow\b/.test(code.slice(gridAt, gridAt + 60));
+  return { cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow, px: cellPx(w), py: flow ? null : cellPy(h) };
+}
+
+const sized = Object.values(grid).every(v => v != null) && manifest
+  ? charts.map(c => Object.assign({}, c, { cell: cellOf(c.id) })).filter(c => c.cell) : [];
+if (!sized.length) {
+  ok('charts fit their cells', 'no charts in a dashboard grid to size');
+  ok('titles fit their charts', 'no charts in a dashboard grid to size');
+} else {
+  const tooSmall = [];
+  for (const c of sized) {
+    const m = manifest.charts[c.type];
+    const needW = m.minWidth, needH = m.minHeight;
+    // A self-sizing chart grows to its content when it has no height, so only
+    // a fixed-height row can squeeze it.
+    const shortBy = c.cell.py != null && needH ? needH - c.cell.py : 0;
+    if (needW && c.cell.px < needW - 8) {
+      const fits = [4, 6, 8, 12].find(w => w > c.cell.w && cellPx(w) >= needW - 8);
+      tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.px + 'px wide, needs ' + needW +
+        (fits ? '  → w' + fits + ' or wider' : ''));
+    } else if (shortBy > 8) {
+      tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.py + 'px tall, needs ' + needH +
+        '  → h2, or a .bento.flow row');
+    }
+  }
+  if (tooSmall.length) bad('charts fit their cells', tooSmall.join(' | '));
+  else ok('charts fit their cells', sized.length + ' chart(s) in grid cells, all at or above their minimum size');
+
+  // Characters per title line scale with width: ~10.5px per character at the
+  // title size (references/chart-api.md § Titles and subtitles wrap), two
+  // lines before the ellipsis.
+  const cut = sized.filter(c => isObj(c.cfg) && typeof c.cfg.title === 'string')
+    .map(c => ({ c, max: Math.floor(c.cell.px / 10.5) * 2 }))
+    .filter(x => x.c.cfg.title.length > x.max)
+    .map(x => x.c.id + ' in ' + x.c.cell.cls + ': ' + x.c.cfg.title.length + ' chars, ~' + x.max + ' fit');
+  if (cut.length) {
+    bad('titles fit their charts', cut.join(' | ') +
+      '  → shorten it, move the qualifier to the subtitle, or widen the cell — the cut-off tail is usually the finding');
+  } else ok('titles fit their charts', 'every chart title fits in two lines at its cell width');
+
+  // Advice, not a failure: the manifest's own thresholds for when a chart
+  // wants more width than a half-page cell gives it.
+  const crowded = sized.filter(c => c.cell.w < 8 && isObj(c.cfg)).map(c => {
+    const cats = catsOf(c.cfg);
+    if (c.type === 'line' && cats && cats.length >= 12) return c.id + ': line over ' + cats.length + ' points';
+    if (c.type === 'waterfall' && Array.isArray(c.cfg.data) && c.cfg.data.length >= 8) return c.id + ': waterfall with ' + c.cfg.data.length + ' steps';
+    if (c.type === 'heatmap' && cats && cats.length >= 25) return c.id + ': heatmap with ' + cats.length + ' columns';
+    return null;
+  }).filter(Boolean);
+  if (crowded.length) note('crowded axes', crowded.join(' | ') + ' in a cell narrower than w8 — consider w8 or w12 (manifest gridSpanWhen)');
+}
+
+// ── 2c. donut and pie options are where the engine reads them ────────
+// Donut options live under plotOptions.pie. At the top level they are
+// silently ignored: the chart draws, without its centre total, suffix or
+// semicircle, and nothing says why. (startColor/endColor are the exception —
+// they are read from the top level.)
+const PIE_ONLY = ['centerText', 'valueSuffix', 'variableRadius', 'startAngle', 'endAngle',
+  'showPercentages', 'innerSize', 'minPointSize', 'droppedNote'];
+const pies = [];
+for (const c of charts) {
+  const cfgs = c.type === 'donut' || c.type === 'pie' ? [{ label: c.id, cfg: c.cfg }]
+    : c.type === 'panels' && isObj(c.cfg)
+      ? (Array.isArray(c.cfg.charts) ? c.cfg.charts : Array.isArray(c.cfg.panels) ? c.cfg.panels : [])
+          .map((p, k) => ({ label: c.id + ' › panel ' + (k + 1), cfg: p })).filter(p => isObj(p.cfg) && /^(donut|pie)$/.test(p.cfg.type))
+      : [];
+  for (const { label, cfg } of cfgs) {
+    if (!isObj(cfg)) continue;
+    const misplaced = PIE_ONLY.filter(k => Object.prototype.hasOwnProperty.call(cfg, k));
+    if (misplaced.length) pies.push(label + ': ' + misplaced.join(', '));
+  }
+}
+if (pies.length) {
+  bad('donut options nested', pies.join(' | ') + ' at the top level, where they are ignored  → move under plotOptions: { pie: { … } }');
+} else ok('donut options nested', 'no donut option at the top level');
+
 // ── 3. the page is standalone ────────────────────────────────────────
 // A page that still points at charts-lib/ works perfectly in the folder it was
 // built in and nowhere else. It is the failure that travels.
@@ -461,5 +591,5 @@ for (const r of results) {
 const failed = results.filter(r => !r.passed).length;
 console.log(failed
   ? '\n' + failed + ' check(s) failed. Fix these before opening the page — they are the ones that look like styling bugs.\n'
-  : '\nAll static checks pass. Now look at the rendered page: this cannot see overlap, overflow, or a colour that vanishes.\n');
+  : '\nAll static checks pass. Now look at the rendered page: this cannot see colliding labels, slide overflow, or a colour that vanishes.\n');
 process.exit(failed ? 1 : 0);

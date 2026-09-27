@@ -141,15 +141,40 @@ slide deck.
 
 5. **Choose a chart per panel** using `references/chart-selection.md` (start at
    § First: what is one item of this data?, not at the big table), then write
-   the config against `references/chart-api.md` (the full charts-lib API: every
-   factory, option, and theme token). Read that file before writing chart code —
-   don't guess option names.
+   the config against the API — don't guess option names. The API is split so
+   you read only what the page uses:
+   - `references/chart-api.md` — the core: the factory list, options shared by
+     every chart, sizing, title wrapping, interactions. Always read it.
+   - `references/charts/<type>.md` — one short file per engine (the table in
+     `chart-api.md` maps each factory to its file). Read the files for the
+     chart types in your plan, and no others.
+   - `references/charts/lifecycle.md` only when the page redraws charts (a
+     control, a resize handler); `references/charts/theme-tokens.md` only when
+     you recolour or name a theme token.
+
+   **Read them in one call, not one file per call.** Every tool call re-sends
+   the whole conversation so far, so ten small reads cost several times what
+   one combined read does. Once the plan names its chart types, fetch the core
+   and every chart file it needs together, along with any other reference this
+   step calls for:
+   ```bash
+   cd <skill-dir>/references && cat chart-api.md charts/line.md charts/table.md narrative.md
+   ```
+   The same goes for the earlier steps: read `chart-selection.md`,
+   `layout.md` and the template in one command rather than three.
 
    For a single fact about one engine — what it refuses, whether it self-sizes,
-   how many grid tracks it wants, its minimum readable size — read
-   `assets/charts-lib/charts.manifest.json` instead of the whole API file. It is
-   the same index the library carries as `Charts.meta`, kept in step with the
-   code by the build, and it also holds the shared `plotBox` and `grid` rules.
+   how many grid tracks it wants, its minimum readable size — read its entry in
+   `assets/charts-lib/charts.manifest.json` rather than prose. It is the same
+   index the library carries as `Charts.meta`, kept in step with the code by the
+   build, and it also holds the shared `plotBox` and `grid` rules.
+
+   Don't read `assets/charts-lib/charts.js` (14,000 lines) to learn an option —
+   the references cover every one. Open it only to confirm a behaviour the
+   references don't describe, and then search it for the option name rather
+   than reading it whole. The finished pages in `examples/` are the same kind of
+   last resort: each inlines the whole library, so read them by searching for
+   the one pattern you need.
 
    **Check the chart's input contract first** (`chart-selection.md` § Input
    contract). Each engine accepts a particular kind of x and y, and a mismatch
@@ -209,39 +234,83 @@ slide deck.
    ```bash
    node <skill-dir>/scripts/finalize.js index.html --stage
    ```
-   Then use the strongest check your environment supports:
-   - *Browser tooling available* — open the file, read the console for errors,
-     and screenshot it to confirm layout. (In Claude Code: `preview_start`, then
-     `read_console_messages` and a screenshot. Serve over a local HTTP server
-     rather than `file://` so the scripts execute.)
-   - *No browser tooling* — run the bundled checker and fix what it reports:
-     ```bash
-     node <skill-dir>/scripts/check-page.js index.html
-     ```
-     It catches the four failures that do not throw and so survive a
-     confident-looking build: a panel whose chart was never wired (an empty
-     box), a line over unordered categories (an error panel *inside* the
-     chart), a page still pointing at `charts-lib/`, and anything else that
-     reaches the network. Each one reads as a styling bug rather than the
-     missing wiring it is. Exit code is non-zero when something fails, so it
-     also works as a gate. Run it here without `--final` — the page is not
-     inlined yet, and mid-build that is simply where you are. (Step 8 runs it
-     for you either way; running it now just shortens the loop.)
-   Either way, fix any panel that renders empty or overflows its cell first. A
-   panel reading *"Line charts need a continuous or temporal x-axis"* is the
-   input-contract failure above — change the chart type or the x values, don't
-   restyle it.
+   Then check it, cheapest first. Work from text reports; a screenshot is the
+   proof you take once at the end, not the way you find problems — each one
+   costs far more than a JSON report and still leaves you guessing which
+   element is wrong.
 
-   **If you built a deck, check it on paper too.** It is made to be handed
-   round as a PDF, and that path has failures the screen never shows: print to
-   PDF (or open the print preview) and confirm one slide per sheet, nothing
-   crossing a page edge, and the dark slides still dark. A slide whose content
-   outgrew its frame is silently cropped there rather than scrolled.
+   1. **Static checks, no browser.** Run the bundled checker and fix what it
+      reports:
+      ```bash
+      node <skill-dir>/scripts/check-page.js index.html
+      ```
+      It catches the failures that do not throw and so survive a
+      confident-looking build: a panel whose chart was never wired (an empty
+      box), a line over unordered categories (an error panel *inside* the
+      chart), a page still pointing at `charts-lib/`, and anything else that
+      reaches the network. Each one reads as a styling bug rather than the
+      missing wiring it is. It also does the layout arithmetic a screenshot
+      would otherwise be taken for: a chart in a dashboard cell smaller than
+      its engine's minimum size (it names the `w`/`h` that fits), a title
+      too long for two lines at its cell width (the cut-off tail is usually
+      the finding), and donut options written at the top level, where the
+      engine ignores them. Fix these before opening a browser — each costs
+      one command, where finding the same thing there costs a screenshot and
+      a guess. Run it here without `--final` — the page is not
+      inlined yet, and mid-build that is simply where you are.
+   2. **The layout audit, in a browser.** Serve the page over a local HTTP
+      server (not `file://`, so the scripts execute), open it at a desktop
+      size — at least 900px wide; a hidden browser pane can report 0x0, so set
+      the size explicitly (1440x900) — and run this in the page (in Claude
+      Code: `javascript_tool`):
+      ```js
+      await new Promise((ok, no) => { const s = document.createElement('script');
+        s.src = 'charts-lib/audit.js?' + Date.now(); s.onload = ok; s.onerror = no;
+        document.head.appendChild(s); });
+      JSON.stringify(await ChartsAudit.run())
+      ```
+      `--stage` put `audit.js` beside the page; the page never references it,
+      and step 8 removes it. It returns `ok` and a short list naming the panel
+      or slide behind each problem: an empty chart, an error panel (with its
+      message), a chart overflowing its cell, content clipped by a card or
+      cell, text spilling out of a KPI tile, slide content past the 1280x720
+      frame or into the footer, sideways page scroll, and template placeholder
+      text left on the page. Warnings flag labels drawn over each other,
+      labels cut short with "…", and KPIs still showing "—". Fix the fails,
+      reload, and run it again until `ok` is true. Read the console as well,
+      filtering on `[charts-lib` — the audit cannot see errors thrown before
+      it loaded.
 
-   **If the page has any control, test it.** Change each dropdown to a
-   non-default value and confirm — with a screenshot or by reading the rendered
-   text back — that the affected charts redraw *and* that any action title
-   recomputed with them. An untested filter is usually a broken filter.
+      A panel reading *"Line charts need a continuous or temporal x-axis"* is
+      the input-contract failure above — change the chart type or the x values,
+      don't restyle it. A `stale-size` warning means only that the browser
+      tab is hidden and could not redraw the chart; ignore it.
+   3. **One screenshot, at the end.** When the audit is clean, take a single
+      screenshot at reduced scale (`scale: 0.5`) as proof and to catch what
+      no measurement can judge — a colour that vanishes on the canvas, a
+      layout that is technically sound but reads badly. Take another only when
+      that one shows a problem the audit did not name.
+
+   Without browser tooling, step 1 is the floor; say that the layout was not
+   checked in a browser.
+
+   **If you built a deck,** the audit's `off-slide` and `into-footer`
+   checks are the paper check: a slide whose content outgrew its frame is
+   silently cropped in the PDF rather than scrolled, and those two find it.
+   Open the print preview only if you changed the template's print CSS.
+
+   **If the page has any control, test it** — an untested filter is usually a
+   broken filter. With the audit loaded, change each control to a
+   non-default value:
+   ```js
+   JSON.stringify(await ChartsAudit.tryControl('#region', 'West'))
+   ```
+   It sets the value, fires `input` and `change`, waits for the redraw, and
+   returns the charts that `changed`, the ones left `unchanged`, and every
+   title and KPI whose text moved. A chart that should follow the filter but
+   is listed as `unchanged` is a half-wired control; an action title that
+   does not appear under `titles` or `text` did not recompute. No screenshot
+   needed.
 8. **Fold the library into the page, and ship one file.** A dashboard outlives
    the folder it was written in — it gets emailed, dropped in Slack, committed
    to a wiki, opened from Downloads. A page that loads `charts-lib/charts.js`
@@ -538,5 +607,5 @@ and run Node (for `finalize.js` and the static checks). Without Node, inline
 the three library files by hand — paste `charts.css` into a `<style>` and
 `theme.js` then `charts.js` into `<script>` blocks, in that order, replacing the
 placeholder tags. An editable page also gets `assets/page-runtime.js` in a
-`<script>` block after them. Browser preview, screenshots, and file attachment are used
-when available and degrade gracefully when not.
+`<script>` block after them. Browser preview, the layout audit, screenshots, and
+file attachment are used when available and degrade gracefully when not.

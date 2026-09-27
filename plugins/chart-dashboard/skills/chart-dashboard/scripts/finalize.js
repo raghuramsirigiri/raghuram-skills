@@ -14,7 +14,8 @@
  * person to look assumes the page depends on it.
  *
  * `--stage` does the first half: copies `assets/charts-lib` next to the page
- * so browser verification has something to load. Nothing else — verifying is
+ * so browser verification has something to load, plus `audit.js`, which
+ * checks the layout from inside the page and reports it as JSON. Nothing else — verifying is
  * yours to do, and it is the part no script can replace.
  *
  * With no flag it does the second half: static checks, inline, remove the
@@ -46,7 +47,10 @@ const LIB_FILES = ['charts.css', 'charts.js', 'theme.js'];
 // Staged too, for editable pages. It lives in assets/ rather than
 // assets/charts-lib/, which mirrors the upstream library.
 const EDITABLE_FILES = ['chart-convert.js', 'page-runtime.js', 'page-editor.js'];
-const STAGED_FILES = LIB_FILES.concat(EDITABLE_FILES);
+// And the layout audit, for verifying in a browser. No page references it,
+// so it is staged only while you verify and removed with the rest.
+const AUDIT_FILES = ['audit.js'];
+const STAGED_FILES = LIB_FILES.concat(EDITABLE_FILES, AUDIT_FILES);
 
 const argv = process.argv.slice(2);
 const stageOnly = argv.includes('--stage');
@@ -69,9 +73,9 @@ const run = (script, args) => spawnSync(process.execPath, [path.join(SCRIPTS, sc
 if (stageOnly) {
   fs.mkdirSync(staged, { recursive: true });
   for (const f of LIB_FILES) fs.copyFileSync(path.join(LIB, f), path.join(staged, f));
-  for (const f of EDITABLE_FILES) fs.copyFileSync(path.join(LIB, '..', f), path.join(staged, f));
+  for (const f of EDITABLE_FILES.concat(AUDIT_FILES)) fs.copyFileSync(path.join(LIB, '..', f), path.join(staged, f));
   console.log('staged charts-lib/ beside ' + path.basename(target) +
-    ' — open the page and verify it, then run this without --stage to ship it.');
+    ' — open the page and run the audit in it (charts-lib/audit.js; see SKILL.md step 7), then run this without --stage to ship it.');
   process.exit(0);
 }
 
@@ -93,7 +97,8 @@ if (fs.existsSync(staged)) {
   // script hold three or four files.
   const same = set => found.length === set.length && found.every((f, i) => f === [...set].sort()[i]);
   if (same(LIB_FILES) || same(LIB_FILES.concat('page-runtime.js')) ||
-      same(LIB_FILES.concat('chart-convert.js', 'page-runtime.js')) || same(STAGED_FILES)) {
+      same(LIB_FILES.concat('chart-convert.js', 'page-runtime.js')) ||
+      same(LIB_FILES.concat(EDITABLE_FILES)) || same(STAGED_FILES)) {
     fs.rmSync(staged, { recursive: true, force: true });
     console.log('removed the staged charts-lib/ — nothing references it now.');
   } else {
