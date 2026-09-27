@@ -12,7 +12,7 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 | Example | Format | Charts it uses | Preview |
 |:--|:--|:--|:--|
 | [`logistics-network-dashboard/`](logistics-network-dashboard/) | **Dashboard** (single file) | Geofacet tile map, bar list, waterfall bridge, Sankey flow, line with a real gap and a callout, histogram, waffle, dumbbell, 100% stacked column, donut, bar insight table | [screenshot](logistics-network-dashboard/screenshot.png) |
-| [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
+| [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, report table with a line and bars per row, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, table, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |
 
