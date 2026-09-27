@@ -188,10 +188,23 @@
   .l-split .fig { height:78%; }
   .l-split.flip .fig { order:2; }
 
-  /* Media-led — the chart argues, a narrow column annotates. */
-  .l-media { display:grid; grid-template-columns:1.85fr 1fr; gap:40px; }
+  /* Media-led — the chart is the larger half, the reading column beside it. */
+  .l-media { display:grid; grid-template-columns:1.6fr 1fr; gap:40px; }
   .l-media.flip .fig { order:2; }
   .l-media .words { align-self:start; padding-top:4px; }
+
+  /* The reading column beside a chart (l-split, l-media) holds as much as the
+     claim needs: a heading, one or two paragraphs, and a bulleted list when
+     the reading is several parallel points. A single line beside a chart
+     leaves half the slide empty; fill the column before shrinking the chart.
+     Stop at what fits above the footer — past that it is two slides. */
+  .words .body + .body { margin-top:12px; }
+  .pts { margin:16px 0 0; padding:0; list-style:none; font-size:16px;
+    line-height:1.5; color:var(--muted); }
+  .pts li { position:relative; padding-left:20px; margin-top:8px; }
+  .pts li::before { content:''; position:absolute; left:2px; top:.62em;
+    width:6px; height:6px; border-radius:50%; background:var(--ink); }
+  .pts li b { color:var(--ink); font-weight:700; }
 
   /* Full-bleed figure — one chart across the whole slide, claim above, reading
      below. The right layout when the shape of the data is the argument and
@@ -240,7 +253,9 @@
 
   /* Table — for when the exact values are the point. Numbers right and tabular,
      one emphasised group, and no more than about six rows: past that it is a
-     handout, not a slide. */
+     handout, not a slide. When a row has a shape as well as figures (a trend,
+     a breakdown), use Charts.reportTable so the chart sits in the row beside
+     its numbers; Charts.table is for figures only. */
   .l-table { display:grid; grid-template-rows:auto 1fr; gap:20px; }
   table.data { width:100%; border-collapse:collapse; font-size:15px; }
   table.data th { text-align:left; font-size:11px; text-transform:uppercase;
@@ -286,8 +301,10 @@
   .steps .s:first-child { padding-left:0; border-left:0; }
   .steps .s .no { font-size:13px; font-weight:700; color:var(--muted); }
   .steps .s h3 { margin-top:10px; }
-  .steps .s.on h3 { text-decoration:underline; text-decoration-thickness:3px;
-    text-underline-offset:6px; }
+  /* .on marks the step the deck is about by its number alone. No underline:
+     under a heading it reads as a link, and copied onto every step it stops
+     meaning anything. Leave .on off entirely when no step leads. */
+  .steps .s.on .no { color:var(--ink); }
 
   /* Timeline — dated milestones on one spine. Use it for a roadmap or a
      history; use l-steps when the sequence carries no dates. */
@@ -432,8 +449,16 @@
     </figure>
     <div class="words">
       <h2>Adoption tripled in six weeks</h2>
-      <p class="body">Two or three sentences saying what the chart shows and what
-        follows from it — not a description of the axes.</p>
+      <p class="body">Weekly active accounts went from 12,000 to 52,000 after the
+        new sign-in shipped in week four. Growth before launch was slow and
+        steady; the bend comes the week it shipped, not with the season.</p>
+      <p class="body">Most of the gain came from accounts that had signed up
+        before and never returned — people we already had, not new demand.</p>
+      <ul class="pts">
+        <li><b>+40,000</b> weekly accounts in six weeks</li>
+        <li>Growth has not levelled off by week six</li>
+        <li>No marketing spend changed in the period</li>
+      </ul>
     </div>
   </section></div>
 
@@ -444,8 +469,17 @@
     </figure>
     <div class="words">
       <h3>Sign-in takes half again as long as the next slowest step</h3>
-      <p class="body">A narrow annotation column. Keep it short — the picture is
-        doing the arguing here.</p>
+      <p class="body">A median session spends 48 seconds signing in, against 31
+        for verification. Every later step waits on it, so sign-in sets the
+        pace for the whole visit.</p>
+      <p class="body">Recovery is shorter only because most people give up on
+        it rather than finish it.</p>
+      <ul class="pts">
+        <li><b>Sign in</b> — method picker, then password</li>
+        <li><b>Verify</b> — one email round trip</li>
+        <li><b>Recover</b> — abandoned by 6 in 10</li>
+        <li><b>Browse</b> — the part people came for</li>
+      </ul>
     </div>
   </section></div>
 
@@ -513,10 +547,13 @@
   <!-- 12 · Table -->
   <div class="page"><section class="slide l-table" data-title="Detail">
     <h2>Two segments carry the change</h2>
-    <!-- Figures the audience reads across a row go in Charts.table, not a
-         hand-built <table>: it formats, aligns and colours the numbers from
-         the data, and follows a brand recolour. Keep table.data for text-only
-         grids. .fig.auto lets the card wrap the rows. -->
+    <!-- A row that has a shape as well as figures goes in Charts.reportTable:
+         a chart per row (a trend line, a bar breakdown) beside the kpi cells
+         that state its numbers, so the reader gets both without two exhibits.
+         Figures alone go in Charts.table. Either way, not a hand-built
+         <table> — the engines format, align and colour from the data and
+         follow a brand recolour. Keep table.data for text-only grids.
+         .fig.auto lets the card wrap the rows. -->
     <figure class="fig auto"><div class="chart" id="c-table"></div></figure>
   </section></div>
 
@@ -777,20 +814,47 @@ Charts.donut('c-o2', { title: 'Share of new accounts',
     { name: 'Self-serve', y: 55 }, { name: 'Team', y: 30 }, { name: 'Other', y: 15 } ] }] });
 
 /* A table is the right exhibit when the audience reads several figures per
-   row. Colour one column, the one the h2 is about: a scale on the change
-   makes the two segments that carry it the darkest cells. */
-Charts.table('c-table', {
+   row; a reportTable, when each row also has a shape worth seeing. Here each
+   segment gets its activation trend as a line and its sign-in drop-off
+   before and after as bars — each chart column shares one scale down the
+   table, so rows compare by eye — then the figures the h2 is about as kpi
+   cells. Colour one column, the
+   one the claim names: the change, by sign. A companion table adds measures;
+   it never reprints a chart that is already on another slide. */
+// Colour here encodes one thing, before vs after: the old state muted, the
+// new one a hue. The trend line is set to ink explicitly — left unnamed, a
+// lone series takes the next palette step, which can pass for "After".
+const dropOff = (before, after) => ({ series: [
+  { name: 'Before', data: [before], color: T.muted },
+  { name: 'After',  data: [after],  color: T.colors[1] } ] });
+const trend = data => ({ series: [{ data: data, color: T.colors[0] }] });
+Charts.reportTable('c-table', {
   title: 'Activation by segment',
+  subtitle: 'Weekly activation, sign-in drop-off before and after the rebuild · this quarter',
+  plotOptions: { reportTable: { rowHeight: 84 } },
   columns: [
-    { key: 'accounts',   name: 'Accounts' },
-    { key: 'activation', name: 'Activation', suffix: '%' },
-    { key: 'change',     name: 'Change', suffix: ' pts', showSign: true, highlight: 'scale' }
+    { key: 'trend', kind: 'chart', name: 'Activation, 13 weeks', width: 260,
+      chart: { type: 'line',
+        xAxis: { categories: ['W1','W3','W5','W7','W9','W11','W13'] } } },
+    // A cell has no room for an axis, so name the bars with series instead
+    // of categories: two named series draw one legend above the table, and
+    // every row reads against it.
+    { key: 'drop', kind: 'chart', name: 'Sign-in drop-off · %', width: 240,
+      chart: { type: 'bar',
+        plotOptions: { series: { dataLabels: { enabled: true } } } } },
+    { key: 'accounts',   kind: 'kpi', name: 'Accounts' },
+    { key: 'activation', kind: 'kpi', name: 'Activation', suffix: '%' },
+    { key: 'change',     kind: 'kpi', name: 'Change', suffix: ' pts', colorBySign: true }
   ],
   rows: [
-    { name: 'Self-serve', accounts: 6210, activation: 68, change: 31 },
-    { name: 'Small team', accounts: 3940, activation: 62, change: 24 },
-    { name: 'Mid-market', accounts: 1680, activation: 44, change: 3 },
-    { name: 'Enterprise', accounts: 650,  activation: 39, change: -1 }
+    { name: 'Self-serve', trend: trend([37, 42, 51, 58, 63, 66, 68]), drop: dropOff(35, 12),
+      accounts: 6210, activation: 68, change: { value: 31, note: 'from 37%' } },
+    { name: 'Small team', trend: trend([38, 41, 47, 53, 58, 61, 62]), drop: dropOff(36, 15),
+      accounts: 3940, activation: 62, change: { value: 24, note: 'from 38%' } },
+    { name: 'Mid-market', trend: trend([41, 41, 42, 43, 43, 44, 44]), drop: dropOff(34, 31),
+      accounts: 1680, activation: 44, change: { value: 3, note: 'from 41%' } },
+    { name: 'Enterprise', trend: trend([40, 39, 40, 39, 38, 39, 39]), drop: dropOff(35, 34),
+      accounts: 650, activation: 39, change: { value: -1, note: 'from 40%' } }
   ]
 });
 
