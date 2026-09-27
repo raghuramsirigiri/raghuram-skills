@@ -3,6 +3,11 @@
 Three formats. Pick one; don't blend prose-heavy narrative into a bento grid,
 and don't turn a deck into a report by filling its slides with paragraphs.
 
+Read the section for the format you picked, then § All three and § Fit the
+page to how it will be read. Skip the other formats' sections — a dashboard
+build never needs the deck rules, and a deck needs the dashboard section only
+for § Tables size themselves.
+
 ## Dashboard (`templates/dashboard.html`)
 
 A 12-column CSS grid with `grid-auto-rows: 340px`. Panels are `.cell` divs with

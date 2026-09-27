@@ -313,7 +313,7 @@ categories drive 90% of volume" above eight identically-colored bars makes the
 reader count bars to find the two you meant. Color them, and the sentence and
 the picture agree instantly.
 
-The mechanism is a per-point `color` (see `chart-api.md` § Column & bar):
+The mechanism is a per-point `color` (see `charts/column-bar.md`):
 
 ```js
 const T = Charts.theme;

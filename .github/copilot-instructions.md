@@ -10,7 +10,7 @@ Read both before building a dashboard, analytics page, KPI view, data report, or
 
 Before writing chart code, consult:
 
-- `plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md` — every factory and option
+- `plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md` — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
 - `plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md` — data shape → chart type
 - `plugins/chart-dashboard/skills/chart-dashboard/references/layout.md` — deriving the grid from the findings; spans and page structure
 - `plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md` — callouts, plot bands, forecast notation
