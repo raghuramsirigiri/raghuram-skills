@@ -361,7 +361,7 @@ Charts.bar('c19', {
     subtitle: 'Share of Q4 buyers by age band and gender',
     xAxis: { categories: ages },
     yAxis: { suffix: '%' },
-    tooltip: { valueSuffix: '%' },
+    tooltip: { valueSuffix: '%', absoluteX: true },
     plotOptions: { bar: { stacking: 'normal' } },
     series: [
       { name: 'Male',   data: male,   color: '#2323FF' },

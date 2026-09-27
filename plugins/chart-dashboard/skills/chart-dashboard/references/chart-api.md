@@ -198,24 +198,12 @@ Every option below is optional; the library picks sensible defaults.
 - **Padding**: `pointPadding`, `groupPadding`
 - **3D effect**: `chart: { options3d: { enabled: true, depth: 40 } }`
 - **Negative values**: bars flip below zero baseline; `negativeColor` overrides bar color for negatives.
-  **Labels and tooltips drop the minus sign.** The value axis keeps it, but a
-  `-2.5` bar is labelled `2.5` and its tooltip reads `2.5`, with or without
-  `tooltip.absoluteX`. `dataLabels.format` doesn't help, because `{y}` is
-  filled with the absolute value too. So on any chart that crosses zero (a
-  change, a delta, profit and loss), a fall reads as a rise. A fix is
-  proposed upstream (`CHARTS-LIB-UPSTREAM.md`, change 3). Until it lands:
-  - Turn labels off with `plotOptions.column.dataLabels: false` (or `.bar`).
-    A top-level `dataLabels: false` does not turn them off. Keep the value
-    axis, since its ticks are signed. Give the negative bars their own colour
-    with `negativeColor`. Put the signed figures that matter in the title or
-    the insight text.
-  - If the tooltip matters, carry the sign in the series name instead. Split
-    the data into two series, such as `Increase` with the positive values and
-    `Decrease` with the negative ones, putting `null` in the other series'
-    slots. Add `plotOptions.column.stacking: 'normal'` so each week keeps one
-    bar. The tooltip then reads `Decrease: 2.5%`.
-  - Don't drop the chart, and don't leave unsigned labels on it.
-- **Population pyramid**: horizontal bar + a series with all-negative values + `tooltip.absoluteX:true`
+  Data labels and tooltips show the value with its sign (`-2.5`), and so does
+  `{y}` in `dataLabels.format`.
+- **Population pyramid**: horizontal bar + a series with all-negative values + `tooltip.absoluteX:true`.
+  The flag drops the sign from the value-axis ticks (horizontal bar), data
+  labels and tooltips, so the mirrored side reads as positive counts. Without
+  it, that side is shown signed.
 - **Data labels**: **on by default** — above the bar (column) or at the right
   end (bar), with automatic contrast text color. In a **stacked** chart they
   move inside each segment, since above a segment is where the next one sits,

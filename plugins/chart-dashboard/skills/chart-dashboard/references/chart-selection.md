@@ -161,7 +161,7 @@ already on the page does not need a table of the same values under it.
 | Many items, only relative size matters | packed bubbles | `Charts.packedBubble` |
 | A min–max span per category | column range | `Charts.column` + `type:'columnrange'`, `data:[[low,high],…]` |
 | Two mirrored populations | population pyramid | `Charts.bar`, one series all-negative, `tooltip.absoluteX:true` |
-| Values that cross zero | column with `negativeColor` | `Charts.column`. Labels and tooltips currently drop the minus sign, so see `chart-api.md` → Column & bar → *Negative values* |
+| Values that cross zero | column with `negativeColor` | `Charts.column` |
 | One value per region, reader compares exact values | geofacet bars | `Charts.geofacet` + `chart:{variant:'bar'}` |
 | One value per region, the *spatial pattern* is the finding | geofacet heat | `Charts.geofacet` + `chart:{variant:'heat'}`, pin `min`/`max` |
 | Per-region attainment against a shared target | geofacet gauges | `Charts.geofacet` + `chart:{variant:'gauge'}`, real `max` |

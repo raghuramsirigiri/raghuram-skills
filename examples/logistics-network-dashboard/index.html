@@ -4915,6 +4915,11 @@ var Charts = window.Charts = window.Charts || {};
       return (s.valuePrefix || '') + addCommas(raw) + (s.valueSuffix || '');
     }
 
+    // A value as shown in a label or tooltip. Signed, except in a population
+    // pyramid (tooltip.absoluteX), where one side is plotted negative only to
+    // mirror it and should read as a positive count, like its axis does.
+    const shownValue = v => (opts.tooltip && opts.tooltip.absoluteX) ? Math.abs(v) : v;
+
     // Filled by render(), read by drawBar(): how many stacked segments sit
     // either side of zero for each category.
     const segsPerSide = [];
@@ -5230,8 +5235,8 @@ var Charts = window.Charts = window.Charts || {};
       if (s.dataLabels && s.dataLabels.enabled) {
         const val = (p.y != null) ? p.y : (p.high != null ? `${p.low}–${p.high}` : '');
         const label = s.dataLabels.format
-          ? String(s.dataLabels.format).replace('{y}', Math.abs(val))
-          : (typeof val === 'number' ? fmtY(Math.abs(val)) : val);
+          ? String(s.dataLabels.format).replace('{y}', shownValue(val))
+          : (typeof val === 'number' ? fmtY(shownValue(val)) : val);
 
         // Estimated label width — the engines size text without measuring it.
         const labelW = String(label).length * T.valueSize * 0.60;
@@ -5347,7 +5352,7 @@ var Charts = window.Charts = window.Charts || {};
         const p = s.points[idx]; if (!p) return;
         let val;
         if (p.low != null && p.high != null) val = `${formatValue(p.low, s)} – ${formatValue(p.high, s)}`;
-        else if (p.y != null) val = formatValue(Math.abs(p.y), s);
+        else if (p.y != null) val = formatValue(shownValue(p.y), s);
         else return;
         html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(s.color)};border-radius:2px"></span><span style="color:${cssColor(T.labelColor)}">${esc(s.name)}: </span><b style="color:${cssColor(T.titleColor)}">${esc(val)}</b></div>`;
       });
