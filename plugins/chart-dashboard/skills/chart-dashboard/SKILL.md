@@ -579,8 +579,8 @@ would carry the information better. Usually it would.
 
 One HTML file, standalone — no sibling `charts-lib/` folder, no CDN tags, no
 network at open time (see step 8). A deck ships the same way, and a reader turns
-it into a PDF with their browser's own Print → Save as PDF: the template sets
-A4 landscape, one slide per sheet. Write it to the working directory (or where
+it into a PDF with their browser's own Print → Save as PDF: the template sizes
+the page to the slide, one rounded slide per page. Write it to the working directory (or where
 the user asked). Then surface
 it however your environment does that — attach or render the file if you can (in
 Claude Code: `SendUserFile` with `display: "render"`); otherwise print the

@@ -27,7 +27,7 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 - **Slide deck** — an argument delivered by someone, one claim per 16:9 slide, with
   a fixed spine (cover → agenda → section dividers → closing ask) and eighteen slide
   layouts to choose evidence from. Triggered by "presentation", "slides", "deck".
-  Prints straight to PDF as A4 landscape, one slide per sheet. See
+  Prints straight to PDF, one rounded slide per page. See
   `coffee-pricing-deck/`.
 
 Any of the three can also be built **editable** on request, with an **Edit page**

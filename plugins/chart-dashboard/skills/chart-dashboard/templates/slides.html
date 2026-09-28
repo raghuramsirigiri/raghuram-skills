@@ -31,17 +31,25 @@
              every slide is exactly 16:9 and one layout fits every screen. */
           --slide-w:1280px; --slide-h:720px;
           /* One margin governs every slide; only a full-bleed image crosses it. */
-          --pad:64px; }
+          --pad:64px;
+          /* Two corner radii, one proportion. A card is ~560px wide with a 10px
+             corner; the slide is 1280px wide, and 24px gives it the same
+             roughly-2% curve, so the slide's corner and its cards' corners
+             read as one family instead of two unrelated roundings. Change one
+             and scale the other with it. */
+          --r-card:10px; --r-slide:24px; }
   * { box-sizing:border-box; }
-  html, body { margin:0; padding:0; background:var(--ground); color:var(--ink);
+  /* Nothing is painted outside the slides: the page is left unpainted, so
+     the only colour on screen and on paper is the slides' own. */
+  html, body { margin:0; padding:0; background:none; color:var(--ink);
     font-family:var(--font); -webkit-font-smoothing:antialiased; }
 
   /* ── The deck is a document ───────────────────────────────────────────────
      It reads the way a PDF does in a browser tab: slides stacked in one
      scrolling column, no ground colour behind them, no progress bar, no
      next/back controls, nothing to click. Scrolling is the only navigation,
-     which is also what lets it print straight to A4 landscape, one slide per
-     sheet — see the @page block at the end of this stylesheet. */
+     which is also what lets it print straight to PDF, one slide per page — see the @page
+     block at the end of this stylesheet. */
   .deck { max-width:1280px; margin:0 auto; padding:40px 24px 80px; }
   /* Pages are separated by margin alone. Padding or a border inside the page
      would sit inside the 16:9 box and push the slide past its own frame. */
@@ -52,7 +60,9 @@
   .slide { position:absolute; top:0; left:0;
     width:var(--slide-w); height:var(--slide-h);
     transform-origin:top left; transform:scale(var(--k,1));
-    background:var(--ground); padding:var(--pad) var(--pad) 88px; }
+    background:var(--ground); padding:var(--pad) var(--pad) 88px;
+    /* overflow:hidden lets the corner clip a full-bleed image too. */
+    border-radius:var(--r-slide); overflow:hidden; }
   /* A dark slide inverts the pair: the ground is the darkest thing on it and a
      card sits one step above, so a figure still reads as lifted. */
   .slide.dark { --ground:#111111; --card:#232321; --ink:#f4f4f0; --muted:#a3a3a0;
@@ -90,7 +100,7 @@
   figure { margin:0; }
   .chart { width:100%; height:100%; }
   .fig { display:flex; flex-direction:column; min-height:0; min-width:0;
-    background:var(--card); border-radius:10px; padding:10px; overflow:hidden; }
+    background:var(--card); border-radius:var(--r-card); padding:10px; overflow:hidden; }
   /* min-height:0 is load-bearing, not tidiness: a flex item refuses to shrink
      below its content height without it, so a chart whose labels wrap grew past
      the card, and overflow:hidden clipped it — which reads as a card with no
@@ -366,40 +376,45 @@
   .l-stat .arrow { text-align:center; color:var(--muted); }
   .l-stat .arrow hr { border:0; border-top:1px solid currentColor; width:130px; margin:0 0 8px; }
 
-  /* Printing gives one slide per page, still at exactly 16:9. */
-  /* ── Print: one slide per A4 landscape page ───────────────────────────────
-     Print (Ctrl/Cmd+P) → Save as PDF and the deck comes out as A4 landscape,
-     one slide per sheet. Leave the printer's own margins at Default or None;
-     @page already sets them to zero.
+  /* ── Print: one slide per page ───────────────────────────────────────────
+     Print (Ctrl/Cmd+P) → Save as PDF and every slide lands on its own page,
+     rounded, with an even unpainted gutter all round. Leave the dialog's margins
+     at Default; @page sets them to zero, and sets the paper size too, so the
+     dialog's own paper choice does not apply.
 
-     A4 landscape is 297x210mm — 1.414:1, against the slide's 16:9 — so the
-     slide fits the page WIDTH and centres in the leftover height, the same
-     choice a projector makes.
+     The page is sized to the slide rather than to A4: A4 is 1.414:1 against
+     the slide's 16:9, which leaves bands top and bottom and none at the sides,
+     so a rounded corner would sit flush against the paper edge left and right.
+     A page cut to the slide's own shape plus one gutter keeps the frame even.
 
      The screen path scales the slide with a transform, which leaves its layout
      box at the authored 1280x720. On paper that box is wider than the sheet,
      and the print engine fragments it: backgrounds get clipped part-way down
-     and content spills past the page edge. So printing uses `zoom` instead,
-     which scales the layout box itself — the slide becomes a real 1122x631px
-     block that fits inside the sheet and needs no offsets. `zoom` is supported
-     by Chrome, Edge and Safari, which is where Save as PDF actually happens.
+     and content spills onto the next page. So printing uses `zoom` instead,
+     which scales the layout box itself — the slide becomes a real 1120x630px
+     block. `zoom` is supported by Chrome, Edge, Safari and Firefox 126+.
 
-     0.877 = 297mm at 96dpi (1122.5px) ÷ the 1280px authored width. Change
-     --slide-w and it needs recomputing. */
-  @page { size: A4 landscape; margin: 0; }
+     The numbers, all at 96px to the inch:
+       slide   1280x720 × zoom 0.875 = 1120x630
+       gutter  12px each side — enough to show the rounded corner, small
+               enough that the slide still fills the sheet
+       page    1144x654 — .page matches it exactly, one per sheet
+     Change --slide-w or the gutter and all three need recomputing. */
+  @page { size: 1144px 654px; margin: 0; }
   @media print {
-    html, body { background:#fff; }
     .deck { max-width:none; margin:0; padding:0; }
-    .page { width:297mm; height:210mm; aspect-ratio:auto; margin:0; padding:0;
+    .page { width:1144px; height:654px; aspect-ratio:auto; margin:0; padding:0;
       display:flex; align-items:center; justify-content:center;
-      overflow:hidden; break-after:page; page-break-after:always; }
+      overflow:hidden; break-inside:avoid; break-after:page; page-break-after:always; }
     .page:last-child { break-after:auto; page-break-after:auto; }
-    /* In flow + zoom: the box really is 1122x631 here, so the flex centring
+    /* In flow + zoom: the box really is 1120x630 here, so the flex centring
        above does the positioning and the transform is dropped entirely.
        position stays `relative` rather than `static` — the slide has to remain
        the containing block for the absolutely positioned .foot and .l-cover
-       .meta, which otherwise fall through to .page and print below the slide. */
-    .slide { position:relative; transform:none; zoom:0.877;
+       .meta, which otherwise fall through to .page and print below the slide.
+       The radius scales with the zoom, so it stays in proportion with the
+       cards' --r-card on paper exactly as on screen. */
+    .slide { position:relative; transform:none; zoom:0.875;
       /* Dark slides and note fills must survive the browser's default of
          dropping backgrounds when printing. */
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }

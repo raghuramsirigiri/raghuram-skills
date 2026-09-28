@@ -151,7 +151,9 @@ A scrolling column of 16:9 slides — the deck reads like a PDF open in a browse
 tab: no ground colour, no progress bar, no next/back controls, nothing to click.
 Each slide is authored at 1280x720 and scaled to the column with a transform, so
 every slide is exactly 16:9 at any window size and nothing reflows. Print →
-Save as PDF gives A4 landscape, one slide per sheet.
+Save as PDF gives one slide per page, on a page cut to the slide's 16:9 with an
+even gutter. The slide's corner (`--r-slide`, 24px) is set in proportion to the
+cards' (`--r-card`, 10px) so the two read as one family; change one, scale both.
 
 Markup is one `<div class="page">` per slide wrapping one
 `<section class="slide l-…" data-title="…">`. The footer strip (deck name,
