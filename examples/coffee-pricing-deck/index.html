@@ -395,14 +395,14 @@
 
      The numbers, all at 96px to the inch:
        slide   1280x720 × zoom 0.875 = 1120x630
-       gutter  24px each side (≥ the printed slide radius, 24 × 0.875 = 21px,
-               so the curve never touches the paper edge)
-       page    1168x678 — .page matches it exactly, one per sheet
+       gutter  12px each side — enough to show the rounded corner, small
+               enough that the slide still fills the sheet
+       page    1144x654 — .page matches it exactly, one per sheet
      Change --slide-w or the gutter and all three need recomputing. */
-  @page { size: 1168px 678px; margin: 0; }
+  @page { size: 1144px 654px; margin: 0; }
   @media print {
     .deck { max-width:none; margin:0; padding:0; }
-    .page { width:1168px; height:678px; aspect-ratio:auto; margin:0; padding:0;
+    .page { width:1144px; height:654px; aspect-ratio:auto; margin:0; padding:0;
       display:flex; align-items:center; justify-content:center;
       overflow:hidden; break-inside:avoid; break-after:page; page-break-after:always; }
     .page:last-child { break-after:auto; page-break-after:auto; }
