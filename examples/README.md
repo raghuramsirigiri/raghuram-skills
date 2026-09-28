@@ -25,7 +25,7 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   that say what the figure means. Triggered by phrasing like "write up",
   "retrospective" or "analysis". See `ev-retrospective/`.
 - **Slide deck** — an argument delivered by someone, one claim per 16:9 slide, with
-  a fixed spine (cover → agenda → section dividers → closing ask) and eighteen slide
+  a fixed spine (cover → agenda → section dividers → closing ask) and nineteen slide
   layouts to choose evidence from. Triggered by "presentation", "slides", "deck".
   Prints straight to PDF as A4 landscape, one slide per sheet. See
   `coffee-pricing-deck/`.

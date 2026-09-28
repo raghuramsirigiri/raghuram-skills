@@ -7,11 +7,12 @@ up here until it lands in `svg-charts`; then the copy is re-synced and the
 section is deleted, so that syncing the library again never silently removes
 behaviour the skill depends on.
 
-**Nothing is outstanding.** The copy is identical to upstream, and the table
-below is empty.
+One change is outstanding, proposed and not applied: the copy is still
+identical to upstream.
 
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
+| 4 | A bar or column with no category name gets a blank label, not its index | `engines/bar.js` | proposed | `templates/slides.html` report table; any `bar`/`column` cell in a `reportTable` |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -29,6 +30,74 @@ Before that, `c8588bd`: `centerText` takes a bare string, formerly change 2.
 And before that, `185de6f`: heatmap and calendarHeatmap, chart handles with
 `update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation.
 See *Syncing the copy* at the bottom for how, and what to check afterwards.
+
+---
+
+## 4. A bar or column with no category name gets a blank label, not its index
+<!-- check: proposed; file: charts.js; needle: Array.from({ length: rowCount }, () => '') -->
+
+### Problem
+
+When `xAxis.categories` is missing, `Charts.bar` and `Charts.column` label each
+category with its position: `0`, `1`, `2`. A row number is never a name, and in
+the commonest case, a single category, it reads as a data value:
+
+```js
+Charts.bar('cell', {
+  series: [
+    { name: 'Before', data: [35] },
+    { name: 'After',  data: [12] }
+  ]
+});
+// draws both bars, and a "0" beside them where the category name would go
+```
+
+It is most visible in a `reportTable` chart cell. Every row repeats the `0`
+beside its bars, on the left of a column readers scan for numbers.
+
+### Why the skill needs it
+
+The deck template's report table drew its before/after bars exactly like this,
+two named series and no categories, and printed a stray `0` in every row. The
+template now names the bars with categories, and `references/charts/report-table.md`
+says to. But nothing on the page tells an author that the `0` is a row number
+rather than a value, so the next page built the other way ships the same
+mistake.
+
+### Change
+
+`charts-lib/engines/bar.js`. Fall back to a blank label rather than the index
+at the three places the engine builds category labels. Hunk positions are
+omitted: this was written against the bundled `charts.js` (lines 3996, 4249
+and 4278 at `c196b94`), not an upstream checkout. A blank row label also
+narrows the bar gutter, since `rowLabelWidth` measures the text it is given.
+
+```diff
+     const rowLabelCats = categories.length
+-      ? categories : Array.from({ length: rowCount }, (_, i) => i);
++      ? categories : Array.from({ length: rowCount }, () => '');
+@@
+           catLayout = layoutCategoryAxis(
+-            categories.length ? categories : Array.from({ length: n }, (_, i) => i),
++            categories.length ? categories : Array.from({ length: n }, () => ''),
+             IW, T.labelSize, M.b, monthNames(resolveTheme(opts)));
+@@
+           rowLabels = layoutRowLabels(
+-            categories.length ? categories : Array.from({ length: n }, (_, i) => i),
++            categories.length ? categories : Array.from({ length: n }, () => ''),
+             M.l - titleX - 10, IH / Math.max(1, n), T.labelSize);
+```
+
+### Apply and verify
+
+Apply in `svg-charts`, rebuild, and run its tests. Then draw the example above:
+the bars have no label beside them and start closer to the left edge. A chart
+with `xAxis.categories` is unchanged.
+
+### Current state
+
+Proposed, not applied. The skill does not need it to work: the template names
+its bars with categories, and `report-table.md` tells authors to do the same.
 
 ---
 

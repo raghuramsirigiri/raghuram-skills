@@ -24,6 +24,7 @@ Charts.reportTable('container', {
 ```
 
 - **Chart cells**: `column.chart` holds defaults (`type` required); each row's value is laid over it — a full config or a bare data array. Refused types: `panels`, `table`, `barInsightTable`, `reportTable`. Cell titles/legends are dropped; 2+ series names show once as a legend above the table. Cells are `compact: true` by default (column `compact: false` keeps axes).
+- **Name the bars in a `bar`/`column` cell with categories**, set once on the column (`chart: { type: 'bar', xAxis: { categories: ['Before', 'After'] } }`), and give each row one series whose points carry any colour (`{ y, color }`). Each row then labels its own bars. Without categories the cell labels its one unnamed category by index, so every row shows a stray `0` beside its bars; splitting the bars into two named series does not avoid it.
 - **Shared scale**: `line`, `column`, `bar`, `dumbbell` cells in one column share `yAxis.min/max`; opt out with `sharedScale: false` when rows differ in unit.
 - **Colour**: `kpi` columns take `colorBySign: true`, or `colorByScale: true` (+ a `scale` id to share one domain across columns). Any `kpi`/`text`/`insight` cell may carry its own `fill`. One colour per series name across the whole table.
 - **Row labels**: `row.name` as text or `{ head, body }`; contiguous `row.group` headings.
