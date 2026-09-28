@@ -115,17 +115,17 @@
   .imgbox img { width:100%; height:100%; object-fit:cover; display:block; }
 
   /* ══ LAYOUTS ══════════════════════════════════════════════════════════════
-     Nineteen layouts, each answering a different job a slide has to do. Pick
-     one per slide and do not blend two — a slide that needs a twentieth
+     Eighteen layouts, each answering a different job a slide has to do. Pick
+     one per slide and do not blend two — a slide that needs a nineteenth
      layout is usually two slides.
 
        STRUCTURE   l-cover · l-agenda · l-section · l-statement · l-quote
-       EVIDENCE    l-split · l-media · l-full · l-metrics · l-compare
+       EVIDENCE    l-split · l-full · l-metrics · l-compare
        ANALYSIS    l-three · l-grid · l-table · l-matrix
        ARGUMENT    l-list · l-points · l-steps · l-timeline · l-stat
 
-     All nineteen are built from the tokens and the type scale above, which is
-     what keeps them reading as one deck rather than nineteen designs.
+     All eighteen are built from the tokens and the type scale above, which is
+     what keeps them reading as one deck rather than eighteen designs.
      ═════════════════════════════════════════════════════════════════════════ */
 
   /* A layout class goes on the .slide itself, which already has the authored
@@ -189,17 +189,20 @@
 
   /* ── EVIDENCE ──────────────────────────────────────────────────────────── */
 
-  /* Split — evidence and its reading as equal partners. .flip swaps sides. */
+  /* Split — a chart and its reading side by side, the claim as the h2 in the
+     reading column. Equal halves by default. .wide gives the chart 1.6 parts
+     to the reading's 1, for a chart that needs the room: many rows, a long
+     axis, long category names. Width is the only difference, which is why it
+     is a modifier and not a layout of its own. .flip swaps sides. */
   .l-split { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; }
   .l-split .fig { height:78%; }
   .l-split.flip .fig { order:2; }
+  .l-split.wide { grid-template-columns:1.6fr 1fr; gap:40px; align-items:start; }
+  .l-split.wide .fig { height:100%; }
+  .l-split.wide .fig.auto { height:auto; }
+  .l-split.wide .words { padding-top:4px; }
 
-  /* Media-led — the chart is the larger half, the reading column beside it. */
-  .l-media { display:grid; grid-template-columns:1.6fr 1fr; gap:40px; }
-  .l-media.flip .fig { order:2; }
-  .l-media .words { align-self:start; padding-top:4px; }
-
-  /* The reading column beside a chart (l-split, l-media) holds as much as the
+  /* The reading column beside a chart (l-split) holds as much as the
      claim needs: a heading, one or two paragraphs, and a bulleted list when
      the reading is several parallel points. A single line beside a chart
      leaves half the slide empty; fill the column before shrinking the chart.
@@ -231,7 +234,8 @@
 
   /* Metrics — two to four figures, each with the sentence that explains it.
      Where l-stat makes one figure the whole slide, here the figures are the
-     evidence and each one needs a line of context to be read correctly. The figure is ink and the context is
+     evidence and each one needs a line of context to be read correctly. The
+     figures are different measures; one measure before and after is an l-stat. The figure is ink and the context is
      muted, so the eye reads the numbers first, then goes back for the words. */
   .l-metrics { display:grid; grid-template-rows:auto 1fr; gap:28px; }
   .metrics { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
@@ -242,14 +246,19 @@
 
   /* ── ANALYSIS ──────────────────────────────────────────────────────────── */
 
-  /* Three peers — options, goals, workstreams. Equal columns, equal weight. */
+  /* Three peers — options, goals, workstreams. Equal columns, equal weight.
+     At least two columns carry a chart; three points in words alone are an
+     l-list. */
   .l-three { display:grid; grid-template-columns:repeat(3,1fr); gap:32px; }
   .l-three .col { display:flex; flex-direction:column; min-height:0; }
   .l-three .col .fig, .l-three .col .note { margin-top:16px; }
   .l-three .col .fig { flex:1; }
 
   /* Grid — the overview slide, in the same 12-column vocabulary as
-     dashboard.html so a deck slide and a dashboard panel are one system. */
+     dashboard.html so a deck slide and a dashboard panel are one system. Use
+     it for three or four small figures that together support one claim, none
+     needing a reading of its own. One chart that carries the claim is an
+     l-split or l-full; three equal peers are an l-three. */
   .l-grid { display:grid; grid-template-columns:repeat(12,1fr); grid-auto-rows:1fr; gap:28px; }
   .w3{grid-column:span 3}.w4{grid-column:span 4}.w5{grid-column:span 5}
   .w6{grid-column:span 6}.w7{grid-column:span 7}.w8{grid-column:span 8}
@@ -272,7 +281,8 @@
   table.data tr.mark td { background:var(--surface-soft); font-weight:700; }
 
   /* Matrix — a 2x2 for positioning, prioritisation or risk. The axes are labels
-     on the frame rather than drawn lines, so the quadrants stay the subject. */
+     on the frame rather than drawn lines, so the quadrants stay the subject.
+     Only when both axes are named: four boxes with no axes are an l-points. */
   .l-matrix { display:grid; grid-template-columns:120px 1fr; grid-template-rows:1fr auto;
     gap:16px 24px; }
   .l-matrix .yaxis { display:flex; align-items:center; justify-content:flex-end; }
@@ -287,8 +297,9 @@
 
   /* ── ARGUMENT ──────────────────────────────────────────────────────────── */
 
-  /* Explained list — claim beside 2-4 points, each a heading plus two lines. A
-     point that needs more than that has earned its own slide. */
+  /* Explained list — claim beside two or three points, each a heading plus
+     two lines. Four or six points are l-points; a point that needs more than
+     two lines has earned its own slide. */
   .l-list { display:grid; grid-template-columns:1fr 1.25fr; gap:56px; align-items:center; }
   .l-list .item { display:grid; grid-template-columns:34px 1fr; gap:16px;
     padding:20px 0; border-top:1px solid var(--hair); }
@@ -301,8 +312,9 @@
      short paragraph, with no chart. Two columns for four points; .c3 gives
      three columns for six. The rows share the space below the claim evenly, so
      the grid fills the slide instead of sinking to the footer. No rules between
-     the points: the grid and the headings carry the structure. More than six
-     points is two slides. */
+     the points: the grid and the headings carry the structure. Two or three
+     points are an l-list; five, cut one or add one; more than six is two
+     slides. On two named axes, the four points are an l-matrix. */
   .l-points { display:grid; grid-template-rows:auto 1fr; gap:32px; }
   .l-points h2 { max-width:22em; }
   .points { display:grid; grid-template-columns:repeat(2,1fr); column-gap:72px;
@@ -340,7 +352,8 @@
   .tl .t h3 { font-size:19px; margin-top:6px; }
 
   /* Stat — the number is the slide. Two figures with the .arrow between them
-     read as a before and after; one figure reads as the headline. */
+     read as a before and after; one figure reads as the headline. Both
+     figures are the same measure; different measures are an l-metrics. */
   .l-stat { display:flex; align-items:center; justify-content:center; gap:72px; }
   .l-stat .f { text-align:center; }
   .l-stat .f b { display:block; font-size:110px; line-height:1; font-weight:700;
@@ -396,7 +409,7 @@
 <body>
 <div class="deck">
   <!-- WHAT FOLLOWS IS A CATALOGUE, NOT A RUNNING ORDER — one worked example of
-       each layout, so the markup for all nineteen is visible in one place.
+       each layout, so the markup for all eighteen is visible in one place.
        Delete the ones the deck does not need and repeat the ones it does.
 
        THE SPINE IS FIXED, THE EVIDENCE IS NOT. Every deck this skill builds
@@ -480,13 +493,13 @@
     </div>
   </section></div>
 
-  <!-- 6 · Media-led -->
-  <div class="page"><section class="slide l-media" data-title="Where time goes">
+  <!-- 6 · Split, wide: the chart needs the room, the reading sits beside it -->
+  <div class="page"><section class="slide l-split wide" data-title="Where time goes">
     <figure class="fig auto">
       <div class="chart" id="c-rank"></div>
     </figure>
     <div class="words">
-      <h3>Sign-in takes half again as long as the next slowest step</h3>
+      <h2>Sign-in is the slowest step by half</h2>
       <p class="body">A median session spends 48 seconds signing in, against 31
         for verification. Every later step waits on it, so sign-in sets the
         pace for the whole visit.</p>

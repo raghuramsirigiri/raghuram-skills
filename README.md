@@ -230,7 +230,7 @@ Three output formats, chosen from how you phrase the request:
 - **Report** — narrative sections with figures and captions. Triggered by phrasing
   like "write up", "retrospective", or "analysis".
 - **Slide deck** — one claim per 16:9 slide, with a fixed spine (cover, agenda,
-  section dividers, closing ask) and nineteen slide layouts. Triggered by
+  section dividers, closing ask) and eighteen slide layouts. Triggered by
   "presentation", "slides", or "deck". Prints to PDF as A4 landscape, one slide
   per sheet.
 
@@ -398,7 +398,7 @@ instruction file (`AGENTS.md`, `GEMINI.md`, or
 
 Yes. Ask for slides, a deck or a presentation and you get a 16:9 deck: one claim per
 slide, a fixed spine (cover, agenda, a divider per section, a closing ask), and
-nineteen slide layouts chosen per claim — split, full-bleed figure, metric row,
+eighteen slide layouts chosen per claim — split, full-bleed figure, metric row,
 two-option compare, matrix, timeline, quote, big-stat and more. It is an HTML file
 rather than a `.pptx`: it opens in any browser, scrolls like a PDF, and needs no
 PowerPoint or Google Slides account. See
@@ -487,7 +487,7 @@ plugins/chart-dashboard/skills/chart-dashboard/
     ├── dashboard.html              # bento grid starting point
     ├── dashboard-editable.html     # the same, in the editable format
     ├── report.html                 # paper-column starting point
-    └── slides.html                 # 16:9 deck, nineteen slide layouts
+    └── slides.html                 # 16:9 deck, eighteen slide layouts
 ```
 
 Four finished outputs live in [`examples/`](examples/) — see

@@ -160,16 +160,16 @@ position — don't write it by hand. Charts sit unframed on the slide, as figure
 do in the report; the only filled surfaces are `.note`, the emphasised table
 rows and the matrix quadrants.
 
-Nineteen layout classes, grouped by the job the slide does:
+Eighteen layout classes, grouped by the job the slide does:
 
 | | |
 |---|---|
 | **Structure** | `l-cover` `l-agenda` `l-section` `l-statement` `l-quote` |
-| **Evidence** | `l-split` `l-media` `l-full` `l-metrics` `l-compare` |
+| **Evidence** | `l-split` `l-full` `l-metrics` `l-compare` |
 | **Analysis** | `l-three` `l-grid` `l-table` `l-matrix` |
 | **Argument** | `l-list` `l-points` `l-steps` `l-timeline` `l-stat` |
 
-One layout per slide; don't blend two. A slide that seems to need a twentieth
+One layout per slide; don't blend two. A slide that seems to need a nineteenth
 layout is usually two slides. `l-grid` uses the dashboard's own span classes
 (`.w4 .w6 .w8 .w12 .h2`), so an overview slide and a dashboard panel stay one
 system.
@@ -238,14 +238,35 @@ job the presenter cannot delegate to a chart. Restate the claim in the same
 words as the cover — the repetition is the point, not a redundancy to edit out.
 
 **4 · Choose a layout per claim.** Now fill the sections. Each claim becomes a
-slide's `h2`, and the layout follows from what that claim needs to be believed —
-a chart and its reading (`l-split`), a chart that carries the whole point
-(`l-full`, `l-media`), a number (`l-stat`), two to four numbers that each need
-a sentence of context and no chart (`l-metrics`), four or six parallel points
-with no measure behind them (`l-points`, `.c3` for six), a comparison on
-identical terms (`l-compare`), a sequence (`l-steps`, `l-timeline`), a
-verbatim (`l-quote`). A claim needing no evidence is an `l-statement`; counting the closing, keep those
-to three or four in a deck or the emphasis stops meaning anything.
+slide's `h2`, and the layout follows from what that claim needs to be believed.
+Read down the table and take the first row that fits. Every layout has one job,
+and the last column names the neighbour it is most often confused with. That
+boundary is what makes two decks built from the same findings pick the same
+layout.
+
+| The claim needs | Layout | Not when — use instead |
+|:--|:--|:--|
+| a chart and the reading of it | `l-split`, with `.wide` when the chart needs the room (many rows, a long axis, long names) | the chart makes the point without words → `l-full` |
+| a chart whose shape is the whole argument | `l-full` | the reading needs more than one line → `l-split` |
+| one figure, or one measure before and after | `l-stat` | the figures are different measures → `l-metrics` |
+| two to four different measures, each needing a sentence, no chart | `l-metrics` | one measure → `l-stat`; a figure whose trend matters → `l-split` |
+| two options, cuts or periods judged on identical terms | `l-compare` | three peers → `l-three` |
+| three peers (options, goals, workstreams), at least two with a chart | `l-three` | all three in words only → `l-list` |
+| three or four small figures that together support one claim | `l-grid` | one chart carries the claim → `l-split` or `l-full`; three equal peers → `l-three` |
+| exact values read across rows, three to six of them | `l-table` | the shape matters more than the values → a chart layout; more than six rows → a handout, not a slide |
+| items placed on two named axes (impact × effort, likelihood × severity) | `l-matrix` | the four boxes have no axes → `l-points` |
+| two or three points, each a heading and two lines, no chart | `l-list` | four or six points → `l-points` |
+| four or six parallel points, each a heading and a paragraph, no chart | `l-points` (`.c3` for six) | two or three → `l-list`; on two axes → `l-matrix`; in order → `l-steps` |
+| a sequence where the order is the message, no dates | `l-steps` | the stages have dates → `l-timeline` |
+| dated milestones: a roadmap or a history | `l-timeline` | no dates → `l-steps` |
+| a verbatim from research, a customer, a review | `l-quote` | your own sentence → `l-statement` |
+| no evidence: the thesis, the turn, the ask | `l-statement` | — |
+
+Point counts are hard boundaries, not suggestions: three points are always an
+`l-list` and four always an `l-points`, never whichever looks better. Five
+points is one too many or one too few, and seven or more is two slides. Keep
+`l-statement` slides to three or four in a deck, counting the closing, or the
+emphasis stops meaning anything.
 
 What varies between two decks built from the same findings should be the
 evidence slides in pass 4 and nothing else. `scripts/check-page.js` checks the
@@ -295,12 +316,12 @@ across a room, for about thirty seconds:
 
 ### The text beside a chart
 
-The reading column in `l-split` and `l-media` is not a caption slot. A single
+The reading column in `l-split` is not a caption slot. A single
 sentence beside a chart leaves a third of the slide empty and forces the
 presenter to say out loud what the slide should have said. Write as much as the
 claim needs to be believed, in this order, stopping when it is said:
 
-- the heading (`h2` in `l-split`, `h3` in `l-media`) — the claim;
+- the `h2` — the claim;
 - one or two `.body` paragraphs — what the chart shows and why it follows;
 - a `<ul class="pts">` of parallel points — the figures, causes or caveats a
   reader would otherwise have to dig out of the chart. `<b>` inside an item
