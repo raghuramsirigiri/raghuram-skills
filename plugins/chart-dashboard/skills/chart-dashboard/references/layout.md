@@ -160,16 +160,16 @@ position — don't write it by hand. Charts sit unframed on the slide, as figure
 do in the report; the only filled surfaces are `.note`, the emphasised table
 rows and the matrix quadrants.
 
-Eighteen layout classes, grouped by the job the slide does:
+Nineteen layout classes, grouped by the job the slide does:
 
 | | |
 |---|---|
 | **Structure** | `l-cover` `l-agenda` `l-section` `l-statement` `l-quote` |
-| **Evidence** | `l-split` `l-media` `l-full` `l-kpi` `l-compare` |
+| **Evidence** | `l-split` `l-media` `l-full` `l-metrics` `l-compare` |
 | **Analysis** | `l-three` `l-grid` `l-table` `l-matrix` |
-| **Argument** | `l-list` `l-steps` `l-timeline` `l-stat` |
+| **Argument** | `l-list` `l-points` `l-steps` `l-timeline` `l-stat` |
 
-One layout per slide; don't blend two. A slide that seems to need a nineteenth
+One layout per slide; don't blend two. A slide that seems to need a twentieth
 layout is usually two slides. `l-grid` uses the dashboard's own span classes
 (`.w4 .w6 .w8 .w12 .h2`), so an overview slide and a dashboard panel stay one
 system.
@@ -178,7 +178,7 @@ system.
 
 The template ships one example of each layout so the markup is visible in one
 place. That order is a catalogue, not a running order — a deck built by keeping
-all nineteen example slides is a deck that argues nothing.
+all twenty-one example slides is a deck that argues nothing.
 
 Build it in four passes, in this order. The order is the point: a deck assembled
 claim-by-claim ends up with whatever scaffolding its author happened to remember
@@ -240,9 +240,11 @@ words as the cover — the repetition is the point, not a redundancy to edit out
 **4 · Choose a layout per claim.** Now fill the sections. Each claim becomes a
 slide's `h2`, and the layout follows from what that claim needs to be believed —
 a chart and its reading (`l-split`), a chart that carries the whole point
-(`l-full`, `l-media`), a number (`l-stat`), a comparison on identical terms
-(`l-compare`), a sequence (`l-steps`, `l-timeline`), a verbatim (`l-quote`). A
-claim needing no evidence is an `l-statement`; counting the closing, keep those
+(`l-full`, `l-media`), a number (`l-stat`), two to four numbers that each need
+a sentence of context and no chart (`l-metrics`), four or six parallel points
+with no measure behind them (`l-points`, `.c3` for six), a comparison on
+identical terms (`l-compare`), a sequence (`l-steps`, `l-timeline`), a
+verbatim (`l-quote`). A claim needing no evidence is an `l-statement`; counting the closing, keep those
 to three or four in a deck or the emphasis stops meaning anything.
 
 What varies between two decks built from the same findings should be the

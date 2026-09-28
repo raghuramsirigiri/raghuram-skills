@@ -100,7 +100,7 @@ slide deck.
    then choose a layout per claim. The reason the spine goes down first is that
    scaffolding added at the end is scaffolding that gets forgotten: the same
    findings would otherwise produce a deck with an agenda one run and none the
-   next. The template's eighteen example slides are a catalogue of the available
+   next. The template's twenty-one example slides are a catalogue of the available
    layouts, never a running order.)*
    Before writing markup, answer: what is the dominant shape of this analysis
    (one trend / a head-to-head comparison / a ranking / a funnel / a

@@ -15,13 +15,17 @@
      Two surfaces, the same pair dashboard.html uses. --ground is the slide
      itself, one soft step darker than the cards; --card is the chart surface,
      the colour the charts paint themselves, so a figure lifts off the slide by
-     luminance rather than by a border alone. --ground is the one page-level
+     luminance alone, with no border or shadow. --ground is the one page-level
      colour choice here — repick it with the palette when you recolour.
      --surface-soft is a third, quieter surface, reserved for notes, tables and
      quadrants — text that belongs to no single chart. */
   :root { --ground:#efece6;
           --card:#f4f4f0; --ink:#111111; --muted:#555555; --hair:#dcdbd7;
           --surface-soft:#eae8e4;
+          /* --hue is the theme's emphasis colour, T.colors[1] — the same hue
+             the charts use to pick out the points a claim names. Synced at load
+             like the tokens above, so a recolour moves it too. */
+          --hue:#2323FF;
           --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif;
           /* Slides are authored at this size and scaled to the column width, so
              every slide is exactly 16:9 and one layout fits every screen. */
@@ -81,14 +85,12 @@
   /* ── Figures ──────────────────────────────────────────────────────────────
      Every chart sits in a card: --card, the lighter of the two surfaces and the
      one the charts paint themselves, over the darker --ground of the slide. The
-     luminance step is what separates the figure; the hairline and the small
-     shadow only sharpen the edge. The card is the only frame a chart gets — no
-     caption rule under it, no second border. */
+     luminance step alone separates the figure: no border, no shadow. The card
+     is the only frame a chart gets — no caption rule under it, no outline. */
   figure { margin:0; }
   .chart { width:100%; height:100%; }
   .fig { display:flex; flex-direction:column; min-height:0; min-width:0;
-    background:var(--card); border:1px solid var(--hair); border-radius:10px;
-    padding:10px; box-shadow:0 1px 2px rgba(0,0,0,0.04); overflow:hidden; }
+    background:var(--card); border-radius:10px; padding:10px; overflow:hidden; }
   /* min-height:0 is load-bearing, not tidiness: a flex item refuses to shrink
      below its content height without it, so a chart whose labels wrap grew past
      the card, and overflow:hidden clipped it — which reads as a card with no
@@ -113,17 +115,17 @@
   .imgbox img { width:100%; height:100%; object-fit:cover; display:block; }
 
   /* ══ LAYOUTS ══════════════════════════════════════════════════════════════
-     Eighteen layouts, each answering a different job a slide has to do. Pick
-     one per slide and do not blend two — a slide that needs a nineteenth
+     Nineteen layouts, each answering a different job a slide has to do. Pick
+     one per slide and do not blend two — a slide that needs a twentieth
      layout is usually two slides.
 
        STRUCTURE   l-cover · l-agenda · l-section · l-statement · l-quote
-       EVIDENCE    l-split · l-media · l-full · l-kpi · l-compare
+       EVIDENCE    l-split · l-media · l-full · l-metrics · l-compare
        ANALYSIS    l-three · l-grid · l-table · l-matrix
-       ARGUMENT    l-list · l-steps · l-timeline · l-stat
+       ARGUMENT    l-list · l-points · l-steps · l-timeline · l-stat
 
-     All eighteen are built from the tokens and the type scale above, which is
-     what keeps them reading as one deck rather than eighteen designs.
+     All nineteen are built from the tokens and the type scale above, which is
+     what keeps them reading as one deck rather than nineteen designs.
      ═════════════════════════════════════════════════════════════════════════ */
 
   /* A layout class goes on the .slide itself, which already has the authored
@@ -158,10 +160,12 @@
      is long, which is the behaviour that keeps a wordy agenda readable. */
   .toc .num { flex:0 0 auto; white-space:nowrap; }
 
-  /* Section divider — a breath between parts. Number, name, nothing else. */
+  /* Section divider — a breath between parts. Number, name, nothing else.
+     The number is --muted, a grey that reads on the light and the dark ground
+     alike. --surface-soft sat one step off the ground and vanished. */
   .l-section { display:flex; flex-direction:column; justify-content:center; }
   .l-section .no { font-size:180px; line-height:1; font-weight:700;
-    letter-spacing:-6px; color:var(--surface-soft); }
+    letter-spacing:-6px; color:var(--muted); }
   .l-section h2 { font-size:52px; margin-top:-20px; }
 
   /* Statement — one sentence carrying a whole beat of the argument: the thesis,
@@ -175,7 +179,9 @@
   /* Quote — a verbatim from research, a customer, a review. The mark sits in
      the margin so the text stays flush with every other slide's left edge. */
   .l-quote { display:grid; grid-template-columns:64px 1fr; gap:24px; align-content:center; }
-  .l-quote .mark { font-size:110px; line-height:.8; font-weight:700; color:var(--surface-soft); }
+  /* The mark takes --hue: in --surface-soft it was a step off the ground and
+     disappeared, and a grey mark reads as a smudge rather than a quotation. */
+  .l-quote .mark { font-size:110px; line-height:.8; font-weight:700; color:var(--hue); }
   .l-quote blockquote { margin:0; font-size:34px; line-height:1.3;
     letter-spacing:-0.7px; font-weight:700; max-width:20em; }
   .l-quote .who { margin-top:24px; font-size:14px; color:var(--muted); }
@@ -214,18 +220,6 @@
     border-top:1px dotted var(--hair); padding-top:10px; }
   .l-full .read b { color:var(--ink); }
 
-  /* KPI strip — the numbers that frame the slide, then the chart that explains
-     them. A row of readouts between two rules, never a row of tiles. */
-  .l-kpi { display:grid; grid-template-rows:auto auto 1fr; gap:18px; }
-  .kpirow { display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr));
-    gap:32px; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair);
-    padding:16px 0; }
-  .kpirow .k span { display:block; font-size:11px; text-transform:uppercase;
-    letter-spacing:.06em; color:var(--muted); }
-  .kpirow .k b { display:block; font-size:34px; font-weight:700; letter-spacing:-1px;
-    margin-top:4px; font-variant-numeric:tabular-nums; }
-  .kpirow .k i { display:block; font-style:normal; font-size:12px; color:var(--muted); }
-
   /* Compare — two options, cuts or periods answered on identical terms. The
      centre rule is what makes it a comparison rather than two half-slides. */
   .l-compare { display:grid; grid-template-columns:1fr 1px 1fr; gap:40px; }
@@ -234,6 +228,17 @@
   .l-compare .side .fig { flex:1; margin-top:14px; }
   .l-compare .side .tag { font-size:11px; text-transform:uppercase;
     letter-spacing:.08em; color:var(--muted); margin-bottom:4px; }
+
+  /* Metrics — two to four figures, each with the sentence that explains it.
+     Where l-stat makes one figure the whole slide, here the figures are the
+     evidence and each one needs a line of context to be read correctly. The figure is ink and the context is
+     muted, so the eye reads the numbers first, then goes back for the words. */
+  .l-metrics { display:grid; grid-template-rows:auto 1fr; gap:28px; }
+  .metrics { display:grid; grid-auto-flow:column; grid-auto-columns:1fr;
+    gap:48px; align-content:center; }
+  .metrics .m b { display:block; font-size:64px; line-height:1; font-weight:700;
+    letter-spacing:-2px; font-variant-numeric:tabular-nums; }
+  .metrics .m .body { margin-top:16px; max-width:18em; }
 
   /* ── ANALYSIS ──────────────────────────────────────────────────────────── */
 
@@ -291,6 +296,19 @@
   .l-list .item .no { font-size:15px; font-weight:700; color:var(--muted);
     font-variant-numeric:tabular-nums; padding-top:3px; }
   .l-list .item .body { max-width:34em; }
+
+  /* Points — a claim over four or six parallel points, each a heading and a
+     short paragraph, with no chart. Two columns for four points; .c3 gives
+     three columns for six. The rows share the space below the claim evenly, so
+     the grid fills the slide instead of sinking to the footer. No rules between
+     the points: the grid and the headings carry the structure. More than six
+     points is two slides. */
+  .l-points { display:grid; grid-template-rows:auto 1fr; gap:32px; }
+  .l-points h2 { max-width:22em; }
+  .points { display:grid; grid-template-columns:repeat(2,1fr); column-gap:72px;
+    align-content:space-evenly; }
+  .l-points.c3 .points { grid-template-columns:repeat(3,1fr); column-gap:48px; }
+  .points .p .body { max-width:30em; }
 
   /* Steps — a sequence where the order is the message: a process, a rollout,
      the stages of a funnel. Numbered, divided, left to right. */
@@ -378,7 +396,7 @@
 <body>
 <div class="deck">
   <!-- WHAT FOLLOWS IS A CATALOGUE, NOT A RUNNING ORDER — one worked example of
-       each layout, so the markup for all eighteen is visible in one place.
+       each layout, so the markup for all nineteen is visible in one place.
        Delete the ones the deck does not need and repeat the ones it does.
 
        THE SPINE IS FIXED, THE EVIDENCE IS NOT. Every deck this skill builds
@@ -422,7 +440,7 @@
       <div class="row">Where the time goes <span class="num">05</span></div>
       <div class="row">Growth by segment <span class="num">06</span></div>
       <div class="part">What we propose <span class="num">Part 2</span></div>
-      <div class="row">The quarter in four numbers <span class="num">08</span></div>
+      <div class="row">Three numbers that moved <span class="num">08</span></div>
       <div class="row">The two options <span class="num">09</span></div>
       <div class="row">Sequencing <span class="num">10</span></div>
       <div class="part">The ask <span class="num">Part 3</span></div>
@@ -491,16 +509,20 @@
       measurement error, so the average hides the whole story.</p>
   </section></div>
 
-  <!-- 8 · KPI strip over a chart -->
-  <div class="page"><section class="slide l-kpi" data-title="Quarter">
-    <h2>The quarter in four numbers</h2>
-    <div class="kpirow">
-      <div class="k"><span>Accounts</span><b>12,480</b><i>+18% vs prior quarter</i></div>
-      <div class="k"><span>Activation</span><b>61%</b><i>+27 points</i></div>
-      <div class="k"><span>Time to value</span><b>4.2d</b><i>−1.9 days</i></div>
-      <div class="k"><span>Support load</span><b>0.8</b><i>tickets per account</i></div>
+  <!-- 8 · Metrics: two to four figures, each with the sentence that explains it. -->
+  <div class="page"><section class="slide l-metrics" data-title="Results">
+    <h2>Three numbers moved after the rebuild</h2>
+    <div class="metrics">
+      <div class="m"><b>61%</b>
+        <p class="body">of new accounts activate in their first week, up from 34%
+          before the change.</p></div>
+      <div class="m"><b>4.2d</b>
+        <p class="body">median time to value, nearly two days faster, with most of
+          the gain in the first session.</p></div>
+      <div class="m"><b>0.8</b>
+        <p class="body">support tickets per account, flat — the new flow added no
+          load while activation rose.</p></div>
     </div>
-    <figure class="fig"><div class="chart" id="c-kpi"></div></figure>
   </section></div>
 
   <!-- 9 · Compare -->
@@ -586,7 +608,52 @@
     </div>
   </section></div>
 
-  <!-- 15 · Steps -->
+  <!-- 15 · Points: four parallel points under one claim. Add .c3 and six points
+       for a three-column grid. -->
+  <div class="page"><section class="slide l-points" data-title="Constraints">
+    <h2>Four constraints shaped the plan</h2>
+    <div class="points">
+      <div class="p"><h3>Two engineers, one quarter</h3>
+        <p class="body">The team is fixed until the next planning cycle, so the
+          rebuild has to fit thirteen weeks with no one borrowed.</p></div>
+      <div class="p"><h3>The identity provider stays</h3>
+        <p class="body">The contract runs another two years. Every change sits on
+          top of it; nothing replaces it.</p></div>
+      <div class="p"><h3>No downtime for enterprise</h3>
+        <p class="body">Enterprise accounts sign in through single sign-on, so the
+          old path stays live until every one of them has moved.</p></div>
+      <div class="p"><h3>Recovery keeps working</h3>
+        <p class="body">A person locked out mid-migration is a support ticket, so
+          recovery ships first and changes last.</p></div>
+    </div>
+  </section></div>
+
+  <!-- 16 · Points, three columns -->
+  <div class="page"><section class="slide l-points c3" data-title="What changes">
+    <h2>What the rebuild changes<br>for each team</h2>
+    <div class="points">
+      <div class="p"><h3>Sign-in</h3>
+        <p class="body">One entry point that remembers the method used last
+          time, instead of three buttons side by side.</p></div>
+      <div class="p"><h3>Verification</h3>
+        <p class="body">Moves from an email round trip to a code on the same
+          screen, so the session never leaves the page.</p></div>
+      <div class="p"><h3>Recovery</h3>
+        <p class="body">Offered on the first failed attempt rather than behind a
+          link most people never find.</p></div>
+      <div class="p"><h3>Support</h3>
+        <p class="body">Sees which method an account uses, which answers most
+          sign-in tickets without a back-and-forth.</p></div>
+      <div class="p"><h3>Security</h3>
+        <p class="body">Rate limits and lockouts stay as they are; only the
+          screens in front of them change.</p></div>
+      <div class="p"><h3>Analytics</h3>
+        <p class="body">Every step emits one event, so drop-off can be read per
+          step instead of for the flow as a whole.</p></div>
+    </div>
+  </section></div>
+
+  <!-- 17 · Steps -->
   <div class="page"><section class="slide l-steps" data-title="How we get there">
     <h2>Four steps, one quarter</h2>
     <div class="steps">
@@ -601,7 +668,7 @@
     </div>
   </section></div>
 
-  <!-- 16 · Timeline -->
+  <!-- 18 · Timeline -->
   <div class="page"><section class="slide l-timeline" data-title="Sequencing">
     <h2>Sequencing across the quarter</h2>
     <div class="tl">
@@ -616,14 +683,14 @@
     </div>
   </section></div>
 
-  <!-- 17 · Stat pair (drop the second .f and the .arrow for a single figure) -->
+  <!-- 19 · Stat pair (drop the second .f and the .arrow for a single figure) -->
   <div class="page"><section class="slide l-stat dark" data-title="Impact">
     <div class="f"><b>34%</b><span>completed sign-up before the change</span></div>
     <div class="arrow micro"><hr>Rebuilt sign-in</div>
     <div class="f"><b>61%</b><span>completed sign-up after</span></div>
   </section></div>
 
-  <!-- 18 · Quote -->
+  <!-- 20 · Quote -->
   <div class="page"><section class="slide l-quote" data-title="Verbatim">
     <div class="mark">&ldquo;</div>
     <div>
@@ -633,7 +700,7 @@
     </div>
   </section></div>
 
-  <!-- 19 · Closing statement -->
+  <!-- 21 · Closing statement -->
   <div class="page"><section class="slide l-statement dark" data-title="The ask">
     <p class="say">We are asking for two engineers for one quarter — <em>and the
       decision this week.</em></p>
@@ -665,6 +732,7 @@ Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2
   s.setProperty('--hair',  t.grid);
   s.setProperty('--font',  t.font);
   s.setProperty('--surface-soft', t.tileSurface);
+  s.setProperty('--hue',   t.colors[1]);
 })();
 </script>
 <script>
@@ -766,16 +834,6 @@ Charts.column('c-full', {
     { y: 3, color: T.muted }, { y: -1, color: T.muted } ] }]
 });
 
-Charts.line('c-kpi', {
-  title: 'Activation by week',
-  subtitle: 'Percent of new accounts',
-  xAxis: { categories: ['W1','W3','W5','W7','W9','W11','W13'] },
-  series: [
-    { name: 'This quarter',  data: [34, 38, 45, 52, 57, 60, 61] },
-    { name: 'Prior quarter', data: [33, 34, 34, 35, 34, 36, 34] }
-  ]
-});
-
 /* Two charts that are read as a comparison MUST share a y scale — left to
    themselves they each fit their own data and the shorter option looks taller
    than it is. Set the same max on both, every time. */
@@ -824,9 +882,8 @@ Charts.donut('c-o2', { title: 'Share of new accounts',
 // Colour here encodes one thing, before vs after: the old state muted, the
 // new one a hue. The trend line is set to ink explicitly — left unnamed, a
 // lone series takes the next palette step, which can pass for "After".
-const dropOff = (before, after) => ({ series: [
-  { name: 'Before', data: [before], color: T.muted },
-  { name: 'After',  data: [after],  color: T.colors[1] } ] });
+const dropOff = (before, after) => ({ series: [{ name: 'Drop-off', data: [
+  { y: before, color: T.muted }, { y: after, color: T.colors[1] } ] }] });
 const trend = data => ({ series: [{ data: data, color: T.colors[0] }] });
 Charts.reportTable('c-table', {
   title: 'Activation by segment',
@@ -836,11 +893,11 @@ Charts.reportTable('c-table', {
     { key: 'trend', kind: 'chart', name: 'Activation, 13 weeks', width: 260,
       chart: { type: 'line',
         xAxis: { categories: ['W1','W3','W5','W7','W9','W11','W13'] } } },
-    // A cell has no room for an axis, so name the bars with series instead
-    // of categories: two named series draw one legend above the table, and
-    // every row reads against it.
+    // Name the bars as categories, once, on the column: each row then labels
+    // its own bars beside them. Left without categories, a bar cell labels
+    // its one unnamed category by index and prints a stray "0" in every row.
     { key: 'drop', kind: 'chart', name: 'Sign-in drop-off · %', width: 240,
-      chart: { type: 'bar',
+      chart: { type: 'bar', xAxis: { categories: ['Before', 'After'] },
         plotOptions: { series: { dataLabels: { enabled: true } } } } },
     { key: 'accounts',   kind: 'kpi', name: 'Accounts' },
     { key: 'activation', kind: 'kpi', name: 'Activation', suffix: '%' },
