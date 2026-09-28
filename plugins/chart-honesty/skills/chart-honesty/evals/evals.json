@@ -44,7 +44,7 @@
         "S4 Fix · Truncated axis: 2.5× drawn vs 3 pts actual (not a % difference); title not flagged",
         "S6 Fix · Pie misuse for more than six slices; no P1 and no units finding",
         "S9 Clean; no Not stated line under it",
-        "S11 Fix · Wrong type (time on a horizontal bar); a Not stated line naming the axis range; Truncated axis NOT raised",
+        "S11 Fix · Wrong type (time on a horizontal bar); last line of its entry is '- Not stated: axis range (Truncated axis not run).'; Truncated axis NOT raised",
         "No question asked; nothing written to disk",
         "Ends with 'Ask \"why is S4 flagged?\" or \"why is S9 clean?\" to see the chart settings behind any verdict.'"
       ]
@@ -73,6 +73,7 @@
       "runs": 3,
       "assertions": [
         "Turn 2 keeps S3's Truncated axis finding and restates drawn 2.6× vs 5% actual",
+        "Turn 2 sizes the distortion only as drawn vs actual: no derived multiplier ('about 30-fold', 'eight times') and no claim about what the board will conclude",
         "Turn 2 offers a line chart (or stating the change in the title) as the way to show a small change honestly",
         "Turn 3 keeps S9's Missing units finding; says the notes say £m and the audience doesn't see notes; fix is e.g. 'Spend (£m)' on the axis",
         "Turn 4 states no cause of its own; says the chart (and S8's slide) doesn't say why",
@@ -91,7 +92,7 @@
       "runs": 3,
       "assertions": [
         "S3 trace quotes the axis min 400 as set (not auto) and the four values with locators, and shows (431−400)÷(412−400) = 2.58 → 2.6× and 431÷412−1 → 5%",
-        "S3 trace names test 4, Set",
+        "S3 trace names the test as 'Test 4 · Truncated axis, Set' and uses the five headings verbatim (Read from the file · Test · Effect · Fix · What would clear it)",
         "S4 clean block has a row for each of the seven tests; the axis row says a line chart is exempt (position, not length); the title row shows the minimum 91.2% is above 90%",
         "Turn 3 holds Dual axis: names the two value axes from the file, says the crossing is set by two independent scales, offers two stacked charts or indexing to 100",
         "Turn 4 gives no value, axis range, ratio or 'appears to' reading from the picture",
