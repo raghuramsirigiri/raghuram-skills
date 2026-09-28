@@ -156,9 +156,11 @@ Save as PDF gives A4 landscape, one slide per sheet.
 Markup is one `<div class="page">` per slide wrapping one
 `<section class="slide l-…" data-title="…">`. The footer strip (deck name,
 context, slide title, number) is generated from `data-title` and the slide's
-position — don't write it by hand. Charts sit unframed on the slide, as figures
-do in the report; the only filled surfaces are `.note`, the emphasised table
-rows and the matrix quadrants.
+position — don't write it by hand. Every chart sits in a `.fig` card: the
+lighter `--card` fill over the slide's `--ground`, with no border or shadow, so
+the fill alone lifts the figure off the slide. Don't add a frame of your own.
+The only other filled surfaces are `.note`, the emphasised table rows and the
+matrix quadrants.
 
 Eighteen layout classes, grouped by the job the slide does:
 
