@@ -139,6 +139,14 @@ slide deck.
    `reportTable` chart column a `width` that fits its data, and choose the
    smallest span that holds the table (`layout.md` § Tables size themselves).
 
+   And **size every cell from its data, not from its rank.** The span follows
+   how many values run across the chart, the height how many run down it: five
+   columns across a `w12` are slabs in a flat strip, forty in a `w4` are
+   hairlines. Once step 5 has picked each chart, count its categories or rows
+   and check the span against `layout.md` § Size each cell from its data. When
+   the count says narrower than the composition wanted, give the row a partner
+   rather than stretching the chart.
+
 5. **Choose a chart per panel** using `references/chart-selection.md` (start at
    § First: what is one item of this data?, not at the big table), then write
    the config against the API — don't guess option names. The API is split so

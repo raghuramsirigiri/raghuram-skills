@@ -365,6 +365,7 @@ const sized = Object.values(grid).every(v => v != null) && manifest
 if (!sized.length) {
   ok('charts fit their cells', 'no charts in a dashboard grid to size');
   ok('titles fit their charts', 'no charts in a dashboard grid to size');
+  ok('bars sized to their cell', 'no charts in a dashboard grid to size');
 } else {
   const tooSmall = [];
   for (const c of sized) {
@@ -407,6 +408,59 @@ if (!sized.length) {
     return null;
   }).filter(Boolean);
   if (crowded.length) note('crowded axes', crowded.join(' | ') + ' in a cell narrower than w8 — consider w8 or w12 (manifest gridSpanWhen)');
+
+  // The other direction: a cell too big for its data. The engine divides the
+  // plot evenly between categories and a bar takes 48% of its slot (group and
+  // point padding 0.2/0.1), shared between the series of an unstacked group.
+  // Five columns across a w12 are 140px slabs; forty in a w4 are hairlines
+  // under slanted labels. Both follow from the category count and the span,
+  // so the span is picked from the data (references/layout.md § Size each
+  // cell from its data). Horizontal bars run the same sum down the height.
+  const BAR = { fat: 72, thin: 6, slot: 36, rowFat: 44, rowSlot: 18 };
+  const barGeom = c => {
+    const cfg = c.cfg;
+    const series = Array.isArray(cfg.series) ? cfg.series.filter(isObj) : [];
+    const n = (catsOf(cfg) || []).length || Math.max(0, ...series.map(s => Array.isArray(s.data) ? s.data.length : 0));
+    if (!n) return null;
+    const po = isObj(cfg.plotOptions) ? cfg.plotOptions : {};
+    const stacked = [po.column, po.bar, po.series].some(p => isObj(p) && p.stacking);
+    const pad = [po.column, po.bar, po.series].find(p => isObj(p) && typeof p.groupPadding === 'number');
+    const k = stacked ? 1 : Math.max(1, series.length);
+    // A bar's thickness in a plot `len` px long, and the slot per category.
+    const f = (1 - 2 * (pad ? pad.groupPadding : 0.2)) * 0.8 / k;
+    return { n, k, at: len => ({ slot: len / n, bar: f * len / n }) };
+  };
+  const misfit = [];
+  for (const c of sized) {
+    if (!/^(column|bar)$/.test(c.type) || !isObj(c.cfg)) continue;
+    const g = barGeom(c);
+    if (!g) continue;
+    const what = c.id + ' (' + c.type + ', ' + g.n + ' categor' + (g.n === 1 ? 'y' : 'ies') + (g.k > 1 ? ' × ' + g.k + ' series' : '') + ') in ' + c.cell.cls;
+    if (c.type === 'column') {
+      // Plot width: the cell less the value axis and its labels.
+      const plot = w => cellPx(w) - 60;
+      const ok = w => { const a = g.at(plot(w)); return a.bar <= BAR.fat && a.slot >= BAR.slot && a.bar >= BAR.thin; };
+      if (ok(c.cell.w)) continue;
+      const a = g.at(plot(c.cell.w));
+      const fits = [4, 6, 8, 12].filter(ok);
+      const fix = fits.length ? '→ w' + fits.join(' or w')
+        : a.bar > BAR.fat ? '→ w4 with more groupPadding, or state the ' + g.n + ' values as KPIs'
+        : '→ w12, a horizontal bar, or fewer categories';
+      misfit.push(what + ': ' + (a.bar > BAR.fat ? Math.round(a.bar) + 'px-wide bars' : Math.round(a.slot) + 'px per category') + '  ' + fix);
+    } else if (c.cell.py != null) {
+      // Horizontal bars: the plot height is the row less title, legend and axis.
+      const plot = h => cellPy(h) - 90;
+      const h = /\bh2\b/.test(c.cell.cls) ? 2 : 1;
+      const a = g.at(plot(h));
+      if (a.slot < BAR.rowSlot) {
+        misfit.push(what + ': ' + Math.round(a.slot) + 'px per row  → ' + (h === 1 && g.at(plot(2)).slot >= BAR.rowSlot ? 'h2' : 'a .bento.flow row with barList, or fewer rows'));
+      } else if (a.bar > BAR.rowFat) {
+        misfit.push(what + ': ' + Math.round(a.bar) + 'px-thick bars  → ' + (h === 2 ? 'drop the h2' : 'share the row with a narrower partner, or use a column chart'));
+      }
+    }
+  }
+  if (misfit.length) bad('bars sized to their cell', misfit.join(' | '));
+  else ok('bars sized to their cell', 'every column and bar chart has room per category without slab-wide bars');
 }
 
 // ── 2c. donut and pie options are where the engine reads them ────────
