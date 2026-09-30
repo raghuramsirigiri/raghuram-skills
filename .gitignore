@@ -23,3 +23,8 @@ temp/
 
 # working docs
 graphify-out/
+
+# per-machine skill installs (skills CLI)
+.agents/skills/
+.claude/skills/
+skills-lock.json
