@@ -100,6 +100,73 @@ Charts fill their cell (`.chart {width:100%;height:100%}`) and charts-lib
 re-reads the container size on render, so a panel that looks cramped needs a
 bigger span, not a chart-level width.
 
+### Size each cell from its data — width and height
+
+The composition table above says *where* a panel goes; this says *how big*.
+The two can disagree, and when they do, the data wins: a finding that leads
+but has five bars still gets a cell sized for five bars. Pick the span from
+**how many values run across** the chart and the height from **how many run
+down** it. Charts stretch to fill whatever cell they get, so a wrong span shows
+up as slab-wide bars in a flat strip (too wide) or hairlines under slanted
+labels (too narrow) — never as an error.
+
+Cell sizes at the template's full width (1600px page, 340px rows), to do the
+sums with:
+
+| Span | Inner width | | Height | Inner height |
+|:--|:--|:--|:--|:--|
+| `w4` | ~490px | | one row | ~330px |
+| `w6` | ~750px | | `h2` | ~680px |
+| `w8` | ~1,000px | | `.bento.flow` | the content's own |
+| `w12` | ~1,520px | | | |
+
+**Across — columns, lines, heatmaps, waterfalls.** A column is about half
+its category slot wide (the rest is padding), and an unstacked group splits
+that half between its series. Keep each bar at or under ~72px and each category
+slot at least 36px. For a single-series or stacked column chart that gives:
+
+| Categories on the x-axis | Spans that fit | Pick |
+|:--|:--|:--|
+| 2 | none — every span gives slabs | KPI tiles, or a `w4` with `groupPadding: 0.3` |
+| 3–4 | `w4` | `w4` |
+| 5–6 | `w4`, `w6` | `w4` beside its partner, `w6` in a pair |
+| 7–11 | `w4` – `w8` | `w6` |
+| 12–19 | `w6`, `w8` | `w8` |
+| 20–26 | `w8`, `w12` | `w12` |
+| 27–40 | `w12` | `w12` |
+| 40+ | none | a horizontal `bar` / `barList`, or bin it |
+
+Grouped columns can go one span wider than this (each bar is a share of its
+slot), but the category labels still need their 36px.
+
+A line chart has no bar to go fat, but it has the same labels: 12+ points
+wants `w8`, and a 4-point line alone across `w12` is a flat strip — pair it. A
+heatmap with 25+ columns and a waterfall with 8+ steps want `w8`+.
+
+**Down — horizontal bars, `barList`, `dumbbell`, `table`.** Each row needs at
+least ~18px of height and a bar thicker than ~44px reads as a block. A one-row
+cell holds **3–13 bars**, an `h2` **7–33**; past that the list goes in a
+`.bento.flow` row (`barList` grows to its rows there). Four bars in an `h2` are
+70px-thick slabs — drop the `h2`.
+Width matters less here: `w4` holds short labels, `w6` long ones.
+
+**Shape-keeping charts — donut, pie, radar, waffle, packed bubble.** They draw
+at the cell's shorter side and centre, so extra width is empty card. `w4` in a
+one-row cell; `w6` only when the legend or axis names are long. Never `w8` or
+`w12` for one of these — give the spare width to a neighbour.
+
+**The row sets the height for everyone in it.** All cells in a `.bento` row
+share its 340px. So a chart that needs more height (a 15-bar list, a tile map)
+takes `h2` *with a partner beside it that has two rows' worth of content* —
+two stacked `w4`s, or an `h2` ranked list — never an `h2` beside empty space.
+
+When the sums point to a narrower span than the composition wanted, **fill the
+row with a partner, not by stretching**: pair the five-bar composition with the
+donut it complements (`w6 + w6`), or put it `w4` next to the `w8` it explains.
+
+`check-page.js` runs these sums on column and horizontal-bar charts ("bars
+sized to their cell") and names the span that fits.
+
 ### Tables size themselves — don't box them into grid rows
 
 `table`, `reportTable` and `barInsightTable` are as tall as their rows. They

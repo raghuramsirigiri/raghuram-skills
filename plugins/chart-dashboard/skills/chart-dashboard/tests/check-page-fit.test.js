@@ -83,3 +83,46 @@ test('a donut inside Charts.panels is checked too', () => {
   assert.ok(!r.passed, r.line);
   assert.match(r.line, /c1 › panel 2: showPercentages/);
 });
+
+// ── bars sized to their cell ─────────────────────────────────────────
+const cols = (n, extra = '') => `Charts.column('c1', { title: 'T', xAxis: { categories: [${
+  Array.from({ length: n }, (_, i) => `'C${i}'`).join(',')}] }, series: [{ name: 'A', data: [${Array(n).fill(1).join(',')}] }]${extra} });`;
+const bars = n => `Charts.bar('c1', { title: 'T', xAxis: { categories: [${
+  Array.from({ length: n }, (_, i) => `'R${i}'`).join(',')}] }, series: [{ name: 'A', data: [${Array(n).fill(1).join(',')}] }] });`;
+const ROW = 'bars sized to their cell';
+
+test('five columns across a w12 fail as slabs and name the spans that fit', () => {
+  const r = check('cols5-w12', { cell: 'w12', call: cols(5) }, ROW);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /5 categories\) in w12: \d+px-wide bars {2}→ w4 or w6/);
+  assert.ok(check('cols5-w6', { cell: 'w6', call: cols(5) }, ROW).passed);
+});
+
+test('forty columns in a w4 fail as crowded; the same in a w12 pass', () => {
+  const r = check('cols40-w4', { cell: 'w4', call: cols(40) }, ROW);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /px per category {2}→ w12/);
+  assert.ok(check('cols40-w12', { cell: 'w12', call: cols(40) }, ROW).passed);
+});
+
+test('grouped columns share the slot, so the same categories fit a wider cell', () => {
+  const grouped = cols(5).replace("}] }", "}, { name: 'B', data: [1,1,1,1,1] }] }");
+  assert.ok(check('cols5x2-w8', { cell: 'w8', call: grouped }, ROW).passed);
+  assert.ok(!check('cols5-w8', { cell: 'w8', call: cols(5) }, ROW).passed);
+});
+
+test('stacked columns are one bar per category, however many series', () => {
+  const stacked = cols(5, ", plotOptions: { column: { stacking: 'percent' } }")
+    .replace("}] }", "}, { name: 'B', data: [1,1,1,1,1] }] }");
+  assert.ok(!check('stack5-w12', { cell: 'w12', call: stacked }, ROW).passed);
+});
+
+test('horizontal bars are sized by the height: too many rows want h2, too few drop it', () => {
+  const many = check('bar20-h1', { cell: 'w6', call: bars(20) }, ROW);
+  assert.ok(!many.passed, many.line);
+  assert.match(many.line, /px per row {2}→ h2/);
+  assert.ok(check('bar20-h2', { cell: 'w6 h2', call: bars(20) }, ROW).passed);
+  const few = check('bar4-h2', { cell: 'w6 h2', call: bars(4) }, ROW);
+  assert.ok(!few.passed, few.line);
+  assert.match(few.line, /drop the h2/);
+});
