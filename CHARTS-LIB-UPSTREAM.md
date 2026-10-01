@@ -7,13 +7,12 @@ up here until it lands in `svg-charts`; then the copy is re-synced and the
 section is deleted, so that syncing the library again never silently removes
 behaviour the skill depends on.
 
-Two changes are outstanding, both proposed and not applied: the copy is still
+One change is outstanding, proposed and not applied: the copy is still
 identical to upstream.
 
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
 | 4 | A bar or column with no category name gets a blank label, not its index | `engines/bar.js` | proposed | `templates/slides.html` report table; any `bar`/`column` cell in a `reportTable` |
-| 5 | Column and bar thickness capped by `maxPointWidth` (default 72px), as waterfall already is | `engines/bar.js` | proposed | any dashboard cell wider than its category count needs (`layout.md` § Size each cell from its data) |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -102,84 +101,6 @@ its bars with categories, and `report-table.md` tells authors to do the same.
 
 ---
 
-## 5. Column and bar thickness capped by `maxPointWidth`
-<!-- check: proposed; file: charts.js; needle: plotCommon.maxPointWidth -->
-
-### Problem
-
-`Charts.column` and `Charts.bar` make each bar a fixed share of its category
-slot (group padding 0.2, point padding 0.1, so 48% of the slot) with no upper
-bound. Few categories in a wide box give slabs:
-
-```js
-// in a 1,500px-wide dashboard cell
-Charts.column('cell', {
-  xAxis: { categories: ['Jul 2025', 'Oct 2025', 'Jan 2026', 'Apr 2026', 'Jun 2026'] },
-  plotOptions: { column: { stacking: 'percent' } },
-  series: [ /* three channels */ ]
-});
-// draws 141px-wide columns; the eye reads area rather than height
-```
-
-`Charts.waterfall` already caps its bars with `plot.maxPointWidth || 72`, so
-the two engines draw the same five values at very different weights.
-
-### Why the skill needs it
-
-A 100% stacked column chart with 5 categories, placed across a `w12`, was the
-logistics example's channel-mix panel. The skill now sizes cells from their
-data: `layout.md` § Size each cell from its data, plus the "bars sized to their
-cell" check in `scripts/check-page.js`, which fails exactly this case. But the
-check only reads literal configs in dashboard grid cells. Deck figures, report
-figures, `panels` and configs built at runtime still stretch unchecked. A cap in
-the engine is the safety net for the pages the check can't see.
-
-### Change
-
-`charts-lib/engines/bar.js`. Read `maxPointWidth` with the other padding
-options and cap each bar's thickness with it. Bars stay centred in their slot:
-the stacked path centres on `catCenterX`/`catCenterY`, and the grouped path
-already centres each bar within its share of the group. Hunk positions are
-omitted: this was written against the bundled `charts.js` (lines 3938, 4324,
-4331, 4347 and 4357 at `c196b94`), not an upstream checkout.
-
-```diff
-     const pointPadding = plotCommon.pointPadding != null ? plotCommon.pointPadding : 0.1;
-     const groupPadding = plotCommon.groupPadding != null ? plotCommon.groupPadding : 0.2;
-+    const maxPointWidth = plotCommon.maxPointWidth != null ? plotCommon.maxPointWidth : 72;
-@@
--              const barW = ((IW / n) * (1 - groupPadding * 2)) * (1 - pointPadding * 2);
-+              const barW = Math.min(maxPointWidth, ((IW / n) * (1 - groupPadding * 2)) * (1 - pointPadding * 2));
-@@
--              const barH = ((IH / n) * (1 - groupPadding * 2)) * (1 - pointPadding * 2);
-+              const barH = Math.min(maxPointWidth, ((IH / n) * (1 - groupPadding * 2)) * (1 - pointPadding * 2));
-@@
--              const barW = (groupW / groupCount) * (1 - pointPadding * 2);
-+              const barW = Math.min(maxPointWidth, (groupW / groupCount) * (1 - pointPadding * 2));
-@@
--              const barH = (groupH / groupCount) * (1 - pointPadding * 2);
-+              const barH = Math.min(maxPointWidth, (groupH / groupCount) * (1 - pointPadding * 2));
-```
-
-Document `plotOptions.column.maxPointWidth` / `.bar.maxPointWidth` in
-upstream's README next to `pointPadding` and `groupPadding`, and add it to the
-manifest's column and bar entries.
-
-### Apply and verify
-
-Apply in `svg-charts`, rebuild, and run its tests. Then draw the example above
-in a 1,500px box: the columns are 72px wide and centred in their slots. The
-same chart in a 480px box is unchanged, since its bars are narrower than the
-cap. `maxPointWidth: Infinity` restores today's drawing.
-
-### Current state
-
-Proposed, not applied. The skill does not need it to work: `layout.md` tells
-authors to pick the span from the category count, and `check-page.js` fails
-slab-wide columns in dashboard cells.
-
----
-
 ## Syncing the copy
 
 The skill vendors four files, not upstream's one-file `charts.min.js`: the
@@ -221,7 +142,7 @@ Default to *proposed*: write it up, leave the copy alone. Apply it to the copy
 only when the skill is broken without it, and say so in the section.
 
 1. Add a row to the table at the top and a section below it, following the
-   shape of the two above: **Problem**, **Why the skill needs it**,
+   shape of the one above: **Problem**, **Why the skill needs it**,
    **Change** (as a diff against the upstream engine file, not the bundle),
    **Apply and verify**, **Current state**.
 2. Give the section a check comment on its own line, right under the heading:
