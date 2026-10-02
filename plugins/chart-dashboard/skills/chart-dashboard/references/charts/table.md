@@ -61,6 +61,6 @@ Charts.table('container', {
   row labels), `pills` (false colours the text instead of a fill).
 - **Sizing**: grows to its rows with no container height; given a taller one,
   the rows open up to half again their height and the rest is blank. Put it in a
-  `<div class="bento flow">` row — see `layout.md` § Tables size themselves. It
+  `<div class="bento flow">` row — see `layout-dashboard.md` § Tables size themselves. It
   needs about 480px; with four or fewer data columns one grid track holds it.
 - **Returns** the standard handle plus `getRows()`.

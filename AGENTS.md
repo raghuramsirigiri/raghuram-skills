@@ -26,7 +26,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 2. Read these before writing chart code — do not guess option names:
    - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
    - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
-   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — deriving the grid from the findings; spans and page structure
+   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md` or `layout-deck.md` (read only the one for your format)
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
    - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
    - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
@@ -63,7 +63,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 - Build static pages unless the user asked for an editable one. An editable page
   ships as two files: `<name>.html` (final) and `<name> (working copy).html`.
 - In a deck, lay the fixed spine first — cover, agenda, section dividers,
-  closing statement — then choose a layout per claim (`references/layout.md`).
+  closing statement — then choose a layout per claim (`references/layout-deck.md`).
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.

@@ -506,7 +506,7 @@
           out.warnings.push('This space is ' + w + 'px wide; a ' + t.type + ' needs about ' + m.minWidth + 'px.');
         }
         // Tables are as tall as their rows. In a fixed-height card the rows
-        // stretch and leave a blank band (layout.md, Tables size themselves).
+        // stretch and leave a blank band (layout-dashboard.md, Tables size themselves).
         var grid = !sp && el && el.closest ? el.closest('.bento') : null;
         if (out.ok && TABLES[t.type] && !TABLES[entry.type] && grid && !grid.classList.contains('flow')) {
           out.warnings.push('Tables size to their rows; in this fixed-height card they leave empty space below.');

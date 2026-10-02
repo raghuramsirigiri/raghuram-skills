@@ -209,7 +209,7 @@ Two neighbours cover what it can't:
 - **A row needs a trend, not a single length** — a sparkline per metric, a
   donut per segment — or more than one number → `Charts.reportTable`. Figures go
   in `kpi` columns, commentary in `insight`, and chart columns share a value
-  scale so rows still compare. It sizes to its rows, so it goes in a `bento flow` row (layout.md § Tables size themselves).
+  scale so rows still compare. It sizes to its rows, so it goes in a `bento flow` row (layout-dashboard.md § Tables size themselves).
 
 ## Choosing among the specialist charts
 

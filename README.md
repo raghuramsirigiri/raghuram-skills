@@ -470,7 +470,10 @@ plugins/chart-dashboard/skills/chart-dashboard/
 │   ├── chart-api.md                # core library API — factories, shared options, sizing
 │   ├── charts/                     # one file per chart engine, plus lifecycle and theme tokens
 │   ├── chart-selection.md          # data shape → chart type, emphasis, anti-patterns
-│   ├── layout.md                   # picking the format; deriving the grid or the slide sequence
+│   ├── layout.md                   # rules every format shares; routes to the per-format file
+│   ├── layout-dashboard.md         # deriving the grid; sizing cells and tables
+│   ├── layout-report.md            # the paper column, figures and captions
+│   ├── layout-deck.md              # the spine, a layout per claim, deck charts
 │   ├── annotation.md               # callouts, plot bands, forecast vs. measured notation
 │   ├── narrative.md                # action titles; where a finding goes
 │   ├── controls.md                 # wiring a filter so every panel and title follows it
