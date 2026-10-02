@@ -414,7 +414,7 @@ if (!sized.length) {
   // point padding 0.2/0.1), shared between the series of an unstacked group.
   // Five columns across a w12 are 140px slabs; forty in a w4 are hairlines
   // under slanted labels. Both follow from the category count and the span,
-  // so the span is picked from the data (references/layout.md § Size each
+  // so the span is picked from the data (references/layout-dashboard.md § Size each
   // cell from its data). Horizontal bars run the same sum down the height.
   const BAR = { fat: 72, thin: 6, slot: 36, rowFat: 44, rowSlot: 18 };
   const barGeom = c => {

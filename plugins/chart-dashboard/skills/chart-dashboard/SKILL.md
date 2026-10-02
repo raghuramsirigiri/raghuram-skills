@@ -91,7 +91,7 @@ slide deck.
    produces.
 
    *(Building a deck? A deck derives its **evidence** from the findings the same
-   way, but its **spine** is fixed, and `references/layout.md` § Compose the
+   way, but its **spine** is fixed, and `references/layout-deck.md` § Compose the
    sequence has the four passes — read it before writing slides. In short: write
    the claims, group them into sections (one section per question the data
    answers), then lay the spine before any evidence slide — `l-cover` first,
@@ -106,7 +106,7 @@ slide deck.
    (one trend / a head-to-head comparison / a ranking / a funnel / a
    distribution / parallel equal measures / geography)? Is there genuinely one
    panel that is the reason the page exists? The answers pick the opening row —
-   worked derivations for each shape are in `references/layout.md` § Compose the
+   worked derivations for each shape are in `references/layout-dashboard.md` § Compose the
    grid from the findings.
 
    Two checks before you move on. **A hero must be earned**: `w8 h2` goes to a
@@ -137,13 +137,13 @@ slide deck.
    they go in a content-sized `<div class="bento flow">` row, never in a fixed
    cell or an `.h2`. A fixed cell leaves a blank band under the last row. Give a
    `reportTable` chart column a `width` that fits its data, and choose the
-   smallest span that holds the table (`layout.md` § Tables size themselves).
+   smallest span that holds the table (`layout-dashboard.md` § Tables size themselves).
 
    And **size every cell from its data, not from its rank.** The span follows
    how many values run across the chart, the height how many run down it: five
    columns across a `w12` are slabs in a flat strip, forty in a `w4` are
    hairlines. Once step 5 has picked each chart, count its categories or rows
-   and check the span against `layout.md` § Size each cell from its data. When
+   and check the span against `layout-dashboard.md` § Size each cell from its data. When
    the count says narrower than the composition wanted, give the row a partner
    rather than stretching the chart.
 
@@ -169,7 +169,8 @@ slide deck.
    cd <skill-dir>/references && cat chart-api.md charts/line.md charts/table.md narrative.md
    ```
    The same goes for the earlier steps: read `chart-selection.md`,
-   `layout.md` and the template in one command rather than three.
+   `layout.md`, your format's `layout-<format>.md` and the template in one
+   command rather than four.
 
    For a single fact about one engine — what it refuses, whether it self-sizes,
    how many grid tracks it wants, its minimum readable size — read its entry in
@@ -369,7 +370,7 @@ slide deck.
   equally important measures, say — don't manufacture a hero; equal panels are
   the honest layout. The rest of the grid follows the same logic: the shape of
   the analysis picks the rows, and a layout reused from the last page is a layout
-  that describes the last page's data (`references/layout.md`).
+  that describes the last page's data (`references/layout-dashboard.md`).
 - Every panel gets a `title` and a `subtitle` that states units and scope
   ("USD thousands · Q4 2025"). Put units in `yAxis.suffix` and
   `tooltip.valueSuffix` too.
