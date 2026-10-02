@@ -212,12 +212,16 @@ cannot settle. Four triggers, and what each one is built from:
 | **Quantify the gap** | On a comparison, state the magnitude of the delta that matters instead of leaving it to be eyeballed | see below |
 | **Deliver the punchline** | In a narrative page, one bold callout carrying the chart's thesis | a single `callout` in `T.callout`, or `plotBand.paragraph` |
 
-**On quantifying the gap:** charts-lib has **no dumbbell chart**. Don't reach for
-one. The expressible forms are `type:'columnrange'` with `data:[[low,high],…]`
-for a span per category, grouped bars with a callout carrying the computed
-difference, or `barInsightTable`, whose stat column exists precisely so each row
-can state its own delta. Compute the number and put it in the text — "+18 pts vs.
-plan" — rather than trusting the reader to subtract two bar lengths.
+**On quantifying the gap:** when the gap is between two states per category —
+before/after, plan/actual — use `Charts.dumbbell`. It draws the difference as
+the rod between two dots and writes the delta in a column on every row
+(`showDelta`, on by default), so the gap needs no callout at all
+(`charts/dumbbell.md`). Elsewhere, the expressible forms are `type:'columnrange'`
+with `data:[[low,high],…]` for a span per category, grouped bars with a callout
+carrying the computed difference, or `barInsightTable`, whose stat column exists
+precisely so each row can state its own delta. Compute the number and put it in
+the text — "+18 pts vs. plan" — rather than trusting the reader to subtract two
+bar lengths.
 
 ### Annotation instead of recolouring
 
