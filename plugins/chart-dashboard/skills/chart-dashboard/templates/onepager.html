@@ -110,8 +110,8 @@
      summary that can be read on its own, and a byline rule carrying scope and
      the reporting window. Not a KPI tile row — tiles are dashboard furniture,
      and on paper they read as a widget pasted onto a document. Headline
-     figures belong in the summary sentence, or in a .stat beside the paragraph
-     that explains them. */
+     figures belong in the summary sentence, or in a .facts line beside the
+     paragraph that explains them. */
   header.masthead { height:var(--band-head); flex:0 0 auto; display:flex;
     flex-direction:column; }
   .kicker { font-size:9px; line-height:1.2; font-weight:700; color:var(--muted);
@@ -151,7 +151,8 @@
   /* ── Blocks ───────────────────────────────────────────────────────────────
      Five. A new block type is a second design system on the page, and none of
      the five is compulsory — a page with no list and no note is a normal page,
-     not an incomplete one. */
+     not an incomplete one. The note in particular has to earn its place: see
+     the comment on it below. */
 
   /* 1. A heading and its paragraph: the unit the argument is made of. */
   .blk { margin:0 0 10px; }
@@ -182,19 +183,27 @@
     width:5px; height:1px; background:var(--muted); }
   ul.pts li b { font-weight:700; }
 
-  /* 4. A figure that is a single number, set beside the sentence explaining it.
-        This is where a headline statistic goes — never a row of six. */
-  .stat { margin:0 0 10px; }
-  .stat b { display:block; font-size:21px; line-height:1.05; font-weight:700;
-    letter-spacing:-0.5px; }
-  .stat span { display:block; font-size:9px; line-height:1.3; color:var(--muted);
-    margin-top:2px; }
-  .stat-row { display:flex; gap:12px; margin:0 0 10px; }
-  .stat-row .stat { flex:1; min-width:0; margin:0; }
+  /* 4. Figures that belong to the prose. A number set large over a small grey
+        label is a KPI tile with the tile taken off: at 21px it was bigger than
+        this page's own 17px headline, which made it the loudest thing on the
+        sheet and read as a widget pasted into a document. A brief states a
+        figure in a line and moves on, so that is what this is — the number
+        bold at the size of a section heading, its meaning running on after it,
+        the set bounded by a hairline. Two or three lines, never six. */
+  .facts { margin:0 0 10px; padding:6px 0;
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+  .facts p { margin:0 0 3px; font-size:10px; line-height:1.45; }
+  .facts p:last-child { margin-bottom:0; }
+  .facts b { font-size:12.5px; font-weight:700; letter-spacing:-0.2px; }
 
-  /* 5. A filled surface, for text belonging to no figure: a caveat, a method
-        note, the ask. Use it when the page has one, not because the template
-        has one. */
+  /* 5. A filled surface, for text belonging to no figure. It is the block most
+        likely to be furniture: the first draft of this page carried a "How to
+        read the figures" note saying the median is used and the mean is 9.1h,
+        which is word for word what Fig 1's caption already said. A note that
+        restates a caption, a subtitle or a sentence of the prose is not a
+        caveat, it is the template showing through — delete it and spend the
+        60px on something the page does not yet say. check-page.js looks for
+        the overlap and says so. */
   .note { background:var(--surface-soft); border-radius:var(--radius);
     padding:8px 10px; font-size:9.5px; line-height:1.45; margin:0 0 10px; }
   .note b { display:block; text-transform:uppercase; font-size:8px;
@@ -280,7 +289,7 @@
                .blk        heading + 3 lines              ~70px
                .fig        the --fig-h you give it, + ~25px for the caption
                ul.pts      ~20px an item
-               .stat       ~55px   (.stat-row puts two side by side for the same)
+               .facts      ~25px a line, hairline-bounded
                .note       ~60px   — only when the page has a caveat to carry
              None is compulsory. Repeat whichever the argument needs.
 

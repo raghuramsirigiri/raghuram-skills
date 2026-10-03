@@ -247,6 +247,39 @@ test('no @page margin at all fails: the sheet is sized against a known one', () 
   assert.match(out, /FAIL {2}fits one page\s+no "@page \{ margin: Nmm \}"/);
 });
 
+// ── a note that only repeats a caption ───────────────────────────────
+test('a note that restates its figure caption is flagged, with the phrase', () => {
+  const file = path.join(dir, 'dupe-note.html');
+  fs.writeFileSync(file,
+    '<div class="col"><figure class="fig"><div class="chart" id="c1"></div>' +
+    '<figcaption><b>Fig 1</b> Median, not mean — a few multi-day escalations pull the mean to 9.1h.</figcaption></figure>' +
+    '<div class="note"><b>How to read the figures</b> First response is the median. ' +
+    'A few multi-day escalations pull the mean to 9.1h, which is why the median is used.</div></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const l = out.split(/\r?\n/).find(x => x.includes('nothing said twice'));
+  assert.ok(/^\s*----/.test(l), 'should be a note, not a pass or a fail: ' + l);
+  assert.match(l, /repeats "a few multi day escalations pull/);
+  assert.match(l, /furniture, not a caveat/);
+});
+
+test('a note carrying something of its own passes', () => {
+  const file = path.join(dir, 'real-note.html');
+  fs.writeFileSync(file,
+    '<div class="col"><figure class="fig"><div class="chart" id="c1"></div>' +
+    '<figcaption><b>Fig 1</b> Routing changed at the start of week 3.</figcaption></figure>' +
+    '<div class="note"><b>Caveat</b> Two sites were excluded: their scanners were offline all quarter.</div></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  assert.match(out, /PASS {2}nothing said twice\s+1 note\(s\), none repeating a caption/);
+});
+
+test('a page with no note says so rather than passing silently', () => {
+  const r = page('no-note', { columns: [[170]], calls: line('c1') })('nothing said twice');
+  assert.ok(r.passed, r.line);
+  assert.match(r.line, /no note on the page/);
+});
+
 // ── nothing that needs a pointer ─────────────────────────────────────
 test('a control fails: it prints as a grey box', () => {
   const file = path.join(dir, 'with-filter.html');

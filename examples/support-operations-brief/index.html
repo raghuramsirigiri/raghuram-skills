@@ -115,13 +115,11 @@
     width:5px; height:1px; background:var(--muted); }
   ul.pts li b { font-weight:700; }
 
-  .stat { margin:0 0 10px; }
-  .stat b { display:block; font-size:21px; line-height:1.05; font-weight:700;
-    letter-spacing:-0.5px; }
-  .stat span { display:block; font-size:9px; line-height:1.3; color:var(--muted);
-    margin-top:2px; }
-  .stat-row { display:flex; gap:12px; margin:0 0 10px; }
-  .stat-row .stat { flex:1; min-width:0; margin:0; }
+  .facts { margin:0 0 10px; padding:6px 0;
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+  .facts p { margin:0 0 3px; font-size:10px; line-height:1.45; }
+  .facts p:last-child { margin-bottom:0; }
+  .facts b { font-size:12.5px; font-weight:700; letter-spacing:-0.2px; }
 
   .note { background:var(--surface-soft); border-radius:var(--radius);
     padding:8px 10px; font-size:9.5px; line-height:1.45; margin:0 0 10px; }
@@ -192,9 +190,9 @@
                 <figcaption><b>Fig 2</b> Top four reasons; the remaining 2,730 contacts are product questions and a long tail.</figcaption>
               </figure>
 
-              <div class="stat-row">
-                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
-                <div class="stat"><b>11.4<small>min</small></b><span>median handling time, unchanged</span></div>
+              <div class="facts">
+                <p><b>18,400</b> contacts handled in the quarter, 9% more than Q2</p>
+                <p><b>11.4 min</b> median handling time, unchanged across the quarter</p>
               </div>
 
               <div class="blk">
@@ -244,9 +242,9 @@
                 <figcaption><b>Fig 4</b> Most contacts already end at first touch; the tail is where the hours go.</figcaption>
               </figure>
 
-              <div class="stat-row">
-                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
-                <div class="stat"><b>54%</b><span>of contacts the two flows would absorb</span></div>
+              <div class="facts">
+                <p><b>71%</b> resolved inside 24 hours, down from 78% in Q2</p>
+                <p><b>54%</b> of all contacts the two planned flows would absorb</p>
               </div>
 
               <div class="blk">

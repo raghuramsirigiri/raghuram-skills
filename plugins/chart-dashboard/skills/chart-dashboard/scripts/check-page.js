@@ -788,6 +788,45 @@ if (!sheet) {
   } else ok('paper-ready', 'no controls, nothing hover-only');
 }
 
+// ── 2f. a note that only repeats a caption ───────────────────────────
+// The soft-surface note is the block most likely to be furniture: it exists in
+// the template, so it ends up on the page, and what it then says is whatever
+// was already said somewhere else. One of this skill's own one-pagers shipped a
+// "How to read the figures" note explaining that the median is used and the
+// mean is 9.1h — word for word what the figure's caption said two inches above
+// it. Nothing catches that by rendering the page, because both halves are
+// correct; it is only visible if you read them together.
+//
+// So: lift a run of words from each note and look for it in the captions and
+// the chart headings. Six words is long enough that matching one is not
+// coincidence and short enough to catch a rephrased repeat. Advisory — a note
+// may legitimately echo a phrase — but on a fixed sheet it is 60px, and the
+// question it should survive is what the page would lose without it.
+const notes = [...code.matchAll(/<div[^>]*class="[^"]*\bnote\b[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].map(m => m[1]);
+if (!notes.length) {
+  ok('nothing said twice', 'no note on the page');
+} else {
+  const words = t => String(t).replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ')
+    .toLowerCase().replace(/[^a-z0-9.%\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const elsewhereText = [
+    ...[...code.matchAll(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/g)].map(m => m[1]),
+    ...charts.flatMap(c => isObj(c.cfg) ? [c.cfg.title, c.cfg.subtitle] : [])
+  ].filter(Boolean);
+  const N = 6;
+  const grams = t => { const w = words(t), out = new Set();
+    for (let i = 0; i + N <= w.length; i++) out.add(w.slice(i, i + N).join(' ')); return out; };
+  const elsewhere = new Set();
+  elsewhereText.forEach(t => grams(t).forEach(g => elsewhere.add(g)));
+  const echoes = [];
+  notes.forEach((n, i) => {
+    for (const g of grams(n)) if (elsewhere.has(g)) { echoes.push('note ' + (i + 1) + ' repeats "' + g + '…"'); break; }
+  });
+  if (echoes.length) {
+    note('nothing said twice', echoes.join(' | ') +
+      ' — already said in a caption or a chart heading; a note that restates one is furniture, not a caveat');
+  } else ok('nothing said twice', notes.length + ' note(s), none repeating a caption');
+}
+
 // ── 3. the page is standalone ────────────────────────────────────────
 // A page that still points at charts-lib/ works perfectly in the folder it was
 // built in and nowhere else. It is the failure that travels.

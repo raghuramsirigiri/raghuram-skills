@@ -29,8 +29,14 @@ way a printed brief is set: a heading and a paragraph, a figure with a caption, 
 short list, another figure. Prose carries the argument and charts are evidence
 for it — the same relationship as `report.html`, compressed onto one sheet. Never
 build a KPI tile row: tiles are dashboard furniture, and on paper they read as a
-widget pasted onto a document. A headline figure goes in the summary sentence, or
-in a `.stat` beside the paragraph that explains it.
+widget pasted onto a document. Nor a tile with the tile taken off — a number set
+large over a small grey label is the same thing. The first version of this format
+set them at 21px, which was *larger than the page's own headline*, so they became
+the loudest thing on the sheet.
+
+A headline figure goes in the summary sentence, or in a `.facts` line: the number
+bold at the size of a section heading with its meaning running on after it, two
+or three lines bounded by a hairline. That is how a brief states a figure.
 
 **Pack it.** This format fails by under-spending the page. Two columns of
 357x900px is 1800px of column run, which is something like five figures and nine
@@ -84,7 +90,7 @@ Nothing about the page's shape is fixed except the sheet. Derive the rest:
 | `.blk` heading + 3 lines | ~70px (+15px a line beyond three) |
 | `.fig` | the `--fig-h` you give it, + ~25px for the caption |
 | `ul.pts` | ~20px an item |
-| `.stat` / `.stat-row` | ~55px (a row of two costs the same as one) |
+| `.facts` | ~25px a line, hairline-bounded |
 | `.note` | ~60px |
 
 **A4 portrait gives 900px a column, landscape 544px.** A full-width `.wide` band
@@ -93,8 +99,20 @@ exhibit that genuinely needs the sheet — a geofacet, a sankey, a long ranking 
 and not for ordinary charts.
 
 None of the five blocks is compulsory. A page with no list and no note is a
-normal page, not an incomplete one; use `.note` when the page has a caveat to
-carry, not because the template has one.
+normal page, not an incomplete one.
+
+**The note has to earn its 60px.** It is the block most likely to be furniture,
+because it exists in the vocabulary and so ends up on the page, and what it then
+says is whatever was already said somewhere else. A one-pager this skill built
+shipped a "How to read the figures" note explaining that the median is used and
+the mean is 9.1h — word for word what the figure's caption said two inches above
+it. Both halves were correct, which is why rendering the page did not reveal it.
+
+So before keeping a note, read it against the captions, the chart subtitles and
+the prose, and ask what the page loses without it. If the answer is nothing, that
+is 60px for something the page does not yet say. `check-page.js` lifts a run of
+six words from each note and looks for it in the captions and chart headings —
+the `nothing said twice` check.
 
 ## Size each figure to its chart
 
@@ -192,7 +210,8 @@ The usual three steps (SKILL.md step 7), with one addition and one subtraction:
 
 - `check-page.js` does the arithmetic — the sheet plus its `@page` margin against
   both papers, the figures in each column against the column, each chart against
-  its engine's wanted size, and the `barList` row heights.
+  its engine's wanted size, and the `barList` row heights. It also reads each note
+  against the captions and flags one that only repeats them.
 - The browser audit sizes the **text**, which no static check can. A column whose
   blocks overrun comes back as `clipped-y` on that column; content past the sheet
   as `off-sheet`. Measure how full each column is while you are there — a column
