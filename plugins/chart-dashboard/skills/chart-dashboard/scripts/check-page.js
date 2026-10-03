@@ -684,17 +684,29 @@ if (pies.length) {
 // prose, and the overflow is silent, because the column crops rather than
 // scrolling.
 const PAPER = { a4: [210, 297], letter: [216, 279.4] };   // mm
+const paperName = n => ({ a4: 'A4', letter: 'Letter' })[n] || n;
 if (!sheet) {
   ok('fits one page', 'not a one-pager');
 } else {
   const mm = px => px * 25.4 / 96;                        // CSS px are 1/96in by spec
   const m = /@page[^}]*\bmargin\s*:\s*([\d.]+)mm/.exec(code);
   const margin = m ? +m[1] : null;
-  // `size` decides which way the paper is turned, and `auto` means the dialog's
-  // orientation — which is portrait everywhere. So a landscape sheet needs
-  // `size: landscape`, or it is laid across a portrait page and split in two.
+  // `size` names the paper the sheet was measured against, and the two have to
+  // agree. A sheet cut to A4's printable area leaves 19mm of a Letter page
+  // empty and vice versa, so the check is against the paper the page actually
+  // declares — not against both, which would force every sheet down to the
+  // intersection of the two and waste 7% of an A4. `auto` is the exception: it
+  // takes whatever paper the dialog is set to, so it only holds up if the sheet
+  // fits both. `size` also carries the orientation, and `auto` means the
+  // dialog's, which is portrait everywhere.
   const sizeDecl = (/@page[^}]*\bsize\s*:\s*([^;}]+)/.exec(code) || [])[1] || '';
   const landscape = /\blandscape\b/.test(sizeDecl);
+  // Split on non-alphanumerics rather than building a \b regex: `size` is a
+  // short keyword list ("A4", "Letter portrait"), and a word list says so
+  // without an escape to get wrong.
+  const sizeWords = sizeDecl.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const named = Object.keys(PAPER).find(n => sizeWords.indexOf(n) >= 0);
+  const against = named ? { [named]: PAPER[named] } : PAPER;
   const problems = [];
   if (margin == null) {
     problems.push('no "@page { margin: Nmm }" — the printed margin is then the dialog\'s, and the sheet is sized against a known one');
@@ -702,14 +714,29 @@ if (!sheet) {
     const w = mm(sheet.w) + 2 * margin, h = mm(sheet.h) + 2 * margin;
     // A landscape page is the same paper turned, so its limits turn with it.
     const limit = p => landscape ? [p[1], p[0]] : p;
-    const over = Object.entries(PAPER).filter(([, p]) => w > limit(p)[0] + 0.5 || h > limit(p)[1] + 0.5);
+    const over = Object.entries(against).filter(([, p]) => w > limit(p)[0] + 0.5 || h > limit(p)[1] + 0.5);
     if (over.length) {
       const turned = !landscape && sheet.w > sheet.h;
       problems.push(sheet.w + 'x' + sheet.h + 'px + 2x' + margin + 'mm = ' + w.toFixed(1) + 'x' + h.toFixed(1) +
-        'mm, past ' + over.map(([n, p]) => n + ' (' + limit(p)[0] + 'x' + limit(p)[1] + ')').join(' and ') +
+        'mm, past ' + over.map(([n, p]) => paperName(n) + ' (' + limit(p)[0] + 'x' + limit(p)[1] + ')').join(' and ') +
         (turned
           ? '  → the sheet is landscape but @page is not: add "size: landscape"'
-          : '  → it prints on two pages there; shrink the sheet or the margin'));
+          : named
+            ? '  → it prints on two pages; shrink the sheet or the margin'
+            : '  → @page has no paper, so the sheet must fit both; name one with "size: A4" or "size: Letter"'));
+    }
+    // The other way round: paper left empty because the sheet was cut smaller
+    // than the one it declares. Advice, not a failure — the intersection box is
+    // a legitimate choice when the paper is genuinely unknown.
+    if (!over.length && named && !landscape) {
+      const p = PAPER[named];
+      const spare = p[1] - h;
+      if (spare > 8) {
+        note('fits one page', sheet.w + 'x' + sheet.h + ' leaves ' + spare.toFixed(0) +
+          'mm of ' + paperName(named) + ' empty at the foot (' + Math.round(100 * spare / p[1]) +
+          '% of the page) — --sheet-h:' + Math.floor((p[1] - 2 * margin) * 96 / 25.4) +
+          'px fills it');
+      }
     }
   }
   if (sheet.bodyH <= 0) {
@@ -732,7 +759,8 @@ if (!sheet) {
       sheet.colWidths.join('/') + 'px wide, ' + sheet.colH + 'px tall' +
       (sheet.wide ? ' under ' + sheet.wide + ' full-width band(s)' : '') +
       (run.length ? ' · figures hold ' + run.join(' and ') + 'px' : '') +
-      ' — fits A4 and Letter' + (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
+      ' — fits ' + (named ? paperName(named) : 'A4 and Letter') +
+      (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
   }
 }
 

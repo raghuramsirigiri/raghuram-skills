@@ -80,7 +80,7 @@ test('the shipped template passes its own checks', () => {
     const l = out.split('\n').find(x => x.includes(row));
     assert.ok(l && /^\s*PASS/.test(l), row + ' did not pass:\n' + out);
   });
-  assert.match(out, /columns \[1fr 1fr\] = 357\/357px wide, 830px tall/);
+  assert.match(out, /columns \[1fr 1fr\] = 357\/357px wide, 900px tall/);
 });
 
 test('a dashboard page is not held to any of it', () => {
@@ -188,14 +188,36 @@ test('class="fig auto" lets it grow, so there is nothing to check', () => {
 test('a taller sheet still fits A4 but spills Letter, and the check names Letter', () => {
   const r = page('tall', { columns: [[170]], calls: line('c1'), geometry: { h: 1050 } })('fits one page');
   assert.ok(!r.passed, r.line);
-  assert.match(r.line, /past letter \(216x279\.4\)/);
-  assert.ok(!/past a4/.test(r.line), 'A4 has the room; only Letter should be named: ' + r.line);
+  assert.match(r.line, /past Letter \(216x279\.4\)/);
+  assert.ok(!/past A4/.test(r.line), 'A4 has the room; only Letter should be named: ' + r.line);
+});
+
+test('a sheet is checked against the paper it declares, not against both', () => {
+  // A4's printable area is 19mm taller than Letter's. Declaring A4 is what lets
+  // a page use it; leaving `size: auto` forces it down to the intersection.
+  const a4 = page('a4-sheet', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 1060, size: 'A4' } })('fits one page');
+  assert.ok(a4.passed, a4.line);
+  assert.match(a4.line, /fits A4 at 8mm/);
+
+  const auto = page('a4-sheet-auto', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 1060, size: 'auto' } })('fits one page');
+  assert.ok(!auto.passed, auto.line);
+  assert.match(auto.line, /@page has no paper, so the sheet must fit both/);
+});
+
+test('a sheet smaller than the paper it declares earns a note naming the waste', () => {
+  const r = page('under-fill', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 990, size: 'A4' } })('fits one page');
+  assert.ok(r.note, r.line);
+  assert.match(r.line, /leaves 19mm of A4 empty at the foot \(6% of the page\)/);
+  assert.match(r.line, /--sheet-h:1062px fills it/);
 });
 
 test('a wider @page margin is the other way to lose the guarantee', () => {
   const r = page('fat-margin', { columns: [[170]], calls: line('c1'), geometry: { margin: 20 } })('fits one page');
   assert.ok(!r.passed, r.line);
-  assert.match(r.line, /past a4 \(210x297\) and letter/);
+  assert.match(r.line, /past A4 \(210x297\) and Letter/);
 });
 
 test('a landscape sheet on a portrait @page is split in two, and the check names the fix', () => {

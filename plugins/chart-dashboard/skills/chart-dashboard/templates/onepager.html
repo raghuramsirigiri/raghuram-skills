@@ -14,13 +14,20 @@
      column that grows. Everything on it is sized from that box, and anything
      that does not fit gets cut — there is no second page to push it onto.
 
-     THE BOX: 730x990px, which is the printable area A4 and US Letter share.
+     THE BOX: 730x1060px, the printable area of A4 less 8mm margins.
        A4      210x297mm, less 8mm margins → 194x281mm → 733x1062px
        Letter  216x279mm, less 8mm margins → 200x263mm → 756x 994px
-       shared  min of each → 733x994px → authored at 730x990 with a little slack
-     So the same file prints on one page on either paper, with no scaling by the
-     print dialog. `@page` sets the 8mm margin; the sheet itself is the content
-     box inside it, which is why it carries no padding of its own.
+     `@page` sets the paper and the margin; the sheet is the content box inside
+     it, which is why it carries no padding of its own.
+
+     PICK THE PAPER THE PAGE WILL BE PRINTED ON. A fixed box cannot fill both:
+       A4 (the default)   --sheet-w:730px  --sheet-h:1060px  @page size:A4
+       US Letter          --sheet-w:750px  --sheet-h: 990px  @page size:Letter
+       either, unscaled   --sheet-w:730px  --sheet-h: 990px  @page size:auto
+     The third is the intersection of the two, so it prints unscaled on both —
+     at the cost of leaving 19mm of A4 empty at the foot, which is 7% of the
+     page. Use it only when you genuinely do not know the paper. Printing an A4
+     sheet on Letter still works; the dialog scales it down about 5%.
 
      LANDSCAPE: swap --sheet-w and --sheet-h, give --cols a third track, and set
      `@page { size: landscape }` at the bottom of this stylesheet. `size: auto`
@@ -35,11 +42,12 @@
 
      ── Pack it ─────────────────────────────────────────────────────────────
      The page is a budget, and the way this format fails is by under-spending
-     it. Two columns of 357x830px is 1660px of column run: at roughly 70px for
+     it. Two columns of 357x900px is 1800px of column run: at roughly 70px for
      a heading and three lines, 200px for a figure with its caption, and 20px a
-     list item, that is something like five figures and eight text blocks. A
+     list item, that is something like five figures and nine text blocks. A
      page carrying two charts and a lot of white space has used a third of the
-     paper it asked for.
+     paper it asked for. The overflow guard below marks a column that has gone
+     the other way.
 
      Charts here are SMALL. Chart type is scaled down for the page (the
      applyMetrics call near the bottom), and the engines draw into whatever box
@@ -48,7 +56,7 @@
      sizes it refuses below. So give a figure the height its content needs and
      no more — check-page.js tells you when a chart has genuinely been squeezed
      past the point of reading. */
-  :root { --sheet-w:730px; --sheet-h:990px;
+  :root { --sheet-w:730px; --sheet-h:1060px;
           /* THE COLUMN TRACKS, and the main thing to choose from the content.
              Any CSS grid track list works; the checker reads it to size the
              charts. Equal columns suit a page of similar blocks; an uneven
@@ -131,6 +139,14 @@
      pushing the footer off the sheet; audit.js reports it as clipped-y. */
   .col { min-width:0; min-height:0; overflow:hidden; display:flex;
     flex-direction:column; }
+  /* flex-shrink:0 is load-bearing. Without it a column that is overfull
+     compresses its own blocks instead of overflowing: a paragraph gets squeezed
+     under its text, which then spills over whatever follows, and the column's
+     scrollHeight never grows — so the page looks broken and nothing can measure
+     why. Held at their natural height, the excess runs past the bottom instead,
+     where overflow:hidden cuts it, the guard below sees it, and the browser
+     audit reports it as clipped-y. */
+  .col > * { flex-shrink:0; }
 
   /* ── Blocks ───────────────────────────────────────────────────────────────
      Five. A new block type is a second design system on the page, and none of
@@ -192,21 +208,37 @@
     font-size:8.5px; line-height:1.4; color:var(--muted); overflow:hidden; }
   footer.sheet-foot b { color:var(--ink); }
 
+  /* ── The overflow guard ──────────────────────────────────────────────────
+     A column that outgrows its height is cut, and on a fixed sheet with no
+     scrollbar there is nothing to show that it happened — the first anyone
+     learns is a printed copy with half a chart at the bottom. So the page
+     watches itself: the script at the end marks any band that overflows and
+     puts a line at the top of the window saying which, and by how much. Screen
+     only, and it never reaches the file — the marker is created at load and
+     carries data-page-generated, so an editable page does not save it. */
+  .pe-over { outline:2px solid #B31B38; outline-offset:2px; }
+  .onepager-overflow { position:fixed; left:0; right:0; top:0; z-index:2147483646;
+    background:#B31B38; color:#fff; font:600 12px/1.45 var(--font);
+    padding:7px 14px; letter-spacing:.01em; }
+  .onepager-overflow b { font-weight:700; }
+  @media print { .pe-over { outline:none; } .onepager-overflow { display:none; } }
+
   /* ── Print: the sheet, once, on one page ─────────────────────────────────
      Ctrl/Cmd+P → Save as PDF, or straight to a printer. Leave the dialog's
      margins at Default; @page sets them.
 
-     `size:auto` rather than a named paper: the sheet is the box A4 and Letter
-     share, so whichever paper the dialog is set to, it fits with no
-     shrink-to-fit. Naming A4 would make every Letter printer scale the page
-     down instead. `auto` does not cover orientation, though — it takes the
-     dialog's, which is portrait — so a landscape sheet must say
-     `size: landscape` here. check-page.js fails the mismatch.
+     `size` names the paper the sheet was measured against, and the two have to
+     agree: the sheet is A4's printable area, so `size: A4` is what makes the
+     page fill the sheet rather than leaving a band at the foot. Switch both
+     together or neither — check-page.js fails the mismatch, and it is invisible
+     until something is printed. `size: auto` takes the dialog's paper and its
+     orientation, so it pairs only with the intersection box above, and a
+     landscape sheet always needs `size: landscape` spelled out.
 
      On screen the paper is scaled with a transform, which leaves its layout box
      at the authored size. In print the transform is dropped and the box is used
      as it is — same pixels, so the printed page is the page you verified. */
-  @page { size:auto; margin:8mm; }
+  @page { size:A4; margin:8mm; }
   @media print {
     html, body { background:none; }
     .ground { padding:0; }
@@ -359,6 +391,50 @@ Charts.applyMetrics({
   addEventListener('resize', fit);
   if (window.ResizeObserver) new ResizeObserver(fit).observe(frame.parentElement);
   fit();
+})();
+
+/* Watches the sheet for content that has outgrown it. A fixed box crops in
+   silence, so this is what makes the crop visible while there is still time to
+   edit — and it is the answer to the one thing an editable one-pager cannot
+   otherwise protect against, since a reader lengthening a heading gets the same
+   warning as the author.
+
+   scrollHeight - clientHeight is the measure: it is layout pixels, so the
+   paper's transform does not distort it, and it reads 0 whenever content fits.
+   A MutationObserver covers editing; charts redraw asynchronously, so a resize
+   listener and a settling timeout cover the rest. */
+(function () {
+  var BANDS = [['.col', 'Column'], ['.sheet-head', 'The header'],
+               ['.masthead', 'The masthead'], ['.sheet-foot', 'The footer']];
+  var bar = null;
+  function check() {
+    var over = [];
+    BANDS.forEach(function (pair) {
+      var nodes = document.querySelectorAll(pair[0]);
+      Array.prototype.forEach.call(nodes, function (n, i) {
+        var by = n.scrollHeight - n.clientHeight;
+        n.classList.toggle('pe-over', by > 1);
+        if (by > 1) over.push((nodes.length > 1 ? pair[1] + ' ' + (i + 1) : pair[1]) + ' by ' + by + 'px');
+      });
+    });
+    if (!over.length) { if (bar) { bar.remove(); bar = null; } return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'onepager-overflow';
+      // Built at load, so an editable page must not save it into the file.
+      bar.setAttribute('data-page-generated', '');
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = '<b>This will be cut when printed.</b> ' + over.join(', ') +
+      '. The sheet is one page and does not scroll — shorten the content, or give a figure less height.';
+  }
+  var t;
+  function soon() { clearTimeout(t); t = setTimeout(check, 120); }
+  addEventListener('resize', soon);
+  addEventListener('load', soon);
+  new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, characterData: true });
+  setTimeout(check, 400);
+  setTimeout(check, 1200);
 })();
 </script>
 <script>

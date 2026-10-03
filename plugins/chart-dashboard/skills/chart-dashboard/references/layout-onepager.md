@@ -2,9 +2,25 @@
 
 Read with `layout.md`, which holds the rules shared by every format.
 
-A one-pager is **one printed page, set in columns**: a fixed 730x990px sheet
-(portrait) or 990x730 (landscape), sized to the printable area A4 and US Letter
-share, so the same file prints as one page on either paper with no shrink-to-fit.
+A one-pager is **one printed page, set in columns**: a fixed 730x1060px sheet,
+which is A4's printable area less 8mm margins.
+
+**Pick the paper the page will be printed on.** A fixed box cannot fill both A4
+and US Letter — their printable areas differ by 19mm of height — so the sheet and
+`@page { size }` name one and move together:
+
+| Paper | `--sheet-w` / `--sheet-h` | `@page size` |
+|:--|:--|:--|
+| A4 (the default) | 730 / 1060 | `A4` |
+| US Letter | 750 / 990 | `Letter` |
+| Either, unscaled | 730 / 990 | `auto` |
+
+The third is the intersection of the two. It prints unscaled on both, at the cost
+of leaving 19mm of an A4 page empty at the foot — 7% of it, and invisible until
+someone prints it. Use it only when the paper is genuinely unknown; printing an A4
+sheet on Letter still works, the dialog just scales it about 5%. `check-page.js`
+checks the sheet against the paper it declares, fails a sheet that overruns it,
+and notes one that leaves more than 8mm unused.
 
 Three things drive everything else.
 
@@ -17,7 +33,7 @@ widget pasted onto a document. A headline figure goes in the summary sentence, o
 in a `.stat` beside the paragraph that explains it.
 
 **Pack it.** This format fails by under-spending the page. Two columns of
-357x830px is 1660px of column run, which is something like five figures and eight
+357x900px is 1800px of column run, which is something like five figures and nine
 text blocks. A page carrying two charts and a lot of white space has used a third
 of the paper it asked for. `check-page.js` reports how much of each column the
 figures hold, so the emptiness is visible before you ship it.
@@ -71,7 +87,7 @@ Nothing about the page's shape is fixed except the sheet. Derive the rest:
 | `.stat` / `.stat-row` | ~55px (a row of two costs the same as one) |
 | `.note` | ~60px |
 
-**Portrait gives 830px a column, landscape 544px.** A full-width `.wide` band
+**A4 portrait gives 900px a column, landscape 544px.** A full-width `.wide` band
 takes its height plus ~25px off every column, which is why it is for the rare
 exhibit that genuinely needs the sheet — a geofacet, a sankey, a long ranking —
 and not for ordinary charts.
@@ -160,11 +176,15 @@ because a masthead that grows steals height from the columns silently.
 - **The footer is one line.** Two lines clip. Definitions that will not fit
   belong in a `.note`, which is what a note is for.
 
-## Not an editable page
+## An editable one-pager
 
-Don't offer the editable format for a one-pager (`editable.md` § When to build
-one). Everything was measured against a fixed box, and an editor lets someone
-lengthen a heading on a page with no scrollbar to show what fell off a column.
+Still don't offer it (`editable.md` § When to build one): everything here was
+measured against a fixed box, and an editor is a way to lengthen a heading on a
+page with no scrollbar. But the overflow guard above is what makes one
+defensible if it is asked for — the editor's reader gets the same red warning
+the author would, naming the column and the overflow, instead of finding out
+from a printed copy. Build it on that basis, and still say to reprint from a
+browser preview after editing.
 
 ## Verify it as paper
 
@@ -177,6 +197,17 @@ The usual three steps (SKILL.md step 7), with one addition and one subtraction:
   blocks overrun comes back as `clipped-y` on that column; content past the sheet
   as `off-sheet`. Measure how full each column is while you are there — a column
   at 60% is a column with a block missing.
+- **The page watches itself.** The template carries an overflow guard: a script
+  that measures every band and, when one has outgrown its box, outlines it and
+  puts a red line across the top of the window naming the band and the overflow
+  in pixels. Screen only, never printed, and marked `data-page-generated` so an
+  editable page does not save it. It is the one protection that survives
+  handover — a reader who lengthens a heading sees the same warning you would.
+
+  It depends on `.col > * { flex-shrink: 0 }`. Without it the column compresses
+  its own blocks instead of overflowing: a paragraph is squeezed under its text,
+  which then spills across whatever follows, and the column's `scrollHeight`
+  never grows — so the page looks broken and nothing can measure why.
 - There is no control to test, because there are no controls.
 
 Then open the print preview once. The screen layout *is* the print layout, so the
