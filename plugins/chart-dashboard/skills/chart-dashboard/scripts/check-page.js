@@ -689,8 +689,18 @@ if (!sheet) {
   ok('fits one page', 'not a one-pager');
 } else {
   const mm = px => px * 25.4 / 96;                        // CSS px are 1/96in by spec
-  const m = /@page[^}]*\bmargin\s*:\s*([\d.]+)mm/.exec(code);
-  const margin = m ? +m[1] : null;
+  // The gutter between the sheet and the paper's edge. It lives in one of two
+  // places and the arithmetic is the same either way: in `@page { margin }`,
+  // which leaves it unpainted, or — since a one-pager wants its background to
+  // reach all four edges — inside the paper as padding, with `@page` at zero.
+  // Nothing in the margin box is ever painted, so a tinted page has to hold the
+  // gutter in an element; `margin: 0` there is correct, not missing.
+  const m = /@page[^}]*\bmargin\s*:\s*([\d.]+)(mm|px)?/.exec(code);
+  const pageMargin = m ? (m[2] === 'px' ? +m[1] * 25.4 / 96 : +m[1]) : null;
+  const inner = cssVar('margin');            // the paper's own gutter, in px
+  const margin = pageMargin == null ? null
+    : pageMargin > 0 ? pageMargin
+    : inner != null ? inner * 25.4 / 96 : 0;
   // `size` names the paper the sheet was measured against, and the two have to
   // agree. A sheet cut to A4's printable area leaves 19mm of a Letter page
   // empty and vice versa, so the check is against the paper the page actually
@@ -760,7 +770,7 @@ if (!sheet) {
       (sheet.wide ? ' under ' + sheet.wide + ' full-width band(s)' : '') +
       (run.length ? ' · figures hold ' + run.join(' and ') + 'px' : '') +
       ' — fits ' + (named ? paperName(named) : 'A4 and Letter') +
-      (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
+      (landscape ? ' landscape' : '') + ' at ' + (Math.round(margin * 10) / 10) + 'mm');
   }
 }
 

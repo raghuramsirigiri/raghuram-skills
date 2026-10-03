@@ -280,6 +280,26 @@ test('a page with no note says so rather than passing silently', () => {
   assert.match(r.line, /no note on the page/);
 });
 
+test('the gutter may live inside the paper, which is what lets the background reach the edge', () => {
+  // @page { margin: 0 } plus padding on the paper: nothing in the margin box is
+  // ever painted, so a tinted page has to hold its gutter in an element. The
+  // check has to read it from there rather than calling the page marginless.
+  const file = path.join(dir, 'full-bleed.html');
+  fs.writeFileSync(file,
+    '<style>:root { --sheet-w:730px; --sheet-h:1060px; --cols: 1fr 1fr; --margin:28px;' +
+    ' --band-head:118px; --band-foot:22px; --gap:10px; --col-gap:16px; }' +
+    ' .fig .chart { height:var(--fig-h, 180px); }' +
+    ' @page { size:A4; margin:0; }</style>' +
+    '<div class="sheet"><div class="body"><div class="cols"><div class="col">' +
+    '<figure class="fig" style="--fig-h:170px"><div class="chart" id="c1"></div></figure>' +
+    '</div></div></div><footer class="sheet-foot">S</footer></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const l = out.split(String.fromCharCode(10)).find(x => x.includes('fits one page'));
+  assert.ok(/^\s*PASS/.test(l), l);
+  assert.match(l, /fits A4 at 7\.4mm/);
+});
+
 // ── nothing that needs a pointer ─────────────────────────────────────
 test('a control fails: it prints as a grey box', () => {
   const file = path.join(dir, 'with-filter.html');

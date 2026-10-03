@@ -9,18 +9,26 @@ which is A4's printable area less 8mm margins.
 and US Letter — their printable areas differ by 19mm of height — so the sheet and
 `@page { size }` name one and move together:
 
-| Paper | `--sheet-w` / `--sheet-h` | `@page size` |
-|:--|:--|:--|
-| A4 (the default) | 730 / 1060 | `A4` |
-| US Letter | 750 / 990 | `Letter` |
-| Either, unscaled | 730 / 990 | `auto` |
+| Paper | `--sheet-w` / `--sheet-h` | `--paper-w` / `--paper-h` | `@page size` |
+|:--|:--|:--|:--|
+| A4 (the default) | 730 / 1060 | 790 / 1120 | `A4` |
+| US Letter | 750 / 990 | 812 / 1052 | `Letter` |
 
-The third is the intersection of the two. It prints unscaled on both, at the cost
-of leaving 19mm of an A4 page empty at the foot — 7% of it, and invisible until
-someone prints it. Use it only when the paper is genuinely unknown; printing an A4
-sheet on Letter still works, the dialog just scales it about 5%. `check-page.js`
-checks the sheet against the paper it declares, fails a sheet that overruns it,
-and notes one that leaves more than 8mm unused.
+The sheet is the content; the paper is the physical page, about 1mm inside it so
+that a fraction of rounding cannot paginate a blank second sheet. `--margin` is
+the gutter between them.
+
+Printing an A4 sheet on Letter still works; the dialog scales it about 5%.
+`check-page.js` checks the sheet against the paper it declares, fails one that
+overruns it, and notes one that leaves more than 8mm unused.
+
+**The gutter lives inside the paper, not in `@page`.** `@page { margin: 0 }`, and
+the paper carries `padding: var(--margin)` and its own background. Nothing in the
+`@page` margin box is ever painted, so putting the gutter there leaves it white:
+the sheet comes out of the printer as a cream page inside a white frame, which
+looks like a rendering fault and does not match what the screen showed. A printer
+with an unprintable edge clips a few mm of the background and nothing else,
+because the content stays inside the gutter.
 
 Three things drive everything else.
 

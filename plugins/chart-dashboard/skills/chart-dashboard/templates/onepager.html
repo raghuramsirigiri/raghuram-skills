@@ -21,13 +21,14 @@
      it, which is why it carries no padding of its own.
 
      PICK THE PAPER THE PAGE WILL BE PRINTED ON. A fixed box cannot fill both:
-       A4 (the default)   --sheet-w:730px  --sheet-h:1060px  @page size:A4
-       US Letter          --sheet-w:750px  --sheet-h: 990px  @page size:Letter
-       either, unscaled   --sheet-w:730px  --sheet-h: 990px  @page size:auto
-     The third is the intersection of the two, so it prints unscaled on both —
-     at the cost of leaving 19mm of A4 empty at the foot, which is 7% of the
-     page. Use it only when you genuinely do not know the paper. Printing an A4
-     sheet on Letter still works; the dialog scales it down about 5%.
+       A4 (the default)   --sheet-w:730px --sheet-h:1060px  --paper-w:790  --paper-h:1120
+       US Letter          --sheet-w:750px --sheet-h: 990px  --paper-w:812  --paper-h:1052
+     …and the matching `@page { size: A4 }` or `{ size: Letter }`. The gutter
+     between the two is --margin, which is why the sheet is the paper less
+     2x30px.
+     Printing an A4 sheet on Letter still works; the dialog scales it about 5%.
+     A printer with an unprintable edge will clip a few mm of the background —
+     only the background, because the content stays inside the gutter.
 
      LANDSCAPE: swap --sheet-w and --sheet-h, give --cols a third track, and set
      `@page { size: landscape }` at the bottom of this stylesheet. `size: auto`
@@ -68,7 +69,14 @@
           --cols: 1fr 1fr;
           /* The 8mm print margin, drawn around the sheet on screen so what you
              see is the sheet inside its paper. 8mm ≈ 30px at 96dpi. */
-          --margin:30px;
+          --margin:28px;
+          /* The physical sheet, now that @page carries no margin: A4 is
+             793.7x1122.5px at 96dpi and these sit ~1mm inside it. The slack is
+             the point: a box even a fraction over the paper paginates into a
+             second, blank page, and 0.1mm of rounding is enough to do it. The
+             gutter is --margin, held inside the paper rather than outside it so
+             the background reaches all four edges. Letter is 816x1056. */
+          --paper-w:790px; --paper-h:1120px;
           /* Two fixed chrome bands; the body gets everything else. Fixed, not
              content-sized, because a masthead that grows would silently steal
              height from the columns. */
@@ -247,14 +255,22 @@
      On screen the paper is scaled with a transform, which leaves its layout box
      at the authored size. In print the transform is dropped and the box is used
      as it is — same pixels, so the printed page is the page you verified. */
-  @page { size:A4; margin:8mm; }
+  @page { size:A4; margin:0; }
   @media print {
     html, body { background:none; }
     .ground { padding:0; }
-    .sheet-frame { position:static; max-width:none; width:var(--sheet-w);
-      height:var(--sheet-h); margin:0; }
-    .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
-      padding:0; box-shadow:none; transform:none;
+    .sheet-frame { position:static; max-width:none; width:var(--paper-w);
+      height:var(--paper-h); margin:0; }
+    /* The paper keeps its padding and its background in print, so the page is
+       the same cream to all four edges that the screen shows. Zeroing the
+       padding and moving the gutter to `@page` instead — which is what this
+       did first — leaves the gutter unpainted, and the printed sheet comes out
+       with a white frame around a cream page. Nothing in the margin box is
+       ever painted, so the background has to come from an element that
+       reaches the edge. */
+    .paper { position:static; width:var(--paper-w); height:var(--paper-h);
+      padding:var(--margin); background:var(--paper); box-shadow:none;
+      transform:none;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>

@@ -44,7 +44,8 @@
 </style>
 <style>
   :root { --sheet-w:730px; --sheet-h:1060px; --cols: 1fr 1fr;
-          --margin:30px;
+          --margin:28px;
+          --paper-w:790px; --paper-h:1120px;
           --band-head:118px; --band-foot:22px;
           --gap:10px; --col-gap:16px; --radius:4px;
           --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
@@ -133,14 +134,19 @@
     font-size:8.5px; line-height:1.4; color:var(--muted); overflow:hidden; }
   footer.sheet-foot b { color:var(--ink); }
 
-  @page { size:A4; margin:8mm; }
+  @page { size:A4; margin:0; }
   @media print {
     html, body { background:none; }
     .ground { padding:0; }
-    .sheet-frame { position:static; max-width:none; width:var(--sheet-w);
-      height:var(--sheet-h); margin:0; }
-    .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
-      padding:0; box-shadow:none; transform:none;
+    .sheet-frame { position:static; max-width:none; width:var(--paper-w);
+      height:var(--paper-h); margin:0; }
+    /* The paper keeps its padding and background in print, so the page is the
+       same cream to all four edges that the screen shows. Nothing in the @page
+       margin box is ever painted, so moving the gutter there leaves a white
+       frame around a cream page. */
+    .paper { position:static; width:var(--paper-w); height:var(--paper-h);
+      padding:var(--margin); background:var(--paper); box-shadow:none;
+      transform:none;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
