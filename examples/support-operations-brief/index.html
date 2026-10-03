@@ -43,11 +43,10 @@
 
 </style>
 <style>
-  :root { --sheet-w:730px; --sheet-h:990px; --cols:2;
+  :root { --sheet-w:730px; --sheet-h:990px; --cols: 1fr 1fr;
           --margin:30px;
-          --band-head:136px; --band-foot:26px;
-          --gap:12px; --col-gap:10px; --radius:4px;
-          --fig-sm:200px; --fig-md:265px; --fig-lg:310px; --fig-xl:430px;
+          --band-head:118px; --band-foot:22px;
+          --gap:10px; --col-gap:16px; --radius:4px;
           --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
           --hair:#dcdbd7; --rule:#cfcdc6;
           --surface-soft:#eae8e4;
@@ -71,68 +70,64 @@
 
   header.masthead { height:var(--band-head); flex:0 0 auto; display:flex;
     flex-direction:column; }
-  .kicker { font-size:10px; line-height:1.2; font-weight:700; color:var(--muted);
+  .kicker { font-size:9px; line-height:1.2; font-weight:700; color:var(--muted);
     text-transform:uppercase; letter-spacing:.12em; }
-  header.masthead h1 { margin:7px 0 0; font-size:20px; line-height:1.2;
-    font-weight:700; letter-spacing:-0.4px; }
-  .dek { margin:7px 0 0; font-size:12.5px; line-height:1.45; color:var(--muted); }
+  header.masthead h1 { margin:5px 0 0; font-size:17px; line-height:1.18;
+    font-weight:700; letter-spacing:-0.3px; }
+  .dek { margin:5px 0 0; font-size:11px; line-height:1.4; color:var(--muted); }
   .byline { margin-top:auto; display:flex; justify-content:space-between;
-    gap:16px; font-size:9.5px; line-height:1.3; color:var(--muted);
+    gap:16px; font-size:8.5px; line-height:1.3; color:var(--muted);
     border-top:1px solid var(--hair); border-bottom:1px solid var(--hair);
-    padding:6px 0; }
+    padding:5px 0; }
   .byline b { color:var(--ink); font-weight:700; }
 
   .body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
     gap:var(--gap); }
   .cols { flex:1 1 auto; min-height:0; display:grid;
-    grid-template-columns:repeat(var(--cols), minmax(0, 1fr));
-    gap:var(--col-gap); }
+    grid-template-columns:var(--cols); gap:var(--col-gap); }
   .col { min-width:0; min-height:0; overflow:hidden; display:flex;
     flex-direction:column; }
-  .col + .col { border-left:1px solid var(--hair); padding-left:var(--col-gap); }
 
-  .blk { margin:0 0 12px; }
-  .blk h2 { margin:0 0 5px; font-size:13px; line-height:1.3; font-weight:700;
+  .blk { margin:0 0 10px; }
+  .blk h2 { margin:0 0 4px; font-size:11.5px; line-height:1.25; font-weight:700;
     letter-spacing:-0.1px; }
-  .blk p, .col p { margin:0 0 7px; font-size:11px; line-height:1.52; }
+  .blk p, .col p { margin:0 0 6px; font-size:10px; line-height:1.45; }
   .blk p:last-child, .col p:last-child { margin-bottom:0; }
 
-  .fig { margin:0 0 14px; }
-  .fig .chart { width:100%; height:var(--fig-md); }
-  .fig.sm .chart { height:var(--fig-sm); }
-  .fig.lg .chart { height:var(--fig-lg); }
-  .fig.xl .chart { height:var(--fig-xl); }
-  .fig figcaption { font-size:9.5px; line-height:1.4; color:var(--muted);
-    margin-top:5px; padding-top:5px; border-top:1px dotted var(--rule); }
+  .fig { margin:0 0 12px; }
+  .fig .chart { width:100%; height:var(--fig-h, 180px); }
+  .fig.auto .chart { height:auto; }
+  .fig figcaption { font-size:8.5px; line-height:1.35; color:var(--muted);
+    margin-top:4px; padding-top:4px; border-top:1px dotted var(--rule); }
   .fig figcaption b { color:var(--ink); }
   .fig.wide { margin:0; }
 
-  ul.pts { margin:0 0 12px; padding:0; list-style:none; font-size:11px;
-    line-height:1.45; }
-  ul.pts li { position:relative; padding:0 0 0 13px; margin-bottom:5px; }
+  ul.pts { margin:0 0 10px; padding:0; list-style:none; font-size:10px;
+    line-height:1.4; }
+  ul.pts li { position:relative; padding:0 0 0 11px; margin-bottom:4px; }
   ul.pts li:last-child { margin-bottom:0; }
-  ul.pts li::before { content:''; position:absolute; left:0; top:7px;
+  ul.pts li::before { content:''; position:absolute; left:0; top:6px;
     width:5px; height:1px; background:var(--muted); }
   ul.pts li b { font-weight:700; }
 
-  .stat { margin:0 0 12px; }
-  .stat b { display:block; font-size:24px; line-height:1.1; font-weight:700;
-    letter-spacing:-0.6px; }
-  .stat span { display:block; font-size:10px; line-height:1.35; color:var(--muted);
-    margin-top:3px; }
-  .stat-row { display:flex; gap:14px; margin:0 0 12px; }
+  .stat { margin:0 0 10px; }
+  .stat b { display:block; font-size:21px; line-height:1.05; font-weight:700;
+    letter-spacing:-0.5px; }
+  .stat span { display:block; font-size:9px; line-height:1.3; color:var(--muted);
+    margin-top:2px; }
+  .stat-row { display:flex; gap:12px; margin:0 0 10px; }
   .stat-row .stat { flex:1; min-width:0; margin:0; }
 
   .note { background:var(--surface-soft); border-radius:var(--radius);
-    padding:10px 12px; font-size:10.5px; line-height:1.5; margin:0 0 12px; }
-  .note b { display:block; text-transform:uppercase; font-size:9px;
-    letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
+    padding:8px 10px; font-size:9.5px; line-height:1.45; margin:0 0 10px; }
+  .note b { display:block; text-transform:uppercase; font-size:8px;
+    letter-spacing:.07em; color:var(--muted); margin-bottom:3px; }
 
   .push { margin-top:auto; }
 
   footer.sheet-foot { height:var(--band-foot); flex:0 0 auto;
-    border-top:1px solid var(--hair); padding-top:7px;
-    font-size:9.5px; line-height:1.45; color:var(--muted); overflow:hidden; }
+    border-top:1px solid var(--hair); padding-top:5px;
+    font-size:8.5px; line-height:1.4; color:var(--muted); overflow:hidden; }
   footer.sheet-foot b { color:var(--ink); }
 
   @page { size:auto; margin:8mm; }
@@ -156,9 +151,9 @@
         <header class="masthead">
           <div class="kicker">Support operations · Q3 brief</div>
           <h1>First response has run above the four-hour target since the week&nbsp;3 routing change</h1>
-          <p class="dek">Contacts rose 9% on the quarter while median first response slipped
-            from 4.1 to 5.6 hours. Account access and billing drive 54% of the load, and both
-            are self-serve candidates.</p>
+          <p class="dek">Contacts rose 9% on the quarter while median first response slipped from 4.1
+            to 5.6 hours. Account access and billing drive 54% of the load, and two scoped self-serve
+            flows would absorb both.</p>
           <div class="byline">
             <div><b>Prepared for</b> the Thursday ops review · all channels, 18,400 contacts · figures are illustrative</div>
             <div>Weeks 1–12, Q3</div>
@@ -166,50 +161,97 @@
         </header>
 
         <div class="body">
-
-          <figure class="fig wide">
-            <div class="chart" id="c-response"></div>
-            <figcaption><b>Fig 1</b> Median, not mean — a handful of multi-day escalations pull the mean to 9.1h and would hide the week-to-week shape.</figcaption>
-          </figure>
-
           <div class="cols">
+
             <div class="col">
               <div class="blk">
+                <h2>What changed</h2>
+                <p>Queue routing changed at the start of week 3. Median first response nearly
+                  doubled inside a fortnight and has settled at 5.6 hours — 40% above the
+                  published four-hour service level, and it has not improved since week 9.</p>
+              </div>
+
+              <figure class="fig" style="--fig-h:160px">
+                <div class="chart" id="c-response"></div>
+                <figcaption><b>Fig 1</b> Routing changed at the start of week 3. Median, not mean — a few multi-day escalations pull the mean to 9.1h.</figcaption>
+              </figure>
+
+              <div class="blk">
                 <h2>Where the contacts come from</h2>
-                <p>Two reasons account for more than half of everything that reaches an
-                  agent. Both are routine and both are already documented, which is what
-                  makes them worth absorbing rather than staffing.</p>
+                <p>Two reasons account for more than half of everything that reaches an agent.
+                  Both are routine and already documented.</p>
               </div>
 
-              <div class="stat-row">
-                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
-                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
-              </div>
-
-              <figure class="fig lg">
+              <figure class="fig" style="--fig-h:225px">
                 <div class="chart" id="c-reasons"></div>
                 <figcaption><b>Fig 2</b> Top four reasons; the remaining 2,730 contacts are product questions and a long tail.</figcaption>
               </figure>
+
+              <div class="stat-row">
+                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
+                <div class="stat"><b>11.4<small>min</small></b><span>median handling time, unchanged</span></div>
+              </div>
+
+              <div class="blk">
+                <h2>What we ruled out</h2>
+                <p>Handling time held flat while response time rose, so the delay is in waiting,
+                  not in the work itself.</p>
+              </div>
+
+              <ul class="pts">
+                <li><b>Not volume.</b> 9% more contacts, but the slip began the week routing changed, not the week volume rose.</li>
+                <li><b>Not staffing.</b> Headcount and shift cover were unchanged across the quarter.</li>
+                <li><b>Not one channel.</b> All three moved together, which a channel-specific fault would not do.</li>
+              </ul>
             </div>
 
             <div class="col">
               <div class="blk">
-                <h2>What we are doing about it</h2>
-                <p>A self-serve password reset and an invoice history page cover the
-                  two largest reasons between them, and neither needs new infrastructure.</p>
+                <h2>Why it happened</h2>
+                <p>The new rules concentrate account-access contacts on one team, which is also
+                  the team carrying the longest queue. Everything behind them waits, which is why
+                  the slip shows up across all three channels rather than one.</p>
               </div>
 
-              <figure class="fig lg">
-                <div class="chart" id="c-selfserve"></div>
-                <figcaption><b>Fig 3</b> The same contacts as Fig 2, split by whether a flow would absorb them.</figcaption>
+              <figure class="fig" style="--fig-h:165px">
+                <div class="chart" id="c-channels"></div>
+                <figcaption><b>Fig 3</b> Share of inbound by channel; all three slipped together after week 3.</figcaption>
               </figure>
 
+              <div class="blk">
+                <h2>What we are doing about it</h2>
+              </div>
+
+              <ul class="pts">
+                <li><b>Self-serve password reset.</b> Scoped, no new infrastructure, covers account access.</li>
+                <li><b>Invoice history page.</b> Covers the billing questions that are lookups, not disputes.</li>
+                <li><b>Split the routing rule</b> so one team no longer holds both queues.</li>
+              </ul>
+
+              <figure class="fig" style="--fig-h:185px">
+                <div class="chart" id="c-path"></div>
+                <figcaption><b>Fig 4</b> Most contacts already end at first touch; the tail is where the hours go.</figcaption>
+              </figure>
+
+              <div class="stat-row">
+                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
+                <div class="stat"><b>54%</b><span>of contacts the two flows would absorb</span></div>
+              </div>
+
+              <div class="blk">
+                <h2>What we need from this review</h2>
+                <p>Sign-off to split the routing rule this week, which is reversible and needs no
+                  build. The two self-serve flows need a sprint each and we would start with
+                  password reset, the larger of the two.</p>
+              </div>
+
               <div class="note push">
-                <b>How to read this</b>
-                Median across channels, from arrival to first human reply. The
-                four-hour line is the published service level.
+                <b>How to read the figures</b>
+                First response is the median from arrival to first human reply. A few multi-day
+                escalations pull the mean to 9.1h, which is why the median is used throughout.
               </div>
             </div>
+
           </div>
         </div>
 
@@ -15119,6 +15161,16 @@ Charts.version = "1.0.0";
 
 </script>
 <script>
+/* The one-pager's chart type scale — small enough that a 357px column holds a
+   real chart. See templates/onepager.html for why this is the one place the
+   skill changes chart metrics. */
+Charts.applyMetrics({
+  titleSize: 13, subtitleSize: 10, labelSize: 9.5, tickSize: 9.5,
+  headingPadTop: 6, headingSubGap: 3, headingGap: 10, plotGap: 8,
+  lineWidth: 2, legendSize: 10, legendRowHeight: 16, legendGap: 10,
+  calloutSize: 9, calloutPad: 5
+});
+
 (function () {
   const t = Charts.theme, s = document.documentElement.style;
   s.setProperty('--paper', t.bg);
@@ -15150,28 +15202,26 @@ Charts.version = "1.0.0";
 const T = Charts.theme;
 
 Charts.line('c-response', {
-  title: 'Response time nearly doubled in the fortnight after the change, then settled at 5.6h',
-  subtitle: 'Median hours to first response · all channels · dashed line is the 4.0h target',
+  title: 'Response time doubled after the change, then settled at 5.6h',
+  subtitle: 'Median hours · dashed line is the 4.0h target',
   xAxis: { categories: ['Week 1','Week 2','Week 3','Week 4','Week 5','Week 6',
                         'Week 7','Week 8','Week 9','Week 10','Week 11','Week 12'] },
-  // The dashed line is the target; the subtitle names it. A label on the line
-  // would be drawn at the left edge, on top of the first two data labels.
-  yAxis: { suffix: 'h', plotLines: [{ value: 4, color: T.annotation, width: 1,
-    dashStyle: 'Dash' }] },
+  yAxis: { suffix: 'h', plotLines: [{ value: 4, color: T.annotation, width: 1, dashStyle: 'Dash' }] },
   tooltip: { valueSuffix: 'h' },
   legend: { enabled: false },
-  callouts: [{ x: 2, text: 'Queue routing changed' }],
+  // No callout: at 160px the box lands on the week-3 data label, and the
+  // paragraph above and the caption below both already name the change. A
+  // short figure earns its space by leaving out what the prose carries.
   series: [{ name: 'First response', type: 'line', color: T.colors[1],
     data: [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
 });
 
-// A column is 360px and Charts.bar needs 480, so the ranked comparison is a
-// barList — which is also the better form here, since the category names are
-// long enough to eat a bar chart's left gutter.
+// Tighter bar metrics than the default 26/22: on a one-pager a ranked list is a
+// block among many, not a panel, and the rhythm is what you buy space with.
 Charts.barList('c-reasons', {
-  title: 'Account access and billing drive 54% of all contacts',
+  title: 'Account access and billing drive 54% of contacts',
   subtitle: 'Contacts in the quarter · top four reasons',
-  plotOptions: { barList: { sort: 'desc' } },
+  plotOptions: { barList: { sort: 'desc', barHeight: 15, rowGap: 11 } },
   series: [{ name: 'Contacts', data: [
     { name: 'Account access',  y: 5110, color: T.colors[1] },
     { name: 'Billing',         y: 4820, color: T.colors[1] },
@@ -15180,18 +15230,24 @@ Charts.barList('c-reasons', {
   ]}]
 });
 
-// A binary split, so the decision reads at a glance. Not a second ranking —
-// Fig 2 ranks the reasons, this one asks only whether a planned flow absorbs
-// them. (A waffle would say this well, but its dots shrink to 3px at column
-// width; it needs the .wide band or a .xl figure.)
-Charts.donut('c-selfserve', {
-  title: 'Fifty-four contacts in every hundred could be absorbed by two flows',
-  subtitle: 'Share of all Q3 contacts',
-  plotOptions: { pie: { valueSuffix: '%', centerText: '54%' } },
+Charts.column('c-channels', {
+  title: 'Email still carries 45% of inbound',
+  subtitle: 'Contacts by channel',
+  xAxis: { categories: ['Email', 'Chat', 'Phone'] },
   legend: { enabled: false },
+  series: [{ name: 'Contacts', data: [
+    { y: 8200, color: T.colors[1] }, { y: 6400, color: T.muted }, { y: 3800, color: T.muted }
+  ]}]
+});
+
+Charts.barList('c-path', {
+  title: 'Six in ten contacts end at first touch',
+  subtitle: 'Share of contacts by resolution path',
+  plotOptions: { barList: { barHeight: 15, rowGap: 11, valueSuffix: '%' } },
   series: [{ name: 'Share', data: [
-    { name: 'Account access and billing', y: 54, color: T.colors[1] },
-    { name: 'Everything else',            y: 46, color: T.muted }
+    { name: 'Resolved at first touch', y: 62, color: T.colors[1] },
+    { name: 'One escalation',          y: 27, color: T.muted },
+    { name: 'Two or more',             y: 11, color: T.muted }
   ]}]
 });
 </script>

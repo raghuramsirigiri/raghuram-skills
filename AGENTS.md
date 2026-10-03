@@ -66,15 +66,19 @@ topic with figures in it.
 - In a deck, lay the fixed spine first — cover, agenda, section dividers,
   closing statement — then choose a layout per claim (`references/layout-deck.md`).
 - A one-pager is a **report set in columns**, not a dashboard on paper: a fixed
-  730x990 sheet (990x730 landscape) whose body is 2 columns (3 landscape) of
-  headings, paragraphs, lists and figures. Prose carries the argument and the
-  charts are evidence. Never build a KPI tile row there. A column is 360px, so
-  most engines do not fit one — a line, column or bar chart goes in the
-  full-width band and a ranked comparison becomes `Charts.barList`. Do the
-  per-block budget in `references/layout-onepager.md` before writing: the page
-  holds about four figures and six text blocks, and under-filling it is the
-  commonest failure. No controls and nothing hover-only, because paper has no
-  pointer. `scripts/check-page.js` fails all of these.
+  730x990 sheet (990x730 landscape) whose body is columns of headings,
+  paragraphs, lists and figures. Prose carries the argument and the charts are
+  evidence. Never build a KPI tile row there. Nothing about the page's shape is
+  fixed except the sheet — pick the column tracks (`--cols`) and each figure's
+  height (`--fig-h`) from the content, and the template ships no arrangement on
+  purpose. Charts go **in** the columns: at the format's reduced type scale a
+  357px column holds a line, column or bar chart, and the manifest's minWidth is
+  the size a chart wants on a screen, not one it refuses below. Pack the page —
+  1660px of column run is about five figures and eight text blocks, and
+  under-filling it is the commonest failure. No controls and nothing hover-only,
+  because paper has no pointer. Budget and measured figure heights in
+  `references/layout-onepager.md`; `scripts/check-page.js` reports how full each
+  column is.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.
