@@ -20,6 +20,7 @@
  *         clipped-x/-y    content cut off by an overflow:hidden box (a .fig, a cell)
  *         spill-x/-y      content running out of a cell, card or KPI tile
  *         off-slide       slide content past the 1280x720 frame (cropped on paper)
+ *         off-sheet       one-pager content past the sheet (sliced off the printed page)
  *         into-footer     slide content running into the generated footer
  *         page-scroll-x   the page scrolls sideways
  *         placeholder     template text still on the page
@@ -50,8 +51,9 @@
   'use strict';
 
   const CHART_SEL = '.chart, [data-charts-chart]';
-  const BOX_SEL = '.cell, .fig, .kpi, .card, .col, .side';
+  const BOX_SEL = '.cell, .fig, .kpi, .card, .col, .side, .sheet-head, .kpis, .sheet-foot';
   const PLACEHOLDERS = ['Metric name', 'START — END', 'Deck name', 'Headline claim, not a topic label',
+    'Headline finding, not a topic label',
     'Claim in prose. The figure below', 'Affiliation · Published', 'Author · Team · DATE'];
   const MAX = 25;          // entries per list, so a badly broken page stays a short report
   const TOL = 2;           // px of slack before a box counts as overflowing
@@ -120,9 +122,11 @@
   }
 
   function scaleOf(el) {
-    // Deck slides are drawn at 1280x720 and scaled by a transform; divide it
-    // back out so thresholds mean authored pixels.
-    const s = slideOf(el);
+    // Both fixed-size formats keep their authored pixels and are scaled to the
+    // window by a transform — a deck slide at 1280x720, a one-pager's paper at
+    // its sheet size. Divide the scale back out so thresholds mean authored
+    // pixels in either.
+    const s = el.closest && el.closest('.slide, .paper');
     if (!s || !s.offsetWidth) return 1;
     return s.getBoundingClientRect().width / s.offsetWidth || 1;
   }
@@ -198,6 +202,8 @@
     for (const el of all) {
       if (el instanceof SVGElement || insideChart(el) || el.closest('[data-charts-a11y]')) continue;
       if (el.matches('.foot, .foot *')) continue;
+      // The sheet clips on purpose, and auditSheet reports that as off-sheet.
+      if (el.matches('.sheet')) continue;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.position === 'fixed') continue;
       if (el.clientWidth < 4 || el.clientHeight < 4) continue;
@@ -247,6 +253,30 @@
     }
   }
 
+  // ── the one-pager: the sheet is the paper, and paper slices ───────────
+  // Same failure as a deck's off-slide, with a worse ending: a page that
+  // outgrew its sheet does not scroll and does not wrap to a second sheet, it
+  // comes out of the printer with the bottom of the last chart missing. On
+  // screen the sheet clips it, which is what makes this measurable here.
+  function auditSheet(out) {
+    for (const s of document.querySelectorAll('.sheet')) {
+      const k = scaleOf(s);
+      const sr = s.getBoundingClientRect();
+      let worst = 0, worstEl = null;
+      for (const el of s.querySelectorAll('*')) {
+        if (el.closest('[data-charts-a11y]') || (el instanceof SVGElement && el.tagName.toLowerCase() !== 'svg')) continue;
+        if (insideChart(el) && el.tagName.toLowerCase() !== 'svg') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden') continue;
+        const off = Math.max(r.bottom - sr.bottom, r.right - sr.right) / k;
+        if (off > worst) { worst = off; worstEl = el; }
+      }
+      if (worst > TOL) out.fail.push({ where: 'sheet', issue: 'off-sheet', by: px(worst), el: tagOf(worstEl) });
+    }
+  }
+
   function auditText(out) {
     // Rendered text, lower-cased: a KPI label styled `text-transform: uppercase`
     // reads back as "METRIC NAME".
@@ -280,6 +310,7 @@
     charts.forEach(c => auditChart(c, out));
     auditBoxes(out);
     auditSlides(out);
+    auditSheet(out);
     auditText(out);
     out.ok = out.fail.length === 0;
     if (out.fail.length > MAX) { out.more = out.fail.length - MAX; out.fail.length = MAX; }

@@ -1,8 +1,8 @@
 # GEMINI.md — chart-dashboard
 
 This repository provides a reusable capability: **turn supplied data into a
-single self-contained HTML dashboard, report or slide deck with interactive SVG charts** —
-no CDN, no npm install, no build step.
+single self-contained HTML dashboard, report, slide deck or printable one-pager
+with interactive SVG charts** — no CDN, no npm install, no build step.
 
 Instructions are shared across all AI tools and live in
 [`AGENTS.md`](AGENTS.md), which routes to the canonical
@@ -10,9 +10,9 @@ Instructions are shared across all AI tools and live in
 
 **Read `AGENTS.md` first, then `plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`, and follow
 that workflow** whenever the user asks for a dashboard, analytics page, KPI
-view, chart deck, or illustrated data report.
+view, chart deck, illustrated data report, or a one-page brief to print.
 
-Five rules that break the output if missed:
+Six rules that break the output if missed:
 
 0. Never fix a library bug in `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/` — it
    is a vendored copy of another repo's library and a re-sync would drop the
@@ -25,6 +25,9 @@ Five rules that break the output if missed:
    and named categories belong on a column chart.
 5. Build the grid from the shape of the analysis rather than reusing a layout;
    the dashboard template ships without a starter arrangement on purpose.
+6. A one-pager is a fixed sheet with a span and row budget, no controls and
+   nothing hover-only — do the budget in `references/layout-onepager.md` before
+   writing panels.
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

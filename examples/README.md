@@ -1,10 +1,10 @@
-# Examples — dashboards, reports and slide decks built by the chart-dashboard skill
+# Examples — dashboards, reports, slide decks and one-pagers built by the chart-dashboard skill
 
 Finished output from the [chart-dashboard Claude Skill](../README.md). Every folder
 is fully self-contained: download `index.html`, double-click it, and it renders —
 no server, no network, no build step, no npm install.
 
-Each example shows one of the three formats the skill produces, across most of the
+Each example shows one of the four formats the skill produces, across most of the
 chart families in the bundled `charts-lib` renderer. The full list of families —
 including radar, scatter, bubble and the `panels` compositor — is in the
 [main README](../README.md#which-chart-types-are-supported).
@@ -15,8 +15,9 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 | [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, report table with a line and bars per row, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, table, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |
+| [`support-operations-brief/`](support-operations-brief/) | **One-pager** (single file, one printed page) | KPI band, line with a dashed service-level target and a callout on the week it changed, ranked horizontal bars with two emphasised, a method note | [screenshot](support-operations-brief/screenshot.png) |
 
-## The three formats, and when the skill picks each
+## The four formats, and when the skill picks each
 
 - **Dashboard** — a monitoring surface. One panel per finding, no prose, nothing
   telling the reader what to think. The default when you hand over metrics with no
@@ -29,9 +30,17 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   layouts to choose evidence from. Triggered by "presentation", "slides", "deck".
   Prints straight to PDF, one rounded slide per page. See
   `coffee-pricing-deck/`.
+- **One-pager** — everything on one sheet of paper. A fixed 730x990 grid sized to
+  the printable area A4 and US Letter share, so it prints as exactly one page on
+  either without touching the print dialog. No controls and nothing hover-only,
+  because paper has no pointer; the format's work is deciding what does not fit.
+  Triggered by "print it", "one page", "a handout", "for the board pack". See
+  `support-operations-brief/`.
 
-Any of the three can also be built **editable** on request, with an **Edit page**
+The first three can also be built **editable** on request, with an **Edit page**
 button that opens an in-page editor for text, numbers, chart types and colours.
+A one-pager is the exception: an editor lets someone lengthen a title on a page
+with no scrollbar, and the sheet would crop it silently.
 
 ## The prompts behind these examples
 
@@ -42,11 +51,14 @@ button that opens an in-page editor for text, numbers, chart types and colours.
 > Turn this pricing analysis into a deck for the board: green coffee costs, what
 > happened to contribution per box, two options for a price increase, and the ask.
 
+> Put our Q3 support numbers on one page I can print for Thursday's ops review —
+> response times against the target and what people are actually contacting us about.
+
 ## A note on the figures
 
-The numbers in `logistics-network-dashboard/` and `coffee-pricing-deck/` are
-illustrative sample data written to demonstrate the skill, and each page says so on
-its own face. The skill never presents invented numbers as real measurements — if
+The numbers in `logistics-network-dashboard/`, `coffee-pricing-deck/` and
+`support-operations-brief/` are illustrative sample data written to demonstrate the
+skill, and each page says so on its own face. The skill never presents invented numbers as real measurements — if
 you give it a topic with no data, it tells you and labels the figures as
 illustrative.
 

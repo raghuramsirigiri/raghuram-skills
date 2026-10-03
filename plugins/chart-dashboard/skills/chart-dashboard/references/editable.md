@@ -22,6 +22,14 @@ page, and the button doesn't print.
   later revisions of the same page.
 - **Converting an existing page** means rebuilding it in this format, with
   the same charts, text and layout. Follow the same rules below.
+- **Not a one-pager, unless they ask twice.** Don't offer one for a one-pager,
+  and say why if they ask for one. A one-pager's single guarantee is that it
+  prints as one page, and that holds because the sheet is fixed and everything
+  on it was measured against that. An editor hands someone a way to lengthen a
+  title or a note on a page with no scrollbar: the sheet crops it silently, and
+  the next thing anyone learns is that the printed copy has half a chart at the
+  bottom. If they still want it, build it, and tell them in one line to reprint
+  from a browser preview after any edit — that is the only check left to them.
 
 ## The format
 

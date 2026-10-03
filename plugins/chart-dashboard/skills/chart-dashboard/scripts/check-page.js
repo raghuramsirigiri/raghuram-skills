@@ -22,10 +22,13 @@
  * works as a gate in a script. Every check names the panel it is unhappy
  * about — the point is to tell you where to look, not to score the page.
  *
- * It also sizes what it can from the markup alone: a chart in a dashboard
- * cell smaller than its engine's minimum, a title too long for two lines at
- * that width, donut options written where the engine never reads them — the
- * problems a screenshot would otherwise be taken to find.
+ * It also sizes what it can from the markup alone: a chart in a dashboard or
+ * one-pager cell smaller than its engine's minimum, a title too long for two
+ * lines at that width, donut options written where the engine never reads them
+ * — the problems a screenshot would otherwise be taken to find. On a one-pager
+ * it does the paper arithmetic too: whether the sheet plus its @page margin
+ * still fits A4 and Letter, and whether the page carries a control or a
+ * hidden number that only works on a screen.
  *
  * This does not replace opening the page. It cannot see labels colliding,
  * a deck slide outgrowing its frame, or a colour that vanishes on the canvas.
@@ -316,15 +319,21 @@ else if (badAxes.length) {
 // carrying the finding — is cut to "…". Both are arithmetic on the grid the
 // page declares, so they cost nothing to check before a browser opens.
 //
-// Only charts in a dashboard `.bento` cell are sized here: that grid is
-// declared in CSS (12 tracks, a fixed row height), so a cell's pixel size
-// follows from its w*/h* classes. Deck and report figures are laid out by
-// their own layouts and left to the browser audit. Sizes are at the page's
-// full width; the narrow-screen reflow is not what this is checking.
+// Two grids are sized here, because both declare their geometry in CSS: the
+// dashboard's `.bento` (12 tracks, a fixed row height) and the one-pager's
+// `.sheet-grid` (12 tracks on a fixed sheet, rows dividing what the chrome
+// bands leave). In either, a cell's pixel size follows from its w*/h* classes.
+// Deck and report figures are laid out by their own layouts and left to the
+// browser audit. Sizes are at the page's full width; the narrow-screen reflow
+// is not what this is checking.
 let manifest = null;
 try { manifest = require('../assets/charts-lib/charts.manifest.json'); } catch (e) { /* skill moved; skip */ }
 const cssNum = (sel, prop) => {
   const m = new RegExp('(?:^|[\\s}])' + sel.replace('.', '\\.') + '\\s*\\{[^}]*?\\b' + prop + '\\s*:\\s*(\\d+(?:\\.\\d+)?)px').exec(code);
+  return m ? +m[1] : null;
+};
+const cssVar = name => {
+  const m = new RegExp('--' + name + '\\s*:\\s*(\\d+(?:\\.\\d+)?)px').exec(code);
   return m ? +m[1] : null;
 };
 const grid = {
@@ -334,6 +343,44 @@ const grid = {
 // A cell's inner size: w tracks and the gaps between them, less its padding.
 const cellPx = w => Math.round(w * (grid.width - 2 * grid.pad - 11 * grid.gap) / 12 + (w - 1) * grid.gap - 2 * grid.cellPad);
 const cellPy = h => Math.round(h * grid.row + (h - 1) * grid.gap - 2 * grid.cellPad);
+
+// ── the one-pager's sheet ────────────────────────────────────────────
+// A one-pager is a fixed sheet, so its geometry is fully determined by six
+// custom properties and the number of cells declared. The row height is the
+// part worth computing: rows are `1fr`, so they divide what the header, the
+// optional KPI band and the footer leave, and every row added makes every
+// chart on the page shorter. The author cannot see that happening.
+function readSheet() {
+  const start = code.indexOf('class="sheet-grid"');
+  if (start < 0) return null;
+  const w = cssVar('sheet-w'), h = cssVar('sheet-h'), gap = cssVar('gap');
+  const head = cssVar('band-head'), kpi = cssVar('band-kpi'), foot = cssVar('band-foot');
+  if ([w, h, gap, head, kpi, foot].some(v => v == null)) return null;
+  // The grid runs from its own tag to the footer band; cells after that are
+  // somebody else's markup.
+  const after = code.slice(start);
+  const end = after.search(/<footer[^>]*class="[^"]*\bsheet-foot\b/);
+  const block = end < 0 ? after : after.slice(0, end);
+  const spanOf = cls => ({
+    w: +((/\bw(\d+)\b/.exec(cls) || [])[1] || 12),
+    h: +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1)
+  });
+  const cells = [...block.matchAll(/class="cell([^"]*)"/g)].map(m => spanOf(m[1]));
+  // The KPI band is optional, and deleting it is the cheapest row the page can
+  // buy, so the arithmetic has to follow whether it is there.
+  const kpis = /class="kpis"/.test(code);
+  const gridH = h - head - foot - (kpis ? kpi : 0) - gap * (kpis ? 3 : 2);
+  const rows = Math.max(1, Math.ceil(cells.reduce((s, c) => s + c.w * c.h, 0) / 12));
+  const rowH = (gridH - (rows - 1) * gap) / rows;
+  const track = (w - 11 * gap) / 12;
+  // A sheet cell's own chrome: the hairline that separates it and the padding
+  // under it. The note card pads all round, but it holds no chart.
+  const chrome = (cssNum('.cell', 'padding-top') || 0) + 1;
+  return { w, h, gap, kpis, gridH, rows, rowH, cells, start, len: block.length,
+    pxOf: s => Math.round(s * track + (s - 1) * gap),
+    pyOf: n => Math.round(n * rowH + (n - 1) * gap - chrome) };
+}
+const sheet = readSheet();
 // Every chart the page draws, with the config literal when it is one.
 const ANY_CALL = /Charts\.(\w+)\s*[(,]\s*(?:'([^']*)'|"([^"]*)")\s*,\s*/g;
 const charts = [...code.matchAll(ANY_CALL)]
@@ -357,15 +404,34 @@ function cellOf(id) {
   if (!w) return null;
   const h = +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1);
   const flow = /^class="bento[^"]*\bflow\b/.test(code.slice(gridAt, gridAt + 60));
-  return { cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow, px: cellPx(w), py: flow ? null : cellPy(h) };
+  return { grid: 'bento', cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow,
+    px: cellPx(w), py: flow ? null : cellPy(h), pxOf: cellPx, pyOf: cellPy };
 }
 
-const sized = Object.values(grid).every(v => v != null) && manifest
-  ? charts.map(c => Object.assign({}, c, { cell: cellOf(c.id) })).filter(c => c.cell) : [];
+// The same, for a cell in the one-pager's sheet grid. No flow rows here: on a
+// fixed sheet nothing is content-sized, which is why a table has to be given a
+// row that is tall enough for it rather than taking the height it wants.
+function sheetCellOf(id) {
+  if (!sheet) return null;
+  const at = code.indexOf('id="' + id + '"');
+  if (at < 0 || at < sheet.start || at > sheet.start + sheet.len) return null;
+  const cellAt = code.lastIndexOf('class="cell', at);
+  if (cellAt < 0) return null;
+  const cls = (/^class="([^"]*)"/.exec(code.slice(cellAt)) || [])[1] || '';
+  const w = +((/\bw(\d+)\b/.exec(cls) || [])[1] || 12);
+  const h = +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1);
+  return { grid: 'sheet', cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow: false,
+    px: sheet.pxOf(w), py: sheet.pyOf(h), pxOf: sheet.pxOf, pyOf: sheet.pyOf };
+}
+
+const bentoReady = Object.values(grid).every(v => v != null);
+const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetCellOf(id);
+const sized = manifest
+  ? charts.map(c => Object.assign({}, c, { cell: cellFor(c.id) })).filter(c => c.cell) : [];
 if (!sized.length) {
-  ok('charts fit their cells', 'no charts in a dashboard grid to size');
-  ok('titles fit their charts', 'no charts in a dashboard grid to size');
-  ok('bars sized to their cell', 'no charts in a dashboard grid to size');
+  ok('charts fit their cells', 'no charts in a sized grid');
+  ok('titles fit their charts', 'no charts in a sized grid');
+  ok('bars sized to their cell', 'no charts in a sized grid');
 } else {
   const tooSmall = [];
   for (const c of sized) {
@@ -375,12 +441,19 @@ if (!sized.length) {
     // a fixed-height row can squeeze it.
     const shortBy = c.cell.py != null && needH ? needH - c.cell.py : 0;
     if (needW && c.cell.px < needW - 8) {
-      const fits = [4, 6, 8, 12].find(w => w > c.cell.w && cellPx(w) >= needW - 8);
+      const fits = [4, 6, 8, 12].find(w => w > c.cell.w && c.cell.pxOf(w) >= needW - 8);
       tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.px + 'px wide, needs ' + needW +
-        (fits ? '  → w' + fits + ' or wider' : ''));
+        (fits ? '  → w' + fits + ' or wider'
+              : c.cell.grid === 'sheet' ? '  → w12, or landscape (swap --sheet-w and --sheet-h)' : ''));
     } else if (shortBy > 8) {
+      // On a sheet the height is the row count, not the cell: .h2 only helps
+      // while there is another row to borrow from, so the fix is usually to
+      // drop a row (references/layout-onepager.md § The budget).
       tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.py + 'px tall, needs ' + needH +
-        '  → h2, or a .bento.flow row');
+        (c.cell.grid === 'sheet'
+          ? '  → ' + sheet.rows + ' rows leaves ' + Math.round(sheet.rowH) + 'px each; cut a row' +
+            (sheet.kpis ? ', or the KPI band' : '')
+          : '  → h2, or a .bento.flow row'));
     }
   }
   if (tooSmall.length) bad('charts fit their cells', tooSmall.join(' | '));
@@ -438,7 +511,7 @@ if (!sized.length) {
     const what = c.id + ' (' + c.type + ', ' + g.n + ' categor' + (g.n === 1 ? 'y' : 'ies') + (g.k > 1 ? ' × ' + g.k + ' series' : '') + ') in ' + c.cell.cls;
     if (c.type === 'column') {
       // Plot width: the cell less the value axis and its labels.
-      const plot = w => cellPx(w) - 60;
+      const plot = w => c.cell.pxOf(w) - 60;
       const ok = w => { const a = g.at(plot(w)); return a.bar <= BAR.fat && a.slot >= BAR.slot && a.bar >= BAR.thin; };
       if (ok(c.cell.w)) continue;
       const a = g.at(plot(c.cell.w));
@@ -449,11 +522,12 @@ if (!sized.length) {
       misfit.push(what + ': ' + (a.bar > BAR.fat ? Math.round(a.bar) + 'px-wide bars' : Math.round(a.slot) + 'px per category') + '  ' + fix);
     } else if (c.cell.py != null) {
       // Horizontal bars: the plot height is the row less title, legend and axis.
-      const plot = h => cellPy(h) - 90;
+      const plot = h => c.cell.pyOf(h) - 90;
       const h = /\bh2\b/.test(c.cell.cls) ? 2 : 1;
       const a = g.at(plot(h));
       if (a.slot < BAR.rowSlot) {
-        misfit.push(what + ': ' + Math.round(a.slot) + 'px per row  → ' + (h === 1 && g.at(plot(2)).slot >= BAR.rowSlot ? 'h2' : 'a .bento.flow row with barList, or fewer rows'));
+        misfit.push(what + ': ' + Math.round(a.slot) + 'px per row  → ' + (h === 1 && g.at(plot(2)).slot >= BAR.rowSlot ? 'h2'
+          : c.cell.grid === 'sheet' ? 'fewer bars, or a row of the sheet to itself' : 'a .bento.flow row with barList, or fewer rows'));
       } else if (a.bar > BAR.rowFat) {
         misfit.push(what + ': ' + Math.round(a.bar) + 'px-thick bars  → ' + (h === 2 ? 'drop the h2' : 'share the row with a narrower partner, or use a column chart'));
       }
@@ -486,6 +560,77 @@ for (const c of charts) {
 if (pies.length) {
   bad('donut options nested', pies.join(' | ') + ' at the top level, where they are ignored  → move under plotOptions: { pie: { … } }');
 } else ok('donut options nested', 'no donut option at the top level');
+
+// ── 2d. a one-pager is one page, and prints without a dialog ─────────
+// Only runs on a page built from templates/onepager.html. The format's whole
+// promise is that the file comes out as ONE sheet of paper on whatever is in
+// the tray, and that promise is arithmetic: the sheet is sized to the printable
+// area A4 and Letter share, so editing --sheet-h, or widening the @page margin,
+// silently buys a second page. Nobody discovers that until it is printed, and
+// by then it has been handed round.
+const PAPER = { a4: [210, 297], letter: [216, 279.4] };   // mm
+if (!sheet) {
+  ok('fits one page', 'not a one-pager');
+} else {
+  const mm = px => px * 25.4 / 96;                        // CSS px are 1/96in by spec
+  const m = /@page[^}]*\bmargin\s*:\s*([\d.]+)mm/.exec(code);
+  const margin = m ? +m[1] : null;
+  // `size` decides which way the paper is turned, and `auto` means the dialog's
+  // orientation — which is portrait everywhere. So a landscape sheet needs
+  // `size: landscape`, or it is laid across a portrait page and split in two.
+  const sizeDecl = (/@page[^}]*\bsize\s*:\s*([^;}]+)/.exec(code) || [])[1] || '';
+  const landscape = /\blandscape\b/.test(sizeDecl);
+  const problems = [];
+  if (margin == null) {
+    problems.push('no "@page { margin: Nmm }" — the printed margin is then the dialog\'s, and the sheet is sized against a known one');
+  } else {
+    const w = mm(sheet.w) + 2 * margin, h = mm(sheet.h) + 2 * margin;
+    // A landscape page is the same paper turned, so its limits turn with it.
+    const limit = p => landscape ? [p[1], p[0]] : p;
+    const over = Object.entries(PAPER).filter(([, p]) => w > limit(p)[0] + 0.5 || h > limit(p)[1] + 0.5);
+    if (over.length) {
+      const turned = !landscape && sheet.w > sheet.h;
+      problems.push(sheet.w + 'x' + sheet.h + 'px + 2x' + margin + 'mm = ' + w.toFixed(1) + 'x' + h.toFixed(1) +
+        'mm, past ' + over.map(([n, p]) => n + ' (' + limit(p)[0] + 'x' + limit(p)[1] + ')').join(' and ') +
+        (turned
+          ? '  → the sheet is landscape but @page is not: add "size: landscape"'
+          : '  → it prints on two pages there; shrink the sheet or the margin'));
+    }
+  }
+  if (sheet.gridH <= 0) {
+    problems.push('the header, KPI band and footer are taller than the sheet — nothing is left for the grid');
+  }
+  if (problems.length) bad('fits one page', problems.join(' | '));
+  else {
+    ok('fits one page', sheet.w + 'x' + sheet.h + ' sheet, ' + sheet.rows + ' row(s) of ' +
+      Math.round(sheet.rowH) + 'px' + (sheet.kpis ? ' (KPI band on)' : '') +
+      ' — fits A4 and Letter' + (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
+  }
+}
+
+// ── 2e. a one-pager has nothing that only works on a screen ──────────
+// Paper has no pointer. A dropdown prints as a grey box showing one value, and
+// a number that only appears in a tooltip does not appear at all — neither
+// looks broken on screen, which is exactly why they ship.
+if (!sheet) {
+  ok('paper-ready', 'not a one-pager');
+} else {
+  const problems = [];
+  const live = code.replace(/<!--[\s\S]*?-->/g, ' ');
+  const controls = [...live.matchAll(/<(select|input|button)\b[^>]*>/g)].map(m => m[1]);
+  if (controls.length) {
+    problems.push(controls.length + ' control(s) on the page (' + [...new Set(controls)].join(', ') +
+      ') — they print as grey boxes  → a page that needs a filter is a dashboard');
+  }
+  // dataLabels: false is a screen decision (the tooltip carries the value).
+  const OFF = /"dataLabels":(false|\{"enabled":false)/;
+  const unlabelled = charts.filter(c => isObj(c.cfg) && OFF.test(JSON.stringify(c.cfg))).map(c => c.id);
+  if (problems.length) bad('paper-ready', problems.join(' | '));
+  else if (unlabelled.length) {
+    note('paper-ready', 'dataLabels off on ' + unlabelled.join(', ') +
+      ' — on paper there is no tooltip behind them; shorten the data rather than hiding the numbers');
+  } else ok('paper-ready', 'no controls, nothing hover-only');
+}
 
 // ── 3. the page is standalone ────────────────────────────────────────
 // A page that still points at charts-lib/ works perfectly in the folder it was

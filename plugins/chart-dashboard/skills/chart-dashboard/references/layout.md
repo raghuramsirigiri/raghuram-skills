@@ -1,18 +1,20 @@
 # Page layouts
 
-Three formats. Pick one; don't blend prose-heavy narrative into a bento grid,
-and don't turn a deck into a report by filling its slides with paragraphs.
+Four formats. Pick one; don't blend prose-heavy narrative into a bento grid,
+don't turn a deck into a report by filling its slides with paragraphs, and
+don't shrink a dashboard onto a sheet of paper and call it a one-pager.
 
-This file holds what all three share. The rules for the format you picked are
-in its own file — read that one and skip the others:
+This file holds what they share. The rules for the format you picked are in its
+own file — read that one and skip the others:
 
 | Format | Template | Read |
 |:--|:--|:--|
 | Dashboard | `templates/dashboard.html` | `layout-dashboard.md` — composing the grid, sizing cells, tables |
 | Report | `templates/report.html` | `layout-report.md` — the paper column, figures and captions |
 | Deck | `templates/slides.html` | `layout-deck.md` — the spine, a layout per claim, deck charts |
+| One-pager | `templates/onepager.html` | `layout-onepager.md` — the fixed sheet, the span and row budget, what to cut |
 
-## All three
+## All four
 
 - Colors come from `Charts.theme`, which is derived from `Charts.palette`. All
   three templates carry the same sync block, copying the theme's canvas, ink,
@@ -45,6 +47,12 @@ in its own file — read that one and skip the others:
   A deck has no room for that strip on every slide: put it on a closing slide.
 - Everything ships as **one** HTML file with the library inlined — no sibling
   folder, no CDN, no build step. See SKILL.md step 8.
+- Two of the four are **fixed-size**: a deck slide is 1280x720, a one-pager's
+  sheet is 730x990 (or 990x730 landscape). Both keep those authored pixels and
+  are scaled to the window by a transform, so what is on screen is what comes
+  out of the printer, and both crop rather than scrolling when something
+  outgrows the frame. The browser audit reports that as `off-slide` and
+  `off-sheet`; treat either as content that would be sliced off the paper.
 
 ## Fit the page to how it will be read
 
@@ -62,8 +70,14 @@ badly in a different context:
 - **"Send it round", "paste into the weekly update", "for the board pack"** — it
   will be read alone, without you narrating. Lean on subtitles and callouts to
   carry the context you would otherwise say out loud.
-- **"Print it", "PDF"** — one column, no reliance on hover; tooltips don't exist
-  on paper, so anything only visible on hover must also be a label.
+- **"Print it", "PDF", "one page", "a handout", "pin it up"** — this is the
+  one-pager's case: a fixed sheet that comes out of the printer as exactly one
+  page (`templates/onepager.html`). Tooltips do not exist on paper and a
+  dropdown prints as a grey box, so every value a reader needs is a label, a
+  KPI or an axis tick, and there are no controls at all. When the findings do
+  not fit one sheet, the answer is to cut, or to build a report — not to shrink
+  the type. If what they want printed is an argument that runs longer than a
+  page, that was a report all along, and a report prints in one column.
 
 None of this changes the design system — same palette, same type scale
 relationships, same components. It changes how much you put on the page and at

@@ -6,8 +6,8 @@ Vendor-neutral: no Claude-specific tools, formats, or APIs are required.
 ## What this repo provides
 
 A reusable capability: **turn supplied data into a single self-contained HTML
-dashboard, report or slide deck with interactive SVG charts.** No CDN, no npm install, no
-build step, no runtime dependencies.
+dashboard, report, slide deck or printable one-pager with interactive SVG
+charts.** No CDN, no npm install, no build step, no runtime dependencies.
 
 The canonical instructions live in
 [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md). That file
@@ -15,9 +15,10 @@ is the source of truth — this one only routes you to it.
 
 ## When to use it
 
-Any request to build a dashboard, analytics page, KPI view, chart deck, or
-illustrated data report from data the user provides or describes — a table, CSV,
-pasted numbers, metrics, notes, or a topic with figures in it.
+Any request to build a dashboard, analytics page, KPI view, chart deck,
+illustrated data report, or one-page printable brief or handout, from data the
+user provides or describes — a table, CSV, pasted numbers, metrics, notes, or a
+topic with figures in it.
 
 ## How to use it
 
@@ -26,7 +27,7 @@ pasted numbers, metrics, notes, or a topic with figures in it.
 2. Read these before writing chart code — do not guess option names:
    - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
    - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
-   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md` or `layout-deck.md` (read only the one for your format)
+   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md` or `layout-onepager.md` (read only the one for your format)
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
    - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
    - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
@@ -34,8 +35,8 @@ pasted numbers, metrics, notes, or a topic with figures in it.
    - [`references/editable.md`](plugins/chart-dashboard/skills/chart-dashboard/references/editable.md) — only when the user asked for an editable page
    - [`assets/charts-lib/charts.manifest.json`](plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.manifest.json) — quick per-engine facts (data shape, refusals, sizing)
 3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
-   `report.html`, `slides.html` (a deck), or `dashboard-editable.html` (only when
-   an editable page was asked for).
+   `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet), or
+   `dashboard-editable.html` (only when an editable page was asked for).
 4. When you want a worked reference, read one of the finished pages in
    `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),
    `coffee-pricing-deck/` (deck with the full spine), `ev-retrospective/`
@@ -64,6 +65,13 @@ pasted numbers, metrics, notes, or a topic with figures in it.
   ships as two files: `<name>.html` (final) and `<name> (working copy).html`.
 - In a deck, lay the fixed spine first — cover, agenda, section dividers,
   closing statement — then choose a layout per claim (`references/layout-deck.md`).
+- A one-pager is a fixed 730x990 sheet (990x730 landscape), sized to the
+  printable area A4 and Letter share. Do the span and row budget before writing
+  panels: on portrait a standard chart needs `w8` or `w12`, `w6` takes only a
+  donut-class chart, and a fourth row puts every chart under its engine's
+  minimum height (`references/layout-onepager.md`). It carries no controls and
+  nothing hover-only, because paper has no pointer. `scripts/check-page.js`
+  fails all of these.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.
