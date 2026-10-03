@@ -15,7 +15,7 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 | [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, report table with a line and bars per row, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, table, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |
-| [`support-operations-brief/`](support-operations-brief/) | **One-pager** (single file, one printed page) | KPI band, line with a dashed service-level target and a callout on the week it changed, ranked horizontal bars with two emphasised, a method note | [screenshot](support-operations-brief/screenshot.png) |
+| [`support-operations-brief/`](support-operations-brief/) | **One-pager** (single file, one printed page) | Masthead and summary, a full-width line with a dashed service-level target and a callout on the week it changed, then two columns of prose, a stat pair, a ranked bar list with two emphasised, a binary donut and a method note | [screenshot](support-operations-brief/screenshot.png) |
 
 ## The four formats, and when the skill picks each
 
@@ -30,12 +30,14 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   layouts to choose evidence from. Triggered by "presentation", "slides", "deck".
   Prints straight to PDF, one rounded slide per page. See
   `coffee-pricing-deck/`.
-- **One-pager** — everything on one sheet of paper. A fixed 730x990 grid sized to
-  the printable area A4 and US Letter share, so it prints as exactly one page on
+- **One-pager** — a report on one sheet of paper, set in columns: a masthead, a
+  lead figure, then two columns (three in landscape) of headings, paragraphs,
+  lists and figures. Prose carries the argument and the charts are evidence, the
+  same relationship as a report, compressed onto a fixed 730x990 sheet sized to
+  the printable area A4 and US Letter share — so it prints as exactly one page on
   either without touching the print dialog. No controls and nothing hover-only,
-  because paper has no pointer; the format's work is deciding what does not fit.
-  Triggered by "print it", "one page", "a handout", "for the board pack". See
-  `support-operations-brief/`.
+  because paper has no pointer. Triggered by "print it", "one page", "a handout",
+  "for the board pack". See `support-operations-brief/`.
 
 The first three can also be built **editable** on request, with an **Edit page**
 button that opens an in-page editor for text, numbers, chart types and colours.

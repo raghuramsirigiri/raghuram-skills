@@ -65,13 +65,16 @@ topic with figures in it.
   ships as two files: `<name>.html` (final) and `<name> (working copy).html`.
 - In a deck, lay the fixed spine first — cover, agenda, section dividers,
   closing statement — then choose a layout per claim (`references/layout-deck.md`).
-- A one-pager is a fixed 730x990 sheet (990x730 landscape), sized to the
-  printable area A4 and Letter share. Do the span and row budget before writing
-  panels: on portrait a standard chart needs `w8` or `w12`, `w6` takes only a
-  donut-class chart, and a fourth row puts every chart under its engine's
-  minimum height (`references/layout-onepager.md`). It carries no controls and
-  nothing hover-only, because paper has no pointer. `scripts/check-page.js`
-  fails all of these.
+- A one-pager is a **report set in columns**, not a dashboard on paper: a fixed
+  730x990 sheet (990x730 landscape) whose body is 2 columns (3 landscape) of
+  headings, paragraphs, lists and figures. Prose carries the argument and the
+  charts are evidence. Never build a KPI tile row there. A column is 360px, so
+  most engines do not fit one — a line, column or bar chart goes in the
+  full-width band and a ranked comparison becomes `Charts.barList`. Do the
+  per-block budget in `references/layout-onepager.md` before writing: the page
+  holds about four figures and six text blocks, and under-filling it is the
+  commonest failure. No controls and nothing hover-only, because paper has no
+  pointer. `scripts/check-page.js` fails all of these.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.

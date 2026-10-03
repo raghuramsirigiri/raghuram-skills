@@ -43,12 +43,13 @@
 
 </style>
 <style>
-  :root { --sheet-w:730px; --sheet-h:990px;
+  :root { --sheet-w:730px; --sheet-h:990px; --cols:2;
           --margin:30px;
-          --band-head:78px; --band-kpi:54px; --band-foot:26px;
-          --gap:10px; --radius:4px;
+          --band-head:136px; --band-foot:26px;
+          --gap:12px; --col-gap:10px; --radius:4px;
+          --fig-sm:200px; --fig-md:265px; --fig-lg:310px; --fig-xl:430px;
           --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
-          --hair:#dcdbd7;
+          --hair:#dcdbd7; --rule:#cfcdc6;
           --surface-soft:#eae8e4;
           --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
   * { box-sizing:border-box; }
@@ -68,53 +69,66 @@
   .sheet { width:var(--sheet-w); height:var(--sheet-h); display:flex;
     flex-direction:column; gap:var(--gap); overflow:hidden; }
 
-  header.sheet-head { height:var(--band-head); flex:0 0 auto; display:flex;
-    justify-content:space-between; align-items:flex-end; gap:20px;
-    padding-bottom:8px; border-bottom:1px solid var(--hair); }
-  header.sheet-head h1 { margin:0; font-size:20px; font-weight:700;
-    letter-spacing:-0.4px; line-height:1.2; }
-  header.sheet-head p { margin:3px 0 0; color:var(--muted); font-size:11.5px;
-    line-height:1.35; }
-  header.sheet-head .stamp { color:var(--muted); font-size:9.5px; text-align:right;
-    text-transform:uppercase; letter-spacing:.06em; flex:0 0 auto; }
-  header.sheet-head .stamp b { display:block; color:var(--ink); font-size:11.5px;
-    font-weight:700; text-transform:none; letter-spacing:0; margin-top:2px; }
+  header.masthead { height:var(--band-head); flex:0 0 auto; display:flex;
+    flex-direction:column; }
+  .kicker { font-size:10px; line-height:1.2; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.12em; }
+  header.masthead h1 { margin:7px 0 0; font-size:20px; line-height:1.2;
+    font-weight:700; letter-spacing:-0.4px; }
+  .dek { margin:7px 0 0; font-size:12.5px; line-height:1.45; color:var(--muted); }
+  .byline { margin-top:auto; display:flex; justify-content:space-between;
+    gap:16px; font-size:9.5px; line-height:1.3; color:var(--muted);
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair);
+    padding:6px 0; }
+  .byline b { color:var(--ink); font-weight:700; }
 
-  .kpis { height:var(--band-kpi); flex:0 0 auto; display:grid;
-    grid-auto-flow:column; grid-auto-columns:1fr; align-items:center;
-    border-bottom:1px solid var(--hair); }
-  .kpi { padding:0 14px; min-width:0; border-left:1px solid var(--hair); }
-  .kpi:first-child { padding-left:0; border-left:0; }
-  /* Explicit line-heights, not `normal`: the three lines have to add up to less
-     than the band, and `normal` is the font's own figure — it comes out at 1.33
-     for the fallback stack, which overflows a band sized for 1.2, and changes
-     again when a theme swaps the face. */
-  .kpi span { display:block; font-size:9.5px; line-height:1.25; font-weight:400;
-    letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .kpi b { display:block; font-size:21px; line-height:1.15; font-weight:700;
-    margin-top:2px; letter-spacing:-0.4px; color:var(--ink); }
-  .kpi i { display:block; font-style:normal; font-size:9.5px; line-height:1.25;
-    font-weight:400; color:var(--muted); margin-top:1px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+    gap:var(--gap); }
+  .cols { flex:1 1 auto; min-height:0; display:grid;
+    grid-template-columns:repeat(var(--cols), minmax(0, 1fr));
+    gap:var(--col-gap); }
+  .col { min-width:0; min-height:0; overflow:hidden; display:flex;
+    flex-direction:column; }
+  .col + .col { border-left:1px solid var(--hair); padding-left:var(--col-gap); }
 
-  .sheet-grid { flex:1 1 auto; min-height:0; display:grid;
-    grid-template-columns:repeat(12,1fr); grid-auto-rows:1fr; gap:var(--gap); }
-  .cell { min-width:0; min-height:0; overflow:hidden; padding-top:6px;
-    border-top:1px solid var(--hair); }
-  .cell .chart { width:100%; height:100%; }
-  .w4{grid-column:span 4}.w6{grid-column:span 6}.w8{grid-column:span 8}.w12{grid-column:span 12}
-  .h2{grid-row:span 2}
+  .blk { margin:0 0 12px; }
+  .blk h2 { margin:0 0 5px; font-size:13px; line-height:1.3; font-weight:700;
+    letter-spacing:-0.1px; }
+  .blk p, .col p { margin:0 0 7px; font-size:11px; line-height:1.52; }
+  .blk p:last-child, .col p:last-child { margin-bottom:0; }
 
-  /* align-self:start, so the note is as tall as its text rather than as tall as
-     the row. A chart has to fill its cell; a paragraph stretched to 400px is a
-     grey slab with writing at the top, and white paper under a short note reads
-     better than a filled box. */
+  .fig { margin:0 0 14px; }
+  .fig .chart { width:100%; height:var(--fig-md); }
+  .fig.sm .chart { height:var(--fig-sm); }
+  .fig.lg .chart { height:var(--fig-lg); }
+  .fig.xl .chart { height:var(--fig-xl); }
+  .fig figcaption { font-size:9.5px; line-height:1.4; color:var(--muted);
+    margin-top:5px; padding-top:5px; border-top:1px dotted var(--rule); }
+  .fig figcaption b { color:var(--ink); }
+  .fig.wide { margin:0; }
+
+  ul.pts { margin:0 0 12px; padding:0; list-style:none; font-size:11px;
+    line-height:1.45; }
+  ul.pts li { position:relative; padding:0 0 0 13px; margin-bottom:5px; }
+  ul.pts li:last-child { margin-bottom:0; }
+  ul.pts li::before { content:''; position:absolute; left:0; top:7px;
+    width:5px; height:1px; background:var(--muted); }
+  ul.pts li b { font-weight:700; }
+
+  .stat { margin:0 0 12px; }
+  .stat b { display:block; font-size:24px; line-height:1.1; font-weight:700;
+    letter-spacing:-0.6px; }
+  .stat span { display:block; font-size:10px; line-height:1.35; color:var(--muted);
+    margin-top:3px; }
+  .stat-row { display:flex; gap:14px; margin:0 0 12px; }
+  .stat-row .stat { flex:1; min-width:0; margin:0; }
+
   .note { background:var(--surface-soft); border-radius:var(--radius);
-    border-top:0; align-self:start; padding:12px 14px; font-size:11.5px;
-    line-height:1.55; color:var(--ink); overflow:hidden; }
+    padding:10px 12px; font-size:10.5px; line-height:1.5; margin:0 0 12px; }
   .note b { display:block; text-transform:uppercase; font-size:9px;
-    letter-spacing:.07em; color:var(--muted); margin-bottom:5px; }
+    letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
+
+  .push { margin-top:auto; }
 
   footer.sheet-foot { height:var(--band-foot); flex:0 0 auto;
     border-top:1px solid var(--hair); padding-top:7px;
@@ -139,35 +153,69 @@
     <div class="paper">
       <div class="sheet">
 
-        <header class="sheet-head">
-          <div>
-            <h1>First response has run above the four-hour target since the week&nbsp;3 routing change</h1>
-            <p>Support operations · all channels · 18,400 contacts · figures are illustrative</p>
+        <header class="masthead">
+          <div class="kicker">Support operations · Q3 brief</div>
+          <h1>First response has run above the four-hour target since the week&nbsp;3 routing change</h1>
+          <p class="dek">Contacts rose 9% on the quarter while median first response slipped
+            from 4.1 to 5.6 hours. Account access and billing drive 54% of the load, and both
+            are self-serve candidates.</p>
+          <div class="byline">
+            <div><b>Prepared for</b> the Thursday ops review · all channels, 18,400 contacts · figures are illustrative</div>
+            <div>Weeks 1–12, Q3</div>
           </div>
-          <div class="stamp">Reporting window<b>Weeks 1–12, Q3</b></div>
         </header>
 
-        <div class="kpis">
-          <div class="kpi"><span>Contacts handled</span><b>18,400</b><i>16,900 in Q2</i></div>
-          <div class="kpi"><span>Median first response</span><b>5.6h</b><i>target 4.0h</i></div>
-          <div class="kpi"><span>Resolved in 24h</span><b>71%</b><i>78% in Q2</i></div>
-          <div class="kpi"><span>CSAT</span><b>4.3</b><i>unchanged on Q2</i></div>
-        </div>
+        <div class="body">
 
-        <div class="sheet-grid">
-          <div class="cell w12"><div class="chart" id="c-response"></div></div>
-          <div class="cell w8"><div class="chart" id="c-reasons"></div></div>
-          <div class="cell w4 note">
-            <b>How to read this</b>
-            First response is the median, not the mean: a handful of multi-day
-            escalations pull the mean to 9.1h and would hide the week-to-week
-            shape. The target is the published service level, not a forecast.
+          <figure class="fig wide">
+            <div class="chart" id="c-response"></div>
+            <figcaption><b>Fig 1</b> Median, not mean — a handful of multi-day escalations pull the mean to 9.1h and would hide the week-to-week shape.</figcaption>
+          </figure>
+
+          <div class="cols">
+            <div class="col">
+              <div class="blk">
+                <h2>Where the contacts come from</h2>
+                <p>Two reasons account for more than half of everything that reaches an
+                  agent. Both are routine and both are already documented, which is what
+                  makes them worth absorbing rather than staffing.</p>
+              </div>
+
+              <div class="stat-row">
+                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
+                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
+              </div>
+
+              <figure class="fig lg">
+                <div class="chart" id="c-reasons"></div>
+                <figcaption><b>Fig 2</b> Top four reasons; the remaining 2,730 contacts are product questions and a long tail.</figcaption>
+              </figure>
+            </div>
+
+            <div class="col">
+              <div class="blk">
+                <h2>What we are doing about it</h2>
+                <p>A self-serve password reset and an invoice history page cover the
+                  two largest reasons between them, and neither needs new infrastructure.</p>
+              </div>
+
+              <figure class="fig lg">
+                <div class="chart" id="c-selfserve"></div>
+                <figcaption><b>Fig 3</b> The same contacts as Fig 2, split by whether a flow would absorb them.</figcaption>
+              </figure>
+
+              <div class="note push">
+                <b>How to read this</b>
+                Median across channels, from arrival to first human reply. The
+                four-hour line is the published service level.
+              </div>
+            </div>
           </div>
         </div>
 
         <footer class="sheet-foot">
           <b>Sources.</b> Illustrative sample data. &nbsp;·&nbsp;
-          <b>Definitions.</b> First response = contact to first human reply, median across channels. &nbsp;·&nbsp;
+          <b>Definitions.</b> Contact = one inbound request, deduplicated per customer per day. &nbsp;·&nbsp;
           <b>Note.</b> Every figure here is illustrative.
         </footer>
 
@@ -15103,7 +15151,7 @@ const T = Charts.theme;
 
 Charts.line('c-response', {
   title: 'Response time nearly doubled in the fortnight after the change, then settled at 5.6h',
-  subtitle: 'Median hours to first response · all channels · target 4.0h',
+  subtitle: 'Median hours to first response · all channels · dashed line is the 4.0h target',
   xAxis: { categories: ['Week 1','Week 2','Week 3','Week 4','Week 5','Week 6',
                         'Week 7','Week 8','Week 9','Week 10','Week 11','Week 12'] },
   // The dashed line is the target; the subtitle names it. A label on the line
@@ -15117,26 +15165,34 @@ Charts.line('c-response', {
     data: [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
 });
 
-// Ranked, so the two the title names are the top two bars. Everything else
-// takes the mute — including Other, which can never be the finding.
-const REASONS = [
-  { name: 'Account access',    value: 5110 },
-  { name: 'Billing',           value: 4820 },
-  { name: 'Delivery status',   value: 3260 },
-  { name: 'Returns',           value: 2480 },
-  { name: 'Product questions', value: 1680 },
-  { name: 'Other',             value: 1050 }
-];
-
-Charts.bar('c-reasons', {
+// A column is 360px and Charts.bar needs 480, so the ranked comparison is a
+// barList — which is also the better form here, since the category names are
+// long enough to eat a bar chart's left gutter.
+Charts.barList('c-reasons', {
   title: 'Account access and billing drive 54% of all contacts',
-  subtitle: 'Contacts in the quarter · ranked',
-  xAxis: { categories: REASONS.map(r => r.name) },
+  subtitle: 'Contacts in the quarter · top four reasons',
+  plotOptions: { barList: { sort: 'desc' } },
+  series: [{ name: 'Contacts', data: [
+    { name: 'Account access',  y: 5110, color: T.colors[1] },
+    { name: 'Billing',         y: 4820, color: T.colors[1] },
+    { name: 'Delivery status', y: 3260, color: T.muted },
+    { name: 'Returns',         y: 2480, color: T.muted }
+  ]}]
+});
+
+// A binary split, so the decision reads at a glance. Not a second ranking —
+// Fig 2 ranks the reasons, this one asks only whether a planned flow absorbs
+// them. (A waffle would say this well, but its dots shrink to 3px at column
+// width; it needs the .wide band or a .xl figure.)
+Charts.donut('c-selfserve', {
+  title: 'Fifty-four contacts in every hundred could be absorbed by two flows',
+  subtitle: 'Share of all Q3 contacts',
+  plotOptions: { pie: { valueSuffix: '%', centerText: '54%' } },
   legend: { enabled: false },
-  plotOptions: { series: { dataLabels: { enabled: true } } },
-  series: [{ name: 'Contacts', data: REASONS.map((r, i) => ({
-    y: r.value, color: i < 2 ? T.colors[1] : T.muted
-  })) }]
+  series: [{ name: 'Share', data: [
+    { name: 'Account access and billing', y: 54, color: T.colors[1] },
+    { name: 'Everything else',            y: 46, color: T.muted }
+  ]}]
 });
 </script>
 </body>

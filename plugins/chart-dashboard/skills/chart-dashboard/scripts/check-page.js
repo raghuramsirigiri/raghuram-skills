@@ -345,40 +345,50 @@ const cellPx = w => Math.round(w * (grid.width - 2 * grid.pad - 11 * grid.gap) /
 const cellPy = h => Math.round(h * grid.row + (h - 1) * grid.gap - 2 * grid.cellPad);
 
 // ── the one-pager's sheet ────────────────────────────────────────────
-// A one-pager is a fixed sheet, so its geometry is fully determined by six
-// custom properties and the number of cells declared. The row height is the
-// part worth computing: rows are `1fr`, so they divide what the header, the
-// optional KPI band and the footer leave, and every row added makes every
-// chart on the page shorter. The author cannot see that happening.
+// A one-pager is a fixed sheet set in columns, so its geometry follows from a
+// handful of custom properties. Two things are worth computing before a browser
+// opens. A column is 360px wide portrait and 323px landscape, which is under
+// the 480px most engines need — so a chart's figure either sits in the
+// full-width band or uses one of the few column-width engines, and getting that
+// wrong is a cramped chart rather than an error. And a figure's height is named
+// (.sm/.md/.lg/.xl), so the figures in one column can be added up and compared
+// with the column before any text is measured.
 function readSheet() {
-  const start = code.indexOf('class="sheet-grid"');
-  if (start < 0) return null;
+  const start = code.indexOf('class="body"');
+  if (start < 0 || !/class="cols"/.test(code)) return null;
   const w = cssVar('sheet-w'), h = cssVar('sheet-h'), gap = cssVar('gap');
-  const head = cssVar('band-head'), kpi = cssVar('band-kpi'), foot = cssVar('band-foot');
-  if ([w, h, gap, head, kpi, foot].some(v => v == null)) return null;
-  // The grid runs from its own tag to the footer band; cells after that are
-  // somebody else's markup.
+  const head = cssVar('band-head'), foot = cssVar('band-foot');
+  const colGap = cssVar('col-gap');
+  const cols = +((/--cols\s*:\s*(\d+)/.exec(code) || [])[1] || 0);
+  if ([w, h, gap, head, foot, colGap].some(v => v == null) || !cols) return null;
+  const bodyH = h - head - foot - 2 * gap;
+  const colW = Math.round((w - (cols - 1) * colGap) / cols);
+  // Named figure heights, read from the page so the two stay in step.
+  const figH = { sm: cssVar('fig-sm'), md: cssVar('fig-md'),
+                 lg: cssVar('fig-lg'), xl: cssVar('fig-xl') };
+  const heightOf = cls => figH[(/\b(sm|lg|xl)\b/.exec(cls) || [])[1]] || figH.md;
+  // Each column, with the figures declared inside it. The body runs to the
+  // footer band; markup after that is somebody else's.
   const after = code.slice(start);
   const end = after.search(/<footer[^>]*class="[^"]*\bsheet-foot\b/);
-  const block = end < 0 ? after : after.slice(0, end);
-  const spanOf = cls => ({
-    w: +((/\bw(\d+)\b/.exec(cls) || [])[1] || 12),
-    h: +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1)
+  const body = end < 0 ? after : after.slice(0, end);
+  const colsAt = body.indexOf('class="cols"');
+  const colBlocks = colsAt < 0 ? [] : body.slice(colsAt).split(/class="col"/).slice(1);
+  // A figure's full cost: the chart, its caption and the margin under it.
+  const capCost = (cssNum('.fig figcaption', 'font-size') || 9.5) * 1.4 +
+    (cssNum('.fig figcaption', 'margin-top') || 5) + (cssNum('.fig figcaption', 'padding-top') || 5);
+  const figMargin = 14;
+  const column = colBlocks.map((b, i) => {
+    const figs = [...b.matchAll(/<figure[^>]*class="fig([^"]*)"/g)].map(m => heightOf(m[1]));
+    return { n: i + 1, figs, figPx: Math.round(figs.reduce((s, f) => s + f + capCost + figMargin, 0)) };
   });
-  const cells = [...block.matchAll(/class="cell([^"]*)"/g)].map(m => spanOf(m[1]));
-  // The KPI band is optional, and deleting it is the cheapest row the page can
-  // buy, so the arithmetic has to follow whether it is there.
-  const kpis = /class="kpis"/.test(code);
-  const gridH = h - head - foot - (kpis ? kpi : 0) - gap * (kpis ? 3 : 2);
-  const rows = Math.max(1, Math.ceil(cells.reduce((s, c) => s + c.w * c.h, 0) / 12));
-  const rowH = (gridH - (rows - 1) * gap) / rows;
-  const track = (w - 11 * gap) / 12;
-  // A sheet cell's own chrome: the hairline that separates it and the padding
-  // under it. The note card pads all round, but it holds no chart.
-  const chrome = (cssNum('.cell', 'padding-top') || 0) + 1;
-  return { w, h, gap, kpis, gridH, rows, rowH, cells, start, len: block.length,
-    pxOf: s => Math.round(s * track + (s - 1) * gap),
-    pyOf: n => Math.round(n * rowH + (n - 1) * gap - chrome) };
+  // A full-width figure band takes its height off every column.
+  const wideFigs = [...body.slice(0, colsAt < 0 ? body.length : colsAt)
+    .matchAll(/<figure[^>]*class="fig([^"]*)"/g)].map(m => heightOf(m[1]));
+  const wideCost = wideFigs.reduce((s, f) => s + f + capCost + gap, 0);
+  const colH = Math.round(bodyH - wideCost);
+  return { w, h, gap, colGap, cols, bodyH, colW, colH, column, wideFigs,
+    start, len: body.length, heightOf };
 }
 const sheet = readSheet();
 // Every chart the page draws, with the config literal when it is one.
@@ -411,21 +421,26 @@ function cellOf(id) {
 // The same, for a cell in the one-pager's sheet grid. No flow rows here: on a
 // fixed sheet nothing is content-sized, which is why a table has to be given a
 // row that is tall enough for it rather than taking the height it wants.
-function sheetCellOf(id) {
+function sheetFigOf(id) {
   if (!sheet) return null;
   const at = code.indexOf('id="' + id + '"');
   if (at < 0 || at < sheet.start || at > sheet.start + sheet.len) return null;
-  const cellAt = code.lastIndexOf('class="cell', at);
-  if (cellAt < 0) return null;
-  const cls = (/^class="([^"]*)"/.exec(code.slice(cellAt)) || [])[1] || '';
-  const w = +((/\bw(\d+)\b/.exec(cls) || [])[1] || 12);
-  const h = +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1);
-  return { grid: 'sheet', cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow: false,
-    px: sheet.pxOf(w), py: sheet.pyOf(h), pxOf: sheet.pxOf, pyOf: sheet.pyOf };
+  const figAt = code.lastIndexOf('<figure', at);
+  if (figAt < 0) return null;
+  const cls = (/class="([^"]*)"/.exec(code.slice(figAt, at)) || [])[1] || '';
+  const wide = /\bwide\b/.test(cls);
+  const size = (/\b(sm|lg|xl)\b/.exec(cls) || [])[1] || 'md';
+  return { grid: 'sheet', wide, flow: false,
+    cls: (wide ? '.fig.wide' : '.fig') + (size === 'md' ? '' : '.' + size),
+    px: wide ? sheet.w : sheet.colW, py: sheet.heightOf(cls),
+    // A column figure can only be widened by moving it to the .wide band, and
+    // only made taller by the next size class up.
+    pxOf: () => sheet.w,
+    pyOf: () => sheet.heightOf(' xl') };
 }
 
 const bentoReady = Object.values(grid).every(v => v != null);
-const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetCellOf(id);
+const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetFigOf(id);
 const sized = manifest
   ? charts.map(c => Object.assign({}, c, { cell: cellFor(c.id) })).filter(c => c.cell) : [];
 if (!sized.length) {
@@ -441,18 +456,23 @@ if (!sized.length) {
     // a fixed-height row can squeeze it.
     const shortBy = c.cell.py != null && needH ? needH - c.cell.py : 0;
     if (needW && c.cell.px < needW - 8) {
+      // On a one-pager a column is 360px (323 landscape) and most engines want
+      // 480, so a chart in a column is usually the wrong engine rather than the
+      // wrong size: barList says what a bar chart says, at a column's width.
+      const COLUMN_WIDTH_ENGINES = 'barList, radar, donut, pie, packedBubble';
       const fits = [4, 6, 8, 12].find(w => w > c.cell.w && c.cell.pxOf(w) >= needW - 8);
       tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.px + 'px wide, needs ' + needW +
-        (fits ? '  → w' + fits + ' or wider'
-              : c.cell.grid === 'sheet' ? '  → w12, or landscape (swap --sheet-w and --sheet-h)' : ''));
+        (c.cell.grid === 'sheet'
+          ? '  → move it to the .wide band (' + sheet.w + 'px), or use a column-width engine (' +
+            COLUMN_WIDTH_ENGINES + ')'
+          : fits ? '  → w' + fits + ' or wider' : ''));
     } else if (shortBy > 8) {
-      // On a sheet the height is the row count, not the cell: .h2 only helps
-      // while there is another row to borrow from, so the fix is usually to
-      // drop a row (references/layout-onepager.md § The budget).
+      // On a one-pager the height is the figure's size class, and the next one
+      // up is bought from the column's remaining run.
+      const NEXT = { 200: '.md (265px)', 265: '.lg (310px)', 310: '.xl (430px)' };
       tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.py + 'px tall, needs ' + needH +
         (c.cell.grid === 'sheet'
-          ? '  → ' + sheet.rows + ' rows leaves ' + Math.round(sheet.rowH) + 'px each; cut a row' +
-            (sheet.kpis ? ', or the KPI band' : '')
+          ? '  → ' + (NEXT[c.cell.py] || 'a taller figure class') + ', or a shorter chart'
           : '  → h2, or a .bento.flow row'));
     }
   }
@@ -509,29 +529,73 @@ if (!sized.length) {
     const g = barGeom(c);
     if (!g) continue;
     const what = c.id + ' (' + c.type + ', ' + g.n + ' categor' + (g.n === 1 ? 'y' : 'ies') + (g.k > 1 ? ' × ' + g.k + ' series' : '') + ') in ' + c.cell.cls;
+    const onSheet = c.cell.grid === 'sheet';
     if (c.type === 'column') {
-      // Plot width: the cell less the value axis and its labels.
+      // Plot width: the box less the value axis and its labels. On a one-pager
+      // the box is the figure's own and there are no spans to suggest.
       const plot = w => c.cell.pxOf(w) - 60;
       const ok = w => { const a = g.at(plot(w)); return a.bar <= BAR.fat && a.slot >= BAR.slot && a.bar >= BAR.thin; };
-      if (ok(c.cell.w)) continue;
-      const a = g.at(plot(c.cell.w));
-      const fits = [4, 6, 8, 12].filter(ok);
+      const at = onSheet ? c.cell.px - 60 : plot(c.cell.w);
+      if (onSheet ? (() => { const a = g.at(at); return a.bar <= BAR.fat && a.slot >= BAR.slot && a.bar >= BAR.thin; })() : ok(c.cell.w)) continue;
+      const a = g.at(at);
+      const fits = onSheet ? [] : [4, 6, 8, 12].filter(ok);
       const fix = fits.length ? '→ w' + fits.join(' or w')
+        : onSheet ? (a.bar > BAR.fat ? '→ state the ' + g.n + ' values in a sentence, or use a .stat'
+                                     : '→ Charts.barList in a column, or fewer categories')
         : a.bar > BAR.fat ? '→ w4 with more groupPadding, or state the ' + g.n + ' values as KPIs'
         : '→ w12, a horizontal bar, or fewer categories';
       misfit.push(what + ': ' + (a.bar > BAR.fat ? Math.round(a.bar) + 'px-wide bars' : Math.round(a.slot) + 'px per category') + '  ' + fix);
     } else if (c.cell.py != null) {
-      // Horizontal bars: the plot height is the row less title, legend and axis.
+      // Horizontal bars: the plot height is the box less title, legend and axis.
       const plot = h => c.cell.pyOf(h) - 90;
       const h = /\bh2\b/.test(c.cell.cls) ? 2 : 1;
-      const a = g.at(plot(h));
+      const a = g.at(onSheet ? c.cell.py - 90 : plot(h));
       if (a.slot < BAR.rowSlot) {
-        misfit.push(what + ': ' + Math.round(a.slot) + 'px per row  → ' + (h === 1 && g.at(plot(2)).slot >= BAR.rowSlot ? 'h2'
-          : c.cell.grid === 'sheet' ? 'fewer bars, or a row of the sheet to itself' : 'a .bento.flow row with barList, or fewer rows'));
+        misfit.push(what + ': ' + Math.round(a.slot) + 'px per row  → ' + (onSheet ? 'a taller figure class, or fewer bars'
+          : h === 1 && g.at(plot(2)).slot >= BAR.rowSlot ? 'h2' : 'a .bento.flow row with barList, or fewer rows'));
       } else if (a.bar > BAR.rowFat) {
-        misfit.push(what + ': ' + Math.round(a.bar) + 'px-thick bars  → ' + (h === 2 ? 'drop the h2' : 'share the row with a narrower partner, or use a column chart'));
+        misfit.push(what + ': ' + Math.round(a.bar) + 'px-thick bars  → ' + (onSheet ? 'a shorter figure class, or Charts.barList'
+          : h === 2 ? 'drop the h2' : 'share the row with a narrower partner, or use a column chart'));
       }
     }
+  }
+  // barList does not refuse a box that is too short for its rows — it thins the
+  // bars instead, and keeps thinning. A four-row list in 200px draws 6px
+  // hairlines where it should draw 26px bars: the chart is there, the labels
+  // and values are right, and the one thing it encodes has been squeezed out of
+  // it. Nothing throws and the browser audit cannot see it either, because
+  // nothing overflows. The constants below are measured off the engine, not
+  // guessed: drawing the same list at a range of heights, full 26px bars first
+  // appear at 265px for 3 rows, 310px for 4, 360px for 5 and 430px for 6, which
+  // is ~55px a row over ~95px of title, subtitle and padding.
+  const BARLIST = { row: 55, chrome: 95 };
+  for (const c of sized) {
+    if (c.type !== 'barList' || !isObj(c.cfg) || c.cell.py == null) continue;
+    const s0 = Array.isArray(c.cfg.series) ? c.cfg.series.find(isObj) : null;
+    const n = s0 && Array.isArray(s0.data) ? s0.data.length : (catsOf(c.cfg) || []).length;
+    if (!n) continue;
+    const need = n * BARLIST.row + BARLIST.chrome;
+    if (c.cell.py < need - 8) {
+      const classes = [['sm', 200], ['md', 265], ['lg', 310], ['xl', 430]];
+      const fits = classes.find(([, px]) => px >= need - 8);
+      misfit.push(c.id + ' (barList, ' + n + ' rows) in ' + c.cell.cls + ' has ~' + c.cell.py +
+        'px for ' + need + 'px of rows  → ' +
+        (c.cell.grid === 'sheet'
+          ? (fits ? '.' + fits[0] + ' (' + fits[1] + 'px)' : 'fewer rows — past 6 it does not fit a figure')
+          : 'a taller cell') + ', or fewer rows; it thins the bars rather than saying so');
+    }
+  }
+  // The waffle degrades the same silent way, in the other direction: its dot
+  // grid shrinks to fit whatever is left after the stat, the name and the
+  // description. In a 360px column a 100-dot grid draws 2.8px dots at 265px of
+  // height and 6px at 310px — a grey smudge where the whole point is counting
+  // units. Measured at column width, dots reach a readable ~11px at 380px.
+  for (const c of sized) {
+    if (c.type !== 'waffle' || c.cell.py == null) continue;
+    if (c.cell.px >= 480 || c.cell.py >= 380 - 8) continue;
+    misfit.push(c.id + ' (waffle) in ' + c.cell.cls + ' is ' + c.cell.px + 'x' + c.cell.py +
+      'px — its dots shrink to a few px at this width  → .xl, the .wide band, or a donut' +
+      (c.cell.grid === 'sheet' ? '' : ' in a wider cell'));
   }
   if (misfit.length) bad('bars sized to their cell', misfit.join(' | '));
   else ok('bars sized to their cell', 'every column and bar chart has room per category without slab-wide bars');
@@ -568,6 +632,11 @@ if (pies.length) {
 // area A4 and Letter share, so editing --sheet-h, or widening the @page margin,
 // silently buys a second page. Nobody discovers that until it is printed, and
 // by then it has been handed round.
+//
+// It also adds up the figures declared in each column. A column that is over
+// its height before a word of text is set cannot be rescued by editing the
+// prose, and the overflow is silent, because the column crops rather than
+// scrolling.
 const PAPER = { a4: [210, 297], letter: [216, 279.4] };   // mm
 if (!sheet) {
   ok('fits one page', 'not a one-pager');
@@ -597,13 +666,23 @@ if (!sheet) {
           : '  → it prints on two pages there; shrink the sheet or the margin'));
     }
   }
-  if (sheet.gridH <= 0) {
-    problems.push('the header, KPI band and footer are taller than the sheet — nothing is left for the grid');
+  if (sheet.bodyH <= 0) {
+    problems.push('the masthead and footer are taller than the sheet — nothing is left for the body');
   }
+  // The figures alone can be added up before any text is measured. If they
+  // already exceed the column, no amount of editing the prose will save it —
+  // and the overflow would be silent, because the column crops.
+  const overfull = sheet.column.filter(c => c.figs.length && c.figPx > sheet.colH)
+    .map(c => 'column ' + c.n + ': ' + c.figs.length + ' figure(s) total ~' + c.figPx +
+      'px in a ' + sheet.colH + 'px column, before a word of text');
+  if (overfull.length) problems.push(overfull.join(' | ') + '  → a smaller figure class, or one figure fewer');
   if (problems.length) bad('fits one page', problems.join(' | '));
   else {
-    ok('fits one page', sheet.w + 'x' + sheet.h + ' sheet, ' + sheet.rows + ' row(s) of ' +
-      Math.round(sheet.rowH) + 'px' + (sheet.kpis ? ' (KPI band on)' : '') +
+    const run = sheet.column.map(c => c.figPx);
+    ok('fits one page', sheet.w + 'x' + sheet.h + ' sheet, ' + sheet.cols + ' columns of ' +
+      sheet.colW + 'x' + sheet.colH + 'px' +
+      (sheet.wideFigs.length ? ' under a full-width band' : '') +
+      (run.length ? ' · figures use ' + run.join('/') + 'px of each column' : '') +
       ' — fits A4 and Letter' + (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
   }
 }
