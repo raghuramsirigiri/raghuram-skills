@@ -346,49 +346,68 @@ const cellPy = h => Math.round(h * grid.row + (h - 1) * grid.gap - 2 * grid.cell
 
 // ── the one-pager's sheet ────────────────────────────────────────────
 // A one-pager is a fixed sheet set in columns, so its geometry follows from a
-// handful of custom properties. Two things are worth computing before a browser
-// opens. A column is 360px wide portrait and 323px landscape, which is under
-// the 480px most engines need — so a chart's figure either sits in the
-// full-width band or uses one of the few column-width engines, and getting that
-// wrong is a cramped chart rather than an error. And a figure's height is named
-// (.sm/.md/.lg/.xl), so the figures in one column can be added up and compared
-// with the column before any text is measured.
+// handful of custom properties and the markup. Two things are worth computing
+// before a browser opens: how wide each column is (the --cols track list, which
+// the author picks from the content, so it can be anything CSS accepts), and
+// how much of each column the figures have already claimed — a column that is
+// over its height before a word of text is set cannot be rescued by editing
+// prose, and it crops rather than scrolling.
 function readSheet() {
   const start = code.indexOf('class="body"');
   if (start < 0 || !/class="cols"/.test(code)) return null;
   const w = cssVar('sheet-w'), h = cssVar('sheet-h'), gap = cssVar('gap');
   const head = cssVar('band-head'), foot = cssVar('band-foot');
   const colGap = cssVar('col-gap');
-  const cols = +((/--cols\s*:\s*(\d+)/.exec(code) || [])[1] || 0);
-  if ([w, h, gap, head, foot, colGap].some(v => v == null) || !cols) return null;
+  const trackList = ((/--cols\s*:\s*([^;}]+)/.exec(code) || [])[1] || '').trim();
+  if ([w, h, gap, head, foot, colGap].some(v => v == null) || !trackList) return null;
+  // Resolve the track list to pixels: fixed lengths come off the top, the rest
+  // is shared between the fr tracks by weight. Anything exotic counts as 1fr,
+  // which keeps a page using a unit this does not know roughly right rather
+  // than silently wrong.
+  const parts = trackList.split(/\s+/).filter(Boolean);
+  let avail = w - (parts.length - 1) * colGap;
+  const frs = [];
+  const widths = parts.map((t, i) => {
+    const px = /^([\d.]+)px$/.exec(t);
+    if (px) { avail -= +px[1]; return +px[1]; }
+    const fr = /^([\d.]+)fr$/.exec(t);
+    frs.push({ i, weight: fr ? +fr[1] : 1 });
+    return null;
+  });
+  const frTotal = frs.reduce((a, f) => a + f.weight, 0) || 1;
+  for (const f of frs) widths[f.i] = avail * f.weight / frTotal;
+  const colWidths = widths.map(v => Math.round(Math.max(0, v || 0)));
   const bodyH = h - head - foot - 2 * gap;
-  const colW = Math.round((w - (cols - 1) * colGap) / cols);
-  // Named figure heights, read from the page so the two stay in step.
-  const figH = { sm: cssVar('fig-sm'), md: cssVar('fig-md'),
-                 lg: cssVar('fig-lg'), xl: cssVar('fig-xl') };
-  const heightOf = cls => figH[(/\b(sm|lg|xl)\b/.exec(cls) || [])[1]] || figH.md;
-  // Each column, with the figures declared inside it. The body runs to the
-  // footer band; markup after that is somebody else's.
+
+  // A figure's height is a content decision set inline as --fig-h; `auto` means
+  // the engine grows to its own rows and there is nothing to add up.
+  const defaultFigH = (/\.fig\s+\.chart\s*\{[^}]*height\s*:\s*var\(--fig-h\s*,\s*(\d+)px/.exec(code) || [])[1];
+  const figOf = tag => {
+    if (/\bauto\b/.test((/class="([^"]*)"/.exec(tag) || [])[1] || '')) return null;
+    const m = /--fig-h\s*:\s*(\d+(?:\.\d+)?)px/.exec(tag);
+    return m ? +m[1] : (defaultFigH ? +defaultFigH : 180);
+  };
   const after = code.slice(start);
   const end = after.search(/<footer[^>]*class="[^"]*\bsheet-foot\b/);
   const body = end < 0 ? after : after.slice(0, end);
   const colsAt = body.indexOf('class="cols"');
+  // The caption and the margin under a figure, read from the page's own CSS.
+  const capCost = (cssNum('.fig figcaption', 'font-size') || 8.5) * 1.35 +
+    (cssNum('.fig figcaption', 'margin-top') || 4) + (cssNum('.fig figcaption', 'padding-top') || 4);
+  const figMargin = cssNum('.fig', 'margin') || 12;
+  const cost = tag => { const fh = figOf(tag); return fh == null ? 0 : fh + capCost + figMargin; };
   const colBlocks = colsAt < 0 ? [] : body.slice(colsAt).split(/class="col"/).slice(1);
-  // A figure's full cost: the chart, its caption and the margin under it.
-  const capCost = (cssNum('.fig figcaption', 'font-size') || 9.5) * 1.4 +
-    (cssNum('.fig figcaption', 'margin-top') || 5) + (cssNum('.fig figcaption', 'padding-top') || 5);
-  const figMargin = 14;
   const column = colBlocks.map((b, i) => {
-    const figs = [...b.matchAll(/<figure[^>]*class="fig([^"]*)"/g)].map(m => heightOf(m[1]));
-    return { n: i + 1, figs, figPx: Math.round(figs.reduce((s, f) => s + f + capCost + figMargin, 0)) };
+    const tags = b.match(/<figure[^>]*>/g) || [];
+    return { n: i + 1, width: colWidths[i] != null ? colWidths[i] : colWidths[0],
+      figs: tags.length, figPx: Math.round(tags.reduce((s, t) => s + cost(t), 0)) };
   });
-  // A full-width figure band takes its height off every column.
-  const wideFigs = [...body.slice(0, colsAt < 0 ? body.length : colsAt)
-    .matchAll(/<figure[^>]*class="fig([^"]*)"/g)].map(m => heightOf(m[1]));
-  const wideCost = wideFigs.reduce((s, f) => s + f + capCost + gap, 0);
+  // Any full-width band takes its height off every column.
+  const wideTags = (body.slice(0, colsAt < 0 ? body.length : colsAt).match(/<figure[^>]*>/g) || []);
+  const wideCost = wideTags.reduce((s, t) => s + (figOf(t) == null ? 0 : figOf(t) + capCost + gap), 0);
   const colH = Math.round(bodyH - wideCost);
-  return { w, h, gap, colGap, cols, bodyH, colW, colH, column, wideFigs,
-    start, len: body.length, heightOf };
+  return { w, h, gap, colGap, tracks: trackList, cols: parts.length, colWidths,
+    bodyH, colH, column, wide: wideTags.length, start, len: body.length, figOf };
 }
 const sheet = readSheet();
 // Every chart the page draws, with the config literal when it is one.
@@ -427,16 +446,20 @@ function sheetFigOf(id) {
   if (at < 0 || at < sheet.start || at > sheet.start + sheet.len) return null;
   const figAt = code.lastIndexOf('<figure', at);
   if (figAt < 0) return null;
-  const cls = (/class="([^"]*)"/.exec(code.slice(figAt, at)) || [])[1] || '';
+  const tag = code.slice(figAt, code.indexOf('>', figAt) + 1);
+  const cls = (/class="([^"]*)"/.exec(tag) || [])[1] || '';
   const wide = /\bwide\b/.test(cls);
-  const size = (/\b(sm|lg|xl)\b/.exec(cls) || [])[1] || 'md';
-  return { grid: 'sheet', wide, flow: false,
-    cls: (wide ? '.fig.wide' : '.fig') + (size === 'md' ? '' : '.' + size),
-    px: wide ? sheet.w : sheet.colW, py: sheet.heightOf(cls),
-    // A column figure can only be widened by moving it to the .wide band, and
-    // only made taller by the next size class up.
+  // Which column it is in: count the column openers before it inside .cols.
+  const colsAt = code.indexOf('class="cols"', sheet.start);
+  const before = colsAt >= 0 && figAt > colsAt ? code.slice(colsAt, figAt) : '';
+  const idx = Math.max(0, (before.match(/class="col"/g) || []).length - 1);
+  const px = wide ? sheet.w : (sheet.colWidths[idx] != null ? sheet.colWidths[idx] : sheet.colWidths[0]);
+  const py = sheet.figOf(tag);     // null when class="fig auto": the engine grows
+  return { grid: 'sheet', wide, flow: py == null,
+    cls: wide ? '.fig.wide' : 'column ' + (idx + 1),
+    px, py,
     pxOf: () => sheet.w,
-    pyOf: () => sheet.heightOf(' xl') };
+    pyOf: () => py };
 }
 
 const bentoReady = Object.values(grid).every(v => v != null);
@@ -448,36 +471,53 @@ if (!sized.length) {
   ok('titles fit their charts', 'no charts in a sized grid');
   ok('bars sized to their cell', 'no charts in a sized grid');
 } else {
-  const tooSmall = [];
+  const tooSmall = [], cramped = [];
+  // The manifest's minWidth/minHeight are the sizes a chart WANTS. No engine
+  // refuses below them — a 12-point line chart at 280px still draws, it just
+  // thins its axis labels — so on a one-pager, where the whole job is fitting
+  // more onto a fixed sheet, falling under them is advice rather than a
+  // failure. The hard floor is 60% of the wanted size, which is where a line's
+  // ticks drop to a third of its points and a donut's ring stops being a ring.
+  // A dashboard cell is a different matter: there the grid is supposed to be
+  // sized to the chart, so under the minimum stays a failure.
+  const FLOOR = 0.6;
   for (const c of sized) {
     const m = manifest.charts[c.type];
     const needW = m.minWidth, needH = m.minHeight;
+    const onSheet = c.cell.grid === 'sheet';
     // A self-sizing chart grows to its content when it has no height, so only
-    // a fixed-height row can squeeze it.
+    // a fixed height can squeeze it.
     const shortBy = c.cell.py != null && needH ? needH - c.cell.py : 0;
-    if (needW && c.cell.px < needW - 8) {
-      // On a one-pager a column is 360px (323 landscape) and most engines want
-      // 480, so a chart in a column is usually the wrong engine rather than the
-      // wrong size: barList says what a bar chart says, at a column's width.
-      const COLUMN_WIDTH_ENGINES = 'barList, radar, donut, pie, packedBubble';
+    const narrow = needW && c.cell.px < needW - 8;
+    const short = shortBy > 8;
+    if (!narrow && !short) continue;
+    const where = c.id + ' (' + c.type + ') in ' + c.cell.cls;
+    if (onSheet) {
+      const hardW = narrow && c.cell.px < needW * FLOOR;
+      const hardH = short && c.cell.py < needH * FLOOR;
+      const what = (narrow ? '~' + c.cell.px + 'px wide (wants ' + needW + ')' : '') +
+        (narrow && short ? ' and ' : '') +
+        (short ? '~' + c.cell.py + 'px tall (wants ' + needH + ')' : '');
+      if (hardW || hardH) {
+        tooSmall.push(where + ' is ' + what + '  → past the point of reading: ' +
+          (hardW ? 'give it a wider column track, or the .wide band' : 'give the figure more --fig-h'));
+      } else {
+        cramped.push(where + ': ' + what);
+      }
+    } else if (narrow) {
       const fits = [4, 6, 8, 12].find(w => w > c.cell.w && c.cell.pxOf(w) >= needW - 8);
-      tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.px + 'px wide, needs ' + needW +
-        (c.cell.grid === 'sheet'
-          ? '  → move it to the .wide band (' + sheet.w + 'px), or use a column-width engine (' +
-            COLUMN_WIDTH_ENGINES + ')'
-          : fits ? '  → w' + fits + ' or wider' : ''));
-    } else if (shortBy > 8) {
-      // On a one-pager the height is the figure's size class, and the next one
-      // up is bought from the column's remaining run.
-      const NEXT = { 200: '.md (265px)', 265: '.lg (310px)', 310: '.xl (430px)' };
-      tooSmall.push(c.id + ' (' + c.type + ') in ' + c.cell.cls + ' is ~' + c.cell.py + 'px tall, needs ' + needH +
-        (c.cell.grid === 'sheet'
-          ? '  → ' + (NEXT[c.cell.py] || 'a taller figure class') + ', or a shorter chart'
-          : '  → h2, or a .bento.flow row'));
+      tooSmall.push(where + ' is ~' + c.cell.px + 'px wide, needs ' + needW +
+        (fits ? '  → w' + fits + ' or wider' : ''));
+    } else {
+      tooSmall.push(where + ' is ~' + c.cell.py + 'px tall, needs ' + needH +
+        '  → h2, or a .bento.flow row');
     }
   }
   if (tooSmall.length) bad('charts fit their cells', tooSmall.join(' | '));
-  else ok('charts fit their cells', sized.length + ' chart(s) in grid cells, all at or above their minimum size');
+  else if (cramped.length) {
+    note('charts fit their cells', cramped.join(' | ') +
+      '  — under the size the engine would like, which on one page is often the right trade; check the labels in the browser');
+  } else ok('charts fit their cells', sized.length + ' chart(s) sized, all at or above their minimum');
 
   // Characters per title line scale with width: ~10.5px per character at the
   // title size (references/chart-api.md § Titles and subtitles wrap), two
@@ -568,21 +608,27 @@ if (!sized.length) {
   // guessed: drawing the same list at a range of heights, full 26px bars first
   // appear at 265px for 3 rows, 310px for 4, 360px for 5 and 430px for 6, which
   // is ~55px a row over ~95px of title, subtitle and padding.
-  const BARLIST = { row: 55, chrome: 95 };
+  // barList's natural height is its rows: a label line, the bar, and the gap
+  // under it, over a heading band. Those are options, so a page that tightens
+  // them gets measured against what it asked for rather than the defaults —
+  // which is how a four-row list comes down from 310px to 226px. Short of that
+  // height the engine thins the bars instead of saying anything: at 200px a
+  // four-row list draws 6px hairlines where it should draw 26px bars, and
+  // nothing throws, nothing overflows, and the browser audit cannot see it.
+  const BARLIST = { label: 14, chrome: 65, barHeight: 26, rowGap: 22 };
   for (const c of sized) {
     if (c.type !== 'barList' || !isObj(c.cfg) || c.cell.py == null) continue;
     const s0 = Array.isArray(c.cfg.series) ? c.cfg.series.find(isObj) : null;
     const n = s0 && Array.isArray(s0.data) ? s0.data.length : (catsOf(c.cfg) || []).length;
     if (!n) continue;
-    const need = n * BARLIST.row + BARLIST.chrome;
+    const po = isObj(c.cfg.plotOptions) && isObj(c.cfg.plotOptions.barList) ? c.cfg.plotOptions.barList : {};
+    const bh = typeof po.barHeight === 'number' ? po.barHeight : BARLIST.barHeight;
+    const rg = typeof po.rowGap === 'number' ? po.rowGap : BARLIST.rowGap;
+    const need = Math.round(n * (bh + rg + BARLIST.label) + BARLIST.chrome);
     if (c.cell.py < need - 8) {
-      const classes = [['sm', 200], ['md', 265], ['lg', 310], ['xl', 430]];
-      const fits = classes.find(([, px]) => px >= need - 8);
-      misfit.push(c.id + ' (barList, ' + n + ' rows) in ' + c.cell.cls + ' has ~' + c.cell.py +
-        'px for ' + need + 'px of rows  → ' +
-        (c.cell.grid === 'sheet'
-          ? (fits ? '.' + fits[0] + ' (' + fits[1] + 'px)' : 'fewer rows — past 6 it does not fit a figure')
-          : 'a taller cell') + ', or fewer rows; it thins the bars rather than saying so');
+      misfit.push(c.id + ' (barList, ' + n + ' rows at barHeight ' + bh + '/rowGap ' + rg + ') in ' +
+        c.cell.cls + ' has ~' + c.cell.py + 'px for ' + need + 'px of rows  → --fig-h:' + need +
+        'px, class="fig auto", tighter barHeight/rowGap, or fewer rows; it thins the bars rather than saying so');
     }
   }
   // The waffle degrades the same silent way, in the other direction: its dot
@@ -672,17 +718,20 @@ if (!sheet) {
   // The figures alone can be added up before any text is measured. If they
   // already exceed the column, no amount of editing the prose will save it —
   // and the overflow would be silent, because the column crops.
-  const overfull = sheet.column.filter(c => c.figs.length && c.figPx > sheet.colH)
-    .map(c => 'column ' + c.n + ': ' + c.figs.length + ' figure(s) total ~' + c.figPx +
+  const overfull = sheet.column.filter(c => c.figs && c.figPx > sheet.colH)
+    .map(c => 'column ' + c.n + ': ' + c.figs + ' figure(s) total ~' + c.figPx +
       'px in a ' + sheet.colH + 'px column, before a word of text');
-  if (overfull.length) problems.push(overfull.join(' | ') + '  → a smaller figure class, or one figure fewer');
+  if (overfull.length) problems.push(overfull.join(' | ') + '  → less --fig-h, or one figure fewer');
   if (problems.length) bad('fits one page', problems.join(' | '));
   else {
-    const run = sheet.column.map(c => c.figPx);
-    ok('fits one page', sheet.w + 'x' + sheet.h + ' sheet, ' + sheet.cols + ' columns of ' +
-      sheet.colW + 'x' + sheet.colH + 'px' +
-      (sheet.wideFigs.length ? ' under a full-width band' : '') +
-      (run.length ? ' · figures use ' + run.join('/') + 'px of each column' : '') +
+    // How much of each column the figures already hold. The rest is the room
+    // left for prose — and a column that is mostly empty is the failure this
+    // format is most prone to, so the number is reported either way.
+    const run = sheet.column.map(c => c.figPx + '/' + sheet.colH);
+    ok('fits one page', sheet.w + 'x' + sheet.h + ' sheet, columns [' + sheet.tracks + '] = ' +
+      sheet.colWidths.join('/') + 'px wide, ' + sheet.colH + 'px tall' +
+      (sheet.wide ? ' under ' + sheet.wide + ' full-width band(s)' : '') +
+      (run.length ? ' · figures hold ' + run.join(' and ') + 'px' : '') +
       ' — fits A4 and Letter' + (landscape ? ' landscape' : '') + ' at ' + margin + 'mm');
   }
 }
