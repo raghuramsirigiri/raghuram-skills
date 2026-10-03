@@ -1,14 +1,14 @@
 ---
 name: chart-dashboard
-description: Build a self-contained HTML dashboard, data-story report, or slide deck from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, or a presentation, slides or a deck built from data they provide or describe.
+description: Build a self-contained HTML dashboard, data-story report, slide deck, or printable one-pager from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, or a one-page handout or brief to print, built from data they provide or describe.
 ---
 
 # Chart dashboard
 
 Turn whatever information the user gives — a table, pasted numbers, a set of
 metrics, notes, or just a topic and some facts — into a single self-contained
-HTML page of SVG charts rendered with `charts-lib`: a dashboard, a report, or a
-slide deck.
+HTML page of SVG charts rendered with `charts-lib`: a dashboard, a report, a
+slide deck, or a one-pager that prints on a single sheet.
 
 ## Workflow
 
@@ -57,12 +57,22 @@ slide deck.
      from across a room or clicked through in a tab. Reach for it when the user
      says presentation, slides, deck, "present this", "walk them through it", or
      names a meeting the page has to survive. Use `templates/slides.html`.
+   - **One-pager** — the whole thing on one sheet of paper, read at a glance and
+     carried out of the room. Reach for it when the page has to leave the
+     screen: "print it", "one page", "a handout", "for the board pack", "pin it
+     up", "a PDF to attach". Use `templates/onepager.html`, and read
+     `references/layout-onepager.md` before you start — the format's work is
+     deciding what does *not* fit, and the sheet holds far less than a
+     dashboard does.
 
-   When it's genuinely ambiguous, ask yourself who reads it and whether you will
-   be in the room. Nobody presents a bento grid to a board, and nobody watches a
-   five-section narrative to see if last night's numbers moved. The deck is the
-   one format that assumes a presenter: if the page has to stand alone with no
-   one narrating, it is a report, however much the user said "slides".
+   When it's genuinely ambiguous, ask yourself who reads it, whether you will
+   be in the room, and whether it ends up on paper. Nobody presents a bento grid
+   to a board, and nobody watches a five-section narrative to see if last
+   night's numbers moved. The deck is the one format that assumes a presenter:
+   if the page has to stand alone with no one narrating, it is a report,
+   however much the user said "slides". And a one-pager is a budget, not a
+   size: if the findings genuinely need more than one sheet, build a report and
+   say so, rather than shrinking the type until they fit.
 
    **Editable or static.** Static is the default. Build an *editable* page
    only when the user asked for one: charts stored as JSON, text marked
@@ -79,6 +89,7 @@ slide deck.
    <skill-dir>/templates/dashboard.html  →  ./index.html
    <skill-dir>/templates/report.html     →  ./index.html
    <skill-dir>/templates/slides.html     →  ./index.html
+   <skill-dir>/templates/onepager.html   →  ./index.html
    <skill-dir>/templates/dashboard-editable.html  →  ./index.html   (only when asked for editable)
    ```
    Do **not** copy `assets/charts-lib/` next to the output. The template's three
@@ -89,6 +100,13 @@ slide deck.
    dashboard template deliberately ships with a placeholder two-cell grid,
    because any arrangement shipped there would end up on every page this skill
    produces.
+
+   *(Building a one-pager? Derive the panels the same way, then do the budget
+   before you write any of them: the sheet is fixed, so the span and the row
+   count decide how big every chart on the page is, and a fourth portrait row
+   puts every chart under its engine's minimum. `references/layout-onepager.md`
+   § The budget has both tables; `scripts/check-page.js` does the arithmetic
+   and names what does not fit.)*
 
    *(Building a deck? A deck derives its **evidence** from the findings the same
    way, but its **spine** is fixed, and `references/layout-deck.md` § Compose the
@@ -308,6 +326,14 @@ slide deck.
    silently cropped in the PDF rather than scrolled, and those two find it.
    Open the print preview only if you changed the template's print CSS.
 
+   **If you built a one-pager,** three things are the paper check. The static
+   checker's `fits one page` does the arithmetic — the sheet plus its `@page`
+   margin against both A4 and Letter — and `paper-ready` fails a control and
+   flags a chart whose numbers only exist in a tooltip. The audit's `off-sheet`
+   is the deck's `off-slide`: content past the sheet is content sliced off the
+   printed page. Then open the print preview once, and confirm the one thing
+   nothing in the page can measure — that it came out as **one** page.
+
    **If the page has any control, test it** — an untested filter is usually a
    broken filter. With the audit loaded, change each control to a
    non-default value:
@@ -423,12 +449,13 @@ will accept without proof doesn't need one either.
 
 The dashboard and report templates are tuned for someone reading at a desk.
 When the user tells you otherwise — "I'm presenting this", "send it round",
-"print it" — the same page fails badly in that other context. Presenting is the
-case with its own template: a deck (`templates/slides.html`) is the right answer
-to "I'm presenting this", not a dashboard with the type scaled up. For the other
-two the fix is how much you put on the page and at what size, never a different
-design system. All three cases are in `references/layout.md` § Fit the page to
-how it will be read.
+"print it" — the same page fails badly in that other context. Two of those
+cases have their own template: a deck (`templates/slides.html`) is the right
+answer to "I'm presenting this", not a dashboard with the type scaled up, and a
+one-pager (`templates/onepager.html`) is the right answer to "print it", not a
+dashboard that happens to fit. For "send it round" the fix is how much you put
+on the page and at what size, never a different design system. All the cases are
+in `references/layout.md` § Fit the page to how it will be read.
 
 ### Make the chart show the finding, not just the data
 
@@ -589,7 +616,10 @@ would carry the information better. Usually it would.
 One HTML file, standalone — no sibling `charts-lib/` folder, no CDN tags, no
 network at open time (see step 8). A deck ships the same way, and a reader turns
 it into a PDF with their browser's own Print → Save as PDF: the template sizes
-the page to the slide, one rounded slide per page. Write it to the working directory (or where
+the page to the slide, one rounded slide per page. A one-pager prints the same
+way and lands on exactly one sheet, on A4 or US Letter alike — say so when you
+hand it over, since the whole point of the format is that it can be printed
+without anyone touching the dialog. Write it to the working directory (or where
 the user asked). Then surface
 it however your environment does that — attach or render the file if you can (in
 Claude Code: `SendUserFile` with `display: "render"`); otherwise print the

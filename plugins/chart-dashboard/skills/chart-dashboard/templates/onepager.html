@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — One-pager</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- These three tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the library's own contents, so
+     the file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* ── The sheet is the deliverable ─────────────────────────────────────────
+     A one-pager is one printed page, so the page is a fixed box rather than a
+     column that grows. Everything on it is sized from that box, and anything
+     that does not fit gets cut — there is no second page to push it onto.
+
+     THE BOX: 730x990px, which is the printable area A4 and US Letter share.
+       A4      210x297mm, less 8mm margins → 194x281mm → 733x1062px
+       Letter  216x279mm, less 8mm margins → 200x263mm → 756x 994px
+       shared  min of each → 733x994px → authored at 730x990 with a little slack
+     So the same file prints on one page on either paper, with no scaling by the
+     print dialog. `@page` sets the 8mm margin; the sheet itself is the content
+     box inside it, which is why it carries no padding of its own.
+
+     LANDSCAPE: two changes, and both are needed. Swap the numbers —
+     --sheet-w:990px, --sheet-h:730px — and turn the paper with them, by
+     setting `@page { size: landscape }` at the bottom of this stylesheet.
+     `size: auto` means the print dialog's orientation, which is portrait
+     everywhere, so a landscape sheet laid on a portrait page is split across
+     two. (The box itself is symmetric: landscape is the same shared printable
+     area rotated.) Reach for landscape when the page leads on charts that need
+     width — it fits two standard charts side by side and portrait does not.
+     The span and row budgets differ between the two; both are in
+     references/layout-onepager.md.
+
+     --paper, --ink, --muted, --hair and --font are overwritten at load from
+     Charts.theme (sync block near the bottom), so recolouring the charts
+     recolours the page. --bg is the ground behind the sheet, screen only. */
+  :root { --sheet-w:730px; --sheet-h:990px;
+          /* The 8mm print margin, drawn around the sheet on screen so what you
+             see is the sheet inside its paper. 8mm ≈ 30px at 96dpi. */
+          --margin:30px;
+          /* The three fixed chrome bands. Fixed, not content-sized, because the
+             grid gets what is left: a header that grows would silently steal
+             height from the charts. The header holds a two-line headline and a
+             scope line at 20px; the footer holds one. A title that needs a
+             third line is too long for a page read at a glance. */
+          --band-head:78px; --band-kpi:54px; --band-foot:26px;
+          --gap:10px; --radius:4px;
+          --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
+          --hair:#dcdbd7;
+          --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
+          --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); -webkit-font-smoothing:antialiased; }
+
+  .ground { padding:28px 20px 56px; }
+  /* Reserves the scaled footprint. fit() writes --frame-h rather than setting
+     `height` directly, so the print rule below can still take the height back:
+     an inline `height` would outrank it and leave the scaled-up screen
+     footprint on the printed page — 60px of empty paper, which is enough to
+     push a page that fits onto a second sheet. */
+  .sheet-frame { position:relative; width:100%; margin:0 auto;
+    max-width:calc(var(--sheet-w) + 2 * var(--margin));
+    height:var(--frame-h, calc(var(--sheet-h) + 2 * var(--margin))); }
+  /* The paper keeps its authored size and is scaled to the window, so type,
+     charts and spacing shrink together and nothing reflows — the page on screen
+     is the page on paper. Never scaled above 1: this is a document, and a
+     document does not grow to fill a monitor. */
+  .paper { position:absolute; top:0; left:0;
+    width:calc(var(--sheet-w) + 2 * var(--margin));
+    height:calc(var(--sheet-h) + 2 * var(--margin));
+    padding:var(--margin); background:var(--paper);
+    box-shadow:0 1px 3px rgba(0,0,0,0.10);
+    transform-origin:top left; transform:scale(var(--k,1)); }
+  /* The content box. overflow:hidden on purpose: paper crops, it does not
+     scroll, so anything past the edge must look cut here too — that is what
+     makes the screen honest, and what audit.js measures as `off-sheet`. */
+  .sheet { width:var(--sheet-w); height:var(--sheet-h); display:flex;
+    flex-direction:column; gap:var(--gap); overflow:hidden; }
+
+  /* ── Chrome ───────────────────────────────────────────────────────────────
+     Hairlines, not cards. On a screen a panel is lifted off the ground by a
+     luminance step; on paper that step is a block of ink around every figure.
+     A one-pager separates with rules instead, which is the print idiom and
+     costs nothing to photocopy. The charts paint themselves --paper, so they
+     sit flush on the sheet with no box at all. */
+  header.sheet-head { height:var(--band-head); flex:0 0 auto; display:flex;
+    justify-content:space-between; align-items:flex-end; gap:20px;
+    padding-bottom:8px; border-bottom:1px solid var(--hair); }
+  header.sheet-head h1 { margin:0; font-size:20px; font-weight:700;
+    letter-spacing:-0.4px; line-height:1.2; }
+  header.sheet-head p { margin:3px 0 0; color:var(--muted); font-size:11.5px;
+    line-height:1.35; }
+  header.sheet-head .stamp { color:var(--muted); font-size:9.5px; text-align:right;
+    text-transform:uppercase; letter-spacing:.06em; flex:0 0 auto; }
+  header.sheet-head .stamp b { display:block; color:var(--ink); font-size:11.5px;
+    font-weight:700; text-transform:none; letter-spacing:0; margin-top:2px; }
+
+  /* Optional KPI band. Keep it or delete the block — deleting it gives the grid
+     64px back, which is the difference between two comfortable rows and three
+     tight ones. Hairline-separated rather than tiled, same reason as above. */
+  .kpis { height:var(--band-kpi); flex:0 0 auto; display:grid;
+    grid-auto-flow:column; grid-auto-columns:1fr; align-items:center;
+    border-bottom:1px solid var(--hair); }
+  .kpi { padding:0 14px; min-width:0; border-left:1px solid var(--hair); }
+  .kpi:first-child { padding-left:0; border-left:0; }
+  /* Explicit line-heights, not `normal`: the three lines have to add up to less
+     than the band, and `normal` is the font's own figure — it comes out at 1.33
+     for the fallback stack, which overflows a band sized for 1.2, and changes
+     again when a theme swaps the face. */
+  .kpi span { display:block; font-size:9.5px; line-height:1.25; font-weight:400;
+    letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kpi b { display:block; font-size:21px; line-height:1.15; font-weight:700;
+    margin-top:2px; letter-spacing:-0.4px; color:var(--ink); }
+  .kpi i { display:block; font-style:normal; font-size:9.5px; line-height:1.25;
+    font-weight:400; color:var(--muted); margin-top:1px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ── The grid ─────────────────────────────────────────────────────────────
+     Twelve tracks, as everywhere else in this skill, but the rows are `1fr`:
+     they divide what the chrome leaves rather than being 340px each. So the
+     number of rows IS the height of every chart on the page, and adding a row
+     makes every existing chart shorter. That is the page budget, and
+     scripts/check-page.js does the arithmetic (see § Spans and rows below). */
+  .sheet-grid { flex:1 1 auto; min-height:0; display:grid;
+    grid-template-columns:repeat(12,1fr); grid-auto-rows:1fr; gap:var(--gap); }
+  .cell { min-width:0; min-height:0; overflow:hidden; padding-top:6px;
+    border-top:1px solid var(--hair); }
+  .cell .chart { width:100%; height:100%; }
+  .w4{grid-column:span 4}.w6{grid-column:span 6}.w8{grid-column:span 8}.w12{grid-column:span 12}
+  .h2{grid-row:span 2}
+
+  /* Soft surface card, for text that belongs to no single figure: a caveat, a
+     method note, the ask. It is a grid cell like any other — on a fixed sheet
+     there is nowhere else for it to go. */
+  /* align-self:start, so the note is as tall as its text rather than as tall as
+     the row. A chart has to fill its cell; a paragraph stretched to 400px is a
+     grey slab with writing at the top, and white paper under a short note reads
+     better than a filled box. */
+  .note { background:var(--surface-soft); border-radius:var(--radius);
+    border-top:0; align-self:start; padding:12px 14px; font-size:11.5px;
+    line-height:1.55; color:var(--ink); overflow:hidden; }
+  .note b { display:block; text-transform:uppercase; font-size:9px;
+    letter-spacing:.07em; color:var(--muted); margin-bottom:5px; }
+
+  footer.sheet-foot { height:var(--band-foot); flex:0 0 auto;
+    border-top:1px solid var(--hair); padding-top:7px;
+    font-size:9.5px; line-height:1.45; color:var(--muted); overflow:hidden; }
+  footer.sheet-foot b { color:var(--ink); }
+
+  /* ── Print: the sheet, once, on one page ─────────────────────────────────
+     Ctrl/Cmd+P → Save as PDF, or straight to a printer. Leave the dialog's
+     margins at Default; @page sets them.
+
+     `size:auto` rather than a named paper: the sheet is the box A4 and Letter
+     share (see the top of this file), so whichever paper the dialog is set to,
+     it fits with no shrink-to-fit. Naming A4 here would make every Letter
+     printer scale the page down instead. `auto` does not cover orientation,
+     though — it takes the dialog's, which is portrait — so a landscape sheet
+     must say `size: landscape` here. check-page.js fails the mismatch.
+
+     On screen the paper is scaled with a transform, which leaves its layout box
+     at the authored size. In print the transform is dropped and the box is used
+     as it is — same pixels, so the printed page is the page you verified. The
+     margin moves from the paper's padding to @page, so the sheet lands inside
+     the printer's own margin rather than drawing its own on top of it. */
+  @page { size:auto; margin:8mm; }
+  @media print {
+    html, body { background:none; }
+    .ground { padding:0; }
+    .sheet-frame { position:static; max-width:none; width:var(--sheet-w);
+      height:var(--sheet-h); margin:0; }
+    .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
+      padding:0; box-shadow:none; transform:none;
+      /* Note fills and any dark surface must survive the browser's default of
+         dropping backgrounds when printing. */
+      -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div class="ground">
+  <div class="sheet-frame">
+    <div class="paper">
+      <div class="sheet">
+
+        <header class="sheet-head">
+          <div>
+            <h1>Headline finding, not a topic label</h1>
+            <p>One line of scope: what is measured, across what population.</p>
+          </div>
+          <div class="stamp">Reporting window<b>START — END</b></div>
+        </header>
+
+        <!-- Optional KPI band: label, value, one line of context. No arrows, no
+             colour-coded verdicts. DELETE THE WHOLE BLOCK if the figures are
+             better off as a chart — it buys the grid 64px, which is a third row.
+             Four tiles is the most that stays legible at this width; five
+             clip their labels. -->
+        <div class="kpis">
+          <div class="kpi"><span>Metric name</span><b id="k1">—</b><i>vs 1,180 prior period</i></div>
+          <div class="kpi"><span>Metric name</span><b>56%</b><i>Q1 average</i></div>
+          <div class="kpi"><span>Metric name</span><b>12.4d</b><i>median, all sites</i></div>
+        </div>
+
+        <!-- THE GRID IS NOT A TEMPLATE — BUILD IT FROM YOUR PANEL PLAN.
+             What follows is two rows showing the three mechanics the format
+             turns on, not an arrangement to reuse: a full-width standard chart,
+             a narrow-capable chart at w6, and a note sharing that row.
+
+             ── Spans and rows: the budget ───────────────────────────────────
+             On a fixed sheet the grid is the only slack, so both numbers are
+             arithmetic rather than taste. At 730x990 portrait:
+
+               w12 = 730px   every chart type fits
+               w8  = 483px   line, column, bar, scatter, waterfall, sankey… (480 min)
+               w6  = 360px   donut, pie, waffle, barList, radar, packedBubble only
+               w4  = 237px   no chart fits — text, a .note, nothing else
+
+             So a portrait one-pager puts standard charts at w8 or w12. Two of
+             them side by side does not fit; that is the reason to go landscape
+             (990x730 → w6 = 490px, two standard charts in a row).
+
+             Rows divide what the chrome leaves, so every row you add shortens
+             every chart on the page:
+
+               portrait, with the KPI band      2 rows 396px · 3 rows 261px
+               portrait, no KPI band            2 rows 428px · 3 rows 282px
+               landscape, with the KPI band     1 row  542px · 2 rows 266px
+               landscape, no KPI band           1 row  606px · 2 rows 298px
+
+             Most charts need 260px of height, a donut 300px, a geofacet 420px
+             (so a geofacet wants .h2, which on a two-row page is the whole
+             grid). Four rows portrait or three landscape fit nothing: that is
+             the ceiling, and it is where a one-pager becomes a report.
+             scripts/check-page.js computes all of this from the markup and
+             names what does not fit. Full table in
+             references/layout-onepager.md § The budget. -->
+        <div class="sheet-grid">
+          <div class="cell w12"><div class="chart" id="c1"></div></div>
+          <div class="cell w6"><div class="chart" id="c2"></div></div>
+          <div class="cell w6 note">
+            <b>Caveat</b>
+            Something the reader needs in order to read the figures correctly,
+            and which is not a finding any single chart carries.
+          </div>
+        </div>
+
+        <footer class="sheet-foot">
+          <b>Sources.</b> … &nbsp;·&nbsp; <b>Definitions.</b> … &nbsp;·&nbsp; Note any illustrative figures here.
+        </footer>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- theme.js MUST load before charts.js; both are inlined by scripts/inline-lib.js -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call
+   with the neutral and series palette, never per-chart colours and never
+   role-by-role (that is how tiles and tooltips get left on the old palette).
+   Generate the block with scripts/extract-theme.js; see references/theming.md.
+   Delete this block when using the default theme.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* Page chrome follows the chart theme, so there is one source of colour truth. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--paper', t.bg);
+  s.setProperty('--ink',   t.titleColor);
+  s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--hair',  t.grid);
+  s.setProperty('--font',  t.font);
+  // Soft surfaces take the theme's own panel token — the same fill a geofacet
+  // tile uses — so the page and the charts step off the canvas by the same
+  // amount, and a dark palette inverts without any luminance guesswork here.
+  s.setProperty('--surface-soft', t.tileSurface);
+})();
+
+/* The paper keeps its authored pixels and is scaled to the window, so one
+   layout serves every screen and the print path needs no second one. Capped at
+   1: scaled past that it would be a poster, and the charts would be drawn at a
+   size nobody is going to print.
+
+   Two guards, both load-bearing. A container that measures 0 is not a narrow
+   window — it is a tab that has not been laid out yet (a background tab, a
+   hidden preview pane), and scaling to 0/790 would paint the whole page away
+   and draw every chart at zero size. So a zero measurement is ignored and the
+   CSS default of 1 stands. And the re-fit runs off a ResizeObserver rather
+   than the resize event alone, because a pane that is shown after load changes
+   the frame's box without the window ever resizing. */
+(function () {
+  const paper = document.querySelector('.paper');
+  const frame = paper.parentElement;
+  let last = 0;
+  function fit() {
+    const avail = frame.clientWidth;
+    if (!avail || avail === last) return;
+    last = avail;
+    const k = Math.min(1, avail / paper.offsetWidth);
+    paper.style.setProperty('--k', k);
+    frame.style.setProperty('--frame-h', (paper.offsetHeight * k) + 'px');
+  }
+  addEventListener('resize', fit);
+  // Observes the ground, not the frame: the frame's height is set above, and an
+  // observer watching that would retrigger itself.
+  if (window.ResizeObserver) new ResizeObserver(fit).observe(frame.parentElement);
+  fit();
+})();
+</script>
+<script>
+/* Two example charts, one per grid cell above. Replace them both. They are
+   here for the mechanics a one-pager adds to the usual ones:
+
+     · NOTHING IS HOVER-ONLY. A tooltip does not exist on paper, so every
+       value a reader needs is a data label, a KPI or an axis tick. The library
+       draws data labels by default; on a one-pager, leave them on unless the
+       labels genuinely collide, and then shorten the data rather than hiding
+       the numbers.
+     · NO CONTROLS. A dropdown prints as a dropdown — a grey box with one
+       value showing. If the page needs a filter it is a dashboard, not a
+       one-pager. check-page.js fails a one-pager that has one.
+     · A narrow cell takes a narrow-capable chart (the donut at w6 below), not
+       a squeezed standard one.
+
+   Chart options for every type are in references/charts/<type>.md — don't
+   guess option names. */
+Charts.column('c1', {
+  title: 'The finding this page exists to state, proved underneath',
+  subtitle: 'Units · scope · period',
+  xAxis: { categories: ['Cat A', 'Cat B', 'Cat C', 'Cat D', 'Cat E'] },
+  legend: { enabled: false },
+  plotOptions: { series: { dataLabels: { enabled: true } } },
+  // Emphasis: the title names two categories, so those two take the accent and
+  // the rest take the mute. Written out in SKILL.md § Make the chart show the
+  // finding, and in chart-selection.md § Emphasis.
+  series: [{ name: 'Units', data: [980, 740, 610, 420, 310].map((y, i) => ({
+    y, color: i < 2 ? Charts.theme.colors[1] : Charts.theme.muted
+  })) }]
+});
+
+Charts.donut('c2', {
+  title: 'Share of total',
+  subtitle: 'Percent',
+  // Donut and pie options live under plotOptions.pie. At the top level they are
+  // silently ignored — the chart draws without them and nothing says why.
+  plotOptions: { pie: { valueSuffix: '%', centerText: '46%' } },
+  series: [{ name: 'Share', data: [
+    { name: 'A', y: 46 }, { name: 'B', y: 28 },
+    { name: 'C', y: 17 }, { name: 'Other', y: 9 }
+  ]}]
+});
+
+document.getElementById('k1').textContent = '1,284';
+</script>
+</body>
+</html>
