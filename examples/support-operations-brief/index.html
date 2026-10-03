@@ -43,8 +43,9 @@
 
 </style>
 <style>
-  :root { --sheet-w:730px; --sheet-h:990px; --cols: 1fr 1fr;
-          --margin:30px;
+  :root { --sheet-w:730px; --sheet-h:1060px; --cols: 1fr 1fr;
+          --margin:28px;
+          --paper-w:790px; --paper-h:1120px;
           --band-head:118px; --band-foot:22px;
           --gap:10px; --col-gap:16px; --radius:4px;
           --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
@@ -87,6 +88,11 @@
     grid-template-columns:var(--cols); gap:var(--col-gap); }
   .col { min-width:0; min-height:0; overflow:hidden; display:flex;
     flex-direction:column; }
+  .col > * { flex-shrink:0; }
+  .pe-over { outline:2px solid #B31B38; outline-offset:2px; }
+  .onepager-overflow { position:fixed; left:0; right:0; top:0; z-index:2147483646;
+    background:#B31B38; color:#fff; font:600 12px/1.45 var(--font); padding:7px 14px; }
+  @media print { .pe-over { outline:none; } .onepager-overflow { display:none; } }
 
   .blk { margin:0 0 10px; }
   .blk h2 { margin:0 0 4px; font-size:11.5px; line-height:1.25; font-weight:700;
@@ -110,13 +116,11 @@
     width:5px; height:1px; background:var(--muted); }
   ul.pts li b { font-weight:700; }
 
-  .stat { margin:0 0 10px; }
-  .stat b { display:block; font-size:21px; line-height:1.05; font-weight:700;
-    letter-spacing:-0.5px; }
-  .stat span { display:block; font-size:9px; line-height:1.3; color:var(--muted);
-    margin-top:2px; }
-  .stat-row { display:flex; gap:12px; margin:0 0 10px; }
-  .stat-row .stat { flex:1; min-width:0; margin:0; }
+  .facts { margin:0 0 10px; padding:6px 0;
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+  .facts p { margin:0 0 3px; font-size:10px; line-height:1.45; }
+  .facts p:last-child { margin-bottom:0; }
+  .facts b { font-size:12.5px; font-weight:700; letter-spacing:-0.2px; }
 
   .note { background:var(--surface-soft); border-radius:var(--radius);
     padding:8px 10px; font-size:9.5px; line-height:1.45; margin:0 0 10px; }
@@ -130,14 +134,19 @@
     font-size:8.5px; line-height:1.4; color:var(--muted); overflow:hidden; }
   footer.sheet-foot b { color:var(--ink); }
 
-  @page { size:auto; margin:8mm; }
+  @page { size:A4; margin:0; }
   @media print {
     html, body { background:none; }
     .ground { padding:0; }
-    .sheet-frame { position:static; max-width:none; width:var(--sheet-w);
-      height:var(--sheet-h); margin:0; }
-    .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
-      padding:0; box-shadow:none; transform:none;
+    .sheet-frame { position:static; max-width:none; width:var(--paper-w);
+      height:var(--paper-h); margin:0; }
+    /* The paper keeps its padding and background in print, so the page is the
+       same cream to all four edges that the screen shows. Nothing in the @page
+       margin box is ever painted, so moving the gutter there leaves a white
+       frame around a cream page. */
+    .paper { position:static; width:var(--paper-w); height:var(--paper-h);
+      padding:var(--margin); background:var(--paper); box-shadow:none;
+      transform:none;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
@@ -187,9 +196,9 @@
                 <figcaption><b>Fig 2</b> Top four reasons; the remaining 2,730 contacts are product questions and a long tail.</figcaption>
               </figure>
 
-              <div class="stat-row">
-                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
-                <div class="stat"><b>11.4<small>min</small></b><span>median handling time, unchanged</span></div>
+              <div class="facts">
+                <p><b>18,400</b> contacts handled in the quarter, 9% more than Q2</p>
+                <p><b>11.4 min</b> median handling time, unchanged across the quarter</p>
               </div>
 
               <div class="blk">
@@ -202,7 +211,11 @@
                 <li><b>Not volume.</b> 9% more contacts, but the slip began the week routing changed, not the week volume rose.</li>
                 <li><b>Not staffing.</b> Headcount and shift cover were unchanged across the quarter.</li>
                 <li><b>Not one channel.</b> All three moved together, which a channel-specific fault would not do.</li>
+                <li><b>Not the mix.</b> The share of contacts by reason is within a point of Q2; what changed is how long each waits.</li>
               </ul>
+
+              <p>What is left is the routing rule itself, which is also the one change we made in
+                the window and the one we can reverse this week.</p>
             </div>
 
             <div class="col">
@@ -210,7 +223,8 @@
                 <h2>Why it happened</h2>
                 <p>The new rules concentrate account-access contacts on one team, which is also
                   the team carrying the longest queue. Everything behind them waits, which is why
-                  the slip shows up across all three channels rather than one.</p>
+                  the slip shows up across all three channels rather than one, and why the median
+                  moved while handling time did not.</p>
               </div>
 
               <figure class="fig" style="--fig-h:165px">
@@ -226,6 +240,7 @@
                 <li><b>Self-serve password reset.</b> Scoped, no new infrastructure, covers account access.</li>
                 <li><b>Invoice history page.</b> Covers the billing questions that are lookups, not disputes.</li>
                 <li><b>Split the routing rule</b> so one team no longer holds both queues.</li>
+                <li><b>Measure for two weeks</b> before committing to either flow, so the split is judged on its own.</li>
               </ul>
 
               <figure class="fig" style="--fig-h:185px">
@@ -233,9 +248,9 @@
                 <figcaption><b>Fig 4</b> Most contacts already end at first touch; the tail is where the hours go.</figcaption>
               </figure>
 
-              <div class="stat-row">
-                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
-                <div class="stat"><b>54%</b><span>of contacts the two flows would absorb</span></div>
+              <div class="facts">
+                <p><b>71%</b> resolved inside 24 hours, down from 78% in Q2</p>
+                <p><b>54%</b> of all contacts the two planned flows would absorb</p>
               </div>
 
               <div class="blk">
@@ -243,13 +258,12 @@
                 <p>Sign-off to split the routing rule this week, which is reversible and needs no
                   build. The two self-serve flows need a sprint each and we would start with
                   password reset, the larger of the two.</p>
+                <p>If the split alone brings the median back under four hours, the flows become a
+                  capacity question rather than an urgent one, and we would rather know that
+                  before committing two sprints. If it does not, the flows are the next move and
+                  the two weeks will have cost nothing we would not have spent anyway.</p>
               </div>
 
-              <div class="note push">
-                <b>How to read the figures</b>
-                First response is the median from arrival to first human reply. A few multi-day
-                escalations pull the mean to 9.1h, which is why the median is used throughout.
-              </div>
             </div>
 
           </div>
@@ -15196,6 +15210,50 @@ Charts.applyMetrics({
   addEventListener('resize', fit);
   if (window.ResizeObserver) new ResizeObserver(fit).observe(frame.parentElement);
   fit();
+})();
+
+/* Watches the sheet for content that has outgrown it. A fixed box crops in
+   silence, so this is what makes the crop visible while there is still time to
+   edit — and it is the answer to the one thing an editable one-pager cannot
+   otherwise protect against, since a reader lengthening a heading gets the same
+   warning as the author.
+
+   scrollHeight - clientHeight is the measure: it is layout pixels, so the
+   paper's transform does not distort it, and it reads 0 whenever content fits.
+   A MutationObserver covers editing; charts redraw asynchronously, so a resize
+   listener and a settling timeout cover the rest. */
+(function () {
+  var BANDS = [['.col', 'Column'], ['.sheet-head', 'The header'],
+               ['.masthead', 'The masthead'], ['.sheet-foot', 'The footer']];
+  var bar = null;
+  function check() {
+    var over = [];
+    BANDS.forEach(function (pair) {
+      var nodes = document.querySelectorAll(pair[0]);
+      Array.prototype.forEach.call(nodes, function (n, i) {
+        var by = n.scrollHeight - n.clientHeight;
+        n.classList.toggle('pe-over', by > 1);
+        if (by > 1) over.push((nodes.length > 1 ? pair[1] + ' ' + (i + 1) : pair[1]) + ' by ' + by + 'px');
+      });
+    });
+    if (!over.length) { if (bar) { bar.remove(); bar = null; } return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'onepager-overflow';
+      // Built at load, so an editable page must not save it into the file.
+      bar.setAttribute('data-page-generated', '');
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = '<b>This will be cut when printed.</b> ' + over.join(', ') +
+      '. The sheet is one page and does not scroll — shorten the content, or give a figure less height.';
+  }
+  var t;
+  function soon() { clearTimeout(t); t = setTimeout(check, 120); }
+  addEventListener('resize', soon);
+  addEventListener('load', soon);
+  new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, characterData: true });
+  setTimeout(check, 400);
+  setTimeout(check, 1200);
 })();
 </script>
 <script>

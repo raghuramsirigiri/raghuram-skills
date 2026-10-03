@@ -80,7 +80,7 @@ test('the shipped template passes its own checks', () => {
     const l = out.split('\n').find(x => x.includes(row));
     assert.ok(l && /^\s*PASS/.test(l), row + ' did not pass:\n' + out);
   });
-  assert.match(out, /columns \[1fr 1fr\] = 357\/357px wide, 830px tall/);
+  assert.match(out, /columns \[1fr 1fr\] = 357\/357px wide, 900px tall/);
 });
 
 test('a dashboard page is not held to any of it', () => {
@@ -188,14 +188,36 @@ test('class="fig auto" lets it grow, so there is nothing to check', () => {
 test('a taller sheet still fits A4 but spills Letter, and the check names Letter', () => {
   const r = page('tall', { columns: [[170]], calls: line('c1'), geometry: { h: 1050 } })('fits one page');
   assert.ok(!r.passed, r.line);
-  assert.match(r.line, /past letter \(216x279\.4\)/);
-  assert.ok(!/past a4/.test(r.line), 'A4 has the room; only Letter should be named: ' + r.line);
+  assert.match(r.line, /past Letter \(216x279\.4\)/);
+  assert.ok(!/past A4/.test(r.line), 'A4 has the room; only Letter should be named: ' + r.line);
+});
+
+test('a sheet is checked against the paper it declares, not against both', () => {
+  // A4's printable area is 19mm taller than Letter's. Declaring A4 is what lets
+  // a page use it; leaving `size: auto` forces it down to the intersection.
+  const a4 = page('a4-sheet', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 1060, size: 'A4' } })('fits one page');
+  assert.ok(a4.passed, a4.line);
+  assert.match(a4.line, /fits A4 at 8mm/);
+
+  const auto = page('a4-sheet-auto', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 1060, size: 'auto' } })('fits one page');
+  assert.ok(!auto.passed, auto.line);
+  assert.match(auto.line, /@page has no paper, so the sheet must fit both/);
+});
+
+test('a sheet smaller than the paper it declares earns a note naming the waste', () => {
+  const r = page('under-fill', { columns: [[170]], calls: line('c1'),
+    geometry: { h: 990, size: 'A4' } })('fits one page');
+  assert.ok(r.note, r.line);
+  assert.match(r.line, /leaves 19mm of A4 empty at the foot \(6% of the page\)/);
+  assert.match(r.line, /--sheet-h:1062px fills it/);
 });
 
 test('a wider @page margin is the other way to lose the guarantee', () => {
   const r = page('fat-margin', { columns: [[170]], calls: line('c1'), geometry: { margin: 20 } })('fits one page');
   assert.ok(!r.passed, r.line);
-  assert.match(r.line, /past a4 \(210x297\) and letter/);
+  assert.match(r.line, /past A4 \(210x297\) and Letter/);
 });
 
 test('a landscape sheet on a portrait @page is split in two, and the check names the fix', () => {
@@ -223,6 +245,59 @@ test('no @page margin at all fails: the sheet is sized against a known one', () 
     '</div></div></div><footer class="sheet-foot">S</footer></div>\n<script>\n' + line('c1') + '\n</script>\n');
   const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
   assert.match(out, /FAIL {2}fits one page\s+no "@page \{ margin: Nmm \}"/);
+});
+
+// ── a note that only repeats a caption ───────────────────────────────
+test('a note that restates its figure caption is flagged, with the phrase', () => {
+  const file = path.join(dir, 'dupe-note.html');
+  fs.writeFileSync(file,
+    '<div class="col"><figure class="fig"><div class="chart" id="c1"></div>' +
+    '<figcaption><b>Fig 1</b> Median, not mean — a few multi-day escalations pull the mean to 9.1h.</figcaption></figure>' +
+    '<div class="note"><b>How to read the figures</b> First response is the median. ' +
+    'A few multi-day escalations pull the mean to 9.1h, which is why the median is used.</div></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const l = out.split(/\r?\n/).find(x => x.includes('nothing said twice'));
+  assert.ok(/^\s*----/.test(l), 'should be a note, not a pass or a fail: ' + l);
+  assert.match(l, /repeats "a few multi day escalations pull/);
+  assert.match(l, /furniture, not a caveat/);
+});
+
+test('a note carrying something of its own passes', () => {
+  const file = path.join(dir, 'real-note.html');
+  fs.writeFileSync(file,
+    '<div class="col"><figure class="fig"><div class="chart" id="c1"></div>' +
+    '<figcaption><b>Fig 1</b> Routing changed at the start of week 3.</figcaption></figure>' +
+    '<div class="note"><b>Caveat</b> Two sites were excluded: their scanners were offline all quarter.</div></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  assert.match(out, /PASS {2}nothing said twice\s+1 note\(s\), none repeating a caption/);
+});
+
+test('a page with no note says so rather than passing silently', () => {
+  const r = page('no-note', { columns: [[170]], calls: line('c1') })('nothing said twice');
+  assert.ok(r.passed, r.line);
+  assert.match(r.line, /no note on the page/);
+});
+
+test('the gutter may live inside the paper, which is what lets the background reach the edge', () => {
+  // @page { margin: 0 } plus padding on the paper: nothing in the margin box is
+  // ever painted, so a tinted page has to hold its gutter in an element. The
+  // check has to read it from there rather than calling the page marginless.
+  const file = path.join(dir, 'full-bleed.html');
+  fs.writeFileSync(file,
+    '<style>:root { --sheet-w:730px; --sheet-h:1060px; --cols: 1fr 1fr; --margin:28px;' +
+    ' --band-head:118px; --band-foot:22px; --gap:10px; --col-gap:16px; }' +
+    ' .fig .chart { height:var(--fig-h, 180px); }' +
+    ' @page { size:A4; margin:0; }</style>' +
+    '<div class="sheet"><div class="body"><div class="cols"><div class="col">' +
+    '<figure class="fig" style="--fig-h:170px"><div class="chart" id="c1"></div></figure>' +
+    '</div></div></div><footer class="sheet-foot">S</footer></div>' +
+    '<script>' + line('c1') + '</script>');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const l = out.split(String.fromCharCode(10)).find(x => x.includes('fits one page'));
+  assert.ok(/^\s*PASS/.test(l), l);
+  assert.match(l, /fits A4 at 7\.4mm/);
 });
 
 // ── nothing that needs a pointer ─────────────────────────────────────

@@ -14,13 +14,21 @@
      column that grows. Everything on it is sized from that box, and anything
      that does not fit gets cut — there is no second page to push it onto.
 
-     THE BOX: 730x990px, which is the printable area A4 and US Letter share.
+     THE BOX: 730x1060px, the printable area of A4 less 8mm margins.
        A4      210x297mm, less 8mm margins → 194x281mm → 733x1062px
        Letter  216x279mm, less 8mm margins → 200x263mm → 756x 994px
-       shared  min of each → 733x994px → authored at 730x990 with a little slack
-     So the same file prints on one page on either paper, with no scaling by the
-     print dialog. `@page` sets the 8mm margin; the sheet itself is the content
-     box inside it, which is why it carries no padding of its own.
+     `@page` sets the paper and the margin; the sheet is the content box inside
+     it, which is why it carries no padding of its own.
+
+     PICK THE PAPER THE PAGE WILL BE PRINTED ON. A fixed box cannot fill both:
+       A4 (the default)   --sheet-w:730px --sheet-h:1060px  --paper-w:790  --paper-h:1120
+       US Letter          --sheet-w:750px --sheet-h: 990px  --paper-w:812  --paper-h:1052
+     …and the matching `@page { size: A4 }` or `{ size: Letter }`. The gutter
+     between the two is --margin, which is why the sheet is the paper less
+     2x30px.
+     Printing an A4 sheet on Letter still works; the dialog scales it about 5%.
+     A printer with an unprintable edge will clip a few mm of the background —
+     only the background, because the content stays inside the gutter.
 
      LANDSCAPE: swap --sheet-w and --sheet-h, give --cols a third track, and set
      `@page { size: landscape }` at the bottom of this stylesheet. `size: auto`
@@ -35,11 +43,12 @@
 
      ── Pack it ─────────────────────────────────────────────────────────────
      The page is a budget, and the way this format fails is by under-spending
-     it. Two columns of 357x830px is 1660px of column run: at roughly 70px for
+     it. Two columns of 357x900px is 1800px of column run: at roughly 70px for
      a heading and three lines, 200px for a figure with its caption, and 20px a
-     list item, that is something like five figures and eight text blocks. A
+     list item, that is something like five figures and nine text blocks. A
      page carrying two charts and a lot of white space has used a third of the
-     paper it asked for.
+     paper it asked for. The overflow guard below marks a column that has gone
+     the other way.
 
      Charts here are SMALL. Chart type is scaled down for the page (the
      applyMetrics call near the bottom), and the engines draw into whatever box
@@ -48,7 +57,7 @@
      sizes it refuses below. So give a figure the height its content needs and
      no more — check-page.js tells you when a chart has genuinely been squeezed
      past the point of reading. */
-  :root { --sheet-w:730px; --sheet-h:990px;
+  :root { --sheet-w:730px; --sheet-h:1060px;
           /* THE COLUMN TRACKS, and the main thing to choose from the content.
              Any CSS grid track list works; the checker reads it to size the
              charts. Equal columns suit a page of similar blocks; an uneven
@@ -60,7 +69,14 @@
           --cols: 1fr 1fr;
           /* The 8mm print margin, drawn around the sheet on screen so what you
              see is the sheet inside its paper. 8mm ≈ 30px at 96dpi. */
-          --margin:30px;
+          --margin:28px;
+          /* The physical sheet, now that @page carries no margin: A4 is
+             793.7x1122.5px at 96dpi and these sit ~1mm inside it. The slack is
+             the point: a box even a fraction over the paper paginates into a
+             second, blank page, and 0.1mm of rounding is enough to do it. The
+             gutter is --margin, held inside the paper rather than outside it so
+             the background reaches all four edges. Letter is 816x1056. */
+          --paper-w:790px; --paper-h:1120px;
           /* Two fixed chrome bands; the body gets everything else. Fixed, not
              content-sized, because a masthead that grows would silently steal
              height from the columns. */
@@ -102,8 +118,8 @@
      summary that can be read on its own, and a byline rule carrying scope and
      the reporting window. Not a KPI tile row — tiles are dashboard furniture,
      and on paper they read as a widget pasted onto a document. Headline
-     figures belong in the summary sentence, or in a .stat beside the paragraph
-     that explains them. */
+     figures belong in the summary sentence, or in a .facts line beside the
+     paragraph that explains them. */
   header.masthead { height:var(--band-head); flex:0 0 auto; display:flex;
     flex-direction:column; }
   .kicker { font-size:9px; line-height:1.2; font-weight:700; color:var(--muted);
@@ -131,11 +147,20 @@
      pushing the footer off the sheet; audit.js reports it as clipped-y. */
   .col { min-width:0; min-height:0; overflow:hidden; display:flex;
     flex-direction:column; }
+  /* flex-shrink:0 is load-bearing. Without it a column that is overfull
+     compresses its own blocks instead of overflowing: a paragraph gets squeezed
+     under its text, which then spills over whatever follows, and the column's
+     scrollHeight never grows — so the page looks broken and nothing can measure
+     why. Held at their natural height, the excess runs past the bottom instead,
+     where overflow:hidden cuts it, the guard below sees it, and the browser
+     audit reports it as clipped-y. */
+  .col > * { flex-shrink:0; }
 
   /* ── Blocks ───────────────────────────────────────────────────────────────
      Five. A new block type is a second design system on the page, and none of
      the five is compulsory — a page with no list and no note is a normal page,
-     not an incomplete one. */
+     not an incomplete one. The note in particular has to earn its place: see
+     the comment on it below. */
 
   /* 1. A heading and its paragraph: the unit the argument is made of. */
   .blk { margin:0 0 10px; }
@@ -166,19 +191,27 @@
     width:5px; height:1px; background:var(--muted); }
   ul.pts li b { font-weight:700; }
 
-  /* 4. A figure that is a single number, set beside the sentence explaining it.
-        This is where a headline statistic goes — never a row of six. */
-  .stat { margin:0 0 10px; }
-  .stat b { display:block; font-size:21px; line-height:1.05; font-weight:700;
-    letter-spacing:-0.5px; }
-  .stat span { display:block; font-size:9px; line-height:1.3; color:var(--muted);
-    margin-top:2px; }
-  .stat-row { display:flex; gap:12px; margin:0 0 10px; }
-  .stat-row .stat { flex:1; min-width:0; margin:0; }
+  /* 4. Figures that belong to the prose. A number set large over a small grey
+        label is a KPI tile with the tile taken off: at 21px it was bigger than
+        this page's own 17px headline, which made it the loudest thing on the
+        sheet and read as a widget pasted into a document. A brief states a
+        figure in a line and moves on, so that is what this is — the number
+        bold at the size of a section heading, its meaning running on after it,
+        the set bounded by a hairline. Two or three lines, never six. */
+  .facts { margin:0 0 10px; padding:6px 0;
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+  .facts p { margin:0 0 3px; font-size:10px; line-height:1.45; }
+  .facts p:last-child { margin-bottom:0; }
+  .facts b { font-size:12.5px; font-weight:700; letter-spacing:-0.2px; }
 
-  /* 5. A filled surface, for text belonging to no figure: a caveat, a method
-        note, the ask. Use it when the page has one, not because the template
-        has one. */
+  /* 5. A filled surface, for text belonging to no figure. It is the block most
+        likely to be furniture: the first draft of this page carried a "How to
+        read the figures" note saying the median is used and the mean is 9.1h,
+        which is word for word what Fig 1's caption already said. A note that
+        restates a caption, a subtitle or a sentence of the prose is not a
+        caveat, it is the template showing through — delete it and spend the
+        60px on something the page does not yet say. check-page.js looks for
+        the overlap and says so. */
   .note { background:var(--surface-soft); border-radius:var(--radius);
     padding:8px 10px; font-size:9.5px; line-height:1.45; margin:0 0 10px; }
   .note b { display:block; text-transform:uppercase; font-size:8px;
@@ -192,28 +225,57 @@
     font-size:8.5px; line-height:1.4; color:var(--muted); overflow:hidden; }
   footer.sheet-foot b { color:var(--ink); }
 
+  /* ── The overflow guard ──────────────────────────────────────────────────
+     A column that outgrows its height is cut, and on a fixed sheet with no
+     scrollbar there is nothing to show that it happened — the first anyone
+     learns is a printed copy with half a chart at the bottom. So the page
+     watches itself: the script at the end marks any band that overflows and
+     puts a line at the top of the window saying which, and by how much. Screen
+     only, and it never reaches the file — the marker is created at load and
+     carries data-page-generated, so an editable page does not save it. */
+  .pe-over { outline:2px solid #B31B38; outline-offset:2px; }
+  .onepager-overflow { position:fixed; left:0; right:0; top:0; z-index:2147483646;
+    background:#B31B38; color:#fff; font:600 12px/1.45 var(--font);
+    padding:7px 14px; letter-spacing:.01em; }
+  .onepager-overflow b { font-weight:700; }
+  @media print { .pe-over { outline:none; } .onepager-overflow { display:none; } }
+
   /* ── Print: the sheet, once, on one page ─────────────────────────────────
      Ctrl/Cmd+P → Save as PDF, or straight to a printer. Leave the dialog's
-     margins at Default; @page sets them.
+     Margins at **Default**, which honours the `@page` rule below; **None** also
+     works. Choosing Minimum or Custom makes the browser impose its own margin
+     instead, which shrinks the page to fit inside it and puts back the white
+     frame this is all arranged to avoid. If a printed copy has a white border
+     around a cream page, that setting is the first thing to check — after
+     confirming the file is the current one.
 
-     `size:auto` rather than a named paper: the sheet is the box A4 and Letter
-     share, so whichever paper the dialog is set to, it fits with no
-     shrink-to-fit. Naming A4 would make every Letter printer scale the page
-     down instead. `auto` does not cover orientation, though — it takes the
-     dialog's, which is portrait — so a landscape sheet must say
-     `size: landscape` here. check-page.js fails the mismatch.
+     `size` names the paper the sheet was measured against, and the two have to
+     agree: the sheet is A4's printable area, so `size: A4` is what makes the
+     page fill the sheet rather than leaving a band at the foot. Switch both
+     together or neither — check-page.js fails the mismatch, and it is invisible
+     until something is printed. `size: auto` takes the dialog's paper and its
+     orientation, so it pairs only with the intersection box above, and a
+     landscape sheet always needs `size: landscape` spelled out.
 
      On screen the paper is scaled with a transform, which leaves its layout box
      at the authored size. In print the transform is dropped and the box is used
      as it is — same pixels, so the printed page is the page you verified. */
-  @page { size:auto; margin:8mm; }
+  @page { size:A4; margin:0; }
   @media print {
     html, body { background:none; }
     .ground { padding:0; }
-    .sheet-frame { position:static; max-width:none; width:var(--sheet-w);
-      height:var(--sheet-h); margin:0; }
-    .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
-      padding:0; box-shadow:none; transform:none;
+    .sheet-frame { position:static; max-width:none; width:var(--paper-w);
+      height:var(--paper-h); margin:0; }
+    /* The paper keeps its padding and its background in print, so the page is
+       the same cream to all four edges that the screen shows. Zeroing the
+       padding and moving the gutter to `@page` instead — which is what this
+       did first — leaves the gutter unpainted, and the printed sheet comes out
+       with a white frame around a cream page. Nothing in the margin box is
+       ever painted, so the background has to come from an element that
+       reaches the edge. */
+    .paper { position:static; width:var(--paper-w); height:var(--paper-h);
+      padding:var(--margin); background:var(--paper); box-shadow:none;
+      transform:none;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
@@ -248,7 +310,7 @@
                .blk        heading + 3 lines              ~70px
                .fig        the --fig-h you give it, + ~25px for the caption
                ul.pts      ~20px an item
-               .stat       ~55px   (.stat-row puts two side by side for the same)
+               .facts      ~25px a line, hairline-bounded
                .note       ~60px   — only when the page has a caveat to carry
              None is compulsory. Repeat whichever the argument needs.
 
@@ -359,6 +421,50 @@ Charts.applyMetrics({
   addEventListener('resize', fit);
   if (window.ResizeObserver) new ResizeObserver(fit).observe(frame.parentElement);
   fit();
+})();
+
+/* Watches the sheet for content that has outgrown it. A fixed box crops in
+   silence, so this is what makes the crop visible while there is still time to
+   edit — and it is the answer to the one thing an editable one-pager cannot
+   otherwise protect against, since a reader lengthening a heading gets the same
+   warning as the author.
+
+   scrollHeight - clientHeight is the measure: it is layout pixels, so the
+   paper's transform does not distort it, and it reads 0 whenever content fits.
+   A MutationObserver covers editing; charts redraw asynchronously, so a resize
+   listener and a settling timeout cover the rest. */
+(function () {
+  var BANDS = [['.col', 'Column'], ['.sheet-head', 'The header'],
+               ['.masthead', 'The masthead'], ['.sheet-foot', 'The footer']];
+  var bar = null;
+  function check() {
+    var over = [];
+    BANDS.forEach(function (pair) {
+      var nodes = document.querySelectorAll(pair[0]);
+      Array.prototype.forEach.call(nodes, function (n, i) {
+        var by = n.scrollHeight - n.clientHeight;
+        n.classList.toggle('pe-over', by > 1);
+        if (by > 1) over.push((nodes.length > 1 ? pair[1] + ' ' + (i + 1) : pair[1]) + ' by ' + by + 'px');
+      });
+    });
+    if (!over.length) { if (bar) { bar.remove(); bar = null; } return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'onepager-overflow';
+      // Built at load, so an editable page must not save it into the file.
+      bar.setAttribute('data-page-generated', '');
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = '<b>This will be cut when printed.</b> ' + over.join(', ') +
+      '. The sheet is one page and does not scroll — shorten the content, or give a figure less height.';
+  }
+  var t;
+  function soon() { clearTimeout(t); t = setTimeout(check, 120); }
+  addEventListener('resize', soon);
+  addEventListener('load', soon);
+  new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, characterData: true });
+  setTimeout(check, 400);
+  setTimeout(check, 1200);
 })();
 </script>
 <script>

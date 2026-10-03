@@ -2,9 +2,37 @@
 
 Read with `layout.md`, which holds the rules shared by every format.
 
-A one-pager is **one printed page, set in columns**: a fixed 730x990px sheet
-(portrait) or 990x730 (landscape), sized to the printable area A4 and US Letter
-share, so the same file prints as one page on either paper with no shrink-to-fit.
+A one-pager is **one printed page, set in columns**: a fixed 730x1060px sheet,
+which is A4's printable area less 8mm margins.
+
+**Pick the paper the page will be printed on.** A fixed box cannot fill both A4
+and US Letter — their printable areas differ by 19mm of height — so the sheet and
+`@page { size }` name one and move together:
+
+| Paper | `--sheet-w` / `--sheet-h` | `--paper-w` / `--paper-h` | `@page size` |
+|:--|:--|:--|:--|
+| A4 (the default) | 730 / 1060 | 790 / 1120 | `A4` |
+| US Letter | 750 / 990 | 812 / 1052 | `Letter` |
+
+The sheet is the content; the paper is the physical page, about 1mm inside it so
+that a fraction of rounding cannot paginate a blank second sheet. `--margin` is
+the gutter between them.
+
+Printing an A4 sheet on Letter still works; the dialog scales it about 5%.
+`check-page.js` checks the sheet against the paper it declares, fails one that
+overruns it, and notes one that leaves more than 8mm unused.
+
+**Printing it:** leave the dialog's Margins at Default (which honours `@page`)
+or None. Minimum or Custom makes the browser impose its own margin, shrink the
+page to fit inside it, and put back the white frame.
+
+**The gutter lives inside the paper, not in `@page`.** `@page { margin: 0 }`, and
+the paper carries `padding: var(--margin)` and its own background. Nothing in the
+`@page` margin box is ever painted, so putting the gutter there leaves it white:
+the sheet comes out of the printer as a cream page inside a white frame, which
+looks like a rendering fault and does not match what the screen showed. A printer
+with an unprintable edge clips a few mm of the background and nothing else,
+because the content stays inside the gutter.
 
 Three things drive everything else.
 
@@ -13,11 +41,17 @@ way a printed brief is set: a heading and a paragraph, a figure with a caption, 
 short list, another figure. Prose carries the argument and charts are evidence
 for it — the same relationship as `report.html`, compressed onto one sheet. Never
 build a KPI tile row: tiles are dashboard furniture, and on paper they read as a
-widget pasted onto a document. A headline figure goes in the summary sentence, or
-in a `.stat` beside the paragraph that explains it.
+widget pasted onto a document. Nor a tile with the tile taken off — a number set
+large over a small grey label is the same thing. The first version of this format
+set them at 21px, which was *larger than the page's own headline*, so they became
+the loudest thing on the sheet.
+
+A headline figure goes in the summary sentence, or in a `.facts` line: the number
+bold at the size of a section heading with its meaning running on after it, two
+or three lines bounded by a hairline. That is how a brief states a figure.
 
 **Pack it.** This format fails by under-spending the page. Two columns of
-357x830px is 1660px of column run, which is something like five figures and eight
+357x900px is 1800px of column run, which is something like five figures and nine
 text blocks. A page carrying two charts and a lot of white space has used a third
 of the paper it asked for. `check-page.js` reports how much of each column the
 figures hold, so the emptiness is visible before you ship it.
@@ -68,17 +102,29 @@ Nothing about the page's shape is fixed except the sheet. Derive the rest:
 | `.blk` heading + 3 lines | ~70px (+15px a line beyond three) |
 | `.fig` | the `--fig-h` you give it, + ~25px for the caption |
 | `ul.pts` | ~20px an item |
-| `.stat` / `.stat-row` | ~55px (a row of two costs the same as one) |
+| `.facts` | ~25px a line, hairline-bounded |
 | `.note` | ~60px |
 
-**Portrait gives 830px a column, landscape 544px.** A full-width `.wide` band
+**A4 portrait gives 900px a column, landscape 544px.** A full-width `.wide` band
 takes its height plus ~25px off every column, which is why it is for the rare
 exhibit that genuinely needs the sheet — a geofacet, a sankey, a long ranking —
 and not for ordinary charts.
 
 None of the five blocks is compulsory. A page with no list and no note is a
-normal page, not an incomplete one; use `.note` when the page has a caveat to
-carry, not because the template has one.
+normal page, not an incomplete one.
+
+**The note has to earn its 60px.** It is the block most likely to be furniture,
+because it exists in the vocabulary and so ends up on the page, and what it then
+says is whatever was already said somewhere else. A one-pager this skill built
+shipped a "How to read the figures" note explaining that the median is used and
+the mean is 9.1h — word for word what the figure's caption said two inches above
+it. Both halves were correct, which is why rendering the page did not reveal it.
+
+So before keeping a note, read it against the captions, the chart subtitles and
+the prose, and ask what the page loses without it. If the answer is nothing, that
+is 60px for something the page does not yet say. `check-page.js` lifts a run of
+six words from each note and looks for it in the captions and chart headings —
+the `nothing said twice` check.
 
 ## Size each figure to its chart
 
@@ -160,11 +206,15 @@ because a masthead that grows steals height from the columns silently.
 - **The footer is one line.** Two lines clip. Definitions that will not fit
   belong in a `.note`, which is what a note is for.
 
-## Not an editable page
+## An editable one-pager
 
-Don't offer the editable format for a one-pager (`editable.md` § When to build
-one). Everything was measured against a fixed box, and an editor lets someone
-lengthen a heading on a page with no scrollbar to show what fell off a column.
+Still don't offer it (`editable.md` § When to build one): everything here was
+measured against a fixed box, and an editor is a way to lengthen a heading on a
+page with no scrollbar. But the overflow guard above is what makes one
+defensible if it is asked for — the editor's reader gets the same red warning
+the author would, naming the column and the overflow, instead of finding out
+from a printed copy. Build it on that basis, and still say to reprint from a
+browser preview after editing.
 
 ## Verify it as paper
 
@@ -172,11 +222,23 @@ The usual three steps (SKILL.md step 7), with one addition and one subtraction:
 
 - `check-page.js` does the arithmetic — the sheet plus its `@page` margin against
   both papers, the figures in each column against the column, each chart against
-  its engine's wanted size, and the `barList` row heights.
+  its engine's wanted size, and the `barList` row heights. It also reads each note
+  against the captions and flags one that only repeats them.
 - The browser audit sizes the **text**, which no static check can. A column whose
   blocks overrun comes back as `clipped-y` on that column; content past the sheet
   as `off-sheet`. Measure how full each column is while you are there — a column
   at 60% is a column with a block missing.
+- **The page watches itself.** The template carries an overflow guard: a script
+  that measures every band and, when one has outgrown its box, outlines it and
+  puts a red line across the top of the window naming the band and the overflow
+  in pixels. Screen only, never printed, and marked `data-page-generated` so an
+  editable page does not save it. It is the one protection that survives
+  handover — a reader who lengthens a heading sees the same warning you would.
+
+  It depends on `.col > * { flex-shrink: 0 }`. Without it the column compresses
+  its own blocks instead of overflowing: a paragraph is squeezed under its text,
+  which then spills across whatever follows, and the column's `scrollHeight`
+  never grows — so the page looks broken and nothing can measure why.
 - There is no control to test, because there are no controls.
 
 Then open the print preview once. The screen layout *is* the print layout, so the
