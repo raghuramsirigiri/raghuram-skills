@@ -57,13 +57,15 @@ slide deck, or a one-pager that prints on a single sheet.
      from across a room or clicked through in a tab. Reach for it when the user
      says presentation, slides, deck, "present this", "walk them through it", or
      names a meeting the page has to survive. Use `templates/slides.html`.
-   - **One-pager** — the whole thing on one sheet of paper, read at a glance and
+   - **One-pager** — a report on one sheet of paper, read at a glance and
      carried out of the room. Reach for it when the page has to leave the
      screen: "print it", "one page", "a handout", "for the board pack", "pin it
      up", "a PDF to attach". Use `templates/onepager.html`, and read
-     `references/layout-onepager.md` before you start — the format's work is
-     deciding what does *not* fit, and the sheet holds far less than a
-     dashboard does.
+     `references/layout-onepager.md` before you start. It is set in **columns**
+     of headings, paragraphs, lists and figures — prose carries the argument
+     and charts are evidence for it, the same relationship as a report. A page
+     of charts with no sentences is a dashboard, and a KPI tile row on paper
+     reads as a widget pasted onto a document.
 
    When it's genuinely ambiguous, ask yourself who reads it, whether you will
    be in the room, and whether it ends up on paper. Nobody presents a bento grid
@@ -101,12 +103,15 @@ slide deck, or a one-pager that prints on a single sheet.
    because any arrangement shipped there would end up on every page this skill
    produces.
 
-   *(Building a one-pager? Derive the panels the same way, then do the budget
-   before you write any of them: the sheet is fixed, so the span and the row
-   count decide how big every chart on the page is, and a fourth portrait row
-   puts every chart under its engine's minimum. `references/layout-onepager.md`
-   § The budget has both tables; `scripts/check-page.js` does the arithmetic
-   and names what does not fit.)*
+   *(Building a one-pager? Write the **claims** first, as sentences, then decide
+   which of them need proving — the page is columns of blocks, and a block is as
+   often a heading and a paragraph as it is a figure. Then do the budget, because
+   the sheet is fixed: a portrait page is two 360x804px columns, a full-width
+   lead figure takes ~300px off both, and a column is too narrow for most chart
+   engines. `references/layout-onepager.md` § The budget has the per-block costs
+   and the table of which charts fit a column; `scripts/check-page.js` does the
+   arithmetic and names what does not fit. The failure to watch for is the
+   opposite of a dashboard's: two charts and a lot of white space.)*
 
    *(Building a deck? A deck derives its **evidence** from the findings the same
    way, but its **spine** is fixed, and `references/layout-deck.md` § Compose the
@@ -328,11 +333,14 @@ slide deck, or a one-pager that prints on a single sheet.
 
    **If you built a one-pager,** three things are the paper check. The static
    checker's `fits one page` does the arithmetic — the sheet plus its `@page`
-   margin against both A4 and Letter — and `paper-ready` fails a control and
-   flags a chart whose numbers only exist in a tooltip. The audit's `off-sheet`
-   is the deck's `off-slide`: content past the sheet is content sliced off the
-   printed page. Then open the print preview once, and confirm the one thing
-   nothing in the page can measure — that it came out as **one** page.
+   margin against both A4 and Letter, and the figures in each column against
+   the column — while `paper-ready` fails a control and flags a chart whose
+   numbers only exist in a tooltip. The audit is what sizes the **text**, which
+   no static check can: a column whose blocks overrun comes back as `clipped-y`
+   on that column, and content past the sheet as `off-sheet` — the deck's
+   `off-slide`, with the same meaning. Then open the print preview once, and
+   confirm the one thing nothing in the page can measure — that it came out as
+   **one** page.
 
    **If the page has any control, test it** — an untested filter is usually a
    broken filter. With the audit loaded, change each control to a

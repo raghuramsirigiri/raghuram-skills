@@ -12,7 +12,7 @@ own file — read that one and skip the others:
 | Dashboard | `templates/dashboard.html` | `layout-dashboard.md` — composing the grid, sizing cells, tables |
 | Report | `templates/report.html` | `layout-report.md` — the paper column, figures and captions |
 | Deck | `templates/slides.html` | `layout-deck.md` — the spine, a layout per claim, deck charts |
-| One-pager | `templates/onepager.html` | `layout-onepager.md` — the fixed sheet, the span and row budget, what to cut |
+| One-pager | `templates/onepager.html` | `layout-onepager.md` — the fixed sheet, the column budget, what to cut |
 
 ## All four
 

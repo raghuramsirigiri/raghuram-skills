@@ -22,33 +22,61 @@
      print dialog. `@page` sets the 8mm margin; the sheet itself is the content
      box inside it, which is why it carries no padding of its own.
 
-     LANDSCAPE: two changes, and both are needed. Swap the numbers —
-     --sheet-w:990px, --sheet-h:730px — and turn the paper with them, by
+     LANDSCAPE: three changes, all needed. Swap the numbers —
+     --sheet-w:990px, --sheet-h:730px — set --cols:3, and turn the paper too, by
      setting `@page { size: landscape }` at the bottom of this stylesheet.
      `size: auto` means the print dialog's orientation, which is portrait
      everywhere, so a landscape sheet laid on a portrait page is split across
-     two. (The box itself is symmetric: landscape is the same shared printable
-     area rotated.) Reach for landscape when the page leads on charts that need
-     width — it fits two standard charts side by side and portrait does not.
-     The span and row budgets differ between the two; both are in
-     references/layout-onepager.md.
+     two. Landscape is the same shared printable area rotated, and it comes out
+     at almost exactly the same total column run — three shorter columns rather
+     than two taller ones. Pick it when the page has many short blocks, or when
+     a chart needs more width than a 360px portrait column gives it.
+
+     ── This is a report, not a dashboard on paper ───────────────────────────
+     The body is COLUMNS of blocks, the way a printed brief is set: a heading
+     and a paragraph, a figure with a caption, a short list, another figure.
+     Prose carries the argument and the charts are evidence for it — the same
+     relationship as templates/report.html, compressed onto one sheet. A page
+     of charts with no sentences is a dashboard, and a dashboard is a different
+     format with its own template.
+
+     The space is the whole constraint, so here is what you have:
+       portrait   2 columns of 360x804px   = 1608px of column run
+       landscape  3 columns of 323x544px   = 1632px of column run
+     Roughly: a figure costs its height plus ~40px, a heading with three lines
+     of body ~95px, a four-point list ~105px. So one page holds something like
+     four figures and six text blocks — far more than it looks. Filling it is
+     the job; two charts and white space is the failure this format is most
+     prone to. The per-block budget is in references/layout-onepager.md.
 
      --paper, --ink, --muted, --hair and --font are overwritten at load from
      Charts.theme (sync block near the bottom), so recolouring the charts
      recolours the page. --bg is the ground behind the sheet, screen only. */
-  :root { --sheet-w:730px; --sheet-h:990px;
+  :root { --sheet-w:730px; --sheet-h:990px; --cols:2;
           /* The 8mm print margin, drawn around the sheet on screen so what you
              see is the sheet inside its paper. 8mm ≈ 30px at 96dpi. */
           --margin:30px;
-          /* The three fixed chrome bands. Fixed, not content-sized, because the
-             grid gets what is left: a header that grows would silently steal
-             height from the charts. The header holds a two-line headline and a
-             scope line at 20px; the footer holds one. A title that needs a
-             third line is too long for a page read at a glance. */
-          --band-head:78px; --band-kpi:54px; --band-foot:26px;
-          --gap:10px; --radius:4px;
+          /* Two fixed chrome bands; the body gets everything else. Fixed, not
+             content-sized, because a masthead that grows would silently steal
+             height from the columns. The masthead holds a kicker, a two-line
+             headline, a two-line summary and the byline rule; the footer holds
+             one line. */
+          --band-head:136px; --band-foot:26px;
+          --gap:12px;        /* between the sheet's bands */
+          --col-gap:10px;    /* between columns — 10 is what makes a portrait
+                                column exactly 360px, the width barList and
+                                radar need. Widen it and they stop fitting. */
+          --radius:4px;
+          /* Figure heights. Named rather than free so a figure's cost is known
+             before the page is rendered, and so check-page.js can size a chart
+             against its engine's minimum without a browser. Pick the smallest
+             that clears the engine's minHeight (manifest / layout-onepager.md). */
+          --fig-sm:200px;    /* barList, table, calendarHeatmap */
+          --fig-md:265px;    /* line, column, bar, scatter, histogram, waterfall, dumbbell */
+          --fig-lg:310px;    /* donut, pie, sankey, bubble, packedBubble, radar */
+          --fig-xl:430px;    /* geofacet; waffle, when it is in a column at all */
           --bg:#e8e5df; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
-          --hair:#dcdbd7;
+          --hair:#dcdbd7; --rule:#cfcdc6;
           --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
           --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
   * { box-sizing:border-box; }
@@ -64,10 +92,6 @@
   .sheet-frame { position:relative; width:100%; margin:0 auto;
     max-width:calc(var(--sheet-w) + 2 * var(--margin));
     height:var(--frame-h, calc(var(--sheet-h) + 2 * var(--margin))); }
-  /* The paper keeps its authored size and is scaled to the window, so type,
-     charts and spacing shrink together and nothing reflows — the page on screen
-     is the page on paper. Never scaled above 1: this is a document, and a
-     document does not grow to fill a monitor. */
   .paper { position:absolute; top:0; left:0;
     width:calc(var(--sheet-w) + 2 * var(--margin));
     height:calc(var(--sheet-h) + 2 * var(--margin));
@@ -80,71 +104,101 @@
   .sheet { width:var(--sheet-w); height:var(--sheet-h); display:flex;
     flex-direction:column; gap:var(--gap); overflow:hidden; }
 
-  /* ── Chrome ───────────────────────────────────────────────────────────────
-     Hairlines, not cards. On a screen a panel is lifted off the ground by a
-     luminance step; on paper that step is a block of ink around every figure.
-     A one-pager separates with rules instead, which is the print idiom and
-     costs nothing to photocopy. The charts paint themselves --paper, so they
-     sit flush on the sheet with no box at all. */
-  header.sheet-head { height:var(--band-head); flex:0 0 auto; display:flex;
-    justify-content:space-between; align-items:flex-end; gap:20px;
-    padding-bottom:8px; border-bottom:1px solid var(--hair); }
-  header.sheet-head h1 { margin:0; font-size:20px; font-weight:700;
-    letter-spacing:-0.4px; line-height:1.2; }
-  header.sheet-head p { margin:3px 0 0; color:var(--muted); font-size:11.5px;
-    line-height:1.35; }
-  header.sheet-head .stamp { color:var(--muted); font-size:9.5px; text-align:right;
-    text-transform:uppercase; letter-spacing:.06em; flex:0 0 auto; }
-  header.sheet-head .stamp b { display:block; color:var(--ink); font-size:11.5px;
-    font-weight:700; text-transform:none; letter-spacing:0; margin-top:2px; }
+  /* ── Masthead ─────────────────────────────────────────────────────────────
+     A report's masthead, compressed: kicker, the finding as a headline, a
+     summary that can be read on its own, and a byline rule carrying scope and
+     the reporting window. Not a KPI tile row — tiles are dashboard furniture,
+     and on paper they read as a widget pasted onto a document. Headline
+     figures belong in the summary sentence, or in a .stat beside the paragraph
+     that explains them. */
+  header.masthead { height:var(--band-head); flex:0 0 auto; display:flex;
+    flex-direction:column; }
+  .kicker { font-size:10px; line-height:1.2; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.12em; }
+  header.masthead h1 { margin:7px 0 0; font-size:20px; line-height:1.2;
+    font-weight:700; letter-spacing:-0.4px; }
+  .dek { margin:7px 0 0; font-size:12.5px; line-height:1.45; color:var(--muted); }
+  .byline { margin-top:auto; display:flex; justify-content:space-between;
+    gap:16px; font-size:9.5px; line-height:1.3; color:var(--muted);
+    border-top:1px solid var(--hair); border-bottom:1px solid var(--hair);
+    padding:6px 0; }
+  .byline b { color:var(--ink); font-weight:700; }
 
-  /* Optional KPI band. Keep it or delete the block — deleting it gives the grid
-     64px back, which is the difference between two comfortable rows and three
-     tight ones. Hairline-separated rather than tiled, same reason as above. */
-  .kpis { height:var(--band-kpi); flex:0 0 auto; display:grid;
-    grid-auto-flow:column; grid-auto-columns:1fr; align-items:center;
-    border-bottom:1px solid var(--hair); }
-  .kpi { padding:0 14px; min-width:0; border-left:1px solid var(--hair); }
-  .kpi:first-child { padding-left:0; border-left:0; }
-  /* Explicit line-heights, not `normal`: the three lines have to add up to less
-     than the band, and `normal` is the font's own figure — it comes out at 1.33
-     for the fallback stack, which overflows a band sized for 1.2, and changes
-     again when a theme swaps the face. */
-  .kpi span { display:block; font-size:9.5px; line-height:1.25; font-weight:400;
-    letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .kpi b { display:block; font-size:21px; line-height:1.15; font-weight:700;
-    margin-top:2px; letter-spacing:-0.4px; color:var(--ink); }
-  .kpi i { display:block; font-style:normal; font-size:9.5px; line-height:1.25;
-    font-weight:400; color:var(--muted); margin-top:1px;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* ── The body: bands, then columns ────────────────────────────────────────
+     The body is a stack of bands. A full-width figure band is optional and
+     goes first — it is the page's lead evidence, the one exhibit that earns
+     the whole width. Everything else lives in .cols, which takes the rest of
+     the height and divides it into columns of blocks. */
+  .body { flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+    gap:var(--gap); }
+  .cols { flex:1 1 auto; min-height:0; display:grid;
+    grid-template-columns:repeat(var(--cols), minmax(0, 1fr));
+    gap:var(--col-gap); }
+  /* overflow:hidden so a column that is overfilled is visibly cut rather than
+     silently pushing the footer off the sheet; audit.js reports it as
+     clipped-y and names the column. */
+  .col { min-width:0; min-height:0; overflow:hidden; display:flex;
+    flex-direction:column; }
+  /* Columns are divided by a hairline rather than by whitespace alone — on
+     paper that rule is what tells the eye the text does not run across. */
+  .col + .col { border-left:1px solid var(--hair); padding-left:var(--col-gap); }
 
-  /* ── The grid ─────────────────────────────────────────────────────────────
-     Twelve tracks, as everywhere else in this skill, but the rows are `1fr`:
-     they divide what the chrome leaves rather than being 340px each. So the
-     number of rows IS the height of every chart on the page, and adding a row
-     makes every existing chart shorter. That is the page budget, and
-     scripts/check-page.js does the arithmetic (see § Spans and rows below). */
-  .sheet-grid { flex:1 1 auto; min-height:0; display:grid;
-    grid-template-columns:repeat(12,1fr); grid-auto-rows:1fr; gap:var(--gap); }
-  .cell { min-width:0; min-height:0; overflow:hidden; padding-top:6px;
-    border-top:1px solid var(--hair); }
-  .cell .chart { width:100%; height:100%; }
-  .w4{grid-column:span 4}.w6{grid-column:span 6}.w8{grid-column:span 8}.w12{grid-column:span 12}
-  .h2{grid-row:span 2}
+  /* ── Blocks ───────────────────────────────────────────────────────────────
+     Five, and no sixth. A new block type is a second design system on the page. */
 
-  /* Soft surface card, for text that belongs to no single figure: a caveat, a
-     method note, the ask. It is a grid cell like any other — on a fixed sheet
-     there is nowhere else for it to go. */
-  /* align-self:start, so the note is as tall as its text rather than as tall as
-     the row. A chart has to fill its cell; a paragraph stretched to 400px is a
-     grey slab with writing at the top, and white paper under a short note reads
-     better than a filled box. */
+  /* 1. A heading and its paragraph: the unit the argument is made of. */
+  .blk { margin:0 0 12px; }
+  .blk h2 { margin:0 0 5px; font-size:13px; line-height:1.3; font-weight:700;
+    letter-spacing:-0.1px; }
+  .blk p, .col p { margin:0 0 7px; font-size:11px; line-height:1.52; }
+  .blk p:last-child, .col p:last-child { margin-bottom:0; }
+
+  /* 2. A figure: a chart with a caption that says what to take from it. The
+        caption is not the title repeated — the title states the finding, the
+        caption says how to read the chart or what it leaves out. */
+  .fig { margin:0 0 14px; }
+  .fig .chart { width:100%; height:var(--fig-md); }
+  .fig.sm .chart { height:var(--fig-sm); }
+  .fig.lg .chart { height:var(--fig-lg); }
+  .fig.xl .chart { height:var(--fig-xl); }
+  .fig figcaption { font-size:9.5px; line-height:1.4; color:var(--muted);
+    margin-top:5px; padding-top:5px; border-top:1px dotted var(--rule); }
+  .fig figcaption b { color:var(--ink); }
+  /* A full-width band: the lead exhibit, above the columns. */
+  .fig.wide { margin:0; }
+
+  /* 3. A short list, for findings that are one line each and would be padding
+        as paragraphs. */
+  ul.pts { margin:0 0 12px; padding:0; list-style:none; font-size:11px;
+    line-height:1.45; }
+  ul.pts li { position:relative; padding:0 0 0 13px; margin-bottom:5px; }
+  ul.pts li:last-child { margin-bottom:0; }
+  ul.pts li::before { content:''; position:absolute; left:0; top:7px;
+    width:5px; height:1px; background:var(--muted); }
+  ul.pts li b { font-weight:700; }
+
+  /* 4. A figure that is a single number, set beside the sentence that explains
+        it. This is where a headline statistic goes — one or two on the page,
+        never a row of six. */
+  .stat { margin:0 0 12px; }
+  .stat b { display:block; font-size:24px; line-height:1.1; font-weight:700;
+    letter-spacing:-0.6px; }
+  .stat span { display:block; font-size:10px; line-height:1.35; color:var(--muted);
+    margin-top:3px; }
+  /* Two stats side by side inside one column, when they are a pair. */
+  .stat-row { display:flex; gap:14px; margin:0 0 12px; }
+  .stat-row .stat { flex:1; min-width:0; margin:0; }
+
+  /* 5. The one filled surface: text belonging to no figure — a caveat, a
+        method note, the ask. Use it once. */
   .note { background:var(--surface-soft); border-radius:var(--radius);
-    border-top:0; align-self:start; padding:12px 14px; font-size:11.5px;
-    line-height:1.55; color:var(--ink); overflow:hidden; }
+    padding:10px 12px; font-size:10.5px; line-height:1.5; margin:0 0 12px; }
   .note b { display:block; text-transform:uppercase; font-size:9px;
-    letter-spacing:.07em; color:var(--muted); margin-bottom:5px; }
+    letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
+
+  /* Pushes what follows to the bottom of its column, so a note or a source
+     line sits on the column's baseline instead of leaving a ragged gap. */
+  .push { margin-top:auto; }
 
   footer.sheet-foot { height:var(--band-foot); flex:0 0 auto;
     border-top:1px solid var(--hair); padding-top:7px;
@@ -175,8 +229,8 @@
       height:var(--sheet-h); margin:0; }
     .paper { position:static; width:var(--sheet-w); height:var(--sheet-h);
       padding:0; box-shadow:none; transform:none;
-      /* Note fills and any dark surface must survive the browser's default of
-         dropping backgrounds when printing. */
+      /* Note fills and any tinted surface must survive the browser's default
+         of dropping backgrounds when printing. */
       -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
@@ -187,65 +241,92 @@
     <div class="paper">
       <div class="sheet">
 
-        <header class="sheet-head">
-          <div>
-            <h1>Headline finding, not a topic label</h1>
-            <p>One line of scope: what is measured, across what population.</p>
+        <header class="masthead">
+          <div class="kicker">Section · Reporting period</div>
+          <h1>The finding, stated as a sentence someone could repeat</h1>
+          <p class="dek">One or two sentences carrying the whole argument, so a
+            reader who gets no further than the masthead still leaves with the
+            point. Headline figures belong here, in prose.</p>
+          <div class="byline">
+            <div><b>Prepared for</b> who reads it · what is measured, across what population</div>
+            <div>START — END</div>
           </div>
-          <div class="stamp">Reporting window<b>START — END</b></div>
         </header>
 
-        <!-- Optional KPI band: label, value, one line of context. No arrows, no
-             colour-coded verdicts. DELETE THE WHOLE BLOCK if the figures are
-             better off as a chart — it buys the grid 64px, which is a third row.
-             Four tiles is the most that stays legible at this width; five
-             clip their labels. -->
-        <div class="kpis">
-          <div class="kpi"><span>Metric name</span><b id="k1">—</b><i>vs 1,180 prior period</i></div>
-          <div class="kpi"><span>Metric name</span><b>56%</b><i>Q1 average</i></div>
-          <div class="kpi"><span>Metric name</span><b>12.4d</b><i>median, all sites</i></div>
-        </div>
+        <!-- THE BODY IS NOT A TEMPLATE — BUILD IT FROM YOUR PLAN.
+             What follows is one worked arrangement showing every block type, not
+             a shape to reuse. The composition procedure, the per-block costs and
+             the rule that prose leads are in references/layout-onepager.md.
 
-        <!-- THE GRID IS NOT A TEMPLATE — BUILD IT FROM YOUR PANEL PLAN.
-             What follows is two rows showing the three mechanics the format
-             turns on, not an arrangement to reuse: a full-width standard chart,
-             a narrow-capable chart at w6, and a note sharing that row.
+             ── Which charts fit where ───────────────────────────────────────
+             A column is 360px wide portrait, 323px landscape. Most engines need
+             480px, so most charts cannot go in a column at all:
 
-             ── Spans and rows: the budget ───────────────────────────────────
-             On a fixed sheet the grid is the only slack, so both numbers are
-             arithmetic rather than taste. At 730x990 portrait:
+               in a portrait column (360px)    barList, radar, donut, pie,
+                                               packedBubble
+               in a landscape column (323px)   donut, pie, packedBubble
+               full width (.wide, 730/990px)   every chart type
+               two of three landscape columns  every chart type
 
-               w12 = 730px   every chart type fits
-               w8  = 483px   line, column, bar, scatter, waterfall, sankey… (480 min)
-               w6  = 360px   donut, pie, waffle, barList, radar, packedBubble only
-               w4  = 237px   no chart fits — text, a .note, nothing else
+             So a line, column, bar, scatter, waterfall, sankey or heatmap is a
+             .wide band — and a page has room for one, maybe two. The ranked
+             comparison that would have been a bar chart becomes Charts.barList,
+             which is built for exactly this width. -->
+        <div class="body">
 
-             So a portrait one-pager puts standard charts at w8 or w12. Two of
-             them side by side does not fit; that is the reason to go landscape
-             (990x730 → w6 = 490px, two standard charts in a row).
+          <!-- The lead exhibit: the one chart that earns the full width. Delete
+               this band if no single chart leads — the columns then take the
+               whole body, 804px instead of 504px, which is the difference
+               between one figure a column and two.
 
-             Rows divide what the chrome leaves, so every row you add shortens
-             every chart on the page:
+               This arrangement is at its budget: a lead band plus one figure in
+               each column leaves about 150px of text a column, and that is the
+               page. The fifth block type, .note (plus .push, which drops it to
+               the column's foot), is not shown here because it does not fit
+               alongside both figures — spending ~85px on it means one figure
+               fewer. examples/support-operations-brief/ shows it in place. -->
+          <figure class="fig wide">
+            <div class="chart" id="c-lead"></div>
+            <figcaption><b>Fig 1</b> How to read it, or what it leaves out — not the title again.</figcaption>
+          </figure>
 
-               portrait, with the KPI band      2 rows 396px · 3 rows 261px
-               portrait, no KPI band            2 rows 428px · 3 rows 282px
-               landscape, with the KPI band     1 row  542px · 2 rows 266px
-               landscape, no KPI band           1 row  606px · 2 rows 298px
+          <div class="cols">
+            <div class="col">
+              <div class="blk">
+                <h2>A heading that states this section's claim</h2>
+                <p>The paragraph that makes it. Three or four lines, in the
+                  reader's language, saying what happened and why it matters.
+                  This is the half of the page a dashboard does not have.</p>
+              </div>
 
-             Most charts need 260px of height, a donut 300px, a geofacet 420px
-             (so a geofacet wants .h2, which on a two-row page is the whole
-             grid). Four rows portrait or three landscape fit nothing: that is
-             the ceiling, and it is where a one-pager becomes a report.
-             scripts/check-page.js computes all of this from the markup and
-             names what does not fit. Full table in
-             references/layout-onepager.md § The budget. -->
-        <div class="sheet-grid">
-          <div class="cell w12"><div class="chart" id="c1"></div></div>
-          <div class="cell w6"><div class="chart" id="c2"></div></div>
-          <div class="cell w6 note">
-            <b>Caveat</b>
-            Something the reader needs in order to read the figures correctly,
-            and which is not a finding any single chart carries.
+              <div class="stat-row">
+                <div class="stat"><b>18,400</b><span>contacts handled, +9% on Q2</span></div>
+                <div class="stat"><b>71%</b><span>resolved inside 24h, from 78%</span></div>
+              </div>
+
+              <figure class="fig lg">
+                <div class="chart" id="c-ranked"></div>
+                <figcaption><b>Fig 2</b> A ranked list is the column-width form of a bar chart.</figcaption>
+              </figure>
+            </div>
+
+            <div class="col">
+              <div class="blk">
+                <h2>What follows from it</h2>
+                <p>The consequence, the decision, or the ask. A brief that
+                  states findings and stops has done half its job.</p>
+              </div>
+
+              <ul class="pts">
+                <li><b>One line each.</b> A finding that is one sentence is a list item, not a paragraph.</li>
+                <li><b>Parallel.</b> Every item the same shape, so the set can be scanned.</li>
+              </ul>
+
+              <figure class="fig lg">
+                <div class="chart" id="c-mix"></div>
+                <figcaption><b>Fig 3</b> Composition, where the parts make one whole.</figcaption>
+              </figure>
+            </div>
           </div>
         </div>
 
@@ -317,49 +398,60 @@ Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2
 })();
 </script>
 <script>
-/* Two example charts, one per grid cell above. Replace them both. They are
-   here for the mechanics a one-pager adds to the usual ones:
+/* Three example charts, one per figure above. Replace them all. They are here
+   for the mechanics a one-pager adds to the usual ones:
 
-     · NOTHING IS HOVER-ONLY. A tooltip does not exist on paper, so every
-       value a reader needs is a data label, a KPI or an axis tick. The library
-       draws data labels by default; on a one-pager, leave them on unless the
-       labels genuinely collide, and then shorten the data rather than hiding
-       the numbers.
-     · NO CONTROLS. A dropdown prints as a dropdown — a grey box with one
-       value showing. If the page needs a filter it is a dashboard, not a
-       one-pager. check-page.js fails a one-pager that has one.
-     · A narrow cell takes a narrow-capable chart (the donut at w6 below), not
-       a squeezed standard one.
+     · NOTHING IS HOVER-ONLY. A tooltip does not exist on paper, so every value
+       a reader needs is a data label, an axis tick or a sentence. The library
+       draws data labels by default; leave them on.
+     · NO CONTROLS. A dropdown prints as a grey box showing one value. If the
+       page needs a filter it is a dashboard. check-page.js fails one here.
+     · A COLUMN TAKES A COLUMN-WIDTH CHART. barList, donut, waffle, radar and
+       packedBubble fit 360px; a bar or line chart does not, and belongs in the
+       .wide band.
 
    Chart options for every type are in references/charts/<type>.md — don't
    guess option names. */
-Charts.column('c1', {
-  title: 'The finding this page exists to state, proved underneath',
+const T = Charts.theme;
+
+Charts.line('c-lead', {
+  title: 'The trend the page is about, with the moment that changed it marked',
   subtitle: 'Units · scope · period',
-  xAxis: { categories: ['Cat A', 'Cat B', 'Cat C', 'Cat D', 'Cat E'] },
+  xAxis: { categories: ['Week 1','Week 2','Week 3','Week 4','Week 5','Week 6',
+                        'Week 7','Week 8','Week 9','Week 10','Week 11','Week 12'] },
   legend: { enabled: false },
-  plotOptions: { series: { dataLabels: { enabled: true } } },
-  // Emphasis: the title names two categories, so those two take the accent and
-  // the rest take the mute. Written out in SKILL.md § Make the chart show the
-  // finding, and in chart-selection.md § Emphasis.
-  series: [{ name: 'Units', data: [980, 740, 610, 420, 310].map((y, i) => ({
-    y, color: i < 2 ? Charts.theme.colors[1] : Charts.theme.muted
-  })) }]
+  callouts: [{ x: 2, text: 'What happened here' }],
+  series: [{ name: 'Measure', type: 'line', color: T.colors[1],
+    data: [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
 });
 
-Charts.donut('c2', {
-  title: 'Share of total',
+// The column-width ranked comparison. Charts.bar needs 480px and does not fit a
+// column; barList is built for exactly this width — the category label sits
+// above its own bar, so long names cost nothing.
+Charts.barList('c-ranked', {
+  title: 'Ranked, largest first',
+  subtitle: 'Units',
+  plotOptions: { barList: { sort: 'desc' } },
+  series: [{ name: 'Units', data: [
+    { name: 'Category A', y: 5110 },
+    { name: 'Category B', y: 4820 },
+    { name: 'Category C', y: 3260 },
+    { name: 'Other',      y: 1050 }
+  ]}]
+});
+
+Charts.donut('c-mix', {
+  title: 'Share of the whole',
   subtitle: 'Percent',
   // Donut and pie options live under plotOptions.pie. At the top level they are
   // silently ignored — the chart draws without them and nothing says why.
   plotOptions: { pie: { valueSuffix: '%', centerText: '46%' } },
+  legend: { enabled: false },
   series: [{ name: 'Share', data: [
     { name: 'A', y: 46 }, { name: 'B', y: 28 },
     { name: 'C', y: 17 }, { name: 'Other', y: 9 }
   ]}]
 });
-
-document.getElementById('k1').textContent = '1,284';
 </script>
 </body>
 </html>

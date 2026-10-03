@@ -25,9 +25,10 @@ Six rules that break the output if missed:
    and named categories belong on a column chart.
 5. Build the grid from the shape of the analysis rather than reusing a layout;
    the dashboard template ships without a starter arrangement on purpose.
-6. A one-pager is a fixed sheet with a span and row budget, no controls and
-   nothing hover-only — do the budget in `references/layout-onepager.md` before
-   writing panels.
+6. A one-pager is a report set in columns, not a dashboard on paper: prose
+   carries the argument, charts are evidence, and a 360px column fits almost no
+   chart. No controls, nothing hover-only. Do the budget in
+   `references/layout-onepager.md` before writing.
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

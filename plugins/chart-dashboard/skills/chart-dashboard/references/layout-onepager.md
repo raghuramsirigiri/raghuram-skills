@@ -2,20 +2,25 @@
 
 Read with `layout.md`, which holds the rules shared by every format.
 
-A one-pager is **one printed page**: a fixed 730x990px sheet (portrait) or
-990x730 (landscape), sized to the printable area A4 and US Letter share, so the
-same file prints on one page on either paper with no shrink-to-fit. Going
-landscape is two changes, not one: swap `--sheet-w` and `--sheet-h`, *and* set
-`@page { size: landscape }`. `size: auto` takes the print dialog's orientation,
-which is portrait, so a landscape sheet on a portrait page is split in two —
-`check-page.js` fails the mismatch and names it. The sheet is
-a flex column of four bands — header, optional KPI band, the grid, footer — and
-the grid takes whatever the other three leave.
+A one-pager is **one printed page, set in columns**: a fixed 730x990px sheet
+(portrait) or 990x730 (landscape), sized to the printable area A4 and US Letter
+share, so the same file prints as one page on either paper with no shrink-to-fit.
 
-Everything that makes this format different follows from one fact: **there is no
-second page and no scrollbar.** The reader cannot scroll to the rest, cannot
-hover for a tooltip, and cannot click a filter. What does not fit gets cut, and
-cutting is the work.
+Two facts drive everything else.
+
+**It is a report, not a dashboard on paper.** The body is columns of blocks, the
+way a printed brief is set: a heading and a paragraph, a figure with a caption, a
+short list, another figure. Prose carries the argument and charts are evidence
+for it — the same relationship as `report.html`, compressed onto one sheet. A
+page of charts with no sentences is a dashboard, and a dashboard has its own
+template. If you find yourself building a KPI tile row, stop: tiles are dashboard
+furniture and on paper they read as a widget pasted onto a document. A headline
+figure goes in the summary sentence, or in a `.stat` beside the paragraph that
+explains it.
+
+**There is no second page and no pointer.** The reader cannot scroll to the rest,
+cannot hover for a tooltip, and cannot click a filter. What does not fit gets
+cut, and deciding what to cut is the work.
 
 ## When it is the right format
 
@@ -27,161 +32,197 @@ the pack".
 Against the other three:
 
 - Not a **dashboard**. A dashboard is a monitoring surface read at a desk, with
-  room to scroll and hover. Shrinking one onto paper gives you eleven panels at
-  180px each, which is a page of thumbnails.
-- Not a **report**. A report is an argument in prose with figures as evidence,
-  and it is as long as the argument needs. If the findings do not fit one page,
-  that is a report — do not set it in 8pt to make it fit.
+  room to scroll and hover, and no prose telling the reader what to think.
+- Not a **report**. A report is as long as the argument needs. If the argument
+  does not fit one page, that is a report — do not set it in 8pt to make it fit.
 - Not a **deck**. A deck has a presenter and one claim per slide. A one-pager
   carries the whole argument at once, unnarrated, in a single glance.
 
 If the user wants "the deck, but as a handout", build the deck — its print path
 already gives them one slide per page.
 
+## Compose the argument first
+
+The failure this format is most prone to is a page of two charts and a lot of
+white space, which happens when the panels get written before the argument. So:
+
+1. **Write the claims**, in sentences. Three to six of them: what changed, why,
+   what it costs, what follows. The headline is the one a reader would repeat;
+   the summary under it is the whole argument in two sentences.
+2. **Decide which claims need proving.** A claim the reader will accept gets a
+   sentence and no figure. A claim that turns on a shape or a ranking gets a
+   figure — one, not a figure and a table of the same numbers.
+3. **Pick the one exhibit that leads.** If a single chart is the reason the page
+   exists, it goes in the full-width band above the columns. If nothing leads,
+   drop the band and let the columns have the whole body.
+4. **Lay the blocks into the columns** and add up the budget below. Then fill the
+   space that is left — with the explanation a reader needs, not with another
+   chart.
+
 ## The budget
 
-On a fixed sheet the grid is the only slack there is, so span and row count are
-arithmetic rather than taste. Both numbers are checked by
-`scripts/check-page.js`, which computes them from the markup and names what does
-not fit.
+The space is the whole constraint, and it is arithmetic. `scripts/check-page.js`
+computes it from the markup and names what does not fit.
 
-### Spans
+### What you have
 
-A cell's width comes from the 12 tracks and the 10px gaps. Against each chart
-engine's `minWidth` (the manifest; below it the axis labels crowd and collide):
+| | Columns | Column | Body band | Total column run |
+|:--|:--|:--|:--|:--|
+| Portrait 730x990 | 2 | 360px wide | 804px tall | 1608px |
+| Landscape 990x730 | 3 | 323px wide | 544px tall | 1632px |
 
-| Span | Portrait (730) | Landscape (990) |
+Both orientations hold about the same amount — landscape is three shorter columns
+rather than two taller ones. **A full-width figure band takes its own height plus
+~40px off every column**: the template's lead line chart costs 300px, leaving
+504px a column.
+
+Going landscape is three changes, not one: swap `--sheet-w` and `--sheet-h`, set
+`--cols:3`, *and* set `@page { size: landscape }`. `size: auto` takes the print
+dialog's orientation, which is portrait, so a landscape sheet on a portrait page
+is split in two — `check-page.js` fails that mismatch and names it.
+
+### What each block costs
+
+| Block | Cost | Notes |
 |:--|:--|:--|
-| `w12` | 730px — every chart type | 990px — every chart type |
-| `w8` | 483px — line, column, bar, scatter, waterfall, sankey, heatmap, table… | 657px — every chart type |
-| `w6` | 360px — **donut, pie, waffle, barList, radar, packedBubble only** | 490px — every chart type except the 640-wide tables |
-| `w4` | 237px — **no chart fits**: text, a `.note`, nothing else | 323px — donut, pie, waffle, packedBubble |
+| `.blk` heading + 3 lines | ~95px | +17px a line beyond three |
+| paragraph alone, per line | 17px | 11px/1.52 at column width |
+| `ul.pts`, per item | ~21px | plus 12px under the list |
+| `.stat` | ~58px | `.stat-row` puts two side by side for the same cost |
+| `.note` | ~85px | 4 lines plus its padding; use one per page |
+| `.fig` | class height + ~40px | the caption and the margin under it |
 
-The line that catches people: **two standard charts do not fit side by side on a
-portrait one-pager.** 480px is the floor for most engines and half the sheet is
-360px. Portrait puts standard charts at `w8` or `w12`, with a donut, a waffle or
-a note beside the `w8`. If the page genuinely leads on two charts that must be
-compared across, that is the reason to go landscape, where `w6` is 490px.
+Figure heights are named so the cost is known before anything renders. Pick the
+smallest class that clears the engine's `minHeight`:
 
-### Rows
+| Class | Height | Holds |
+|:--|:--|:--|
+| `.sm` | 200px | table, calendarHeatmap |
+| *(none)* | 265px | line, column, bar, scatter, histogram, waterfall, dumbbell |
+| `.lg` | 310px | donut, pie, sankey, bubble, packedBubble, radar |
+| `.xl` | 430px | geofacet, waffle at column width |
 
-Rows are `1fr`: they divide what the chrome leaves. So the row count *is* the
-height of every chart on the page, and adding a row shortens every chart already
-on it.
+So a 504px column holds one figure and about 150px of text; an 804px column
+holds two figures, or one figure and a full half-page of prose. **A page is
+roughly three or four figures and six text blocks.** If you have used two charts
+and a heading, you have filled a third of it.
 
-| | 1 row | 2 rows | 3 rows |
-|:--|:--|:--|:--|
-| Portrait, with the KPI band | 802px | 396px | 261px |
-| Portrait, no KPI band | 866px | 428px | 282px |
-| Landscape, with the KPI band | 542px | 266px | 174px — nothing fits |
-| Landscape, no KPI band | 606px | 298px | 195px — nothing fits |
+### Which charts fit where
 
-Most engines need 260px of height, a donut or a sankey 300px, a geofacet 420px.
-Read the table against those numbers rather than against the row count: a donut
-does not fit a two-row landscape page at all (266px, or 298 without the KPI
-band), though it fits anywhere on portrait. The checker names the chart and the
-row height whenever the two disagree.
-So the ceilings are **three rows portrait, two landscape**. A fourth portrait
-row is 193px and a third landscape row 174px, both under every engine's
-minimum — at that point the page has more findings than a page holds, and it is
-a report.
+A column is 360px wide portrait, 323px landscape, and most engines need 480px.
+This is the constraint that catches people:
 
-An `.h2` cell spans two of those rows, which on a two-row page is the entire
-grid. That is the right call for a geofacet or a tall ranked list, and it means
-the rest of the page is one row.
+| Where | Width | Charts that fit |
+|:--|:--|:--|
+| Portrait column | 360px | `barList`, `radar`, `donut`, `pie`, `packedBubble` |
+| Landscape column | 323px | `donut`, `pie`, `packedBubble` |
+| Two of three landscape columns | 656px | every chart type |
+| `.wide` band | 730 / 990px | every chart type |
+
+A line, column, bar, scatter, waterfall, sankey or heatmap is therefore a `.wide`
+band — and a page has room for one, maybe two. **The ranked comparison that
+wanted to be a bar chart becomes `Charts.barList`**, which is built for this
+width: the category label sits above its own bar, so long names cost nothing.
+
+### The engines that shrink their marks rather than refusing
+
+`barList`, `dumbbell`, `barInsightTable` and `waffle` fill the box they are
+given, and when the box is too short they **thin the marks instead of saying so**.
+Nothing throws, and the browser audit cannot see it either, because nothing
+overflows — the chart is there, the labels and values are right, and the one
+thing it encodes has been squeezed out of it. Both of these are worth knowing
+before you pick a figure class; `check-page.js` checks both.
+
+**`barList`** draws 6px hairlines instead of 26px bars when it is short.
+Measured off the engine, full-thickness bars need:
+
+| Rows | Needs | Class |
+|:--|:--|:--|
+| 3 | 265px | *(none)* |
+| 4 | 310px | `.lg` |
+| 5 | 360px | `.xl` |
+| 6 | 430px | `.xl` |
+
+Past six rows a ranked list does not belong in a column figure — roll the tail
+into "Other", or make it a `.wide` table.
+
+**`waffle`** shrinks its dots. At column width a 100-dot grid draws 2.8px dots in
+a 265px figure and 6px in a 310px one, where the whole point is counting units;
+they reach a readable ~11px at 380px. So a waffle in a column is `.xl`, and it is
+usually better off in the `.wide` band — which is also where it has room to split
+into the several panels it is designed for. A binary proportion in a column is a
+donut's job.
 
 ## What to cut, in order
 
-The findings will not fit. They never do — a one-pager is the format where the
-cut is the design. Work down this list, and stop as soon as the page fits:
+The claims will not all fit. Work down this list, and stop as soon as the page
+fits:
 
-1. **Panels that answer no question the reader has.** The same test as every
-   other format (SKILL.md § How many charts), applied harder because here a
-   weak panel costs a strong one its height.
-2. **The KPI band**, if its figures are also read off a chart. It is 64px with
-   its gap — the difference between two comfortable rows and three tight ones.
-   Keep it only when the headline numbers appear nowhere else.
-3. **A chart, down to its number.** A finding that is one value — "attrition
-   held at 4.1%" — is a KPI tile or a clause in a title, not a panel. This is
-   the cut that recovers the most room for the least loss.
-4. **Two panels into one exhibit.** Two cuts of one question become
-   `Charts.panels` under one title, or a `reportTable` whose rows carry both.
-5. **Portrait to landscape**, when what is left is chart-heavy and wants width
-   rather than more rows.
+1. **A figure whose claim the reader would accept anyway.** It costs 300px and
+   buys agreement you already had.
+2. **A chart, down to its number.** A finding that is one value — "attrition held
+   at 4.1%" — is a `.stat` or a clause in a sentence, not a figure. This recovers
+   the most room for the least loss.
+3. **The full-width band**, if its chart does not genuinely lead. It is worth
+   300px of both columns — a figure in each column instead.
+4. **Two figures into one exhibit**, with `Charts.panels` or a `reportTable`
+   whose rows carry both.
+5. **Portrait to landscape**, when what is left is many short blocks rather than
+   a few tall ones.
 
-What not to cut: the subtitle that carries the units, the footer's sources, and
-the note that says a figure is illustrative. Those are what make the page
-readable by someone who was not in the room — which is the whole point of a
-page that travels on paper.
+What not to cut: the summary under the headline, the units in a subtitle, the
+footer's sources, and the note that says a figure is illustrative. Those are what
+make the page readable by someone who was not in the room — which is the whole
+point of a page that travels on paper.
 
 ## Nothing hover-only, nothing interactive
 
 A tooltip does not exist on paper and a `<select>` prints as a grey box showing
 one value. So:
 
-- **Data labels stay on.** The library draws them by default; on a one-pager
-  leave them on. If they collide, the fix is fewer categories or a wider span,
-  not `dataLabels: false` — hiding the numbers on a page that has no tooltips
-  leaves the reader with nothing.
-- **Every value a reader needs is printed**: a data label, a KPI, an axis tick
-  or a table cell. If the only way to learn a number is to point at it, it is
-  not on the page.
-- **No controls at all.** `check-page.js` fails a one-pager that has a `select`
-  or a filter bar. A page that needs a filter is a dashboard; build that
-  instead, or build the one-pager for the cut that matters.
+- **Data labels stay on.** The library draws them by default. If they collide,
+  the fix is fewer categories or a wider figure, not `dataLabels: false` — hiding
+  the numbers on a page with no tooltips leaves the reader with nothing.
+- **Every value a reader needs is printed**: a data label, an axis tick, a table
+  cell, or a sentence.
+- **No controls at all.** `check-page.js` fails a one-pager with a `select` or a
+  filter bar. A page that needs a filter is a dashboard.
 
-## Chrome: three fixed bands
+## Chrome: two fixed bands
 
-The header (78px), KPI band (54px) and footer (26px) are fixed heights, not
-content-sized, because a header that grows steals height from the charts
-silently. The constraint is useful on its own:
+The masthead (136px) and footer (26px) are fixed heights, not content-sized,
+because a masthead that grows steals height from the columns silently.
 
-- **The header is one h1 and one line of scope**, plus the reporting window on
-  the right. The h1 has room for two lines at 20px — enough for a headline
-  finding, not for a finding with its qualifiers attached. A third line means
-  the qualifier belongs in the scope line underneath.
+- **The masthead is a kicker, the headline, a two-sentence summary and the byline
+  rule.** The h1 has room for two lines at 20px — enough for a finding, not for a
+  finding with its qualifiers attached. The summary is the part most readers
+  actually read; write it last, when you know what the page says.
 - **The footer is one line**: sources, definitions, and the illustrative-figures
   note. Not a paragraph.
-- Four KPI tiles is the most that stays legible at portrait width; five clip
-  their labels. Landscape holds five.
-
-If a band overflows, `audit.js` reports it as `off-sheet` or a clip — fix the
-copy, not the band height. The bands are the page's proportions, and a page
-that needs them changed is a page with too much on it.
+- If a band overflows, `audit.js` reports it — fix the copy, not the band height.
 
 ## Not an editable page
 
 Don't offer the editable format for a one-pager (`editable.md` § When to build
 one). Everything on the sheet was measured against a fixed box, and an editor
-lets someone lengthen a title on a page that has no scrollbar to show what fell
-off the bottom.
-
-## Hairlines, not cards
-
-Panels have no card behind them. On screen a card lifts a panel off the ground
-with a luminance step; printed, that step is a block of ink around every figure
-and the page comes out grey. A one-pager separates with hairline rules instead,
-which is the print idiom, survives a photocopier, and costs nothing in toner.
-The charts paint themselves in `Charts.theme.bg`, which is also the sheet, so
-they sit flush with no visible box.
-
-The one filled surface is the `.note` card, and it is filled because it is text
-with no figure to anchor it. Use at most one.
+lets someone lengthen a heading on a page with no scrollbar to show what fell off
+the bottom of a column.
 
 ## Verify it as paper
 
 The usual three steps (SKILL.md step 7), with one addition and one subtraction:
 
-- `check-page.js` does the budget arithmetic above — the row count, the row
-  height, each chart against its engine's minimum, and the no-controls rule.
-- The browser audit adds `off-sheet`: content past the sheet's frame. Paper
-  crops rather than scrolling, so anything the audit reports there is content
-  that would be sliced off the printed page. Treat it exactly as the deck
-  treats `off-slide`.
+- `check-page.js` does the arithmetic above — the paper, the figures against each
+  column, each chart against its engine's minimum, the `barList` row heights, and
+  the no-controls rule.
+- The browser audit is what sizes the **text**, which no static check can: a
+  column whose blocks overrun is reported as `clipped-y` on that column, and
+  content past the sheet as `off-sheet`. Both mean content that would be sliced
+  off the printed page. Treat them the way a deck treats `off-slide`.
 - There is no control to test, because there are no controls.
 
 Then open the print preview once. The screen layout *is* the print layout — the
-sheet keeps its authored pixels in both, the only difference being that the
-8mm margin moves from the paper's padding to `@page` — so the preview is a
-confirmation, not an inspection. What it confirms is the one thing no
-measurement in the page can: that it came out as **one** page.
+sheet keeps its authored pixels in both, the only difference being that the 8mm
+margin moves from the paper's padding to `@page` — so the preview is a
+confirmation, not an inspection. What it confirms is the one thing no measurement
+in the page can: that it came out as **one** page.
