@@ -22,6 +22,10 @@ Printing an A4 sheet on Letter still works; the dialog scales it about 5%.
 `check-page.js` checks the sheet against the paper it declares, fails one that
 overruns it, and notes one that leaves more than 8mm unused.
 
+**Printing it:** leave the dialog's Margins at Default (which honours `@page`)
+or None. Minimum or Custom makes the browser impose its own margin, shrink the
+page to fit inside it, and put back the white frame.
+
 **The gutter lives inside the paper, not in `@page`.** `@page { margin: 0 }`, and
 the paper carries `padding: var(--margin)` and its own background. Nothing in the
 `@page` margin box is ever painted, so putting the gutter there leaves it white:

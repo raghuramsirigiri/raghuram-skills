@@ -242,7 +242,12 @@
 
   /* ── Print: the sheet, once, on one page ─────────────────────────────────
      Ctrl/Cmd+P → Save as PDF, or straight to a printer. Leave the dialog's
-     margins at Default; @page sets them.
+     Margins at **Default**, which honours the `@page` rule below; **None** also
+     works. Choosing Minimum or Custom makes the browser impose its own margin
+     instead, which shrinks the page to fit inside it and puts back the white
+     frame this is all arranged to avoid. If a printed copy has a white border
+     around a cream page, that setting is the first thing to check — after
+     confirming the file is the current one.
 
      `size` names the paper the sheet was measured against, and the two have to
      agree: the sheet is A4's printable area, so `size: A4` is what makes the
