@@ -42,3 +42,6 @@ Non-negotiables:
 - Any control must be fully wired: filtered data, every dependent panel redrawn,
   action titles recomputed — and a one-pager has none at all, because paper has
   no pointer.
+- A one-pager is a report set in columns, not a dashboard on paper: prose leads,
+  charts are sized to their column, the template ships no arrangement, and the
+  page is meant to be packed. See `references/layout-onepager.md`.

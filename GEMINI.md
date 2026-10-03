@@ -26,9 +26,10 @@ Six rules that break the output if missed:
 5. Build the grid from the shape of the analysis rather than reusing a layout;
    the dashboard template ships without a starter arrangement on purpose.
 6. A one-pager is a report set in columns, not a dashboard on paper: prose
-   carries the argument, charts are evidence, and a 360px column fits almost no
-   chart. No controls, nothing hover-only. Do the budget in
-   `references/layout-onepager.md` before writing.
+   carries the argument and charts are evidence, sized to the column they sit
+   in. Nothing about the shape is fixed but the sheet, so the template ships no
+   arrangement — pack the page and under-fill nothing. No controls, nothing
+   hover-only. Do the budget in `references/layout-onepager.md` before writing.
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

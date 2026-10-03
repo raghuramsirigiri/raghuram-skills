@@ -65,7 +65,8 @@ slide deck, or a one-pager that prints on a single sheet.
      of headings, paragraphs, lists and figures — prose carries the argument
      and charts are evidence for it, the same relationship as a report. A page
      of charts with no sentences is a dashboard, and a KPI tile row on paper
-     reads as a widget pasted onto a document.
+     reads as a widget pasted onto a document. Pack it: under-filling the sheet
+     is how this format fails.
 
    When it's genuinely ambiguous, ask yourself who reads it, whether you will
    be in the room, and whether it ends up on paper. Nobody presents a bento grid
@@ -105,13 +106,18 @@ slide deck, or a one-pager that prints on a single sheet.
 
    *(Building a one-pager? Write the **claims** first, as sentences, then decide
    which of them need proving — the page is columns of blocks, and a block is as
-   often a heading and a paragraph as it is a figure. Then do the budget, because
-   the sheet is fixed: a portrait page is two 360x804px columns, a full-width
-   lead figure takes ~300px off both, and a column is too narrow for most chart
-   engines. `references/layout-onepager.md` § The budget has the per-block costs
-   and the table of which charts fit a column; `scripts/check-page.js` does the
-   arithmetic and names what does not fit. The failure to watch for is the
-   opposite of a dashboard's: two charts and a lot of white space.)*
+   often a heading and a paragraph as it is a figure. Nothing about the shape is
+   fixed except the sheet: pick the column tracks (`--cols`) and each figure's
+   height (`--fig-h`) from the content, which is why the template ships no
+   arrangement. Charts go **in** the columns — at this format's reduced type
+   scale a 357px column holds a line, column or bar chart, and the manifest's
+   minWidth is the size a chart wants on a screen, not one it refuses below — so
+   keep the full-width band for the exhibit that genuinely needs a sheet. Then do
+   the budget: `references/layout-onepager.md` § The budget has the per-block
+   costs and measured figure heights, and `scripts/check-page.js` reports how
+   full each column is. The failure to watch for is the opposite of a
+   dashboard's: two charts and a lot of white space. 1660px of column run is
+   about five figures and eight text blocks.)*
 
    *(Building a deck? A deck derives its **evidence** from the findings the same
    way, but its **spine** is fixed, and `references/layout-deck.md` § Compose the
