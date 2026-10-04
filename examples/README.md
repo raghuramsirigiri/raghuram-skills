@@ -1,10 +1,10 @@
-# Examples — dashboards, reports, slide decks and one-pagers built by the chart-dashboard skill
+# Examples — dashboards, reports, slide decks, one-pagers and email snapshots built by the chart-dashboard skill
 
 Finished output from the [chart-dashboard Claude Skill](../README.md). Every folder
 is fully self-contained: download `index.html`, double-click it, and it renders —
 no server, no network, no build step, no npm install.
 
-Each example shows one of the four formats the skill produces, across most of the
+Each example shows one of the five formats the skill produces, across most of the
 chart families in the bundled `charts-lib` renderer. The full list of families —
 including radar, scatter, bubble and the `panels` compositor — is in the
 [main README](../README.md#which-chart-types-are-supported).
@@ -15,9 +15,10 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 | [`coffee-pricing-deck/`](coffee-pricing-deck/) | **Slide deck** (single file, 16:9) | Line, waterfall, column comparison, report table with a line and bars per row, dumbbell — across cover, agenda, section dividers, split, full-bleed, KPI strip, compare, table, timeline, quote, stat and closing-ask layouts | [screenshot](coffee-pricing-deck/screenshot.png) |
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |
+| [`logistics-network-email/`](logistics-network-email/) | **Email snapshot** (single file, 600px block) | The logistics dashboard's Q2 data cut to an email: a headline, three figures, a weekly on-time line with its real gap and a callout, a signed column of cost drivers, and the busiest lanes as a plain email table. Charts freeze to PNG when the page opens; **Copy for email** puts the block on the clipboard | — |
 | [`support-operations-brief/`](support-operations-brief/) | **One-pager** (single file, one printed page) | Two packed columns: a line against a dashed service-level target, a ranked bar list, a column chart, a second bar list, six prose sections, a findings list, two stat pairs and a method note | [screenshot](support-operations-brief/screenshot.png) |
 
-## The four formats, and when the skill picks each
+## The five formats, and when the skill picks each
 
 - **Dashboard** — a monitoring surface. One panel per finding, no prose, nothing
   telling the reader what to think. The default when you hand over metrics with no
@@ -40,6 +41,14 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   packed. No controls and nothing hover-only, because paper has no pointer.
   Triggered by "print it", "one page", "a handout", "for the board pack". See
   `support-operations-brief/`.
+
+- **Email snapshot** — one to three findings that travel in the body of an email.
+  Gmail strips SVG and Outlook for Windows cannot draw it, so the block is a 600px
+  table with every style inline, the titles are text, and each chart is frozen into
+  a PNG with alt text when the page opens. Open the file, click **Copy for email**,
+  paste into a new message. Triggered by "paste it into the weekly update",
+  "something I can drop into an email", "Outlook", "Gmail". See
+  `logistics-network-email/`.
 
 The first three can also be built **editable** on request, with an **Edit page**
 button that opens an in-page editor for text, numbers, chart types and colours.
