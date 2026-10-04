@@ -430,7 +430,10 @@ PowerPoint or Google Slides account. See
 **PDF** — yes, from the browser's own print dialog. A deck prints as A4 landscape,
 one slide per sheet, at exactly 16:9; a one-pager prints as exactly one page on
 A4 or US Letter, with no dialog settings to change; a dashboard or report prints
-as the page you see. **PNG** — screenshot the page, or the individual charts, which are plain inline
+as the page you see. **Email** — ask for charts to paste into an email and you get
+an email snapshot: a 600px block whose charts freeze into PNGs (Gmail and Outlook
+delete SVG), with a **Copy for email** button that puts it on the clipboard.
+**PNG** — screenshot the page, or the individual charts, which are plain inline
 SVG you can also copy out and drop into another document. **PowerPoint** — no; the
 output is HTML by design, which is what lets it stay one dependency-free file that
 renders identically everywhere.

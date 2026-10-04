@@ -10,9 +10,10 @@ Instructions are shared across all AI tools and live in
 
 **Read `AGENTS.md` first, then `plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`, and follow
 that workflow** whenever the user asks for a dashboard, analytics page, KPI
-view, chart deck, illustrated data report, or a one-page brief to print.
+view, chart deck, illustrated data report, a one-page brief to print, or charts
+to paste into an email.
 
-Six rules that break the output if missed:
+Seven rules that break the output if missed:
 
 0. Never fix a library bug in `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/` — it
    is a vendored copy of another repo's library and a re-sync would drop the
@@ -30,6 +31,10 @@ Six rules that break the output if missed:
    in. Nothing about the shape is fixed but the sheet, so the template ships no
    arrangement — pack the page and under-fill nothing. No controls, nothing
    hover-only. Do the budget in `references/layout-onepager.md` before writing.
+7. An email snapshot (`templates/email.html`) is a 600px table block with inline
+   styles, titles as text, and charts drawn through `EmailSnapshot.draw` so they
+   freeze to PNG with alt text: mail clients delete SVG and run no script. One to
+   three findings. Read `references/layout-email.md` before writing.
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

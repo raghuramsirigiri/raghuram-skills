@@ -47,10 +47,12 @@ const LIB_FILES = ['charts.css', 'charts.js', 'theme.js'];
 // Staged too, for editable pages. It lives in assets/ rather than
 // assets/charts-lib/, which mirrors the upstream library.
 const EDITABLE_FILES = ['chart-convert.js', 'page-runtime.js', 'page-editor.js'];
+// The freeze runtime for an email snapshot (references/layout-email.md).
+const EMAIL_FILES = ['email-snapshot.js'];
 // And the layout audit, for verifying in a browser. No page references it,
 // so it is staged only while you verify and removed with the rest.
 const AUDIT_FILES = ['audit.js'];
-const STAGED_FILES = LIB_FILES.concat(EDITABLE_FILES, AUDIT_FILES);
+const STAGED_FILES = LIB_FILES.concat(EDITABLE_FILES, EMAIL_FILES, AUDIT_FILES);
 
 const argv = process.argv.slice(2);
 const stageOnly = argv.includes('--stage');
@@ -73,7 +75,7 @@ const run = (script, args) => spawnSync(process.execPath, [path.join(SCRIPTS, sc
 if (stageOnly) {
   fs.mkdirSync(staged, { recursive: true });
   for (const f of LIB_FILES) fs.copyFileSync(path.join(LIB, f), path.join(staged, f));
-  for (const f of EDITABLE_FILES.concat(AUDIT_FILES)) fs.copyFileSync(path.join(LIB, '..', f), path.join(staged, f));
+  for (const f of EDITABLE_FILES.concat(EMAIL_FILES, AUDIT_FILES)) fs.copyFileSync(path.join(LIB, '..', f), path.join(staged, f));
   console.log('staged charts-lib/ beside ' + path.basename(target) +
     ' — open the page and run the audit in it (charts-lib/audit.js; see SKILL.md step 7), then run this without --stage to ship it.');
   process.exit(0);
@@ -98,7 +100,8 @@ if (fs.existsSync(staged)) {
   const same = set => found.length === set.length && found.every((f, i) => f === [...set].sort()[i]);
   if (same(LIB_FILES) || same(LIB_FILES.concat('page-runtime.js')) ||
       same(LIB_FILES.concat('chart-convert.js', 'page-runtime.js')) ||
-      same(LIB_FILES.concat(EDITABLE_FILES)) || same(STAGED_FILES)) {
+      same(LIB_FILES.concat(EDITABLE_FILES)) || same(LIB_FILES.concat(EDITABLE_FILES, AUDIT_FILES)) ||
+      same(STAGED_FILES)) {
     fs.rmSync(staged, { recursive: true, force: true });
     console.log('removed the staged charts-lib/ — nothing references it now.');
   } else {
