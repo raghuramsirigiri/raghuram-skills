@@ -1,6 +1,6 @@
 ---
 name: chart-dashboard
-description: Build a self-contained HTML dashboard, data-story report, slide deck, or printable one-pager from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, or a one-page handout or brief to print, built from data they provide or describe.
+description: Build a self-contained HTML dashboard, data-story report, slide deck, printable one-pager, or email-safe chart snapshot from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, a one-page handout or brief to print, or charts to paste into an email (Outlook, Gmail, a weekly update), built from data they provide or describe.
 ---
 
 # Chart dashboard
@@ -8,7 +8,8 @@ description: Build a self-contained HTML dashboard, data-story report, slide dec
 Turn whatever information the user gives — a table, pasted numbers, a set of
 metrics, notes, or just a topic and some facts — into a single self-contained
 HTML page of SVG charts rendered with `charts-lib`: a dashboard, a report, a
-slide deck, or a one-pager that prints on a single sheet.
+slide deck, a one-pager that prints on a single sheet, or an email snapshot
+whose charts survive being pasted into Outlook or Gmail.
 
 ## Workflow
 
@@ -67,6 +68,16 @@ slide deck, or a one-pager that prints on a single sheet.
      of charts with no sentences is a dashboard, and a KPI tile row on paper
      reads as a widget pasted onto a document. Pack it: under-filling the sheet
      is how this format fails.
+   - **Email snapshot** — one to three findings that travel in the body of an
+     email, read by someone who will never open a file. Reach for it when the
+     user says "paste it into the weekly update", "something I can drop into an
+     email", "send it round in Outlook/Gmail", "email-safe". Use
+     `templates/email.html`, and read `references/layout-email.md` before you
+     start. Mail clients delete SVG, strip style sheets and run no script, so
+     the block is a 600px table with every style inline, the titles are text,
+     and each chart is frozen into a PNG with alt text when the page opens.
+     Nothing in it can be hovered or clicked. The page around the block has a
+     **Copy for email** button, and that is how the reader takes it.
 
    When it's genuinely ambiguous, ask yourself who reads it, whether you will
    be in the room, and whether it ends up on paper. Nobody presents a bento grid
@@ -75,7 +86,9 @@ slide deck, or a one-pager that prints on a single sheet.
    if the page has to stand alone with no one narrating, it is a report,
    however much the user said "slides". And a one-pager is a budget, not a
    size: if the findings genuinely need more than one sheet, build a report and
-   say so, rather than shrinking the type until they fit.
+   say so, rather than shrinking the type until they fit. The email snapshot is
+   a budget too: past three findings, build the page they belong in, and paste a
+   snapshot of its lead finding.
 
    **Editable or static.** Static is the default. Build an *editable* page
    only when the user asked for one: charts stored as JSON, text marked
@@ -93,10 +106,12 @@ slide deck, or a one-pager that prints on a single sheet.
    <skill-dir>/templates/report.html     →  ./index.html
    <skill-dir>/templates/slides.html     →  ./index.html
    <skill-dir>/templates/onepager.html   →  ./index.html
+   <skill-dir>/templates/email.html      →  ./index.html
    <skill-dir>/templates/dashboard-editable.html  →  ./index.html   (only when asked for editable)
    ```
-   Do **not** copy `assets/charts-lib/` next to the output. The template's three
-   `charts-lib/…` tags are placeholders; leave them exactly as written while you
+   Do **not** copy `assets/charts-lib/` next to the output. The template's
+   `charts-lib/…` tags are placeholders (the email template has a fourth, for
+   its freeze runtime); leave them exactly as written while you
    build the page, and fold the library in as the last step (step 9). Their
    order matters and the inliner preserves it — theme must load before charts.
 4. **Derive the structure from the findings, not from the template.** The
@@ -347,6 +362,13 @@ slide deck, or a one-pager that prints on a single sheet.
    `off-slide`, with the same meaning. Then open the print preview once, and
    confirm the one thing nothing in the page can measure — that it came out as
    **one** page.
+
+   **If you built an email snapshot,** the static checker's `email-safe block`
+   and `charts freeze to PNG` rows lint the source, and in the browser
+   `JSON.stringify(await EmailSnapshot.freeze())` lints the frozen block: the
+   images, the resolved colours, and each PNG's size. That report replaces the
+   paper check. The paste into a real mail client is the one step no tool here
+   can run, so say so at handover (`layout-email.md` § Verify it).
 
    **If the page has any control, test it** — an untested filter is usually a
    broken filter. With the audit loaded, change each control to a
@@ -633,7 +655,10 @@ it into a PDF with their browser's own Print → Save as PDF: the template sizes
 the page to the slide, one rounded slide per page. A one-pager prints the same
 way and lands on exactly one sheet, on A4 or US Letter alike — say so when you
 hand it over, since the whole point of the format is that it can be printed
-without anyone touching the dialog. Write it to the working directory (or where
+without anyone touching the dialog. An email snapshot ships the same single
+file, and the reader opens it and clicks **Copy for email**; tell them that,
+and that the paste has not been tried in their mail client, so they should
+send a test to themselves first (`layout-email.md` § Hand it over). Write it to the working directory (or where
 the user asked). Then surface
 it however your environment does that — attach or render the file if you can (in
 Claude Code: `SendUserFile` with `display: "render"`); otherwise print the
@@ -660,5 +685,6 @@ and run Node (for `finalize.js` and the static checks). Without Node, inline
 the three library files by hand — paste `charts.css` into a `<style>` and
 `theme.js` then `charts.js` into `<script>` blocks, in that order, replacing the
 placeholder tags. An editable page also gets `assets/page-runtime.js` in a
-`<script>` block after them. Browser preview, the layout audit, screenshots, and
+`<script>` block after them, and an email snapshot gets
+`assets/email-snapshot.js`. Browser preview, the layout audit, screenshots, and
 file attachment are used when available and degrade gracefully when not.

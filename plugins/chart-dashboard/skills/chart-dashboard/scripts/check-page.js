@@ -28,7 +28,9 @@
  * — the problems a screenshot would otherwise be taken to find. On a one-pager
  * it does the paper arithmetic too: whether the sheet plus its @page margin
  * still fits A4 and Letter, and whether the page carries a control or a
- * hidden number that only works on a screen.
+ * hidden number that only works on a screen. On an email snapshot it lints the
+ * block against what a mail client strips (assets/email-snapshot.js holds the
+ * rules) and checks that every chart will freeze to a PNG.
  *
  * This does not replace opening the page. It cannot see labels colliding,
  * a deck slide outgrowing its frame, or a colour that vanishes on the canvas.
@@ -463,7 +465,24 @@ function sheetFigOf(id) {
 }
 
 const bentoReady = Object.values(grid).every(v => v != null);
-const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetFigOf(id);
+// And for a chart in an email snapshot's block: the placeholder carries its
+// own px box, which is exactly the PNG it will be frozen into.
+const emailBlock = (() => {
+  const a = html.indexOf('<!-- email:start'), b = html.indexOf('<!-- email:end -->');
+  return a >= 0 && b > a ? html.slice(html.indexOf('-->', a) + 3, b) : null;
+})();
+function emailFigOf(id) {
+  if (emailBlock == null) return null;
+  const tag = [...emailBlock.matchAll(/<div\b[^>]*>/g)].map(m => m[0]).find(t => t.includes('id="' + id + '"'));
+  if (!tag) return null;
+  const st = (/style="([^"]*)"/.exec(tag) || [])[1] || '';
+  const px = +((/(?:^|;)\s*width\s*:\s*([\d.]+)px/.exec(st) || [])[1] || 0);
+  const py = +((/(?:^|;)\s*height\s*:\s*([\d.]+)px/.exec(st) || [])[1] || 0);
+  if (!px) return null;
+  return { grid: 'email', cls: 'the email block', flow: !py, px, py: py || null,
+    pxOf: () => px, pyOf: () => py };
+}
+const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetFigOf(id) || emailFigOf(id);
 const sized = manifest
   ? charts.map(c => Object.assign({}, c, { cell: cellFor(c.id) })).filter(c => c.cell) : [];
 if (!sized.length) {
@@ -483,8 +502,11 @@ if (!sized.length) {
   const FLOOR = 0.6;
   for (const c of sized) {
     const m = manifest.charts[c.type];
-    const needW = m.minWidth, needH = m.minHeight;
-    const onSheet = c.cell.grid === 'sheet';
+    // An email chart carries no title or subtitle — they are text rows in the
+    // block — so it does not spend the heading band the minimum allows for.
+    const headless = c.cell.grid === 'email' && !(isObj(c.cfg) && (c.cfg.title || c.cfg.subtitle));
+    const needW = m.minWidth, needH = m.minHeight && headless ? m.minHeight - 60 : m.minHeight;
+    const onSheet = c.cell.grid !== 'bento';   // a fixed box: one-pager figure or email image
     // A self-sizing chart grows to its content when it has no height, so only
     // a fixed height can squeeze it.
     const shortBy = c.cell.py != null && needH ? needH - c.cell.py : 0;
@@ -516,7 +538,7 @@ if (!sized.length) {
   if (tooSmall.length) bad('charts fit their cells', tooSmall.join(' | '));
   else if (cramped.length) {
     note('charts fit their cells', cramped.join(' | ') +
-      '  — under the size the engine would like, which on one page is often the right trade; check the labels in the browser');
+      '  — under the size the engine would like, which in a fixed box is often the right trade; check the labels in the browser');
   } else ok('charts fit their cells', sized.length + ' chart(s) sized, all at or above their minimum');
 
   // Characters per title line scale with width: ~10.5px per character at the
@@ -569,7 +591,7 @@ if (!sized.length) {
     const g = barGeom(c);
     if (!g) continue;
     const what = c.id + ' (' + c.type + ', ' + g.n + ' categor' + (g.n === 1 ? 'y' : 'ies') + (g.k > 1 ? ' × ' + g.k + ' series' : '') + ') in ' + c.cell.cls;
-    const onSheet = c.cell.grid === 'sheet';
+    const onSheet = c.cell.grid !== 'bento';   // a fixed box: one-pager figure or email image
     if (c.type === 'column') {
       // Plot width: the box less the value axis and its labels. On a one-pager
       // the box is the figure's own and there are no spans to suggest.
@@ -835,6 +857,44 @@ if (!notes.length) {
     note('nothing said twice', echoes.join(' | ') +
       ' — already said in a caption or a chart heading; a note that restates one is furniture, not a caveat');
   } else ok('nothing said twice', notes.length + ' note(s), none repeating a caption');
+}
+
+// ── 2e. an email snapshot survives a mail client ────────────────────
+// Only runs on a page built from templates/email.html. Everything between the
+// email:start and email:end markers is pasted into a message, where Gmail
+// strips <svg> and <style>, Outlook for Windows lays out with Word, and nothing
+// runs a script. The rules live in assets/email-snapshot.js, which applies the
+// same lint again to the frozen block in the browser — one list, two moments.
+// Each failure here is invisible in the browser that built the page, which is
+// what makes it worth a checker: the page looks perfect until it is forwarded.
+if (emailBlock == null) {
+  ok('email-safe block', 'not an email snapshot');
+} else {
+  const { lint } = require(require('path').join(__dirname, '..', 'assets', 'email-snapshot.js'));
+  const r = lint(emailBlock, { frozen: false });
+  if (!r.ok) {
+    const seen = {};
+    bad('email-safe block', r.fails.filter(f => !seen[f.msg] && (seen[f.msg] = 1))
+      .map(f => f.rule + ': ' + f.msg).slice(0, 6).join(' | '));
+  } else ok('email-safe block', 'tables, inline styles, system fonts, sized charts with alt text');
+  if (r.warns.length) note('email-safe block', r.warns.map(f => f.msg).join(' | '));
+
+  // The charts themselves: what freezes, what cannot.
+  const inBlock = charts.filter(c => emailFigOf(c.id));
+  const problems = [], advice = [];
+  const viaSnapshot = new Set([...code.matchAll(/EmailSnapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
+  for (const c of inBlock) {
+    if (!viaSnapshot.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which mail clients delete  → EmailSnapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)");
+    if (GROWS.includes(c.type)) problems.push(c.id + ' (' + c.type + ') is an HTML table the PNG export cannot carry  → write it as a <table> in the block: its text survives image blocking');
+    if (!isObj(c.cfg)) continue;
+    if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → make them text rows above the image, where they survive image blocking and dark mode');
+    if (isObj(c.cfg.chart) && c.cfg.chart.transparent) problems.push(c.id + ' is transparent  → drop it: dark-mode mail apps darken the page behind the image, and the dark ink vanishes');
+    if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — an inbox has no tooltip, so every value the reader needs must be printed or in the caption');
+  }
+  if (problems.length) bad('charts freeze to PNG', problems.join(' | '));
+  else ok('charts freeze to PNG', inBlock.length + ' chart(s), each drawn through EmailSnapshot.draw');
+  if (inBlock.length > 3) advice.push(inBlock.length + ' charts — a snapshot carries one to three findings; past that, send the page itself');
+  if (advice.length) note('charts freeze to PNG', advice.join(' | '));
 }
 
 // ── 3. the page is standalone ────────────────────────────────────────

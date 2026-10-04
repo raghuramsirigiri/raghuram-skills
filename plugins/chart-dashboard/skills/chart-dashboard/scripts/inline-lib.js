@@ -19,6 +19,7 @@
  *   <script src="charts-lib/chart-convert.js"></script>   →  <script>…</script>  (editable pages)
  *   <script src="charts-lib/page-runtime.js"></script>    →  <script>…</script>  (editable pages)
  *   <script src="charts-lib/page-editor.js"></script>     →  <script>…</script>  (editable pages)
+ *   <script src="charts-lib/email-snapshot.js"></script>  →  <script>…</script>  (email snapshots)
  *
  * Order is preserved, so theme.js still runs before charts.js. Running it on
  * an already-inlined file is a no-op, which makes it safe to re-run after
@@ -41,7 +42,8 @@ const TARGETS = [
   // so an editable page loads it from the same place while it is being built.
   { tag: '<script src="charts-lib/chart-convert.js"></script>', file: 'chart-convert.js', dir: ASSETS, open: '<script>', close: '</script>', bad: '</script' },
   { tag: '<script src="charts-lib/page-runtime.js"></script>', file: 'page-runtime.js', dir: ASSETS, open: '<script>', close: '</script>', bad: '</script' },
-  { tag: '<script src="charts-lib/page-editor.js"></script>', file: 'page-editor.js', dir: ASSETS, open: '<script>', close: '</script>', bad: '</script' }
+  { tag: '<script src="charts-lib/page-editor.js"></script>', file: 'page-editor.js', dir: ASSETS, open: '<script>', close: '</script>', bad: '</script' },
+  { tag: '<script src="charts-lib/email-snapshot.js"></script>', file: 'email-snapshot.js', dir: ASSETS, open: '<script>', close: '</script>', bad: '</script' }
 ];
 
 const files = process.argv.slice(2);

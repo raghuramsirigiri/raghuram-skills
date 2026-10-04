@@ -6,8 +6,8 @@ Vendor-neutral: no Claude-specific tools, formats, or APIs are required.
 ## What this repo provides
 
 A reusable capability: **turn supplied data into a single self-contained HTML
-dashboard, report, slide deck or printable one-pager with interactive SVG
-charts.** No CDN, no npm install, no build step, no runtime dependencies.
+dashboard, report, slide deck, printable one-pager or email-safe chart snapshot
+with SVG charts.** No CDN, no npm install, no build step, no runtime dependencies.
 
 The canonical instructions live in
 [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md). That file
@@ -16,7 +16,8 @@ is the source of truth — this one only routes you to it.
 ## When to use it
 
 Any request to build a dashboard, analytics page, KPI view, chart deck,
-illustrated data report, or one-page printable brief or handout, from data the
+illustrated data report, one-page printable brief or handout, or charts to paste
+into an email, from data the
 user provides or describes — a table, CSV, pasted numbers, metrics, notes, or a
 topic with figures in it.
 
@@ -27,7 +28,7 @@ topic with figures in it.
 2. Read these before writing chart code — do not guess option names:
    - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
    - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
-   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md` or `layout-onepager.md` (read only the one for your format)
+   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md` or `layout-email.md` (read only the one for your format)
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
    - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
    - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
@@ -35,7 +36,8 @@ topic with figures in it.
    - [`references/editable.md`](plugins/chart-dashboard/skills/chart-dashboard/references/editable.md) — only when the user asked for an editable page
    - [`assets/charts-lib/charts.manifest.json`](plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.manifest.json) — quick per-engine facts (data shape, refusals, sizing)
 3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
-   `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet), or
+   `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet),
+   `email.html` (a chart block to paste into Outlook or Gmail), or
    `dashboard-editable.html` (only when an editable page was asked for).
 4. When you want a worked reference, read one of the finished pages in
    `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),
@@ -79,6 +81,14 @@ topic with figures in it.
   because paper has no pointer. Budget and measured figure heights in
   `references/layout-onepager.md`; `scripts/check-page.js` reports how full each
   column is.
+- An email snapshot is a 600px **table** block with every style inline, its
+  titles as text, and its charts frozen into PNGs when the page opens, because
+  Gmail and Outlook delete SVG, strip style sheets and run no script. Draw each
+  chart through `EmailSnapshot.draw(Charts.x, 'id', config)` so it freezes,
+  give it `data-alt` text that states the finding with its numbers, and keep
+  it to one to three findings. No controls and nothing hover-only. Rules and
+  budget are in `references/layout-email.md`, and `scripts/check-page.js`
+  lints the block.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.
