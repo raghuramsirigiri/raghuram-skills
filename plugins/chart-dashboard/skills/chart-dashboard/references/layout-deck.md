@@ -91,7 +91,15 @@ It is also a real table of contents, which means:
   if the deck has one section, the agenda is simply the list of claims.
 - **Keep the row titles short enough to sit on one line** beside their number.
   The claim on the slide can be a full sentence; its agenda row is the shortest
-  phrase that still names it. The **closing** is what a deck is *for*: a deck that
+  phrase that still names it.
+- **The agenda holds about fifteen lines**, parts and rows together. From
+  twelve it tightens on its own (the template's `.toc:has(> :nth-child(12))`
+  rule), which fits fifteen with three parts. Past that, the deck has more
+  slides than one contents page can carry: merge or cut slides rather than
+  shrinking the agenda further. The layout audit reports an overfull agenda
+  as `clipped-y` on slide 2.
+
+The **closing** is what a deck is *for*: a deck that
 stops on its last chart leaves the audience to infer the ask, which is the one
 job the presenter cannot delegate to a chart. Restate the claim in the same
 words as the cover — the repetition is the point, not a redundancy to edit out.
