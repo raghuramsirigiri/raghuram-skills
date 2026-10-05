@@ -169,6 +169,14 @@
   /* The number never wraps and never shrinks; the title is what reflows when it
      is long, which is the behaviour that keeps a wordy agenda readable. */
   .toc .num { flex:0 0 auto; white-space:nowrap; }
+  /* A long agenda tightens rather than running into the footer. At the size
+     above the slide holds eleven lines (parts and rows together); from twelve
+     the parts drop a size and every line gives up a little padding, which
+     holds fifteen with three parts. Past that, the deck has more slides than
+     one contents page can carry: cut or merge slides, don't shrink further. */
+  .toc:has(> :nth-child(12)) .part { font-size:22px; padding:7px 0 9px; margin-top:10px; }
+  .toc:has(> :nth-child(12)) .part:first-child { margin-top:0; }
+  .toc:has(> :nth-child(12)) .row { padding:6px 0; }
 
   /* Section divider — a breath between parts. Number, name, nothing else.
      The number is --muted, a grey that reads on the light and the dark ground
