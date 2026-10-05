@@ -96,9 +96,11 @@ whose charts survive being pasted into Outlook or Gmail.
    can switch chart types, change text or numbers, and save the file later
    without you. If they haven't asked, offer it once when you hand over the
    first page (see Output). The format and its rules are in
-   `references/editable.md`. Read that file before building one; for a
-   dashboard, start from `templates/dashboard-editable.html`, and for an email
-   snapshot from `templates/email-editable.html`.
+   `references/editable.md`. Read that file before building one, and start
+   from the format's editable template: `dashboard-editable.html`,
+   `report-editable.html`, `slides-editable.html` or `email-editable.html`. A
+   one-pager has none and is not offered one (`editable.md` § When to build
+   one).
 3. **Copy the template.** It lives in this skill's own directory — resolve
    `templates/` relative to the directory containing this SKILL.md, never from a
    hard-coded home path:
@@ -109,6 +111,8 @@ whose charts survive being pasted into Outlook or Gmail.
    <skill-dir>/templates/onepager.html   →  ./index.html
    <skill-dir>/templates/email.html      →  ./index.html
    <skill-dir>/templates/dashboard-editable.html  →  ./index.html   (only when asked for editable)
+   <skill-dir>/templates/report-editable.html     →  ./index.html   (only when asked for editable)
+   <skill-dir>/templates/slides-editable.html     →  ./index.html   (only when asked for editable)
    <skill-dir>/templates/email-editable.html      →  ./index.html   (only when asked for editable)
    ```
    Do **not** copy `assets/charts-lib/` next to the output. The template's
@@ -670,8 +674,8 @@ figures came from the user's data and which, if any, were illustrative.
 On the **first** page you build in a conversation, if the user didn't ask for
 an editable page, end with a one-line offer of one, such as: *"Want an
 editable version, so you can switch chart types and change the text or
-numbers yourself without rerunning this?"* Only offer it once. Build it only
-on a yes, following `references/editable.md`.
+numbers yourself without rerunning this?"* Only offer it once, and never for
+a one-pager. Build it only on a yes, following `references/editable.md`.
 
 An editable page ships as **two files**: `finalize.js` writes `<name>.html` as
 the final copy (no editor, safe to share) and `<name> (working copy).html` as

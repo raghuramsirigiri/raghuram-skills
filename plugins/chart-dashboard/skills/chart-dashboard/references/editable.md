@@ -22,14 +22,18 @@ page, and the button doesn't print.
   later revisions of the same page.
 - **Converting an existing page** means rebuilding it in this format, with
   the same charts, text and layout. Follow the same rules below.
-- **Not a one-pager, unless they ask twice.** Don't offer one for a one-pager,
-  and say why if they ask for one. A one-pager's single guarantee is that it
+- **Never offered for a one-pager; built only if they still want it after
+  hearing why.** Don't offer one, and when they ask for one, say why first.
+  A one-pager's single guarantee is that it
   prints as one page, and that holds because the sheet is fixed and everything
   on it was measured against that. An editor hands someone a way to lengthen a
   title or a note on a page with no scrollbar: the sheet crops it silently, and
   the next thing anyone learns is that the printed copy has half a chart at the
-  bottom. If they still want it, build it, and tell them in one line to reprint
-  from a browser preview after any edit — that is the only check left to them.
+  bottom. If they still want it, build it from `onepager.html` with the
+  rules below (there is no editable one-pager template), and tell them in one
+  line to reprint from a browser preview after any edit — that, and the
+  template's overflow guard (`layout-onepager.md` § An editable one-pager),
+  are the only checks left to them.
 
 ## The format
 
@@ -73,12 +77,19 @@ Three parts, all in the one HTML file:
    Like the other placeholder tags, `finalize.js` stages all three and then
    inlines them.
 
-`templates/dashboard-editable.html` is the dashboard template already in this
-format, and `templates/email-editable.html` is the email snapshot's (see
-[An editable email snapshot](#an-editable-email-snapshot)). For a report or a
-deck, start from `report.html` or `slides.html`, apply the rules below, and
-add the spec block and runtime tag in the same positions as in the editable
-dashboard.
+Each format but the one-pager has its template already in this format:
+
+| Format | Template |
+|:-------|:---------|
+| Dashboard | `templates/dashboard-editable.html` |
+| Report | `templates/report-editable.html` |
+| Deck | `templates/slides-editable.html` |
+| Email snapshot | `templates/email-editable.html` (see [An editable email snapshot](#an-editable-email-snapshot)) |
+
+Each keeps its static template's stylesheet and layouts, and differs only in
+the three parts above, so everything in that format's `layout-*.md` still
+holds. `tests/editable-templates.test.js` fails if a variant's stylesheet or
+chart ids drift from its static template, so a change to one goes into both.
 
 ## Authoring rules
 
@@ -99,9 +110,11 @@ someone other than you will change the numbers later.
   page opens (the deck's slide footers, a generated table of contents) must
   carry `data-page-generated`. Saving leaves those nodes out; without the
   mark, each save writes them into the file and the next open adds another
-  copy. The deck template already marks its footers. They are rebuilt from
-  the `DECK` object and each slide's `data-title`, which are code, so a
-  reader can't edit the footer text.
+  copy. The deck templates already mark their footers. In
+  `slides-editable.html` the footer's name and context are the cover
+  kicker's two marked spans (`deck-name`, `deck-context`), so a reader edits
+  them there and every footer follows; the slide title in each footer is the
+  slide's `data-title`, which is not editable.
 - **No filter controls.** A filter recomputes charts in code, which locks
   them. If the user wants both filters and editing, tell them this and let
   them choose. Where filters would help, small multiples in the spec usually

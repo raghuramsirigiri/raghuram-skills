@@ -13,7 +13,7 @@ that workflow** whenever the user asks for a dashboard, analytics page, KPI
 view, chart deck, illustrated data report, a one-page brief to print, or charts
 to paste into an email.
 
-Seven rules that break the output if missed:
+Eight rules that break the output if missed:
 
 0. Never fix a library bug in `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/` — it
    is a vendored copy of another repo's library and a re-sync would drop the
@@ -22,8 +22,9 @@ Seven rules that break the output if missed:
 2. Donut and pie options go under `plotOptions.pie`, never at the top level.
 3. Never invent numbers that read as real measurements — label illustrative
    figures as illustrative, on the page.
-4. A line chart needs an ordered x — `'Jan 2025'` parses, bare `'Jan'` does not,
-   and named categories belong on a column chart.
+4. A line chart needs an ordered x — dates like `'Jan 2025'`, or a complete rising
+   run like `'Jan'…'Jun'` or `'Q1'…'Q4'`. A shuffled run or named categories
+   render an error panel; those belong on a column chart.
 5. Build the grid from the shape of the analysis rather than reusing a layout;
    the dashboard template ships without a starter arrangement on purpose.
 6. A one-pager is a report set in columns, not a dashboard on paper: prose
@@ -37,6 +38,11 @@ Seven rules that break the output if missed:
    three findings. Read `references/layout-email.md` before writing. Asked for an
    editable one, start from `templates/email-editable.html` instead (charts in
    the page spec; `references/editable.md` § An editable email snapshot).
+
+Asked for an editable dashboard, report or deck, start from
+`templates/dashboard-editable.html`, `report-editable.html` or
+`slides-editable.html` and follow `references/editable.md`. A one-pager has no
+editable template and is not offered one.
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

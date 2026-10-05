@@ -19,7 +19,7 @@ Before writing chart code, consult:
 - `plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md` — action titles; where a finding goes
 - `plugins/chart-dashboard/skills/chart-dashboard/references/controls.md` — before adding a filter or dropdown
 - `plugins/chart-dashboard/skills/chart-dashboard/references/theming.md` — brand recolour and the generator scripts
-- `plugins/chart-dashboard/skills/chart-dashboard/references/editable.md` — only when an editable page was asked for
+- `plugins/chart-dashboard/skills/chart-dashboard/references/editable.md` — only when an editable page was asked for; start from the format's `templates/*-editable.html` (dashboard, report, slides, email — none for a one-pager)
 
 Worked references: `examples/logistics-network-dashboard/` (dashboard),
 `examples/coffee-pricing-deck/` (slide deck), `examples/ev-retrospective/` (report).
@@ -38,7 +38,8 @@ Non-negotiables:
 - No CDN links, npm dependencies, or build steps — output must open offline.
   Finish with `node plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js index.html` to ship one file.
 - Derive the grid from the analysis; a hero cell goes to a finding that leads.
-- A line chart needs an ordered x — `'Jan 2025'`, not bare `'Jan'`.
+- A line chart needs an ordered x — `'Jan 2025'`, or a complete rising run like
+  `'Jan'…'Jun'`; a shuffled run or named categories render an error panel.
 - Any control must be fully wired: filtered data, every dependent panel redrawn,
   action titles recomputed — and a one-pager has none at all, because paper has
   no pointer.

@@ -211,3 +211,17 @@ series rather than categories — two named series draw one legend above the
 table, where category labels in an 84px cell collapse into each other. Set a
 lone series' colour explicitly (`T.colors[0]` for ink); left unnamed it takes
 the next palette step, which can look like one of the legend's colours.
+
+## An editable deck
+
+When the user asks for one, build it from `templates/slides-editable.html` and
+follow `editable.md`. Everything above still holds — the spine, one claim per
+slide, the layouts. Two things behave differently from a static deck:
+
+- **The footer's words live on the cover.** Its name and context are the cover
+  kicker's two marked spans (`deck-name`, `deck-context`), not a `DECK`
+  object, so a reader can change them and every footer follows.
+- **Agenda numbers are text.** Slide numbers in the footers follow the order
+  on the page, but the agenda's `.num` spans are written by hand. After a
+  reader removes or moves a slide, those are the lines to check, and the hand
+  over should say so.
