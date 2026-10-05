@@ -922,8 +922,8 @@ Charts.reportTable('c-table', {
       chart: { type: 'line',
         xAxis: { categories: ['W1','W3','W5','W7','W9','W11','W13'] } } },
     // Name the bars as categories, once, on the column: each row then labels
-    // its own bars beside them. Left without categories, a bar cell labels
-    // its one unnamed category by index and prints a stray "0" in every row.
+    // its own bars beside them. Left without categories, the bars in every
+    // row go unlabelled.
     { key: 'drop', kind: 'chart', name: 'Sign-in drop-off · %', width: 240,
       chart: { type: 'bar', xAxis: { categories: ['Before', 'After'] },
         plotOptions: { series: { dataLabels: { enabled: true } } } } },

@@ -210,9 +210,8 @@ the card clears the footer, and cell charts without axes. Name a bar cell's
 bars with categories, set once on the column (`xAxis: { categories: ['Before',
 'After'] }`), and colour each bar on its point (`{ y, color }`), as
 `slides.html` does. Each row then labels its own bars, and two labels fit an
-84px row. Without categories every row prints a stray `0` beside its bars, and
-splitting the bars into two named series does not avoid it
-(`charts/report-table.md`). Set a sparkline's colour explicitly (`T.colors[0]`
+84px row. Without categories the bars go unlabelled, and the reader has to
+find a legend above the table to tell them apart (`charts/report-table.md`). Set a sparkline's colour explicitly (`T.colors[0]`
 for ink); left unnamed, a lone series takes the next palette step, which can
 pass for one of the bar colours.
 
