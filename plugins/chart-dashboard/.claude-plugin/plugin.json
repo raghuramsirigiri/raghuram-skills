@@ -1,7 +1,7 @@
 {
   "name": "chart-dashboard",
   "description": "Turn any data — a table, CSV, metrics, or notes — into a self-contained HTML dashboard, report, slide deck, printable one-pager or email-safe chart snapshot with SVG charts. Zero dependencies, no CDN, no build step, works offline.",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "author": {
     "name": "Raghuram Sirigiri"
   },

@@ -1374,11 +1374,15 @@ var Charts = window.Charts = window.Charts || {};
     }
     subscribeConfig();
 
+    // The width the engine is about to measure. Read after drawing instead, it
+    // misses the case where the drawing itself changed the width — a chart
+    // that makes the page tall enough to scroll narrows its own container by
+    // the scrollbar, and the observer below would never redraw it.
+    let drawnW = el ? Math.round(el.clientWidth) : 0;
     let inner = runFactory(factory, container, opts, emitter);
     if (el && animates(opts)) animateEnter(el, opts);
     let destroyed = false;
     let frame = 0, ro = null;
-    let drawnW = el ? Math.round(el.clientWidth) : 0;
     let drawnH = el ? Math.round(el.clientHeight) : 0;
 
     function rerender(reason) {
@@ -1386,10 +1390,17 @@ var Charts = window.Charts = window.Charts || {};
       // Only an update is a change a reader should watch happen. A resize or a
       // font swap redraws the same data, and animating it would be noise.
       const before = reason === 'update' && el && animates(opts) ? captureMarks(el) : null;
+      // Hold the container's height across the redraw. Emptied, a self-sizing
+      // chart collapses, the page can lose its scrollbar, and the engine would
+      // measure the width it had before the scrollbar — then draw, bring the
+      // scrollbar back, and be resized again, without end.
+      const hold = el ? el.style.minHeight : '';
+      if (el) el.style.minHeight = el.offsetHeight + 'px';
       inner.destroy();
+      if (el) drawnW = Math.round(el.clientWidth);
       inner = runFactory(factory, container, opts, emitter);
+      if (el) { el.style.minHeight = hold; drawnH = Math.round(el.clientHeight); }
       if (before) animateUpdate(el, before, opts);
-      if (el) { drawnW = Math.round(el.clientWidth); drawnH = Math.round(el.clientHeight); }
       emitter.emit('render', { reason: reason });
     }
 
@@ -4762,7 +4773,7 @@ var Charts = window.Charts = window.Charts || {};
       || ((opts.series || [])[0] ? ((opts.series[0].data || []).length) : 1));
     const gutterMax = Math.min(Math.max(172, W * 0.34), 20 + maxCatLen * 6.5 + 14);
     const rowLabelCats = categories.length
-      ? categories : Array.from({ length: rowCount }, (_, i) => i);
+      ? categories : Array.from({ length: rowCount }, () => '');
     let rowLabels = null;
     let leftPadForBars = 24;
     if (inverted) {
@@ -4800,7 +4811,7 @@ var Charts = window.Charts = window.Charts || {};
     let catLayout = inverted
       ? null
       : layoutCategoryAxis(
-          categories.length ? categories : Array.from({ length: catCount }, (_, i) => i),
+          categories.length ? categories : Array.from({ length: catCount }, () => ''),
           IW, T.labelSize, Math.max(40, Math.min(110, H * 0.3)), monthNames(resolveTheme(opts)));
     if (catLayout) M.b = Math.max(26, catLayout.height);
     const IH = H - M.t - M.b;
@@ -5014,7 +5025,7 @@ var Charts = window.Charts = window.Charts || {};
         // named category (see layoutCategoryAxis).
         if (n !== catLayout.count) {
           catLayout = layoutCategoryAxis(
-            categories.length ? categories : Array.from({ length: n }, (_, i) => i),
+            categories.length ? categories : Array.from({ length: n }, () => ''),
             IW, T.labelSize, M.b, monthNames(resolveTheme(opts)));
         }
         catLayout.ticks.forEach((tk, k) => {
@@ -5043,7 +5054,7 @@ var Charts = window.Charts = window.Charts || {};
         // the bars.
         if (rowLabels.lines.length !== n) {
           rowLabels = layoutRowLabels(
-            categories.length ? categories : Array.from({ length: n }, (_, i) => i),
+            categories.length ? categories : Array.from({ length: n }, () => ''),
             M.l - titleX - 10, IH / Math.max(1, n), T.labelSize);
         }
         rowLabels.lines.forEach((lns, i) => {
