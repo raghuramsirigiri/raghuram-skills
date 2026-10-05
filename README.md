@@ -61,7 +61,7 @@ Chart libraries render what you tell them to render. This skill decides *what to
 render* — which is the part that takes design judgment.
 
 | | chart-dashboard | Chart.js / Plotly / Recharts | Screenshot of a BI tool |
-|:--|:--|:--|:--| 
+|:--|:--|:--|:--|
 | Input | Plain-language data | Hand-written config | Manual dashboard building |
 | Picks the chart type for you | ✅ | ❌ | ❌ |
 | Runtime dependencies | None | npm / CDN | SaaS account |
