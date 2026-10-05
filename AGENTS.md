@@ -38,8 +38,9 @@ topic with figures in it.
 3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
    `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet),
    `email.html` (a chart block to paste into Outlook or Gmail), or
-   `dashboard-editable.html` / `email-editable.html` (only when an editable
-   page was asked for).
+   `dashboard-editable.html` / `report-editable.html` /
+   `slides-editable.html` / `email-editable.html` (only when an editable page
+   was asked for; a one-pager has no editable template and isn't offered one).
 4. When you want a worked reference, read one of the finished pages in
    `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),
    `coffee-pricing-deck/` (deck with the full spine), `ev-retrospective/`
@@ -93,8 +94,10 @@ topic with figures in it.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.
-- A line chart needs an ordered x. Named categories — and bare month names like
-  `'Jan'` — render an error panel; write `'Jan 2025'` or use a column chart.
+- A line chart needs an ordered x. Named categories — and a shuffled or partial
+  run like `['Jan', 'Mar', 'Feb']` — render an error panel. Write dates
+  (`'Jan 2025'`), a complete rising run (`'Jan'…'Jun'`, `'Q1'…'Q4'`), or use a
+  column chart (`references/charts/line.md`).
 - `assets/charts-lib/` is a **vendored copy** of a library that lives in another
   repo (`svg-charts`). Never fix a library bug here — a future sync would wipe
   it, and the two copies would disagree in the meantime. Write the fix up in
@@ -153,7 +156,7 @@ plugins/decisions-only/
 plugins/whats-changed/      same shape as decisions-only
 plugins/sanity-check/       same shape as decisions-only
 plugins/exec-brief/         same shape as decisions-only
-examples/                   four finished outputs (dashboard, deck, report, bento dashboard)
+examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
 ```

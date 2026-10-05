@@ -102,8 +102,12 @@
        (references/layout-dashboard.md § Compose the grid from the findings). One chart
        div per cell; each id must have an entry in #page-spec below. -->
   <div class="bento">
-    <div class="cell w6"><div class="chart" id="c1"></div></div>
-    <div class="cell w6"><div class="chart" id="c2"></div></div>
+    <div class="cell w12"><div class="chart" id="c1"></div></div>
+  </div>
+  <!-- Tables size themselves to their rows, so they go in a content-sized
+       "bento flow" row, never a fixed cell or an h2. -->
+  <div class="bento flow">
+    <div class="cell w12"><div class="chart" id="c2"></div></div>
   </div>
 
   <footer class="notes" data-edit="rich" data-key="footer">
@@ -137,13 +141,22 @@
       }
     },
     "c2": {
-      "type": "column",
+      "type": "table",
       "config": {
         "title": "Volume by category",
-        "subtitle": "Units · All regions",
-        "xAxis": { "categories": ["Cat A", "Cat B", "Cat C", "Cat D"] },
-        "legend": { "enabled": false },
-        "series": [{ "name": "Units", "data": [980, 740, 610, 420] }]
+        "subtitle": "Units · this period vs prior · All regions",
+        "columns": [
+          { "key": "region", "name": "Region" },
+          { "key": "value", "name": "Units" },
+          { "key": "prior", "name": "Prior" },
+          { "key": "change", "name": "Change", "suffix": "%", "decimals": 1, "showSign": true, "highlight": "sign" }
+        ],
+        "rows": [
+          { "name": "Cat A", "region": "North", "value": 980, "prior": 870, "change": 12.6 },
+          { "name": "Cat B", "region": "South", "value": 740, "prior": 760, "change": -2.6 },
+          { "name": "Cat C", "region": "North", "value": 610, "prior": 540, "change": 13.0 },
+          { "name": "Cat D", "region": "South", "value": 420, "prior": 450, "change": -6.7 }
+        ]
       }
     }
   }

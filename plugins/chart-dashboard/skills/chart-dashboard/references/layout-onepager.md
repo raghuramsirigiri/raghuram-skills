@@ -208,13 +208,14 @@ because a masthead that grows steals height from the columns silently.
 
 ## An editable one-pager
 
-Still don't offer it (`editable.md` § When to build one): everything here was
-measured against a fixed box, and an editor is a way to lengthen a heading on a
-page with no scrollbar. But the overflow guard above is what makes one
-defensible if it is asked for — the editor's reader gets the same red warning
-the author would, naming the column and the overflow, instead of finding out
-from a printed copy. Build it on that basis, and still say to reprint from a
-browser preview after editing.
+Never offered, and when asked for, say why first (`editable.md` § When to
+build one): everything here was measured against a fixed box, and an editor is
+a way to lengthen a heading on a page with no scrollbar. If they still want
+it, the overflow guard below is what makes one defensible — the editor's
+reader gets the same red warning the author would, naming the column and the
+overflow, instead of finding out from a printed copy. There is no editable
+one-pager template: build it from `onepager.html` with `editable.md`'s rules,
+and still say to reprint from a browser preview after editing.
 
 ## Verify it as paper
 

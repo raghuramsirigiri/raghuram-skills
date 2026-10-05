@@ -50,10 +50,11 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   "something I can drop into an email", "Outlook", "Gmail". See
   `logistics-network-email/`.
 
-The first three can also be built **editable** on request, with an **Edit page**
-button that opens an in-page editor for text, numbers, chart types and colours.
-A one-pager is the exception: an editor lets someone lengthen a title on a page
-with no scrollbar, and the sheet would crop it silently.
+The dashboard, report, deck and email snapshot can also be built **editable** on
+request, with an **Edit page** button that opens an in-page editor for text,
+numbers, chart types and colours. A one-pager is the exception: an editor lets
+someone lengthen a title on a page with no scrollbar, and the sheet would crop it
+silently.
 
 ## The prompts behind these examples
 

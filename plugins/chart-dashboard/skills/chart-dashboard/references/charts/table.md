@@ -63,4 +63,11 @@ Charts.table('container', {
   the rows open up to half again their height and the rest is blank. Put it in a
   `<div class="bento flow">` row — see `layout-dashboard.md` § Tables size themselves. It
   needs about 480px; with four or fewer data columns one grid track holds it.
+- **Known overflow by the scrollbar's width.** When the table is what makes the
+  page tall enough to scroll, it keeps the width it measured before the
+  scrollbar appeared, and the layout audit reports `overflow-x` on it by 15–17px.
+  That is a library bug (`CHARTS-LIB-UPSTREAM.md` change 5), not your layout: if
+  the overflow equals `innerWidth - document.documentElement.clientWidth`,
+  leave it. The same applies to any self-sizing chart (`reportTable`,
+  `barInsightTable`, `barList`).
 - **Returns** the standard handle plus `getRows()`.

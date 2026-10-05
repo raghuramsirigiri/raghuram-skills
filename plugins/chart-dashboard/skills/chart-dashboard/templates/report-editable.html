@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — Report</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- EDITABLE VARIANT of report.html. Build from this file only when the
+     user asked for an editable page; the rules are in references/editable.md.
+     These three tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the library's own contents, so
+     the file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* --paper, --ink, --muted, --soft, --hair and --font are overwritten at load
+     from Charts.theme (sync block near the bottom), so recolouring the charts
+     recolours the page. --bg is the ground behind the paper. */
+  :root { --bg:#efece6; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
+          --soft:#666666; --hair:#dcdbd7; --rule:#cfcdc6; --radius:4px;
+          --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
+          --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  .paper { max-width:880px; margin:0 auto; background:var(--paper);
+    padding:64px 72px 96px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+  @media (max-width:720px){ .paper{padding:40px 24px} }
+
+  .kicker { font-size:12px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:1.2px; font-weight:700; }
+  h1 { font-size:40px; line-height:1.1; letter-spacing:-0.7px; margin:12px 0 16px; font-weight:700; }
+  .deck { font-size:18px; color:var(--muted); line-height:1.55; margin:0 0 28px; }
+  .byline { font-size:12px; color:var(--soft); border-top:1px solid var(--hair);
+    border-bottom:1px solid var(--hair); padding:12px 0; margin:0 0 40px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .byline b { color:var(--ink); }
+
+  /* Soft surface: a low-contrast fill sets text apart without a rule cutting
+     into the column. --surface-soft is the theme's panel fill, so it follows
+     the theme automatically, light or dark. */
+  .abstract, .note { background:var(--surface-soft); border-radius:var(--radius);
+    padding:18px 22px; margin:0 0 40px; font-size:15px; line-height:1.65; }
+  .abstract b, .note b { text-transform:uppercase; font-size:11px; letter-spacing:1px;
+    display:block; margin-bottom:6px; color:var(--muted); }
+  .note { margin:28px 0; }
+
+  h2 { font-size:24px; font-weight:700; margin:48px 0 12px; letter-spacing:-0.3px; }
+  h2 .n { color:var(--soft); font-weight:700; margin-right:12px; }
+  p { font-size:16px; line-height:1.72; color:#1a1a1a; margin:0 0 18px; }
+
+  .fig { margin:28px 0 32px; }
+  .fig .chart { width:100%; height:380px; background:var(--paper); }
+  /* Tables (table, reportTable, barInsightTable) are as tall as their rows:
+     give them no height, or they stretch and leave a blank band. */
+  .fig .chart.flow { height:auto; }
+  .fig figcaption { font-size:12px; color:var(--soft); margin-top:8px; padding-top:8px;
+    border-top:1px dotted var(--rule); line-height:1.5; }
+  .fig figcaption b { color:var(--ink); margin-right:6px; }
+
+
+  /* minmax(0,1fr), not 1fr: a drawn chart has a fixed-width SVG, and a plain 1fr
+     column never shrinks below it, so a narrower window would push the pair
+     past the paper instead of letting the charts redraw smaller. */
+  .grid2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; margin:28px 0 32px; }
+  .grid2 .fig { margin:0; }
+  .grid2 .fig .chart { height:340px; }
+  @media (max-width:640px){ .grid2{grid-template-columns:1fr} }
+
+  footer.notes { border-top:1px solid var(--hair); margin-top:56px; padding-top:20px;
+    font-size:12px; color:var(--soft); line-height:1.6; }
+  footer.notes b { color:var(--ink); }
+</style>
+</head>
+<body>
+<article class="paper">
+  <!-- Every piece of text the reader might want to change carries
+       data-edit (text | rich) and a data-key that is unique on the page.
+       text = plain text. rich = a paragraph that may keep <b>/<i>/<br>.
+       Mark the words, not a styled wrapper: a heading's section number is its
+       own marked span, and a caption's "Fig. n" stays outside the marked one. -->
+
+  <div class="kicker" data-edit="text" data-key="kicker">Section · Category</div>
+  <h1 data-edit="text" data-key="title">Headline claim, not a topic label</h1>
+  <p class="deck" data-edit="rich" data-key="standfirst">Two sentences that state what changed and why it matters.</p>
+
+  <div class="byline">
+    <div data-edit="rich" data-key="byline"><b>Author</b> · Affiliation · Published DATE</div>
+    <div><span data-edit="text" data-key="window-label">Reporting window</span> <span data-edit="text" data-key="window">START — END</span></div>
+  </div>
+
+  <div class="abstract">
+    <b data-edit="text" data-key="abstract-heading">Summary</b>
+    <span data-edit="rich" data-key="abstract">Three or four sentences: the finding, the evidence, the caveat.</span>
+  </div>
+
+  <h2><span class="n" data-edit="text" data-key="n-1">01</span><span data-edit="text" data-key="h-1">First section</span></h2>
+  <p data-edit="rich" data-key="p-1-1">Claim in prose. The figure below is the evidence for it.</p>
+
+  <figure class="fig">
+    <div class="chart" id="f1"></div>
+    <figcaption><b>Fig. 1</b> <span data-edit="text" data-key="f1-caption">One sentence interpreting the chart — not a repeat of its title.</span></figcaption>
+  </figure>
+
+  <!-- Soft surface card. Use for text that belongs to no single figure: a
+       caveat, a method note, the ask. If the point can be read off one chart,
+       put it in that chart's title instead of here. -->
+  <div class="note">
+    <b data-edit="text" data-key="note-1-heading">Caveat</b>
+    <span data-edit="rich" data-key="note-1">Something the reader needs in order to read the figures correctly, and which
+    is not a finding any single chart carries.</span>
+  </div>
+
+  <h2><span class="n" data-edit="text" data-key="n-2">02</span><span data-edit="text" data-key="h-2">Second section</span></h2>
+  <p data-edit="rich" data-key="p-2-1">Paired figures when two cuts of the same question belong side by side.</p>
+
+  <div class="grid2">
+    <figure class="fig">
+      <div class="chart" id="f2"></div>
+      <figcaption><b>Fig. 2</b> <span data-edit="text" data-key="f2-caption">Interpretation.</span></figcaption>
+    </figure>
+    <figure class="fig">
+      <div class="chart" id="f3"></div>
+      <figcaption><b>Fig. 3</b> <span data-edit="text" data-key="f3-caption">Interpretation.</span></figcaption>
+    </figure>
+  </div>
+
+  <h2><span class="n" data-edit="text" data-key="n-3">03</span><span data-edit="text" data-key="h-3">Third section</span></h2>
+  <p data-edit="rich" data-key="p-3-1">When each row carries its own finding, give the row its own sentence.
+     This is not a bar chart with a caption per bar.</p>
+
+  <!-- A table-shaped figure. Pick by what each row carries (chart-selection.md
+       § First: what is one item of this data?):
+         a bar + a sentence + a number        → barInsightTable (below)
+         several measures to look up          → table
+         a trend + a figure + a note per row  → reportTable
+       The .flow class lets it size itself to its rows. -->
+  <figure class="fig">
+    <div class="chart flow" id="f4"></div>
+    <figcaption><b>Fig. 4</b> <span data-edit="text" data-key="f4-caption">Interpretation.</span></figcaption>
+  </figure>
+
+  <footer class="notes" data-edit="rich" data-key="footer">
+    <b>Sources.</b> … <b>Method.</b> … <b>Note.</b> Flag any illustrative figures here.
+  </footer>
+</article>
+
+<!-- THE PAGE'S CONTENT. Every chart is one entry: the id of its element, a
+     chart type from charts.manifest.json, and a config that is plain JSON —
+     no functions, no Charts.theme lookups, no computed values. Colours that
+     would have been T.colors[1] / T.muted are written as the literal hex from
+     the theme in use. Options are the same as in references/chart-api.md. -->
+<script type="application/json" id="page-spec">
+{
+  "version": 1,
+  "charts": {
+    "f1": {
+      "type": "line",
+      "config": {
+        "title": "The trend behind the claim",
+        "subtitle": "Units · scope",
+        "xAxis": { "categories": ["2019", "2020", "2021", "2022", "2023", "2024", "2025"] },
+        "series": [{ "name": "Series", "data": [12, 18, 31, 47, 62, 81, 96] }],
+        "callouts": [{ "x": 3, "text": "Inflection" }]
+      }
+    },
+    "f2": {
+      "type": "column",
+      "config": {
+        "title": "Breakdown by category",
+        "subtitle": "Units",
+        "xAxis": { "categories": ["A", "B", "C", "D"] },
+        "series": [{ "name": "Value", "data": [46, 28, 17, 9] }]
+      }
+    },
+    "f3": {
+      "type": "donut",
+      "config": {
+        "title": "Share of total",
+        "subtitle": "Percent",
+        "plotOptions": { "pie": { "valueSuffix": "%" } },
+        "series": [{ "name": "Share", "data": [
+          { "name": "A", "y": 46 }, { "name": "B", "y": 28 },
+          { "name": "C", "y": 17 }, { "name": "Other", "y": 9 }
+        ] }]
+      }
+    },
+    "f4": {
+      "type": "barInsightTable",
+      "config": {
+        "title": "Each line item, with what moved it",
+        "subtitle": "Units · change vs prior period",
+        "xAxis": { "categories": ["Line item A", "Line item B", "Line item C"] },
+        "series": [{ "name": "Value", "data": [46, 28, 17] }],
+        "rows": [
+          { "insight": "Headline for this row", "description": "One sentence on why it moved.", "stat": "+12%" },
+          { "insight": "Headline for this row", "description": "One sentence on why it moved.", "stat": "−4%" },
+          { "insight": "Headline for this row", "description": "One sentence on why it moved.", "stat": "+1%" }
+        ]
+      }
+    }
+  }
+}
+</script>
+
+<!-- theme.js MUST load before charts.js; page-runtime.js loads last. All three
+     are inlined by scripts/finalize.js. -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour, if any — one Charts.applyPalette call, before page-runtime.js
+   draws anything. See references/theming.md.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* Page chrome follows the chart theme, so there is one source of colour truth. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--paper', t.bg);
+  s.setProperty('--ink',   t.titleColor);
+  s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--soft',  t.subtitleColor);
+  s.setProperty('--hair',  t.grid);
+  s.setProperty('--font',  t.font);
+  // Soft surfaces take the theme's own panel token — the same fill a geofacet
+  // tile uses — so the page and the charts step off the canvas by the same
+  // amount, and a dark palette inverts without any luminance guesswork here.
+  s.setProperty('--surface-soft', t.tileSurface);
+})();
+</script>
+<!-- chart-convert.js lets a chart switch type; page-runtime.js draws every
+     chart in #page-spec and exposes window.Page; page-editor.js adds the
+     "Edit page" button.
+     No other chart code on an editable page. -->
+<script src="charts-lib/chart-convert.js"></script>
+<script src="charts-lib/page-runtime.js"></script>
+<script src="charts-lib/page-editor.js"></script>
+</body>
+</html>

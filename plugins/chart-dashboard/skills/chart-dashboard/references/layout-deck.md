@@ -206,8 +206,26 @@ a small line or bar chart in every row, on a scale shared down the column, and
 the shape and the number in one exhibit. Keep `Charts.table` for figures alone.
 
 For a report table on a 16:9 slide: four to six rows, `rowHeight` about 84 so
-the card clears the footer, and cell charts without axes. Name the bars with
-series rather than categories — two named series draw one legend above the
-table, where category labels in an 84px cell collapse into each other. Set a
-lone series' colour explicitly (`T.colors[0]` for ink); left unnamed it takes
-the next palette step, which can look like one of the legend's colours.
+the card clears the footer, and cell charts without axes. Name a bar cell's
+bars with categories, set once on the column (`xAxis: { categories: ['Before',
+'After'] }`), and colour each bar on its point (`{ y, color }`), as
+`slides.html` does. Each row then labels its own bars, and two labels fit an
+84px row. Without categories every row prints a stray `0` beside its bars, and
+splitting the bars into two named series does not avoid it
+(`charts/report-table.md`). Set a sparkline's colour explicitly (`T.colors[0]`
+for ink); left unnamed, a lone series takes the next palette step, which can
+pass for one of the bar colours.
+
+## An editable deck
+
+When the user asks for one, build it from `templates/slides-editable.html` and
+follow `editable.md`. Everything above still holds — the spine, one claim per
+slide, the layouts. Two things behave differently from a static deck:
+
+- **The footer's words live on the cover.** Its name and context are the cover
+  kicker's two marked spans (`deck-name`, `deck-context`), not a `DECK`
+  object, so a reader can change them and every footer follows.
+- **Agenda numbers are text.** Slide numbers in the footers follow the order
+  on the page, but the agenda's `.num` spans are written by hand. After a
+  reader removes or moves a slide, those are the lines to check, and the hand
+  over should say so.

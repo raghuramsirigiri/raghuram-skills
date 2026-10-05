@@ -226,7 +226,7 @@ Common uses, and the format each one produces:
 - **Portfolio and investment reviews** — allocation donuts, performance over time
 - **Client-facing agency deliverables** — branded, self-contained, emailable
 
-Four output formats, chosen from how you phrase the request:
+Five output formats, chosen from how you phrase the request:
 
 - **Dashboard** — a bento grid, one panel per finding, no prose. The default.
 - **Report** — narrative sections with figures and captions. Triggered by phrasing
@@ -242,18 +242,25 @@ Four output formats, chosen from how you phrase the request:
   column they sit in rather than the other way round, so the page gets packed
   instead of padded. Triggered by "print it", "one page", "a handout", or "for
   the board pack".
+- **Email snapshot** — one to three findings in a 600px block that survives being
+  pasted into Gmail or Outlook: every style inline, titles as text, and each
+  chart frozen into a PNG when the page opens. A **Copy for email** button puts
+  it on the clipboard. Triggered by "paste it into the weekly update",
+  "something I can drop into an email", "Outlook", or "Gmail".
 
-The first three can also be built **editable** on request: an **Edit page** button
-opens an in-page editor where you can change text and numbers, switch a chart's
-type, restyle colours, and remove or move content, then save the file — no
-rerun needed. An editable page ships as two files: `<name>.html` (the final copy,
-no editor) and `<name> (working copy).html` (the editable one, marked as a draft).
-The email snapshot can be editable too: every edit re-freezes the charts, so
-**Copy for email** always copies the page as it now stands.
+The dashboard, report, deck and email snapshot can also be built **editable** on
+request: an **Edit page** button opens an in-page editor where you can change text
+and numbers, switch a chart's type, restyle colours, and remove or move content,
+then save the file — no rerun needed. An editable page ships as two files:
+`<name>.html` (the final copy, no editor) and `<name> (working copy).html` (the
+editable one, marked as a draft). In an editable email snapshot every edit
+re-freezes the charts, so **Copy for email** always copies the page as it now
+stands. The one-pager is the exception: an editor lets someone lengthen a title on
+a page with no scrollbar, and the sheet would crop it silently, so it isn't offered.
 
 ## Examples
 
-Five finished pages, all in [`examples/`](examples/). Each is a real build from
+Six finished pages, all in [`examples/`](examples/). Each is a real build from
 the skill — download the `index.html` and open it, no server and no network
 needed.
 
@@ -300,6 +307,13 @@ that say what the figure means, pull quotes and source notes.
 
 A 20-panel bento grid: revenue trend with annotated spikes, channel and device mix,
 category comparisons, funnel and cohort views, and a full-width composition panel.
+
+### Email snapshot — [`logistics-network-email/`](examples/logistics-network-email/)
+
+The logistics dashboard's Q2 data cut down for an email: a headline, three figures,
+a weekly on-time line with a callout, a column of cost drivers and the busiest lanes
+as a plain email table. The charts freeze to PNG when the page opens, and **Copy for
+email** puts the block on the clipboard.
 
 ## Which chart types are supported?
 
@@ -518,8 +532,11 @@ plugins/chart-dashboard/skills/chart-dashboard/
     ├── dashboard-editable.html     # the same, in the editable format
     ├── email.html                  # 600px block to paste into Outlook or Gmail
     ├── email-editable.html         # the same, in the editable format
+    ├── onepager.html               # one printed sheet, set in columns
     ├── report.html                 # paper-column starting point
-    └── slides.html                 # 16:9 deck, eighteen slide layouts
+    ├── report-editable.html        # the same, in the editable format
+    ├── slides.html                 # 16:9 deck, eighteen slide layouts
+    └── slides-editable.html        # the same, in the editable format
 ```
 
 Four finished outputs live in [`examples/`](examples/) — see

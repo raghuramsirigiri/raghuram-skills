@@ -7,12 +7,13 @@ up here until it lands in `svg-charts`; then the copy is re-synced and the
 section is deleted, so that syncing the library again never silently removes
 behaviour the skill depends on.
 
-One change is outstanding, proposed and not applied: the copy is still
+Two changes are outstanding, both proposed and not applied: the copy is still
 identical to upstream.
 
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
 | 4 | A bar or column with no category name gets a blank label, not its index | `engines/bar.js` | proposed | `templates/slides.html` report table; any `bar`/`column` cell in a `reportTable` |
+| 5 | A chart that brings in the page scrollbar is redrawn at the narrower width | `engines/_shared.js` | proposed | `templates/dashboard.html` and `dashboard-editable.html` table; any self-sizing chart that makes its page scroll |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -98,6 +99,106 @@ with `xAxis.categories` is unchanged.
 
 Proposed, not applied. The skill does not need it to work: the template names
 its bars with categories, and `report-table.md` tells authors to do the same.
+
+---
+
+## 5. A chart that brings in the page scrollbar is redrawn at the narrower width
+<!-- check: proposed; file: charts.js; needle: el.style.minHeight = el.offsetHeight -->
+
+### Problem
+
+A self-sizing chart (`table`, `reportTable`, `barInsightTable`, `barList`) can
+be the thing that makes its page tall enough to scroll. It measures
+`container.clientWidth` before it has drawn, when there is no vertical
+scrollbar yet. Once drawn, the scrollbar appears and the container narrows by
+its width (15–17px), but the SVG keeps the wider width and overflows the cell.
+
+The resize observer should catch that and redraw, but it doesn't.
+`makeResponsive` records the width a chart was "drawn at" by reading
+`el.clientWidth` *after* the draw, which is already the narrower width. So the
+observer sees no change.
+
+```text
+dashboard.html as shipped, 1062x995 viewport:
+  #c2 (table)  cell 970px  svg 986px   → audit: overflow-x by 16 on #c2
+redraw the same table once the page already scrolls:
+  #c2 (table)  cell 970px  svg 970px
+```
+
+### Why the skill needs it
+
+`templates/dashboard.html` and `dashboard-editable.html` both put a table in a
+full-width flow row, and the layout audit (SKILL.md step 7) fails both
+templates as shipped: `overflow-x` on the table and `clipped-x` on its cell.
+Every dashboard whose table pushes the page past one screen inherits it. The
+clipped strip is the table's right edge, often its last column of numbers.
+
+### Change
+
+`charts-lib/engines/_shared.js`, `makeResponsive`. There are two parts, and
+both are needed:
+
+1. **Record the width the engine measured.** Read it before the draw, not
+   after. The observer then sees the scrollbar's narrowing as a resize and
+   redraws once.
+2. **Hold the container's height during a redraw.** Without this, emptying a
+   self-sizing chart can drop the page's scrollbar again. The engine would then
+   measure the wide width, draw, bring the scrollbar back, and be resized again
+   forever.
+
+Hunk positions are omitted: this was written against the bundled `charts.js`
+(`makeResponsive`, lines 609–624 at `c196b94`), not an upstream checkout.
+
+```diff
++    // The width the engine is about to measure. Read after drawing instead, it
++    // misses the case where the drawing itself changed the width — a chart
++    // that makes the page tall enough to scroll narrows its own container by
++    // the scrollbar, and the observer below would never redraw it.
++    let drawnW = el ? Math.round(el.clientWidth) : 0;
+     let inner = runFactory(factory, container, opts, emitter);
+     if (el && animates(opts)) animateEnter(el, opts);
+     let destroyed = false;
+     let frame = 0, ro = null;
+-    let drawnW = el ? Math.round(el.clientWidth) : 0;
+     let drawnH = el ? Math.round(el.clientHeight) : 0;
+@@
+       const before = reason === 'update' && el && animates(opts) ? captureMarks(el) : null;
++      // Hold the container's height across the redraw. Emptied, a self-sizing
++      // chart collapses, the page can lose its scrollbar, and the engine would
++      // measure the width it had before the scrollbar — then draw, bring the
++      // scrollbar back, and be resized again, without end.
++      const hold = el ? el.style.minHeight : '';
++      if (el) el.style.minHeight = el.offsetHeight + 'px';
+       inner.destroy();
++      if (el) drawnW = Math.round(el.clientWidth);
+       inner = runFactory(factory, container, opts, emitter);
++      if (el) { el.style.minHeight = hold; drawnH = Math.round(el.clientHeight); }
+       if (before) animateUpdate(el, before, opts);
+-      if (el) { drawnW = Math.round(el.clientWidth); drawnH = Math.round(el.clientHeight); }
+       emitter.emit('render', { reason: reason });
+```
+
+### Apply and verify
+
+Apply in `svg-charts`, rebuild, and run its tests. Then open
+`templates/dashboard.html` from this repo, staged, in a window short enough
+that the table makes the page scroll, and run the layout audit. The table's
+SVG should match its cell (970/970 at 1062x995, 1349/1349 at 1440x900), the
+audit should report no `overflow-x` or `clipped-x`, and a `MutationObserver` on
+the chart should see no further redraws once it settles. I tried the diff on a
+throwaway staged copy, not on the vendored file, and got exactly that: one
+corrective redraw, then none, and window resizes still redraw. The thing to
+recheck upstream is `update()` with an animation: the height hold is released
+before `animateUpdate` runs, so the animation should see the chart at its own
+height.
+
+### Current state
+
+Proposed, not applied. Nothing in the skill breaks outright: the table is
+clipped by its scrollbar's width, and the browser audit names it. Until it
+lands, a page author who sees `overflow-x` on a table that otherwise fits can
+ignore it if the overflow equals the scrollbar width (`innerWidth -
+document.documentElement.clientWidth`).
 
 ---
 
