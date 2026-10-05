@@ -34,7 +34,9 @@ Seven rules that break the output if missed:
 7. An email snapshot (`templates/email.html`) is a 600px table block with inline
    styles, titles as text, and charts drawn through `EmailSnapshot.draw` so they
    freeze to PNG with alt text: mail clients delete SVG and run no script. One to
-   three findings. Read `references/layout-email.md` before writing.
+   three findings. Read `references/layout-email.md` before writing. Asked for an
+   editable one, start from `templates/email-editable.html` instead (charts in
+   the page spec; `references/editable.md` § An editable email snapshot).
 
 Finished pages to read when you want a worked example:
 `examples/logistics-network-dashboard/` (dashboard), `examples/coffee-pricing-deck/`

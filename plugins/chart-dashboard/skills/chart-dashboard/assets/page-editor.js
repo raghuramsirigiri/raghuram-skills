@@ -2025,6 +2025,9 @@
   function start() {
     if (editing) return;
     editing = true;
+    // Lets page CSS show what only an editor needs, such as an email
+    // snapshot's alt-text rows. page-runtime's serialize() drops it.
+    document.documentElement.setAttribute('data-page-editing', '');
     ui.toggle.hidden = true;
     ui.bar.hidden = false;
     setMessage(null);
@@ -2042,6 +2045,7 @@
     if (!editing) return;
     select(null);
     editing = false;
+    document.documentElement.removeAttribute('data-page-editing');
     hovered = null;
     place();
     ui.bar.hidden = true;

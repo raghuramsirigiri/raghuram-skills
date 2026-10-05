@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — Email snapshot</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- EDITABLE VARIANT of email.html. Build from this file only when the
+     user asked for an editable snapshot; the rules are in
+     references/editable.md and references/layout-email.md.
+     These tags are placeholders. Run scripts/finalize.js on the finished
+     page and they are replaced by the files' own contents, so the file works
+     standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* ── This sheet styles the PAGE, never the email ─────────────────────────
+     An email snapshot is two things in one file: the block inside
+     #email-block, which is what the reader copies into a message, and the
+     page around it — a toolbar and a grey stage — which never leaves this
+     file. Gmail and Outlook strip <style> sheets and ignore classes, so
+     nothing in here can style the block. The block carries every style
+     inline, on the element, in a table layout: see
+     references/layout-email.md.
+
+     The colour tokens below are overwritten from Charts.theme at load. Inside
+     the block, write them as var(--ink) etc.; EmailSnapshot.freeze() resolves
+     each one to the hex value it holds, so a brand recolour is still one
+     Charts.applyPalette call. */
+  :root {
+    --card:#fbfaf8; --ground:#eae8e4; --ink:#2a2723; --muted:#77716a;
+    --hair:#e4e1dc; --accent:#2e5bba;
+    /* The block's one font. Outlook for Windows sets text in Times New Roman
+       when the FIRST family in a stack is missing, so the stack starts with a
+       face every mail client has. The charts are set in it too (below), so the
+       PNG and the text around it match. */
+    --font: Arial, Helvetica, sans-serif;
+  }
+  html, body { margin: 0; background: var(--ground); }
+  body { font: 13px/1.4 system-ui, 'Segoe UI', Arial, sans-serif; color: var(--ink); }
+  .snap-bar {
+    /* Below the editor's working-copy banner, which sets --pe-draft-h. */
+    position: sticky; top: var(--pe-draft-h, 0px); z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--hair);
+  }
+  .snap-bar b { font-weight: 600; margin-right: 8px; }
+  .snap-bar button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--hair); background: var(--card); color: var(--ink);
+  }
+  .snap-bar button[data-snap="copy"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .snap-bar button:disabled { opacity: .5; cursor: progress; }
+  .snap-bar [data-snap="status"] { color: var(--muted); flex: 1 1 240px; }
+  .snap-stage { padding: 24px 16px 48px; overflow-x: auto; }
+  #email-block { width: 600px; margin: 0 auto; }
+  /* Alt-text rows are for whoever edits the page: shown in edit mode, never
+     copied (freeze() drops data-snap-omit), hidden from everyone else. */
+  [data-snap-omit] { display: none; }
+  html[data-page-editing] [data-snap-omit] { display: table-row; }
+  @media print { .snap-bar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- The toolbar. email-snapshot.js wires all three buttons and reports the
+     freeze in the status line; keep the data-snap names as written. -->
+<div class="snap-bar" id="snap-bar">
+  <b>Email snapshot</b>
+  <button type="button" data-snap="copy">Copy for email</button>
+  <button type="button" data-snap="save-html">Save email HTML</button>
+  <button type="button" data-snap="save-png">Save charts as PNG</button>
+  <span data-snap="status"></span>
+</div>
+
+<div class="snap-stage">
+<div id="email-block">
+<!-- email:start
+     Everything between these two markers is the email. Rules (checked by
+     scripts/check-page.js, and again on the frozen block by freeze()):
+       · tables for layout — no div, flex, grid, float or position
+       · every style inline, on the element; no class
+       · every <td> that holds text names font-family: var(--font)
+       · colours as var(--token) or #rrggbb; nothing wider than 600px
+       · a chart is an empty div with class "chart", an id, a data-alt-key
+         naming its alt-text row, and a px width and height; its entry in
+         #page-spec draws it, and freeze() swaps a PNG of it into the email
+       · every piece of text a reader might change carries data-edit and a
+         unique data-key (references/editable.md)
+       · the chart's title and subtitle are TEXT in the block, not in the image -->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:600px;border-collapse:collapse;background-color:var(--card);">
+  <tr>
+    <td style="padding:24px 24px 4px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);" data-edit="text" data-key="kicker">KICKER · scope · Week ending DATE</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 6px;font-family:var(--font);font-size:20px;line-height:26px;font-weight:bold;color:var(--ink);" data-edit="text" data-key="headline">Headline: the one finding this snapshot exists to send</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 18px;font-family:var(--font);font-size:14px;line-height:21px;color:var(--ink);" data-edit="rich" data-key="context">One or two sentences: what changed, and what the reader should take from it. This is the part most people read, and on a phone it is often the only part they read.</td>
+  </tr>
+
+  <!-- One chart. Title and subtitle are text above the image, so they survive
+       image blocking, read in dark mode and can be searched; the caption under
+       it carries the source or the one number the picture can't. -->
+  <tr>
+    <td style="padding:14px 24px 2px;border-top:1px solid var(--hair);font-family:var(--font);font-size:15px;line-height:20px;font-weight:bold;color:var(--ink);" data-edit="text" data-key="c1-title">The trend, with the moment that changed it marked</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 8px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);" data-edit="text" data-key="c1-subtitle">Units · scope · period</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 6px;">
+      <div class="chart" id="c1" style="width:552px;height:230px" data-alt-key="c1-alt"></div>
+    </td>
+  </tr>
+  <!-- The chart's alt text, as a row only the editor shows (data-snap-omit:
+       never copied). freeze() reads it through the chart's data-alt-key, so
+       a reader who changes the numbers can correct the alt text too. -->
+  <tr data-snap-omit>
+    <td style="padding:0 24px 10px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);"><b>Alt text, not shown in the email:</b> <span data-edit="text" data-key="c1-alt">Line chart: the measure rose from 3.8 in week 1 to a peak of 7.4 in week 4, then settled near 5.6 by week 12.</span></td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 18px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);" data-edit="text" data-key="c1-caption">Caption: the source, or the one number the chart cannot show.</td>
+  </tr>
+
+  <tr>
+    <td style="padding:12px 24px 22px;border-top:1px solid var(--hair);font-family:var(--font);font-size:11px;line-height:15px;color:var(--muted);" data-edit="rich" data-key="footer">Source: SOURCE. A snapshot taken DATE — the figures will not update.</td>
+  </tr>
+</table>
+<!-- email:end -->
+</div>
+</div>
+
+<!-- THE SNAPSHOT'S CHARTS. One entry per chart element in the block: its
+     id, a chart type from charts.manifest.json, and a config that is plain
+     JSON — no functions, no Charts.theme lookups, no computed values. Colours
+     are literal hex from the theme in use. The email rules still apply: NO
+     title or subtitle (they are text rows in the block), nothing hover-only,
+     no transparent: true. Options are in references/charts/<type>.md. -->
+<script type="application/json" id="page-spec">
+{
+  "version": 1,
+  "charts": {
+    "c1": {
+      "type": "line",
+      "config": {
+        "xAxis": { "categories": ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6",
+                                  "Week 7", "Week 8", "Week 9", "Week 10", "Week 11", "Week 12"] },
+        "legend": { "enabled": false },
+        "callouts": [{ "x": 3, "text": "What happened here" }],
+        "series": [{ "name": "Measure", "type": "line", "color": "#2323FF",
+          "data": [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
+      }
+    }
+  }
+}
+</script>
+
+<!-- theme.js MUST load before charts.js. All of these are inlined by
+     scripts/finalize.js. -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call,
+   never per-chart colours. See references/theming.md.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* The email's one sanctioned metric change: the charts are set in the block's
+   own font, so the text baked into each PNG matches the text around it. */
+Charts.applyMetrics({ font: getComputedStyle(document.documentElement).getPropertyValue('--font').trim() });
+
+/* Page chrome and the block's tokens follow the chart theme — one source of
+   colour truth, resolved to hex when the block is frozen. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',   t.bg);
+  s.setProperty('--ground', t.tileSurface);
+  s.setProperty('--ink',    t.titleColor);
+  s.setProperty('--muted',  t.secondaryColor);
+  s.setProperty('--hair',   t.grid);
+  s.setProperty('--accent', t.highlight);
+})();
+</script>
+<!-- chart-convert.js lets a chart switch type; page-runtime.js draws every
+     chart in #page-spec; email-snapshot.js freezes them into the email and
+     rebuilds it after each edit; page-editor.js adds the "Edit page" button.
+     No other chart code on an editable snapshot. -->
+<script src="charts-lib/chart-convert.js"></script>
+<script src="charts-lib/page-runtime.js"></script>
+<script src="charts-lib/email-snapshot.js"></script>
+<script src="charts-lib/page-editor.js"></script>
+</body>
+</html>

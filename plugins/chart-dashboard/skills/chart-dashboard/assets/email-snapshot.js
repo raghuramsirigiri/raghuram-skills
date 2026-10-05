@@ -21,6 +21,12 @@
  *   EmailSnapshot.copy()                           put html + text on the clipboard
  *   EmailSnapshot.check()                          the lint report on the frozen block, as JSON
  *
+ * An editable snapshot (templates/email-editable.html) keeps its charts in
+ * page-runtime.js's spec instead, so the reader can change them. There the
+ * live charts stay SVG for the editor; each freeze draws a copy off screen,
+ * and every edit rebuilds the frozen email a moment later (EmailSnapshot.stale
+ * is true until it has).
+ *
  * The block is the element with id="email-block"; only its contents are
  * copied. Everything outside it — the toolbar, the grey stage — is the page's
  * own chrome and never reaches the email.
@@ -71,6 +77,13 @@
     charts.forEach(function (tag) {
       var id = attr(tag, 'id') || '?';
       var alt = attr(tag, 'data-alt') || '';
+      // An editable snapshot keeps the alt text in a marked element the reader
+      // can edit (data-alt-key names its data-key), not in an attribute.
+      var altKey = attr(tag, 'data-alt-key');
+      if (altKey) {
+        var km = new RegExp('\\sdata-key="' + altKey.replace(/[.*+?^${}()|[\]\\]/g, function (c) { return '\\' + c; }) + '"[^>]*>([^<]*)<').exec(h);
+        alt = km ? km[1] : '';
+      }
       if (alt.trim().split(/\s+/).length < 6 || !/\d/.test(alt)) {
         fail('alt text', id + ': data-alt must state the finding with its numbers (6+ words, at least one figure) — ' +
           'it is all a reader with images off, or a screen reader, ever gets');
@@ -171,6 +184,16 @@
   var drawn = [];
   var state = { frozen: false, html: '', text: '', document: '', images: [], report: null };
 
+  // An editable snapshot (templates/email-editable.html) keeps its charts in
+  // page-runtime's spec, and the reader changes them after the page opens. So
+  // the live charts stay SVG for the editor, and each freeze draws a copy
+  // off screen, rasterises that, and builds the email from a clone of the
+  // block. An edit makes the frozen copy stale; it is rebuilt shortly after.
+  function editable() { return !!(root.Page && document.getElementById('page-spec')); }
+  var busy = null, again = false, stale = false, changed = {};
+  var listeners = [];
+  function notify() { listeners.forEach(function (fn) { try { fn(); } catch (e) { /* a listener's bug is its own */ } }); }
+
   /**
    * Draw a chart that freeze() will rasterise. Same shape as the draw()
    * helper in references/controls.md, so the static checker sees the chart.
@@ -233,23 +256,32 @@
       r.readAsDataURL(blob);
     });
   }
+  // A few frames, or a moment when there are none: a hidden tab runs no
+  // animation frames, and an edit made there must still reach the email.
   function frames(n) {
     return new Promise(function (ok) {
+      setTimeout(ok, 50 * n);
       (function step(k) { if (!k) return ok(); requestAnimationFrame(function () { step(k - 1); }); })(n);
     });
   }
 
   // The copy that leaves the page: no ids, no data-*, no classes, and no
-  // comments — the template's rules for the author are not the reader's.
-  function exportClone(block) {
-    var clone = block.cloneNode(true);
+  // comments — the template's rules for the author are not the reader's. On
+  // an editable page it also drops what the editor hid (data-page-removed),
+  // its own chrome (data-page-ui), the rows that exist only for whoever edits
+  // the page (data-snap-omit, the alt-text rows), and the editor's tab stops.
+  function exportClone(clone) {
     var walker = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT);
     var comments = [];
     while (walker.nextNode()) comments.push(walker.currentNode);
     comments.forEach(function (c) { c.parentNode.removeChild(c); });
+    Array.prototype.slice.call(clone.querySelectorAll('[data-page-removed],[data-page-ui],[data-snap-omit]')).forEach(function (n) {
+      if (n.parentNode) n.parentNode.removeChild(n);
+    });
     Array.prototype.forEach.call(clone.querySelectorAll('*'), function (n) {
       Array.prototype.slice.call(n.attributes).forEach(function (a) {
-        if (a.name === 'id' || a.name === 'class' || a.name.indexOf('data-') === 0) n.removeAttribute(a.name);
+        if (a.name === 'id' || a.name === 'class' || a.name === 'contenteditable' || a.name === 'tabindex' ||
+            a.name === 'spellcheck' || a.name.indexOf('data-') === 0) n.removeAttribute(a.name);
       });
     });
     return clone;
@@ -272,53 +304,121 @@
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
+  function cssId(id) { return root.CSS && CSS.escape ? CSS.escape(id) : id; }
+  // The chart's alt text: from the marked element its data-alt-key names (an
+  // editable snapshot, where the reader can correct it), else data-alt.
+  function altOf(host) {
+    var key = host.getAttribute('data-alt-key');
+    if (key) {
+      var src = document.querySelector('[data-key="' + cssId(key) + '"]');
+      if (src) return src.textContent.replace(/\s+/g, ' ').trim();
+    }
+    return host.getAttribute('data-alt') || '';
+  }
+
+  // Draw a spec chart again where nobody sees it, at its box's size and with
+  // no animation, and rasterise that. The live chart is the editor's, so it
+  // is never touched.
+  function offscreenPNG(id, w, h) {
+    var entry = root.Page.getChart(id);
+    if (!entry || typeof Charts[entry.type] !== 'function') return Promise.reject(new Error('not in the page spec'));
+    var box = document.createElement('div');
+    box.setAttribute('data-page-ui', '');
+    box.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + w + 'px;height:' + h + 'px';
+    document.body.appendChild(box);
+    var cfg = JSON.parse(JSON.stringify(entry.config || {}));
+    cfg.chart = Object.assign({}, cfg.chart, { animation: false, responsive: false });
+    var handle;
+    var done = function () { if (handle && handle.destroy) handle.destroy(); box.remove(); };
+    try { handle = Charts[entry.type](box, cfg); } catch (e) { done(); return Promise.reject(e); }
+    if (handle && handle.error) { var err = handle.error; done(); return Promise.reject(new Error(err)); }
+    return frames(2).then(function () { return handle.toPNG({ scale: 2 }); })
+      .then(function (blob) { done(); return blob; }, function (e) { done(); throw e; });
+  }
+
+  function drawnFor(id) { return drawn.filter(function (x) { return x.id === id; }).pop(); }
+
+  /**
+   * Rasterise every chart in the block, resolve the tokens, and lint the
+   * result. On a static snapshot the frozen images replace the live charts on
+   * screen, once. On an editable one the live charts stay, and each call
+   * rebuilds the email from the page as it now is; an edit marks it stale.
+   */
   function freeze() {
-    if (state.frozen) return Promise.resolve(state.report);
+    var live = editable();
+    if (state.frozen && !(live && stale)) return Promise.resolve(state.report);
+    if (busy) { again = true; return busy; }
     var block = document.getElementById('email-block');
     if (!block) return Promise.reject(new Error('email-snapshot: no element with id="email-block"'));
-    var problems = [];
+    stale = false;
+    var problems = [], warns = [], images = [], shots = {};
     var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     // Charts lay out on a debounced resize observer, so let it settle.
-    return fontsReady.then(function () { return frames(2); })
+    busy = fontsReady.then(function () { return frames(2); })
       .then(function () { return new Promise(function (ok) { setTimeout(ok, 250); }); })
       .then(function () {
-        var claimed = drawn.map(function (d) { return d.id; });
-        Array.prototype.forEach.call(block.querySelectorAll('.chart'), function (n) {
-          if (claimed.indexOf(n.id) < 0) problems.push({ rule: 'charts frozen', msg: (n.id || 'a chart') + ' was not drawn with EmailSnapshot.draw, so it cannot be frozen' });
+        var hosts = Array.prototype.filter.call(block.querySelectorAll('.chart'), function (n) {
+          return !(n.closest('[data-page-removed]') || (n.parentElement && n.parentElement.closest('.chart')));
         });
-        return drawn.reduce(function (p, d) {
+        return hosts.reduce(function (p, host) {
           return p.then(function () {
-            var host = document.getElementById(d.id);
-            if (!host || !block.contains(host)) return;
-            if (d.handle && d.handle.error) {
-              problems.push({ rule: 'chart drew', msg: d.id + ': ' + d.handle.error });
+            var id = host.id;
+            var d = drawnFor(id);
+            var inSpec = live && root.Page.getChart(id);
+            if (!d && !inSpec) {
+              problems.push({ rule: 'charts frozen', msg: (id || 'a chart') + ' was not drawn with EmailSnapshot.draw' +
+                (live ? ' or the page spec' : '') + ', so it cannot be frozen' });
+              return;
+            }
+            if (inSpec && inSpec.config && (inSpec.config.title || inSpec.config.subtitle)) {
+              warns.push({ rule: 'chart text', msg: id + ' has a title or subtitle inside the image — the text rows above it already carry them, and text in an image is lost when images are blocked' });
+            }
+            if (d && d.handle && d.handle.error) {
+              problems.push({ rule: 'chart drew', msg: id + ': ' + d.handle.error });
               return;
             }
             var w = Math.round(host.offsetWidth), h = Math.round(host.offsetHeight);
-            return d.handle.toPNG({ scale: 2 }).then(function (blob) {
+            var png = d ? d.handle.toPNG({ scale: 2 }) : offscreenPNG(id, w, h);
+            return png.then(function (blob) {
               return blobToDataURL(blob).then(function (url) {
                 var img = document.createElement('img');
                 img.setAttribute('src', url);
                 img.setAttribute('width', String(w));
                 img.setAttribute('height', String(h));
-                img.setAttribute('alt', host.getAttribute('data-alt') || '');
+                img.setAttribute('alt', altOf(host));
                 img.setAttribute('style', 'display:block;width:' + w + 'px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;');
-                state.images.push({ id: d.id, blob: blob, kb: Math.round(blob.size / 1024) });
-                if (d.handle.destroy) d.handle.destroy();
-                host.replaceWith(img);
+                images.push({ id: id, blob: blob, kb: Math.round(blob.size / 1024) });
+                shots[id] = img;
               });
             }).catch(function (e) {
-              problems.push({ rule: 'chart drew', msg: d.id + ': ' + (e && e.message || e) });
+              problems.push({ rule: 'chart drew', msg: id + ': ' + (e && e.message || e) });
             });
           });
         }, Promise.resolve());
       })
       .then(function () {
-        resolveVars(block);
-        var clone = exportClone(block);
+        // A static snapshot shows on screen exactly what is pasted, so its
+        // live charts give way to their images. An editable one keeps them.
+        if (!live) {
+          Object.keys(shots).forEach(function (id) {
+            var host = document.getElementById(id);
+            var d = drawnFor(id);
+            if (d && d.handle && d.handle.destroy) d.handle.destroy();
+            if (host) host.replaceWith(shots[id].cloneNode(true));
+          });
+        }
+        var clone = block.cloneNode(true);
+        Object.keys(shots).forEach(function (id) {
+          var host = clone.querySelector('#' + cssId(id));
+          if (host) host.replaceWith(shots[id]);
+        });
+        exportClone(clone);
+        resolveVars(clone);
+        state.images = images;
         state.html = clone.innerHTML.trim();
-        state.text = plainText(block);
-        var title = (document.title || 'Snapshot').replace(/[<&]/g, '');
+        state.text = plainText(clone);
+        // An editable working copy's tab reads "Draft · …"; the email's doesn't.
+        var title = (document.title || 'Snapshot').replace(/^(Draft · )+/, '').replace(/[<&]/g, '');
         var ground = toHex(getComputedStyle(document.documentElement).getPropertyValue('--ground').trim() || '#ffffff');
         state.document = '<!doctype html>\n<html lang="' + (document.documentElement.lang || 'en') + '">\n<head>\n' +
           '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n' +
@@ -326,9 +426,19 @@
           state.html + '\n</body>\n</html>\n';
         state.frozen = true;
         state.report = check(problems);
+        state.report.warns = warns.concat(state.report.warns);
+        // Alt text is written by hand, so it does not follow an edit to the
+        // chart's numbers. Say which charts changed since the page opened.
+        var edited = Object.keys(changed).filter(function (id) { return shots[id] && block.querySelector('#' + cssId(id) + '[data-alt-key]'); });
+        if (edited.length) state.report.warns.push({ rule: 'alt text', msg: 'The data in ' + edited.join(' and ') + ' changed. Check that ' +
+          (edited.length > 1 ? 'their alt text still states' : 'its alt text still states') + ' the right numbers (shown under each chart in edit mode).' });
         document.documentElement.setAttribute('data-email', state.report.ok ? 'frozen' : 'problems');
+        busy = null;
+        if (again) { again = false; stale = true; return freeze(); }
+        notify();
         return state.report;
-      });
+      }, function (e) { busy = null; again = false; throw e; });
+    return busy;
   }
 
   function check(extra) {
@@ -351,6 +461,7 @@
 
   function copy() {
     if (!state.frozen) return Promise.reject(new Error('freeze() has not finished'));
+    if (busy || stale) return Promise.reject(new Error('the snapshot is still catching up with your last edit — try again in a moment'));
     // The copy event first: it is synchronous, works from file://, and hands
     // the clipboard our markup untouched. The async API is the fallback.
     var done = false;
@@ -392,7 +503,8 @@
   }
 
   // The toolbar, if the page has one. Wired here so a page cannot ship a
-  // half-wired Copy button.
+  // half-wired Copy button. On an editable page it also follows the edits:
+  // each one disables the buttons until the email has been rebuilt from it.
   function wire() {
     var bar = document.getElementById('snap-bar');
     if (!bar) return;
@@ -403,21 +515,42 @@
       if (b) b.addEventListener('click', fn);
       return b;
     };
+    var live = editable();
     var buttons = [
       on('copy', function () {
         copy().then(function () { say('Copied. Paste into the body of a new message.'); },
-          function (e) { say('Could not copy: ' + e.message + '. Select the block and press Ctrl+C instead.'); });
+          function (e) { say('Could not copy: ' + e.message + (live ? '.' : '. Select the block and press Ctrl+C instead.')); });
       }),
       on('save-html', saveDocument),
       on('save-png', saveImages)
     ];
-    buttons.forEach(function (b) { if (b) b.disabled = true; });
+    var enable = function (yes) { buttons.forEach(function (b) { if (b) b.disabled = !yes; }); };
+    var report = function (r) {
+      enable(true);
+      var n = r.images.length + ' chart(s) frozen as PNG';
+      var notes = r.warns.filter(function (w) { return w.rule === 'alt text' || w.rule === 'chart text'; });
+      say(!r.ok ? 'Frozen with problems: ' + r.fails.map(function (f) { return f.msg; }).join(' · ')
+        : notes.length ? 'Ready — ' + n + '. ' + notes.map(function (w) { return w.msg; }).join(' · ')
+        : 'Ready — ' + n + (live && root.PageEditor ? '. Edits update the email as you make them.' : '.'));
+    };
+    var failed = function (e) { enable(true); say('Could not freeze: ' + e.message); };
+    enable(false);
     say('Freezing the charts…');
-    freeze().then(function (r) {
-      buttons.forEach(function (b) { if (b) b.disabled = false; });
-      say(r.ok ? 'Ready — ' + r.images.length + ' chart(s) frozen as PNG.'
-               : 'Frozen with problems: ' + r.fails.map(function (f) { return f.msg; }).join(' · '));
-    }, function (e) { say('Could not freeze: ' + e.message); });
+    freeze().then(report, failed);
+    if (!live) return;
+    var timer = null;
+    root.Page.on(function (change) {
+      if (change && change.kind === 'chart' && change.id) changed[String(change.id).split('::')[0]] = 1;
+      // Editing a chart's alt text answers the warning for that chart.
+      if (change && change.kind === 'text') {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-alt-key="' + cssId(change.id) + '"]'), function (n) { delete changed[n.id]; });
+      }
+      stale = true;
+      enable(false);
+      say('Updating the email…');
+      clearTimeout(timer);
+      timer = setTimeout(function () { freeze().then(report, failed); }, 500);
+    });
   }
 
   root.EmailSnapshot = {
@@ -431,7 +564,11 @@
     get html() { return state.html; },
     get text() { return state.text; },
     get document() { return state.document; },
-    get frozen() { return state.frozen; }
+    get frozen() { return state.frozen; },
+    /** true while an edit has not yet reached the frozen email */
+    get stale() { return stale || !!busy; },
+    /** fn() after every freeze, including the rebuilds that follow an edit */
+    on: function (fn) { listeners.push(fn); }
   };
   if (document.readyState === 'complete') setTimeout(wire, 0);
   else root.addEventListener('load', wire);

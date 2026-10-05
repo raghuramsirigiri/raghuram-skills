@@ -124,3 +124,52 @@ test('finalize stages and inlines the freeze runtime, then cleans up', () => {
   assert.ok(shipped.includes('root.EmailSnapshot = {'), 'the freeze runtime was not inlined');
   assert.ok(!fs.existsSync(path.join(dir, 'ship', 'charts-lib')), 'staged folder left behind');
 });
+
+// ── the editable variant (templates/email-editable.html) ─────────────
+// Its charts live in page-runtime's spec so a reader can change them, and its
+// alt text sits in an editable row that data-alt-key points at. The freeze
+// works from the spec in the browser; these pin what the checker and the
+// build can see.
+const EDITABLE = path.join(__dirname, '..', 'templates', 'email-editable.html');
+
+test('alt text can come from the marked element data-alt-key names', () => {
+  const chart = key => '<div class="chart" id="c1" style="width:552px;height:230px" data-alt-key="' + key + '"></div>';
+  const altRow = text => '<tr data-snap-omit><td style="' + F + '"><span data-edit="text" data-key="c1-alt">' + text + '</span></td></tr>';
+  const good = lint(block('<tr><td style="padding:0;">' + chart('c1-alt') + '</td></tr>' + altRow('Tickets rose from 120 in week 1 to 410 in week 9.')));
+  assert.deepStrictEqual(good.fails, []);
+  const vague = lint(block('<tr><td style="padding:0;">' + chart('c1-alt') + '</td></tr>' + altRow('A chart of tickets over time')));
+  assert.ok(rules(vague).includes('alt text'));
+  const missing = lint(block('<tr><td style="padding:0;">' + chart('nowhere') + '</td></tr>'));
+  assert.ok(rules(missing).includes('alt text'));
+});
+
+test('the editable template passes its own checks, its charts frozen from the spec', () => {
+  const out = runCheck(EDITABLE);
+  assert.match(row(out, 'email-safe block'), /PASS/, out);
+  assert.match(row(out, 'charts freeze to PNG'), /PASS.*1 chart\(s\), each drawn through the page spec/, out);
+  assert.match(row(out, 'editable page'), /PASS/, out);
+});
+
+test('a spec chart with no freeze runtime on the page stays SVG, and says so', () => {
+  const src = fs.readFileSync(EDITABLE, 'utf8').replace('<script src="charts-lib/email-snapshot.js"></script>\n', '');
+  const file = path.join(dir, 'no-freeze.html');
+  fs.writeFileSync(file, src);
+  assert.match(row(runCheck(file), 'charts freeze to PNG'), /FAIL.*email-snapshot\.js/);
+});
+
+test('finalize ships an editable snapshot as a final copy and a working copy', () => {
+  const page = path.join(dir, 'ship-editable', 'snapshot.html');
+  fs.mkdirSync(path.dirname(page));
+  fs.copyFileSync(EDITABLE, page);
+  const f = spawnSync(process.execPath, [FINALIZE, page], { encoding: 'utf8' });
+  assert.strictEqual(f.status, 0, f.stdout + f.stderr);
+  const fin = fs.readFileSync(page, 'utf8');
+  const work = fs.readFileSync(path.join(dir, 'ship-editable', 'snapshot (working copy).html'), 'utf8');
+  for (const html of [fin, work]) {
+    assert.ok(!/src="charts-lib\//.test(html), 'a charts-lib reference survived');
+    assert.ok(html.includes('root.EmailSnapshot = {'), 'the freeze runtime was not inlined');
+    assert.ok(html.includes('window.Page = Page'), 'the page runtime was not inlined');
+  }
+  assert.ok(!fin.includes('window.PageEditor ='), 'the final copy still carries the editor');
+  assert.ok(work.includes('window.PageEditor ='), 'the working copy lost the editor');
+});

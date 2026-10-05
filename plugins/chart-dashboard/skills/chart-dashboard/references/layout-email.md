@@ -231,6 +231,16 @@ in this order:
 Say which figures came from their data and which, if any, were illustrative,
 the same as for every format.
 
+## An editable snapshot
+
+When the user asks for an editable snapshot (so they can fix a number or a
+title and copy it again next week without you), build it from
+`templates/email-editable.html` and follow `editable.md` § An editable email
+snapshot. The block's rules above don't change. The charts move into the page
+spec, and each chart's alt text moves into an editable row that the email
+never carries. Don't offer one unprompted beyond the usual one-line offer on
+the first page.
+
 ## What it never has
 
 - No controls, no hover, no animation, no script in the block.

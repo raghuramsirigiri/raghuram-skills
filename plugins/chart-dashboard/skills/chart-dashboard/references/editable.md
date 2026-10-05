@@ -74,9 +74,11 @@ Three parts, all in the one HTML file:
    inlines them.
 
 `templates/dashboard-editable.html` is the dashboard template already in this
-format. For a report or a deck, start from `report.html` or `slides.html`,
-apply the rules below, and add the spec block and runtime tag in the same
-positions as in the editable dashboard.
+format, and `templates/email-editable.html` is the email snapshot's (see
+[An editable email snapshot](#an-editable-email-snapshot)). For a report or a
+deck, start from `report.html` or `slides.html`, apply the rules below, and
+add the spec block and runtime tag in the same positions as in the editable
+dashboard.
 
 ## Authoring rules
 
@@ -138,6 +140,44 @@ someone other than you will change the numbers later.
 - **One spec entry per chart element**, and every `.chart` element on the
   page has one. `check-page.js` fails both an orphan cell and an entry with
   no cell.
+
+## An editable email snapshot
+
+`templates/email-editable.html` is `email.html` in this format. Everything in
+`layout-email.md` still holds: the block is a 600px table with inline styles,
+titles are text rows, and at most three findings. What changes:
+
+- **Charts are spec entries, not `EmailSnapshot.draw` calls.** Their configs
+  carry no `title` or `subtitle`, the same as on a static snapshot. Load
+  `email-snapshot.js` after `page-runtime.js`: it freezes the spec charts by
+  drawing a copy of each off screen, so the live charts stay SVG for the
+  editor. `check-page.js` fails a spec chart in the block when that runtime
+  is missing.
+- **Alt text is an editable row, not an attribute.** The chart element names
+  it with `data-alt-key="c1-alt"`, and the row under the chart holds it:
+  ```html
+  <tr data-snap-omit>
+    <td style="…font-family:var(--font);…"><b>Alt text, not shown in the email:</b>
+      <span data-edit="text" data-key="c1-alt">Median first response rose from 3.8h …</span></td>
+  </tr>
+  ```
+  `data-snap-omit` keeps the row out of every copy, and the template's CSS
+  shows it only while the editor is open (`html[data-page-editing]`). The
+  checker reads the alt text through the key, with the same rule as
+  `data-alt`: it must state the finding with a figure in it.
+- **Every edit rebuilds the email.** Half a second after a change, the email
+  is frozen again from the page as it is. The toolbar says *Updating the
+  email…* and its buttons wait until it is done. Removing a row or a chart in
+  the editor removes it from the email too.
+- **Changed data flags its alt text.** Once a chart's data has changed, the
+  toolbar asks the reader to check that chart's alt text, until they edit it.
+  Alt text is written by hand, so nothing can update it for them.
+- **Mark the block's text, not the toolbar.** Kicker, headline, context,
+  each chart's title, subtitle, caption and alt text, and the footer. The
+  layout controls are dashboard-only, so they don't appear.
+
+It ships as two files like any editable page. Both freeze and both have
+**Copy for email**; only the working copy has the editor.
 
 ## Build and verify
 
