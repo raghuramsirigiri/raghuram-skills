@@ -151,7 +151,8 @@ test('the editable template passes its own checks, its charts frozen from the sp
 });
 
 test('a spec chart with no freeze runtime on the page stays SVG, and says so', () => {
-  const src = fs.readFileSync(EDITABLE, 'utf8').replace('<script src="charts-lib/email-snapshot.js"></script>\n', '');
+  // \r?\n: a Windows checkout has CRLF line endings.
+  const src = fs.readFileSync(EDITABLE, 'utf8').replace(/<script src="charts-lib\/email-snapshot\.js"><\/script>\r?\n/, '');
   const file = path.join(dir, 'no-freeze.html');
   fs.writeFileSync(file, src);
   assert.match(row(runCheck(file), 'charts freeze to PNG'), /FAIL.*email-snapshot\.js/);
