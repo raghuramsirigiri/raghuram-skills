@@ -38,7 +38,8 @@ topic with figures in it.
 3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
    `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet),
    `email.html` (a chart block to paste into Outlook or Gmail), or
-   `dashboard-editable.html` (only when an editable page was asked for).
+   `dashboard-editable.html` / `email-editable.html` (only when an editable
+   page was asked for).
 4. When you want a worked reference, read one of the finished pages in
    `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),
    `coffee-pricing-deck/` (deck with the full spine), `ev-retrospective/`

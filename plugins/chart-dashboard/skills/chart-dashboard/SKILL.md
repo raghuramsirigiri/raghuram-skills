@@ -97,7 +97,8 @@ whose charts survive being pasted into Outlook or Gmail.
    without you. If they haven't asked, offer it once when you hand over the
    first page (see Output). The format and its rules are in
    `references/editable.md`. Read that file before building one; for a
-   dashboard, start from `templates/dashboard-editable.html`.
+   dashboard, start from `templates/dashboard-editable.html`, and for an email
+   snapshot from `templates/email-editable.html`.
 3. **Copy the template.** It lives in this skill's own directory — resolve
    `templates/` relative to the directory containing this SKILL.md, never from a
    hard-coded home path:
@@ -108,6 +109,7 @@ whose charts survive being pasted into Outlook or Gmail.
    <skill-dir>/templates/onepager.html   →  ./index.html
    <skill-dir>/templates/email.html      →  ./index.html
    <skill-dir>/templates/dashboard-editable.html  →  ./index.html   (only when asked for editable)
+   <skill-dir>/templates/email-editable.html      →  ./index.html   (only when asked for editable)
    ```
    Do **not** copy `assets/charts-lib/` next to the output. The template's
    `charts-lib/…` tags are placeholders (the email template has a fourth, for
@@ -686,5 +688,6 @@ the three library files by hand — paste `charts.css` into a `<style>` and
 `theme.js` then `charts.js` into `<script>` blocks, in that order, replacing the
 placeholder tags. An editable page also gets `assets/page-runtime.js` in a
 `<script>` block after them, and an email snapshot gets
-`assets/email-snapshot.js`. Browser preview, the layout audit, screenshots, and
+`assets/email-snapshot.js` (an editable snapshot gets both, in the template's
+order). Browser preview, the layout audit, screenshots, and
 file attachment are used when available and degrade gracefully when not.

@@ -248,6 +248,8 @@ opens an in-page editor where you can change text and numbers, switch a chart's
 type, restyle colours, and remove or move content, then save the file — no
 rerun needed. An editable page ships as two files: `<name>.html` (the final copy,
 no editor) and `<name> (working copy).html` (the editable one, marked as a draft).
+The email snapshot can be editable too: every edit re-freezes the charts, so
+**Copy for email** always copies the page as it now stands.
 
 ## Examples
 
@@ -514,6 +516,8 @@ plugins/chart-dashboard/skills/chart-dashboard/
 └── templates/
     ├── dashboard.html              # bento grid starting point
     ├── dashboard-editable.html     # the same, in the editable format
+    ├── email.html                  # 600px block to paste into Outlook or Gmail
+    ├── email-editable.html         # the same, in the editable format
     ├── report.html                 # paper-column starting point
     └── slides.html                 # 16:9 deck, eighteen slide layouts
 ```

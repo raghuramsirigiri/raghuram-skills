@@ -736,6 +736,12 @@
       // The editor marks a working copy's tab "Draft · …" while it is open;
       // the file keeps its real title, or every save would add another.
       root.style.removeProperty('--pe-draft-h');
+      // State the page sets on <html> while it runs: edit mode, and an email
+      // snapshot's freeze result. Both are rebuilt on the next open.
+      root.removeAttribute('data-page-editing');
+      root.removeAttribute('data-email');
+      Array.prototype.forEach.call(root.querySelectorAll('[data-snap="status"]'), function (n) { n.textContent = ''; });
+      Array.prototype.forEach.call(root.querySelectorAll('[data-snap]'), function (n) { n.removeAttribute('disabled'); });
       if (!root.getAttribute('style')) root.removeAttribute('style');
       var t = root.querySelector('title');
       if (t) t.textContent = t.textContent.replace(/^(Draft \u00B7 )+/, '');

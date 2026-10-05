@@ -860,7 +860,8 @@ if (!notes.length) {
 }
 
 // ── 2e. an email snapshot survives a mail client ────────────────────
-// Only runs on a page built from templates/email.html. Everything between the
+// Only runs on a page built from templates/email.html (or its editable
+// variant, email-editable.html). Everything between the
 // email:start and email:end markers is pasted into a message, where Gmail
 // strips <svg> and <style>, Outlook for Windows lays out with Word, and nothing
 // runs a script. The rules live in assets/email-snapshot.js, which applies the
@@ -883,8 +884,14 @@ if (emailBlock == null) {
   const inBlock = charts.filter(c => emailFigOf(c.id));
   const problems = [], advice = [];
   const viaSnapshot = new Set([...code.matchAll(/EmailSnapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
+  // An editable snapshot (templates/email-editable.html) keeps its charts in
+  // the page spec; email-snapshot.js freezes those from the spec, so they
+  // count as frozen when that runtime is on the page.
+  const freezer = /<script src="charts-lib\/email-snapshot\.js"><\/script>/.test(html) || /root\.EmailSnapshot\s*=/.test(html);
+  const viaSpec = new Set(freezer ? specCharts.map(c => c.id) : []);
   for (const c of inBlock) {
-    if (!viaSnapshot.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which mail clients delete  → EmailSnapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)");
+    if (!viaSnapshot.has(c.id) && !viaSpec.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which mail clients delete  → EmailSnapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)" +
+      (specCharts.length ? ', or load charts-lib/email-snapshot.js so the spec charts freeze' : ''));
     if (GROWS.includes(c.type)) problems.push(c.id + ' (' + c.type + ') is an HTML table the PNG export cannot carry  → write it as a <table> in the block: its text survives image blocking');
     if (!isObj(c.cfg)) continue;
     if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → make them text rows above the image, where they survive image blocking and dark mode');
@@ -892,7 +899,8 @@ if (emailBlock == null) {
     if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — an inbox has no tooltip, so every value the reader needs must be printed or in the caption');
   }
   if (problems.length) bad('charts freeze to PNG', problems.join(' | '));
-  else ok('charts freeze to PNG', inBlock.length + ' chart(s), each drawn through EmailSnapshot.draw');
+  else ok('charts freeze to PNG', inBlock.length + ' chart(s), each drawn through ' +
+    (viaSpec.size ? (viaSnapshot.size ? 'EmailSnapshot.draw or the page spec' : 'the page spec') : 'EmailSnapshot.draw'));
   if (inBlock.length > 3) advice.push(inBlock.length + ' charts — a snapshot carries one to three findings; past that, send the page itself');
   if (advice.length) note('charts freeze to PNG', advice.join(' | '));
 }

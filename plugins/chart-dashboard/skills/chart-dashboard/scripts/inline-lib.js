@@ -62,7 +62,9 @@ for (const target of files) {
       console.error('refusing to inline ' + t.file + ': it contains a literal ' + t.bad);
       process.exit(1);
     }
-    html = html.replace(t.tag, t.open + '\n' + src + '\n' + t.close);
+    // A function, not a string: a replacement string would expand any $& or
+    // $' in the source being inlined.
+    html = html.replace(t.tag, () => t.open + '\n' + src + '\n' + t.close);
     done++;
   }
   if (!done) {
