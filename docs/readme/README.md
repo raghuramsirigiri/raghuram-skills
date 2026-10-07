@@ -1,7 +1,8 @@
-# README images
+# README and docs-site images
 
-The images in the main README are built from the pages in this folder, so they
-can be rebuilt whenever the templates or the chart library change.
+The images in the main README and on the docs site are built from the pages in
+this folder, so they can be rebuilt whenever the templates or the chart library
+change. One build writes both.
 
 | Path | What it is |
 |:--|:--|
@@ -10,6 +11,7 @@ can be rebuilt whenever the templates or the chart library change.
 | `hero.html` | The composition at the top of the README, laid out from the raw captures. |
 | `build.mjs` | Captures every page in headless Chrome, runs the skill's layout audit on it, then renders the framed images and the hero. |
 | `images/` | The output the README links to. `images/raw/` holds the unframed captures and is not committed. |
+| `../img/` | The same frames for the docs site (`docs/index.html`): 1x WebP, about 40–100 KB each, plus `og.png`, the hero as a 1x PNG for social previews. |
 
 Rebuild everything, or only the named shots (the hero is always recomposed):
 
