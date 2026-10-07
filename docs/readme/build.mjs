@@ -33,7 +33,7 @@ const CHROME = process.env.CHROME || [
 // `setup` runs in the page before the capture; `wait` is real time, so
 // charts that freeze or animate have settled.
 const SHOTS = [
-  { name: 'dashboard', page: 'dashboard.html', w: 1680, h: 1050, title: 'Lakeshore Bike Share — Dashboard' },
+  { name: 'dashboard', page: 'dashboard.html', w: 2240, h: 1400, title: 'Lakeshore Bike Share — Dashboard' },
   { name: 'report',    page: 'report.html',    w: 1536, h: 960,  title: 'What e-bikes changed — Report' },
   { name: 'deck',      page: 'deck.html',      w: 1280, h: 800,  title: 'Lakeshore Bike Share — Deck',
     setup: `(() => {
@@ -132,11 +132,11 @@ try {
 
     await browser.open(pathToFileURL(join(HERE, 'frame.html')).href + '?' + new URLSearchParams({
       img: pathToFileURL(raw).href, title: s.title, ...(s.fade ? { fade: 1 } : {})
-    }), { w: 1600, h: 1080, scale: 1, wait: 800 });
+    }), { w: 1600, h: 1080, scale: 2, wait: 800 });
     await browser.capture(join(OUT, `${s.name}.png`));
     console.log(`framed   images/${s.name}.png`);
   }
-  await browser.open(pathToFileURL(join(HERE, 'hero.html')).href, { w: 1600, h: 1000, scale: 1, wait: 1200 });
+  await browser.open(pathToFileURL(join(HERE, 'hero.html')).href, { w: 1600, h: 1000, scale: 2, wait: 1200 });
   await browser.capture(join(OUT, 'hero.png'));
   console.log('composed images/hero.png');
 } finally {

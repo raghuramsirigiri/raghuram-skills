@@ -20,7 +20,7 @@
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
     font-family:var(--font); }
-  .page { max-width:1600px; margin:0 auto; padding:32px; }
+  .page { max-width:2176px; margin:0 auto; padding:32px; }
   header { display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
     margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--hair); }
   header h1 { margin:0; font-size:28px; font-weight:700; letter-spacing:-0.5px; }
@@ -89,30 +89,30 @@
   <header>
     <div>
       <h1>Lakeshore Bike Share, 2025 season</h1>
-      <p>Rides, revenue and station demand across 212 stations · illustrative data for a fictional city</p>
+      <p>Rides, riders and revenue across 212 stations · illustrative data for a fictional city</p>
     </div>
     <div class="stamp">Reporting window<b>Jan 1 — Dec 31, 2025</b></div>
   </header>
 
-  <div class="kpis">
-    <div class="kpi"><span>Rides</span><b>2.85m</b><i>vs 2.34m in 2024</i></div>
-    <div class="kpi"><span>E-bike share</span><b>37%</b><i>of rides, Apr–Dec</i></div>
-    <div class="kpi"><span>Revenue</span><b>$10.1m</b><i>vs $7.9m in 2024</i></div>
-    <div class="kpi"><span>Median trip</span><b>14 min</b><i>vs 12 min in 2024</i></div>
-  </div>
-
-  <!-- One trend leads (the year-on-year gap that opens in April); where the
-       rides came from sits beside it. Then when people ride, and what the
-       growth was worth. -->
+  <!-- Nothing here is a single dominant trend: the season is a set of
+       co-equal findings about one change (the e-bike fleet), so the top row
+       is three equal cells. The flows need width. The district scorecard
+       sizes itself, and the radar needs more height than a 340px row leaves
+       it, so both close the page in a content-sized row. -->
   <div class="bento">
-    <div class="cell w8"><div class="chart" id="c-rides"></div></div>
-    <div class="cell w4"><div class="chart" id="c-stations"></div></div>
-    <div class="cell w8"><div class="chart" id="c-hours"></div></div>
+    <div class="cell w4"><div class="chart" id="c-mix"></div></div>
     <div class="cell w4"><div class="chart" id="c-bridge"></div></div>
+    <div class="cell w4"><div class="chart" id="c-service"></div></div>
+    <div class="cell w8"><div class="chart" id="c-flow"></div></div>
+    <div class="cell w4"><div class="chart" id="c-hours"></div></div>
+  </div>
+  <div class="bento flow">
+    <div class="cell w8"><div class="chart" id="c-districts"></div></div>
+    <div class="cell w4"><div class="chart" id="c-purpose" style="height:440px"></div></div>
   </div>
 
   <footer class="notes">
-    <b>Sources.</b> Trip records and fare-system settlements, 2024–2025 &nbsp;·&nbsp;
+    <b>Sources.</b> Trip records, fare settlements and the 2025 rider survey (n = 4,120) &nbsp;·&nbsp;
     <b>Definitions.</b> A ride is an unlock longer than one minute; revenue excludes sponsorship &nbsp;·&nbsp;
     Every figure is illustrative sample data for a fictional city, not a measurement of a real system.
   </footer>
@@ -147,52 +147,101 @@ Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2
 </script>
 <script>
 const T = Charts.theme;
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-Charts.line('c-rides', {
-  title: 'Rides rose 22% in 2025, and the gap opened when e-bikes arrived in April',
-  subtitle: 'Rides per month · thousands · 2025 against 2024',
-  xAxis: { categories: MONTHS },
-  yAxis: { min: 0 },
-  tooltip: { valueSuffix: 'k' },
-  plotOptions: { series: { dataLabels: { enabled: false } } },
-  callouts: [{ x: 3, series: '2025', text: 'E-bikes launch' }],
-  series: [
-    { name: '2024', color: T.muted, lineWidth: 2,
-      data: [96, 101, 138, 186, 244, 281, 302, 297, 255, 201, 136, 104] },
-    { name: '2025', color: T.colors[1], lineWidth: 3,
-      data: [99, 106, 151, 228, 309, 352, 381, 374, 316, 248, 165, 121] }
-  ]
-});
-
-Charts.barList('c-stations', {
-  title: 'Harbor Point and North Campus added the most rides',
-  subtitle: 'Rides added in 2025 over 2024 · thousands · top 7 stations',
-  legend: { enabled: false },
-  plotOptions: { barList: { sort: 'desc', valuePrefix: '+', valueSuffix: 'k', barHeight: 14, rowGap: 9 } },
-  series: [{ name: 'Rides added', data: [
-    { name: 'Harbor Point',   y: 38, color: T.colors[1] },
-    { name: 'North Campus',   y: 31, color: T.colors[1] },
-    { name: 'Pier 9',         y: 27, color: T.muted },
-    { name: 'Union Station',  y: 22, color: T.muted },
-    { name: 'Bluff Road',     y: 19, color: T.muted },
-    { name: 'Market Square',  y: 14, color: T.muted },
-    { name: 'Old Mill',       y: 11, color: T.muted }
+Charts.donut('c-mix', {
+  title: 'E-bikes carried 37% of rides from April',
+  subtitle: 'Rides by fleet · thousands · Apr–Dec 2025',
+  plotOptions: { pie: { valueSuffix: 'k',
+    centerText: { value: '37%', label: 'on e-bikes', color: T.colors[1] } } },
+  series: [{ name: 'Rides', data: [
+    { name: 'E-bike',  y: 925,  color: T.colors[1] },
+    { name: 'Classic', y: 1569, color: T.muted }
   ] }]
 });
 
-/* Average rides per hour by weekday and hour of day. Weekdays carry two
-   commute peaks; weekends one broad afternoon peak, highest on Saturday. */
+Charts.radar('c-purpose', {
+  title: 'E-bike trips lean to leisure: 31% against 22% on classic bikes',
+  subtitle: 'Share of trips by purpose · % · 2025 rider survey',
+  xAxis: { categories: ['Commute', 'Leisure', 'Errands', 'Exercise', 'Transit link'] },
+  yAxis: { max: 40, suffix: '%' },
+  series: [
+    { name: 'Classic', color: T.muted,     data: [38, 22, 18, 8, 14] },
+    { name: 'E-bike',  color: T.colors[1], data: [34, 31, 17, 9, 9] }
+  ]
+});
+
+Charts.waterfall('c-bridge', {
+  title: 'E-bike fees added $0.9m of the $2.2m revenue gain',
+  subtitle: 'Revenue bridge · USD millions · 2024 → 2025',
+  legend: { enabled: false },
+  tooltip: { valuePrefix: '$', valueSuffix: 'm' },
+  series: [{ name: 'Revenue', data: [
+    { name: '2024', y: 7.9, color: T.defaultColor },
+    { name: 'Volume', y: 1.4 },
+    { name: 'E-bike fees', y: 0.9 },
+    { name: 'Members', y: 0.3 },
+    { name: 'Promos', y: -0.4 },
+    { name: '2025', isSum: true }
+  ] }]
+});
+
+Charts.sankey('c-flow', {
+  title: 'E-bikes carried 63% of rides that started on the hills',
+  subtitle: 'Rides by start area, fleet and end area · thousands · 2025',
+  stages: ['Start area', 'Fleet', 'End area'],
+  // Only the fleet carries colour: e-bike flows take the accent, everything
+  // else stays neutral, so the bands into and out of E-bike are the reading.
+  plotOptions: { sankey: { valueSuffix: 'k', colorBy: 'node', linkColor: 'gradient' } },
+  series: [{
+    nodes: [
+      { id: 'Hills', color: T.muted }, { id: 'Downtown', color: T.muted }, { id: 'Waterfront', color: T.muted },
+      { id: 'E-bike', color: T.colors[1] }, { id: 'Classic', color: T.muted },
+      { id: 'Hills ', name: 'Hills', color: T.muted }, { id: 'Downtown ', name: 'Downtown', color: T.muted },
+      { id: 'Waterfront ', name: 'Waterfront', color: T.muted }
+    ],
+    data: [
+      ['Hills', 'E-bike', 520], ['Hills', 'Classic', 300],
+      ['Downtown', 'E-bike', 250], ['Downtown', 'Classic', 930],
+      ['Waterfront', 'E-bike', 155], ['Waterfront', 'Classic', 695],
+      ['E-bike', 'Waterfront ', 470], ['E-bike', 'Downtown ', 300], ['E-bike', 'Hills ', 155],
+      ['Classic', 'Waterfront ', 640], ['Classic', 'Downtown ', 1000], ['Classic', 'Hills ', 285]
+    ]
+  }]
+});
+
+Charts.waffle('c-service', {
+  title: 'Members stayed, and fewer docks ran empty at peak',
+  subtitle: 'Share of 100 · 2025',
+  series: [{ name: 'Share', data: [
+    { name: 'Members renewed', y: 71, color: T.colors[1], description: 'Annual members who renewed for 2026, as in 2024' },
+    { name: 'Empty at peak', y: 6, color: T.colors[0], description: 'Peak hours a dock sat empty, down from 9%' }
+  ] }]
+});
+
+Charts.reportTable('c-districts', {
+  title: 'The hill districts grew fastest, Bluff Road by 41%',
+  subtitle: 'Rides by start district · 2025 against 2024 · five busiest districts',
+  plotOptions: { reportTable: { rowHeight: 62 } },
+  columns: [
+    { key: 'trend',  kind: 'chart', name: 'Rides · thousands',
+      chart: { type: 'bar', xAxis: { categories: ['2024', '2025'] },
+        plotOptions: { series: { dataLabels: { enabled: true } } } } },
+    { key: 'change', kind: 'kpi', name: 'vs 2024', suffix: '%', colorBySign: true },
+    { key: 'share',  kind: 'kpi', name: 'On e-bikes', suffix: '%' }
+  ],
+  rows: [{"name": "Bluff Road", "trend": [221, 312], "rides": 312, "change": {"value": 41}, "share": 58}, {"name": "North Campus", "trend": [305, 405], "rides": 405, "change": {"value": 33}, "share": 46}, {"name": "Old Mill", "trend": [208, 268], "rides": 268, "change": {"value": 29}, "share": 52}, {"name": "Harbor Point", "trend": [441, 520], "rides": 520, "change": {"value": 18}, "share": 31}, {"name": "Market Square", "trend": [560, 610], "rides": 610, "change": {"value": 9}, "share": 22}].map(r => Object.assign({}, r, { trend: { series: [{ name: 'Rides', data: [
+    { y: r.trend[0], color: T.muted }, { y: r.trend[1], color: T.colors[1] } ] }] } }))
+});
+
 (function () {
   const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const hours = []; for (let h = 5; h <= 23; h++) hours.push(String(h));
+  const hours = []; for (let h = 6; h <= 22; h++) hours.push(String(h));
   const bump = (h, c, w, a) => a * Math.exp(-((h - c) * (h - c)) / (2 * w * w));
   const data = [];
   days.forEach((d, y) => {
     const weekend = y >= 5;
     hours.forEach((hs, x) => {
-      const h = +hs;
-      let v = 40;
+      const h = +hs; let v = 40;
       if (!weekend) {
         const fri = y === 4 ? 1.08 : 1;
         v += bump(h, 8, 1.0, 1250) + bump(h, 17.4, 1.3, 1380 * fri) + bump(h, 12.5, 1.6, 380) + bump(h, 20.5, 1.6, 180 * fri);
@@ -204,28 +253,13 @@ Charts.barList('c-stations', {
   });
   Charts.heatmap('c-hours', {
     title: 'Saturday afternoons are the busiest hours of the week',
-    subtitle: 'Average rides per hour · by weekday and hour of day · 2025',
+    subtitle: 'Average rides per hour · by weekday and hour · 2025',
     xAxis: { categories: hours },
     yAxis: { categories: days },
     plotOptions: { heatmap: { dataLabels: false } },
     series: [{ name: 'Rides per hour', data: data }]
   });
 })();
-
-Charts.waterfall('c-bridge', {
-  title: 'E-bike surcharges added $0.9m of the $2.2m revenue gain',
-  subtitle: 'Revenue bridge · USD millions · 2024 → 2025',
-  legend: { enabled: false },
-  tooltip: { valuePrefix: '$', valueSuffix: 'm' },
-  series: [{ name: 'Revenue', data: [
-    { name: '2024', y: 7.9, color: T.defaultColor },
-    { name: 'Ride volume', y: 1.4 },
-    { name: 'E-bike fees', y: 0.9 },
-    { name: 'Members', y: 0.3 },
-    { name: 'Promos', y: -0.4 },
-    { name: '2025', isSum: true }
-  ] }]
-});
 </script>
 </body>
 </html>

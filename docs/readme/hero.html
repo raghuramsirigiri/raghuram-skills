@@ -32,19 +32,18 @@
     color:#6f6d68; pointer-events:none; }
   .win img { display:block; width:100%; height:auto; }
 
-  /* The dashboard leads; the email and the deck sit in front of its lower
-     corners. Each overlap is placed so a window edge never cuts a line of
-     text: the email covers only heatmap cells, the deck covers the whole
-     revenue panel, and the dashboard is cropped above its footer. */
-  .dash  { left:190px; top:60px;  width:1080px; z-index:1; }
-  .email { left:56px;  top:578px; width:380px;  z-index:2; }
-  .deck  { left:898px; top:474px; width:640px;  z-index:3; }
+  /* The dashboard leads and is shown whole (its capture is 2240x1400 css,
+     drawn here at 0.482). The front windows touch it only where no text is:
+     the deck's top-left corner sits in the grid gutters around the radar
+     cell (css x 1467–1483, y 827–843), so it covers that panel whole and the
+     empty end of the footer; the email overlaps only the dashboard's left
+     padding (css x < 64). Re-measure the cells if the dashboard page changes. */
+  .dash  { left:330px;  top:120px;  width:1080px; z-index:1; }
+  .deck  { left:1041px; top:556px; width:520px;  z-index:3; }
+  .email { left:30px;   top:420px; width:328px;  z-index:2; }
 
   .crop { position:relative; overflow:hidden; }
   .crop img { position:absolute; max-width:none; }
-  /* Dashboard capture is 1680x1050 css; keep the top 950, above the footer. */
-  .dash .crop { aspect-ratio:1680 / 950; }
-  .dash .crop img { width:100%; left:0; top:0; }
   /* Email capture is 1040x650 css with the 600px block at x 220–820 and the
      toolbar above y 66; keep the block with 20px of ground either side. */
   .email .crop { aspect-ratio:640 / 584; }
@@ -52,7 +51,7 @@
 </style>
 </head>
 <body>
-  <div class="win dash"><div class="bar"><i></i><i></i><i></i><span>Dashboard</span></div><div class="crop"><img src="images/raw/dashboard.png" alt=""></div></div>
+  <div class="win dash"><div class="bar"><i></i><i></i><i></i><span>Dashboard</span></div><img src="images/raw/dashboard.png" alt=""></div>
   <div class="win email"><div class="bar"><i></i><i></i><i></i><span>Email snapshot</span></div><div class="crop"><img src="images/raw/email.png" alt=""></div></div>
   <div class="win deck"><div class="bar"><i></i><i></i><i></i><span>Slide deck</span></div><img src="images/raw/deck.png" alt=""></div>
 </body>
