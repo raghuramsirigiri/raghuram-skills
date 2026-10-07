@@ -308,7 +308,7 @@ Finished example: [`logistics-network-email/`](examples/logistics-network-email/
 
 ### Editable page
 
-![An editable working copy of the dashboard with its editor open: the line chart is selected and outlined, a side panel offers Type, Text, Data, Style, Callouts and Layout tabs with the chart types it can switch to, and a toolbar at the bottom holds Undo, Redo, Save and Done](docs/readme/images/editable.png)
+![An editable working copy of the dashboard with its editor open: the donut is selected and outlined, a side panel offers Type, Text, Data, Style, Callouts and Layout tabs with the chart types it can switch to and the reason each other type is refused, and a toolbar at the bottom holds Undo, Redo, Save and Done](docs/readme/images/editable.png)
 
 Ask for an editable page and the dashboard, report, deck or email snapshot comes
 with an **Edit page** button. It opens an in-page editor where you can change text

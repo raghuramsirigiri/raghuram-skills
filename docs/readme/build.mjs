@@ -46,11 +46,11 @@ const SHOTS = [
   { name: 'onepager',  page: 'onepager.html',  w: 1200, h: 750,  title: 'Season brief — One-pager' },
   // 650 ends the window in the gap under the first chart's caption.
   { name: 'email',     page: 'email.html',     w: 1040, h: 650,  title: 'Season wrap — Email snapshot', wait: 4000 },
-  { name: 'editable',  page: 'editable.html',  w: 1776, h: 1110, title: 'Draft · Lakeshore Bike Share — Editable', wait: 2500,
+  { name: 'editable',  page: 'editable.html',  w: 2592, h: 1620, title: 'Draft · Lakeshore Bike Share — Editable', wait: 2500,
     setup: `(async () => {
       PageEditor.start();
       await new Promise(r => setTimeout(r, 700));
-      const el = document.getElementById('c-rides');
+      const el = document.getElementById('c-mix');
       const b = el.getBoundingClientRect();
       for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
         el.dispatchEvent(new MouseEvent(t, { bubbles: true, clientX: b.left + b.width / 2, clientY: b.top + b.height / 2 }));
