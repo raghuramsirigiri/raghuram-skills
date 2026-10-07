@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lakeshore Bike Share, 2025 season — Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- EDITABLE VARIANT of dashboard.html. Build from this file only when the
+     user asked for an editable page; the rules are in references/editable.md.
+     These three tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the library's own contents, so
+     the file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* --card, --ink, --muted, --hair and --font are overwritten at load from
+     Charts.theme (see the sync block below), so recolouring the charts
+     recolours the page. Only these two are page-level choices: --bg is the
+     ground behind the cards, --radius is the brand's corner signature. */
+  :root { --bg:#efece6; --radius:14px;
+          --card:#f4f4f0; --ink:#111111; --muted:#555555; --hair:#dcdbd7;
+          --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
+          --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); }
+  .page { max-width:1600px; margin:0 auto; padding:32px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+    margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--hair); }
+  header h1 { margin:0; font-size:28px; font-weight:700; letter-spacing:-0.5px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .stamp { color:var(--muted); font-size:12px; text-align:right; }
+  .stamp b { color:var(--ink); font-size:18px; display:block; font-weight:700; }
+
+  /* Optional KPI row. Sizes are the charts-lib type scale scaled up one step,
+     so the tiles read as the same family as the panels rather than as a second
+     design system. Use it or delete it; don't invent a different one. */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:16px; margin-bottom:16px; }
+  .kpi { background:var(--card); border-radius:var(--radius); padding:16px 18px; }
+  .kpi span { display:block; font-size:11px; font-weight:400; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted); }
+  .kpi b { display:block; font-size:24px; font-weight:700; margin-top:6px;
+    letter-spacing:-0.4px; color:var(--ink); }
+  .kpi i { display:block; font-style:normal; font-size:11px; font-weight:400;
+    color:var(--muted); margin-top:2px; }
+
+  /* Soft surface card. For text that belongs to no single panel — a caveat, a
+     data-quality note, an ask. A low-contrast fill separates it without a rule
+     or a coloured bar cutting across the grid. Sits in the flow as its own cell. */
+  .note { background:var(--surface-soft); border-radius:var(--radius);
+    padding:16px 18px; font-size:13.5px; line-height:1.6; color:var(--ink); }
+  .note b { display:block; text-transform:uppercase; font-size:11px;
+    letter-spacing:.06em; color:var(--muted); margin-bottom:6px; }
+
+  /* Editable pages have no filter bar: a chart computed by code is locked to
+     the editor, so a filtered page would be mostly un-editable. */
+  .bento { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; grid-auto-rows:340px; }
+  .cell { background:var(--card); border-radius:var(--radius); padding:6px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04); overflow:hidden; }
+  .cell .chart { width:100%; height:100%; }
+  /* A row sized by its content, for charts whose height is their row count —
+     table, reportTable, barInsightTable. A fixed 340/696px cell makes them
+     stretch rows and leave a blank band; here they take their natural height.
+     Use it as a separate grid: <div class="bento flow"><div class="cell w8">… */
+  .bento.flow { grid-auto-rows:auto; align-items:start; margin-top:16px; }
+  .flow .chart { height:auto; }
+  .w4{grid-column:span 4}.w6{grid-column:span 6}.w8{grid-column:span 8}.w12{grid-column:span 12}
+  .h2{grid-row:span 2}
+
+  footer.notes { border-top:1px solid var(--hair); margin-top:28px; padding-top:16px;
+    font-size:12px; color:var(--muted); line-height:1.6; }
+  footer.notes b { color:var(--ink); }
+
+  /* Two-up: every cell becomes half the grid, so an odd number of cells would
+     strand the last one beside an empty half. It takes the whole row instead. */
+  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1}
+    .bento > *:last-child:nth-child(odd){grid-column:span 12} }
+  @media (max-width:700px){ .w4,.w6,.w8,.w12{grid-column:span 12} .page{padding:16px} }
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Every piece of text the reader might want to change carries
+       data-edit (text | rich) and a data-key that is unique on the page.
+       text = plain text. rich = a paragraph that may keep <b>/<i>/<br>.
+       Structural labels you would never want changed need not be marked. -->
+  <header>
+    <div>
+      <h1 data-edit="text" data-key="title">Lakeshore Bike Share, 2025 season</h1>
+      <p data-edit="text" data-key="scope">Rides, revenue and station demand across 212 stations · illustrative data for a fictional city</p>
+    </div>
+    <div class="stamp"><span data-edit="text" data-key="window-label">Reporting window</span><b data-edit="text" data-key="window">Jan 1 — Dec 31, 2025</b></div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><span data-edit="text" data-key="k1-label">Rides</span><b data-edit="text" data-key="k1-value">2.85m</b><i data-edit="text" data-key="k1-context">vs 2.34m in 2024</i></div>
+    <div class="kpi"><span data-edit="text" data-key="k2-label">E-bike share</span><b data-edit="text" data-key="k2-value">37%</b><i data-edit="text" data-key="k2-context">of rides, Apr–Dec</i></div>
+    <div class="kpi"><span data-edit="text" data-key="k3-label">Revenue</span><b data-edit="text" data-key="k3-value">$10.1m</b><i data-edit="text" data-key="k3-context">vs $7.9m in 2024</i></div>
+    <div class="kpi"><span data-edit="text" data-key="k4-label">Median trip</span><b data-edit="text" data-key="k4-value">14 min</b><i data-edit="text" data-key="k4-context">vs 12 min in 2024</i></div>
+  </div>
+
+  <div class="bento">
+    <div class="cell w8"><div class="chart" id="c-rides"></div></div>
+    <div class="cell w4"><div class="chart" id="c-stations"></div></div>
+    <div class="cell w8"><div class="chart" id="c-hours"></div></div>
+    <div class="cell w4"><div class="chart" id="c-bridge"></div></div>
+  </div>
+
+  <footer class="notes" data-edit="rich" data-key="footer">
+    <b>Sources.</b> Trip records and fare-system settlements, 2024–2025 &nbsp;·&nbsp;
+    <b>Definitions.</b> A ride is an unlock longer than one minute; revenue excludes sponsorship &nbsp;·&nbsp;
+    Every figure is illustrative sample data for a fictional city, not a measurement of a real system.
+  </footer>
+</div>
+
+<!-- THE PAGE'S CONTENT. Every chart is one entry: the id of its element, a
+     chart type from charts.manifest.json, and a config that is plain JSON —
+     no functions, no Charts.theme lookups, no computed values. Colours that
+     would have been T.colors[1] / T.muted are written as the literal hex from
+     the theme in use. Options are the same as in references/chart-api.md. -->
+<script type="application/json" id="page-spec">
+{
+ "version": 1,
+ "charts": {
+  "c-rides": {
+   "type": "line",
+   "config": {
+    "title": "Rides rose 22% in 2025, and the gap opened when e-bikes arrived in April",
+    "subtitle": "Rides per month · thousands · 2025 against 2024",
+    "xAxis": {
+     "categories": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+     ]
+    },
+    "yAxis": {
+     "min": 0
+    },
+    "plotOptions": {
+     "series": {
+      "dataLabels": {
+       "enabled": false
+      }
+     }
+    },
+    "callouts": [
+     {
+      "x": 3,
+      "series": "2025",
+      "text": "E-bikes launch"
+     }
+    ],
+    "series": [
+     {
+      "name": "2024",
+      "color": "#8f8d87",
+      "lineWidth": 2,
+      "data": [
+       96,
+       101,
+       138,
+       186,
+       244,
+       281,
+       302,
+       297,
+       255,
+       201,
+       136,
+       104
+      ]
+     },
+     {
+      "name": "2025",
+      "color": "#2323FF",
+      "lineWidth": 3,
+      "data": [
+       99,
+       106,
+       151,
+       228,
+       309,
+       352,
+       381,
+       374,
+       316,
+       248,
+       165,
+       121
+      ]
+     }
+    ]
+   }
+  },
+  "c-stations": {
+   "type": "barList",
+   "config": {
+    "title": "Harbor Point and North Campus added the most rides",
+    "subtitle": "Rides added in 2025 over 2024 · thousands · top 7 stations",
+    "legend": {
+     "enabled": false
+    },
+    "plotOptions": {
+     "barList": {
+      "sort": "desc",
+      "valuePrefix": "+",
+      "valueSuffix": "k",
+      "barHeight": 14,
+      "rowGap": 9
+     }
+    },
+    "series": [
+     {
+      "name": "Rides added",
+      "data": [
+       {
+        "name": "Harbor Point",
+        "y": 38,
+        "color": "#2323FF"
+       },
+       {
+        "name": "North Campus",
+        "y": 31,
+        "color": "#2323FF"
+       },
+       {
+        "name": "Pier 9",
+        "y": 27,
+        "color": "#8f8d87"
+       },
+       {
+        "name": "Union Station",
+        "y": 22,
+        "color": "#8f8d87"
+       },
+       {
+        "name": "Bluff Road",
+        "y": 19,
+        "color": "#8f8d87"
+       },
+       {
+        "name": "Market Square",
+        "y": 14,
+        "color": "#8f8d87"
+       },
+       {
+        "name": "Old Mill",
+        "y": 11,
+        "color": "#8f8d87"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "c-hours": {
+   "type": "heatmap",
+   "config": {
+    "title": "Saturday afternoons are the busiest hours of the week",
+    "subtitle": "Average rides per hour · by weekday and hour of day · 2025",
+    "xAxis": {
+     "categories": [
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
+     ]
+    },
+    "yAxis": {
+     "categories": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+     ]
+    },
+    "plotOptions": {
+     "heatmap": {
+      "dataLabels": false
+     }
+    },
+    "series": [
+     {
+      "name": "Rides per hour",
+      "data": [
+       [0, 0, 50],
+       [1, 0, 210],
+       [2, 0, 800],
+       [3, 0, 1300],
+       [4, 0, 830],
+       [5, 0, 320],
+       [6, 0, 300],
+       [7, 0, 400],
+       [8, 0, 410],
+       [9, 0, 330],
+       [10, 0, 400],
+       [11, 0, 850],
+       [12, 0, 1380],
+       [13, 0, 1330],
+       [14, 0, 800],
+       [15, 0, 400],
+       [16, 0, 240],
+       [17, 0, 160],
+       [18, 0, 90],
+       [0, 1, 50],
+       [1, 1, 210],
+       [2, 1, 800],
+       [3, 1, 1300],
+       [4, 1, 830],
+       [5, 1, 320],
+       [6, 1, 300],
+       [7, 1, 400],
+       [8, 1, 410],
+       [9, 1, 330],
+       [10, 1, 400],
+       [11, 1, 850],
+       [12, 1, 1380],
+       [13, 1, 1330],
+       [14, 1, 800],
+       [15, 1, 400],
+       [16, 1, 240],
+       [17, 1, 160],
+       [18, 1, 90],
+       [0, 2, 50],
+       [1, 2, 210],
+       [2, 2, 800],
+       [3, 2, 1300],
+       [4, 2, 830],
+       [5, 2, 320],
+       [6, 2, 300],
+       [7, 2, 400],
+       [8, 2, 410],
+       [9, 2, 330],
+       [10, 2, 400],
+       [11, 2, 850],
+       [12, 2, 1380],
+       [13, 2, 1330],
+       [14, 2, 800],
+       [15, 2, 400],
+       [16, 2, 240],
+       [17, 2, 160],
+       [18, 2, 90],
+       [0, 3, 50],
+       [1, 3, 210],
+       [2, 3, 800],
+       [3, 3, 1300],
+       [4, 3, 830],
+       [5, 3, 320],
+       [6, 3, 300],
+       [7, 3, 400],
+       [8, 3, 410],
+       [9, 3, 330],
+       [10, 3, 400],
+       [11, 3, 850],
+       [12, 3, 1380],
+       [13, 3, 1330],
+       [14, 3, 800],
+       [15, 3, 400],
+       [16, 3, 240],
+       [17, 3, 160],
+       [18, 3, 90],
+       [0, 4, 50],
+       [1, 4, 210],
+       [2, 4, 800],
+       [3, 4, 1300],
+       [4, 4, 830],
+       [5, 4, 320],
+       [6, 4, 300],
+       [7, 4, 400],
+       [8, 4, 410],
+       [9, 4, 330],
+       [10, 4, 420],
+       [11, 4, 910],
+       [12, 4, 1490],
+       [13, 4, 1440],
+       [14, 4, 860],
+       [15, 4, 430],
+       [16, 4, 260],
+       [17, 4, 170],
+       [18, 4, 100],
+       [0, 5, 40],
+       [1, 5, 50],
+       [2, 5, 80],
+       [3, 5, 150],
+       [4, 5, 300],
+       [5, 5, 540],
+       [6, 5, 880],
+       [7, 5, 1260],
+       [8, 5, 1560],
+       [9, 5, 1680],
+       [10, 5, 1570],
+       [11, 5, 1270],
+       [12, 5, 930],
+       [13, 5, 660],
+       [14, 5, 510],
+       [15, 5, 410],
+       [16, 5, 300],
+       [17, 5, 170],
+       [18, 5, 90],
+       [0, 6, 40],
+       [1, 6, 50],
+       [2, 6, 80],
+       [3, 6, 140],
+       [4, 6, 270],
+       [5, 6, 490],
+       [6, 6, 800],
+       [7, 6, 1140],
+       [8, 6, 1410],
+       [9, 6, 1520],
+       [10, 6, 1420],
+       [11, 6, 1150],
+       [12, 6, 820],
+       [13, 6, 550],
+       [14, 6, 370],
+       [15, 6, 260],
+       [16, 6, 180],
+       [17, 6, 110],
+       [18, 6, 60]
+      ]
+     }
+    ]
+   }
+  },
+  "c-bridge": {
+   "type": "waterfall",
+   "config": {
+    "title": "E-bike surcharges added $0.9m of the $2.2m revenue gain",
+    "subtitle": "Revenue bridge · USD millions · 2024 → 2025",
+    "legend": {
+     "enabled": false
+    },
+    "series": [
+     {
+      "name": "Revenue",
+      "data": [
+       {
+        "name": "2024",
+        "y": 7.9,
+        "color": "#000000"
+       },
+       {
+        "name": "Ride volume",
+        "y": 1.4
+       },
+       {
+        "name": "E-bike fees",
+        "y": 0.9
+       },
+       {
+        "name": "Members",
+        "y": 0.3
+       },
+       {
+        "name": "Promos",
+        "y": -0.4
+       },
+       {
+        "name": "2025",
+        "isSum": true
+       }
+      ]
+     }
+    ]
+   }
+  }
+ }
+}
+</script>
+
+<!-- theme.js MUST load before charts.js; page-runtime.js loads last. All three
+     are inlined by scripts/finalize.js. -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour, if any — one Charts.applyPalette call, before page-runtime.js
+   draws anything. See references/theming.md.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* Page chrome follows the chart theme, so there is one source of colour truth. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',  t.bg);
+  s.setProperty('--ink',   t.titleColor);
+  s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--hair',  t.grid);
+  s.setProperty('--font',  t.font);
+  s.setProperty('--surface-soft', t.tileSurface);
+})();
+</script>
+<!-- chart-convert.js lets a chart switch type; page-runtime.js draws every
+     chart in #page-spec and exposes window.Page; page-editor.js adds the
+     "Edit page" button.
+     No other chart code on an editable page. -->
+<script src="charts-lib/chart-convert.js"></script>
+<script src="charts-lib/page-runtime.js"></script>
+<script src="charts-lib/page-editor.js"></script>
+</body>
+</html>

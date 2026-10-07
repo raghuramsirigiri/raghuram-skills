@@ -20,20 +20,9 @@ that can read a file.
 
 📖 **[Full documentation and FAQ →](https://raghuramsirigiri.github.io/raghuram-skills/)**
 
-<table>
-<tr>
-<td width="33%" valign="top"><a href="#dashboard"><img src="examples/thumbs/dashboard.png" alt="Dashboard: a bento grid of KPI tiles, a geofacet tile map and a ranked bar list"></a><br><b><a href="#dashboard">Dashboard</a></b><br><sub>One panel per finding</sub></td>
-<td width="33%" valign="top"><a href="#report"><img src="examples/thumbs/report.png" alt="Report: a narrative analysis with a title, abstract and numbered sections in a paper column"></a><br><b><a href="#report">Report</a></b><br><sub>An argument with evidence</sub></td>
-<td width="33%" valign="top"><a href="#slide-deck"><img src="examples/thumbs/deck.png" alt="Slide deck: four 16:9 slides, a cover, a waterfall bridge, a two-option comparison and a dark closing ask"></a><br><b><a href="#slide-deck">Slide deck</a></b><br><sub>One claim per slide</sub></td>
-</tr>
-<tr>
-<td width="33%" valign="top"><a href="#one-pager"><img src="examples/thumbs/onepager.png" alt="One-pager: a single printed sheet set in two columns of prose, lists and charts"></a><br><b><a href="#one-pager">One-pager</a></b><br><sub>One printed sheet, in columns</sub></td>
-<td width="33%" valign="top"><a href="#email-snapshot"><img src="examples/thumbs/email.png" alt="Email snapshot: a 600px block with a headline, three figures and a Copy for email button"></a><br><b><a href="#email-snapshot">Email snapshot</a></b><br><sub>Pastes into Gmail and Outlook</sub></td>
-<td width="33%" valign="top"><a href="#editable-pages"><img src="examples/thumbs/editable.png" alt="Editable page: a dashboard with the in-page editor open, a chart selected and its chart-type panel showing"></a><br><b><a href="#editable-pages">Editable pages</a></b><br><sub>Change it without a rerun</sub></td>
-</tr>
-</table>
+![Three pages built by the chart-dashboard skill from one fictional bike-share season, shown as overlapping browser windows: a dashboard with KPI tiles, a monthly rides line chart, a station ranking and an hour-by-weekday heatmap; in front of it on the left, an email snapshot with a headline, three figures and a line chart; on the right, a 16:9 slide with a revenue bridge beside its claim](docs/readme/images/hero.png)
 
-<sub>Every page above was built by the skill from a single prompt. The finished files are in [`examples/`](examples/): each is one HTML file that opens offline.</sub>
+<sub>A dashboard, an email snapshot and a slide deck, built with the skill's templates from the same data. All six formats are shown one at a time under [Output formats](#output-formats).</sub>
 
 ---
 
@@ -45,7 +34,7 @@ that can read a file.
 - [How do I use it?](#how-do-i-use-it)
 - [What can it build?](#what-can-it-build)
 - [Output formats](#output-formats)
-  - [Dashboard](#dashboard) · [Report](#report) · [Slide deck](#slide-deck) · [One-pager](#one-pager) · [Email snapshot](#email-snapshot) · [Editable pages](#editable-pages)
+  - [Dashboard](#dashboard) · [Report](#report) · [Slide deck](#slide-deck) · [One-pager](#one-pager) · [Email snapshot](#email-snapshot) · [Editable page](#editable-page)
 - [Which chart types are supported?](#which-chart-types-are-supported)
 - [Theming and brand colors](#theming-and-brand-colors)
 - [FAQ](#faq)
@@ -245,108 +234,89 @@ Common uses:
 The skill picks the format from how you phrase the request. Every format is one
 self-contained HTML file that opens offline.
 
-| Format | What it's for | Ask for it with | Example |
-|:--|:--|:--|:--|
-| [Dashboard](#dashboard) | Monitoring: one panel per finding, no prose | *(the default)* "dashboard", "analytics page", "KPI view" | [`logistics-network-dashboard/`](examples/logistics-network-dashboard/), [`q4-ecommerce/`](examples/q4-ecommerce/) |
-| [Report](#report) | An argument with evidence | "write up", "retrospective", "analysis" | [`ev-retrospective/`](examples/ev-retrospective/) |
-| [Slide deck](#slide-deck) | An argument someone presents | "presentation", "slides", "deck" | [`coffee-pricing-deck/`](examples/coffee-pricing-deck/) |
-| [One-pager](#one-pager) | A report on one printed sheet | "print it", "one page", "a handout", "for the board pack" | [`support-operations-brief/`](examples/support-operations-brief/) |
-| [Email snapshot](#email-snapshot) | One to three findings in an email body | "paste it into the weekly update", "Outlook", "Gmail" | [`logistics-network-email/`](examples/logistics-network-email/) |
-| [Editable pages](#editable-pages) | Any of the above except the one-pager, with an in-page editor | "make it editable", "so I can change the numbers" | [screenshot](examples/editable-editor.png) |
+| Format | What it's for | Ask for it with |
+|:--|:--|:--|
+| [Dashboard](#dashboard) | Monitoring: one panel per finding, no prose | *(the default)* "dashboard", "analytics page", "KPI view" |
+| [Report](#report) | An argument with evidence | "write up", "retrospective", "analysis" |
+| [Slide deck](#slide-deck) | An argument someone presents | "presentation", "slides", "deck" |
+| [One-pager](#one-pager) | A report on one printed sheet | "print it", "one page", "a handout", "for the board pack" |
+| [Email snapshot](#email-snapshot) | One to three findings in an email body | "paste it into the weekly update", "Outlook", "Gmail" |
+| [Editable page](#editable-page) | Any of the above except the one-pager, changed in the browser | "make it editable", "so I can change the numbers" |
+
+The images below all come from one fictional bike-share season, built once in
+each format, so you can compare how each format handles the same data. Their sources are in
+[`docs/readme/`](docs/readme/). Finished pages on other data are in [`examples/`](examples/).
 
 ### Dashboard
 
-A bento grid with one panel per finding and no prose. This is the default when
-you hand over metrics with no argument attached. The grid comes from the shape of
-the analysis, and a wide hero panel goes only to a finding that leads.
+![Dashboard built by the chart-dashboard skill: a bike-share season with four KPI tiles, a line chart of monthly rides in 2025 against 2024 with the e-bike launch marked, a ranked bar list of the stations that added the most rides, an hour-by-weekday heatmap, and a revenue bridge waterfall](docs/readme/images/dashboard.png)
 
-**Example: [`logistics-network-dashboard/`](examples/logistics-network-dashboard/).**
-A quarterly operations dashboard in one standalone file (770 KB, library inlined):
-a geofacet tile map of on-time delivery by US state, a cost-per-parcel waterfall
-bridge, a Sankey of parcel flow through the hubs, a histogram of time in network,
-waffle grids, a dumbbell of hub dwell before and after, a 100% stacked column of
-channel mix, a donut, and a bar insight table of the five busiest lanes. A missing
-week of scan data is left as a visible gap rather than filled in.
+A bento grid with one panel per finding and no prose. This is the default when you
+hand over metrics with no argument attached. The grid comes from the shape of the
+analysis, so a wide panel goes only to a finding that leads, and each title states
+what its chart shows rather than naming the measure.
 
-[![Operations dashboard generated by the chart-dashboard skill, with a geofacet tile map of on-time delivery by US state, a waterfall cost bridge, a Sankey parcel-flow diagram, a histogram, waffle charts, a dumbbell chart, a donut and a bar insight table](examples/logistics-network-dashboard/screenshot.png)](examples/logistics-network-dashboard/)
-
-A second dashboard, [`q4-ecommerce/`](examples/q4-ecommerce/)
-([screenshot](examples/q4-ecommerce/screenshot.png)), is a 20-panel grid: a revenue
-trend with annotated spikes, channel and device mix, category comparisons, funnel
-and cohort views, and a full-width composition panel.
+Finished examples: [`logistics-network-dashboard/`](examples/logistics-network-dashboard/), a
+quarterly operations dashboard with a geofacet tile map, a Sankey and a waterfall;
+[`q4-ecommerce/`](examples/q4-ecommerce/), a 20-panel grid.
 
 ### Report
 
-Narrative sections with figures and captions, set in a paper column. Captions say
-what the figure means, not what it shows.
+![Report built by the chart-dashboard skill: a narrative page in a paper column headed 'E-bikes added 925,000 rides in their first season', with a standfirst, a byline, a numbered first section and a captioned line chart of rides by fleet](docs/readme/images/report.png)
 
-**Example: [`ev-retrospective/`](examples/ev-retrospective/).** A sector
-retrospective with an abstract, numbered sections, figures with interpretive
-captions, pull quotes and source notes.
+Numbered sections of prose with figures and captions, set in a paper column. Each
+section makes a claim, and its figure is the evidence. Captions say what the
+figure means instead of repeating its title.
 
-[![A narrative report generated by the chart-dashboard skill: a research analysis titled The Electric Decade Reaches Half-Time, with an abstract, numbered sections and captioned figures in a single paper column](examples/ev-retrospective/screenshot.png)](examples/ev-retrospective/)
+Finished example: [`ev-retrospective/`](examples/ev-retrospective/), a sector
+retrospective with an abstract, pull quotes and source notes.
 
 ### Slide deck
+
+![A slide from a 16:9 deck built by the chart-dashboard skill: a revenue bridge waterfall beside the claim 'E-bike fees brought in $0.9m of the $2.2m gain', a short reading and four bullet points, with the generated footer along the bottom](docs/readme/images/deck.png)
 
 One claim per 16:9 slide. The skill always lays a fixed spine first (cover,
 agenda, a divider for each section, a closing ask), then picks one of eighteen
 layouts for each claim. Print it (Ctrl/Cmd+P, then Save as PDF) and it comes out
 A4 landscape, one slide per sheet.
 
-**Example: [`coffee-pricing-deck/`](examples/coffee-pricing-deck/).** A
-sixteen-slide decision deck. Evidence slides use the split, full-bleed, KPI-strip,
-compare, table, timeline, quote and stat layouts. Chart slides carry paragraphs
-and bullet points beside the chart, and the table slide puts a trend line and
-before/after bars in every row.
-
-[![Four slides from a 16:9 deck generated by the chart-dashboard skill: a cover slide, a full-bleed waterfall contribution bridge, a two-option comparison with column charts, and a dark closing statement slide](examples/coffee-pricing-deck/screenshot.png)](examples/coffee-pricing-deck/)
+Finished example: [`coffee-pricing-deck/`](examples/coffee-pricing-deck/), a
+sixteen-slide decision deck.
 
 ### One-pager
 
+![One-pager built by the chart-dashboard skill: a printed season brief with a masthead, then two columns of short sections, each a heading and a paragraph followed by a small chart: monthly rides, e-bike share, trip distance by district and a revenue bridge](docs/readme/images/onepager.png)
+
 A report on a single sheet of paper, set in columns of headings, paragraphs, lists
-and figures. The sheet is sized to the printable area that A4 and US Letter share,
-so it prints as exactly one page on either with nothing to change in the print
-dialog. Charts are sized to the column they sit in, so the page gets packed
-instead of padded. It has no controls and nothing that only appears on hover,
-because paper has no pointer.
+and small figures. It prints as exactly one page, with nothing to change in the
+print dialog. Charts are sized to the column they sit in, so the page is packed
+rather than padded, and there's nothing to hover or click because paper has no
+pointer.
 
-**Example: [`support-operations-brief/`](examples/support-operations-brief/).** A
-masthead with the finding and a two-sentence summary, then two packed columns: six
-prose sections, four charts, a findings list, two pairs of statistics and a method
-note.
-
-[![A one-page support operations brief generated by the chart-dashboard skill: a masthead with a headline finding and summary above two densely packed columns, carrying a twelve-week line chart of median first-response time against a dashed four-hour target, a ranked bar list of contact reasons, a column chart of channel mix, a second bar list of resolution paths, several short prose sections, a findings list, statistics and a method note](examples/support-operations-brief/screenshot.png)](examples/support-operations-brief/)
+Finished example: [`support-operations-brief/`](examples/support-operations-brief/).
 
 ### Email snapshot
 
+![Email snapshot built by the chart-dashboard skill: a toolbar with Copy for email, Save email HTML and Save charts as PNG above a 600px email block with a headline, three figures and a line chart of monthly rides, with the status 'Ready, 2 charts frozen as PNG'](docs/readme/images/email.png)
+
 One to three findings in a 600px block that survives being pasted into Gmail or
-Outlook. Gmail strips SVG and Outlook for Windows can't draw it, so every style is
-inline, the titles are text, and each chart is frozen into a PNG with alt text
-when the page opens. Click **Copy for email** and paste into a new message.
+Outlook. Mail clients delete SVG and strip style sheets, so every style is inline,
+the titles are text, and each chart is frozen into a PNG with alt text when the
+page opens. Click **Copy for email** and paste it into a new message.
 
-**Example: [`logistics-network-email/`](examples/logistics-network-email/).** The
-logistics dashboard's Q2 data cut down for an email: a headline, three figures, a
-weekly on-time line with a callout, a column of cost drivers, and the busiest lanes
-as a plain email table.
+Finished example: [`logistics-network-email/`](examples/logistics-network-email/).
 
-[![An email snapshot generated by the chart-dashboard skill: a toolbar with Copy for email, Save email HTML and Save charts as PNG buttons above a 600px block with a headline about on-time delivery and cost per parcel, three headline figures, a weekly on-time line chart with a callout, a column chart of cost drivers, and a table of the five busiest lanes](examples/logistics-network-email/screenshot.png)](examples/logistics-network-email/)
+### Editable page
 
-### Editable pages
+![An editable working copy of the dashboard with its editor open: the line chart is selected and outlined, a side panel offers Type, Text, Data, Style, Callouts and Layout tabs with the chart types it can switch to, and a toolbar at the bottom holds Undo, Redo, Save and Done](docs/readme/images/editable.png)
 
 Ask for an editable page and the dashboard, report, deck or email snapshot comes
 with an **Edit page** button. It opens an in-page editor where you can change text
 and numbers, switch a chart's type, restyle colours, and remove or move content,
-then save the file without rerunning anything. An editable page ships as two files:
-
-- `<name>.html` is the final copy. It has no editor, and it's the one to share.
-- `<name> (working copy).html` is the editable copy, marked as a draft.
-
-In an editable email snapshot every edit re-freezes the charts, so **Copy for
-email** always copies the page as it now stands. A one-pager can't be made
-editable: an edit could lengthen a title on a page with no scrollbar, and the
-sheet would crop it without warning.
-
-![A working copy of an editable dashboard with the editor open: the weekly on-time line chart is selected, and a side panel offers Type, Text, Data, Style, Callouts and Layout tabs, with the chart types it can switch to and the reason each is limited. A toolbar at the bottom holds Undo, Redo, Save and Done.](examples/editable-editor.png)
+then save the file without rerunning anything. It ships as two files:
+`<name>.html`, the final copy to share, and `<name> (working copy).html`, the
+editable draft. A one-pager can't be made editable: an edit could lengthen a title
+on a page with no scrollbar, and the sheet would crop it without warning.
 
 ## Which chart types are supported?
 

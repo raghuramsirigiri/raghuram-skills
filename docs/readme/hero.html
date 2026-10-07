@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hero</title>
+<!-- The README's opening image: three of the captures in images/raw/ laid
+     out as one composition. build.mjs renders it at 1600x1000. -->
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; width:1600px; height:1000px; overflow:hidden; }
+  body {
+    position:relative; font-family:'Inter','Segoe UI',system-ui,sans-serif;
+    background:
+      radial-gradient(900px 620px at 8% 0%, rgba(35,35,255,0.16), transparent 62%),
+      radial-gradient(800px 600px at 100% 100%, rgba(35,35,255,0.12), transparent 60%),
+      radial-gradient(700px 500px at 70% 10%, rgba(255,190,120,0.10), transparent 60%),
+      linear-gradient(135deg, #e7e5f6 0%, #f3f0e9 50%, #e4eaf5 100%);
+  }
+  .win { position:absolute; border-radius:12px; overflow:hidden; background:#f7f6f3;
+    box-shadow:
+      0 0 0 1px rgba(20,20,40,0.07),
+      0 2px 4px rgba(20,20,40,0.05),
+      0 20px 44px -10px rgba(30,30,70,0.22),
+      0 56px 100px -36px rgba(30,30,90,0.36); }
+  .bar { height:34px; display:flex; align-items:center; gap:7px; padding:0 14px;
+    border-bottom:1px solid #e4e2dc; position:relative; }
+  .bar i { width:10px; height:10px; border-radius:50%; display:block; }
+  .bar i:nth-child(1) { background:#ff5f57; }
+  .bar i:nth-child(2) { background:#febc2e; }
+  .bar i:nth-child(3) { background:#28c840; }
+  .bar span { position:absolute; left:0; right:0; text-align:center; font-size:11.5px;
+    color:#6f6d68; pointer-events:none; }
+  .win img { display:block; width:100%; height:auto; }
+
+  /* The dashboard leads; the email and the deck sit in front of its lower
+     corners. Each overlap is placed so a window edge never cuts a line of
+     text: the email covers only heatmap cells, the deck covers the whole
+     revenue panel, and the dashboard is cropped above its footer. */
+  .dash  { left:190px; top:60px;  width:1080px; z-index:1; }
+  .email { left:56px;  top:578px; width:380px;  z-index:2; }
+  .deck  { left:898px; top:474px; width:640px;  z-index:3; }
+
+  .crop { position:relative; overflow:hidden; }
+  .crop img { position:absolute; max-width:none; }
+  /* Dashboard capture is 1680x1050 css; keep the top 950, above the footer. */
+  .dash .crop { aspect-ratio:1680 / 950; }
+  .dash .crop img { width:100%; left:0; top:0; }
+  /* Email capture is 1040x650 css with the 600px block at x 220–820 and the
+     toolbar above y 66; keep the block with 20px of ground either side. */
+  .email .crop { aspect-ratio:640 / 584; }
+  .email .crop img { width:calc(100% * 1040 / 640); left:calc(-100% * 200 / 640); top:-11.3%; }
+</style>
+</head>
+<body>
+  <div class="win dash"><div class="bar"><i></i><i></i><i></i><span>Dashboard</span></div><div class="crop"><img src="images/raw/dashboard.png" alt=""></div></div>
+  <div class="win email"><div class="bar"><i></i><i></i><i></i><span>Email snapshot</span></div><div class="crop"><img src="images/raw/email.png" alt=""></div></div>
+  <div class="win deck"><div class="bar"><i></i><i></i><i></i><span>Slide deck</span></div><img src="images/raw/deck.png" alt=""></div>
+</body>
+</html>

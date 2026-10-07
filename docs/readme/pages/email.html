@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lakeshore Bike Share, season wrap — Email snapshot</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- These four tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the files' own contents, so the
+     file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* ── This sheet styles the PAGE, never the email ─────────────────────────
+     An email snapshot is two things in one file: the block inside
+     #email-block, which is what the reader copies into a message, and the
+     page around it — a toolbar and a grey stage — which never leaves this
+     file. Gmail and Outlook strip <style> sheets and ignore classes, so
+     nothing in here can style the block. The block carries every style
+     inline, on the element, in a table layout: see
+     references/layout-email.md.
+
+     The colour tokens below are overwritten from Charts.theme at load. Inside
+     the block, write them as var(--ink) etc.; EmailSnapshot.freeze() resolves
+     each one to the hex value it holds, so a brand recolour is still one
+     Charts.applyPalette call. */
+  :root {
+    --card:#fbfaf8; --ground:#eae8e4; --ink:#2a2723; --muted:#77716a;
+    --hair:#e4e1dc; --accent:#2e5bba;
+    /* The block's one font. Outlook for Windows sets text in Times New Roman
+       when the FIRST family in a stack is missing, so the stack starts with a
+       face every mail client has. The charts are set in it too (below), so the
+       PNG and the text around it match. */
+    --font: Arial, Helvetica, sans-serif;
+  }
+  html, body { margin: 0; background: var(--ground); }
+  body { font: 13px/1.4 system-ui, 'Segoe UI', Arial, sans-serif; color: var(--ink); }
+  .snap-bar {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--hair);
+  }
+  .snap-bar b { font-weight: 600; margin-right: 8px; }
+  .snap-bar button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--hair); background: var(--card); color: var(--ink);
+  }
+  .snap-bar button[data-snap="copy"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .snap-bar button:disabled { opacity: .5; cursor: progress; }
+  .snap-bar [data-snap="status"] { color: var(--muted); flex: 1 1 240px; }
+  .snap-stage { padding: 24px 16px 48px; overflow-x: auto; }
+  #email-block { width: 600px; margin: 0 auto; }
+  @media print { .snap-bar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- The toolbar. email-snapshot.js wires all three buttons and reports the
+     freeze in the status line; keep the data-snap names as written. -->
+<div class="snap-bar" id="snap-bar">
+  <b>Email snapshot</b>
+  <button type="button" data-snap="copy">Copy for email</button>
+  <button type="button" data-snap="save-html">Save email HTML</button>
+  <button type="button" data-snap="save-png">Save charts as PNG</button>
+  <span data-snap="status"></span>
+</div>
+
+<div class="snap-stage">
+<div id="email-block">
+<!-- email:start
+     Everything between these two markers is the email. Rules (checked by
+     scripts/check-page.js, and again on the frozen block by freeze()):
+       · tables for layout — no div, flex, grid, float or position
+       · every style inline, on the element; no class
+       · every <td> that holds text names font-family: var(--font)
+       · colours as var(--token) or #rrggbb; nothing wider than 600px
+       · a chart is an empty div with class "chart", an id, a data-alt that
+         states the finding with its numbers, and a px width and height;
+         draw it with EmailSnapshot.draw and freeze() swaps it for a PNG
+       · the chart's title and subtitle are TEXT in the block, not in the image -->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:600px;border-collapse:collapse;background-color:var(--card);">
+  <tr>
+    <td style="padding:24px 24px 4px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);">Lakeshore Bike Share · Season wrap · Jan 1 – Dec 31, 2025</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 6px;font-family:var(--font);font-size:20px;line-height:26px;font-weight:bold;color:var(--ink);">Rides rose 22% in 2025, and e-bikes carried 37% of them from April</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 16px;font-family:var(--font);font-size:14px;line-height:21px;color:var(--ink);">The year ran level with 2024 until the e-bikes arrived in April, then pulled ahead every month. Harbor Point and North Campus added the most rides of any station.</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 18px;">
+      <table role="presentation" width="552" cellpadding="0" cellspacing="0" border="0" style="width:552px;border-collapse:collapse;">
+      <tr>
+        <td width="184" valign="top" style="padding:10px 12px 10px 0;border-top:1px solid var(--hair);font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);"><span style="font-size:18px;line-height:24px;font-weight:bold;color:var(--ink);">2.85m</span><br>rides, vs 2.34m in 2024</td>
+        <td width="184" valign="top" style="padding:10px 12px;border-top:1px solid var(--hair);font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);"><span style="font-size:18px;line-height:24px;font-weight:bold;color:var(--ink);">$10.1m</span><br>revenue, vs $7.9m in 2024</td>
+        <td width="184" valign="top" style="padding:10px 0 10px 12px;border-top:1px solid var(--hair);font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);"><span style="font-size:18px;line-height:24px;font-weight:bold;color:var(--ink);">14 min</span><br>median trip, up from 12</td>
+      </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:14px 24px 2px;border-top:1px solid var(--hair);font-family:var(--font);font-size:15px;line-height:20px;font-weight:bold;color:var(--ink);">2025 pulled ahead of 2024 from the month e-bikes arrived</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 8px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);">Rides per month · thousands · 2025 against 2024</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 6px;">
+      <div class="chart" id="c-rides" style="width:552px;height:240px" data-alt="Line chart: monthly rides in 2025 ran level with 2024 through March, then pulled ahead from April when e-bikes launched. The widest gap was July, 381,000 rides against 302,000. The year closed at 2.85m rides against 2.34m."></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 18px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);">The widest gap was July: 381,000 rides against 302,000 a year earlier.</td>
+  </tr>
+
+  <tr>
+    <td style="padding:14px 24px 2px;border-top:1px solid var(--hair);font-family:var(--font);font-size:15px;line-height:20px;font-weight:bold;color:var(--ink);">Harbor Point and North Campus added the most rides</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 8px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);">Rides added in 2025 over 2024 · thousands · top 5 stations</td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 6px;">
+      <div class="chart" id="c-stations" style="width:552px;height:270px" data-alt="Bar list: rides added in 2025 over 2024 by station. Harbor Point +38,000, North Campus +31,000, Pier 9 +27,000, Union Station +22,000, Bluff Road +19,000."></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:0 24px 18px;font-family:var(--font);font-size:12px;line-height:16px;color:var(--muted);">Both sit at the top of a climb, where the e-bike does the most work.</td>
+  </tr>
+
+  <tr>
+    <td style="padding:12px 24px 22px;border-top:1px solid var(--hair);font-family:var(--font);font-size:11px;line-height:15px;color:var(--muted);">Source: trip records and fare settlements, 2024–2025. Every figure is illustrative sample data for a fictional city. A snapshot taken Feb 2, 2026 — the figures will not update.</td>
+  </tr>
+</table>
+<!-- email:end -->
+</div>
+</div>
+
+<!-- theme.js MUST load before charts.js; all three are inlined by scripts/inline-lib.js -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script src="charts-lib/email-snapshot.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call,
+   never per-chart colours. Generate it with scripts/extract-theme.js; see
+   references/theming.md. Delete this block when using the default theme.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* The email's one sanctioned metric change: the charts are set in the block's
+   own font, so the text baked into each PNG matches the text around it.
+   Nothing else about the type scale changes. */
+Charts.applyMetrics({ font: getComputedStyle(document.documentElement).getPropertyValue('--font').trim() });
+
+/* Page chrome and the block's tokens follow the chart theme — one source of
+   colour truth, resolved to hex when the block is frozen. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',   t.bg);
+  s.setProperty('--ground', t.tileSurface);
+  s.setProperty('--ink',    t.titleColor);
+  s.setProperty('--muted',  t.secondaryColor);
+  s.setProperty('--hair',   t.grid);
+  s.setProperty('--accent', t.highlight);
+})();
+</script>
+<script>
+const T = Charts.theme;
+EmailSnapshot.draw(Charts.line, 'c-rides', {
+  xAxis: { categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
+  yAxis: { min: 0 },
+  plotOptions: { series: { dataLabels: { enabled: false } } },
+  callouts: [{ x: 3, series: '2025', text: 'E-bikes launch' }],
+  series: [
+    { name: '2024', color: T.muted, lineWidth: 2,
+      data: [96, 101, 138, 186, 244, 281, 302, 297, 255, 201, 136, 104] },
+    { name: '2025', color: T.colors[1], lineWidth: 3,
+      data: [99, 106, 151, 228, 309, 352, 381, 374, 316, 248, 165, 121] }
+  ]
+});
+
+EmailSnapshot.draw(Charts.barList, 'c-stations', {
+  legend: { enabled: false },
+  plotOptions: { barList: { sort: 'desc', valuePrefix: '+', valueSuffix: 'k', barHeight: 16, rowGap: 10 } },
+  series: [{ name: 'Rides added', data: [
+    { name: 'Harbor Point',  y: 38, color: T.colors[1] },
+    { name: 'North Campus',  y: 31, color: T.colors[1] },
+    { name: 'Pier 9',        y: 27, color: T.muted },
+    { name: 'Union Station', y: 22, color: T.muted },
+    { name: 'Bluff Road',    y: 19, color: T.muted }
+  ] }]
+});
+</script>
+</body>
+</html>
