@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lakeshore Bike Share, 2025 season — Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- These three tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the library's own contents, so
+     the file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* --card, --ink, --muted, --hair and --font are overwritten at load from
+     Charts.theme (see the sync block below), so recolouring the charts
+     recolours the page. Only these two are page-level choices: --bg is the
+     ground behind the cards, --radius is the brand's corner signature. */
+  :root { --bg:#efece6; --radius:14px;
+          --card:#f4f4f0; --ink:#111111; --muted:#555555; --hair:#dcdbd7;
+          --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
+          --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); }
+  .page { max-width:1600px; margin:0 auto; padding:32px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+    margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--hair); }
+  header h1 { margin:0; font-size:28px; font-weight:700; letter-spacing:-0.5px; }
+  header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+  .stamp { color:var(--muted); font-size:12px; text-align:right; }
+  .stamp b { color:var(--ink); font-size:18px; display:block; font-weight:700; }
+
+  /* Optional KPI row. Sizes are the charts-lib type scale scaled up one step,
+     so the tiles read as the same family as the panels rather than as a second
+     design system. Use it or delete it; don't invent a different one. */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:16px; margin-bottom:16px; }
+  .kpi { background:var(--card); border-radius:var(--radius); padding:16px 18px; }
+  .kpi span { display:block; font-size:11px; font-weight:400; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted); }
+  .kpi b { display:block; font-size:24px; font-weight:700; margin-top:6px;
+    letter-spacing:-0.4px; color:var(--ink); }
+  .kpi i { display:block; font-style:normal; font-size:11px; font-weight:400;
+    color:var(--muted); margin-top:2px; }
+
+  /* Soft surface card. For text that belongs to no single panel — a caveat, a
+     data-quality note, an ask. A low-contrast fill separates it without a rule
+     or a coloured bar cutting across the grid. Sits in the flow as its own cell. */
+  .note { background:var(--surface-soft); border-radius:var(--radius);
+    padding:16px 18px; font-size:13.5px; line-height:1.6; color:var(--ink); }
+  .note b { display:block; text-transform:uppercase; font-size:11px;
+    letter-spacing:.06em; color:var(--muted); margin-bottom:6px; }
+
+  /* Optional filter bar. Delete it entirely if the page is static — but if you
+     keep it, every control must be wired to render(). See SKILL.md § If you add
+     a control, wire it. Styled off the same tokens; no second design system. */
+  .filter-bar { display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    margin-bottom:16px; }
+  .filter-bar label { display:flex; align-items:center; gap:8px; font-size:11px;
+    font-weight:400; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+  .filter-bar select { font-family:var(--font); font-size:13px; color:var(--ink);
+    background:var(--card); border:1px solid var(--hair); border-radius:8px;
+    padding:7px 10px; }
+
+  .bento { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; grid-auto-rows:340px; }
+  .cell { background:var(--card); border-radius:var(--radius); padding:6px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04); overflow:hidden; }
+  .cell .chart { width:100%; height:100%; }
+  /* A row sized by its content, for charts whose height is their row count —
+     table, reportTable, barInsightTable. A fixed 340/696px cell makes them
+     stretch rows and leave a blank band; here they take their natural height.
+     Use it as a separate grid: <div class="bento flow"><div class="cell w8">… */
+  .bento.flow { grid-auto-rows:auto; align-items:start; margin-top:16px; }
+  .flow .chart { height:auto; }
+  .w4{grid-column:span 4}.w6{grid-column:span 6}.w8{grid-column:span 8}.w12{grid-column:span 12}
+  .h2{grid-row:span 2}
+
+  footer.notes { border-top:1px solid var(--hair); margin-top:28px; padding-top:16px;
+    font-size:12px; color:var(--muted); line-height:1.6; }
+  footer.notes b { color:var(--ink); }
+
+  /* Two-up: every cell becomes half the grid, so an odd number of cells would
+     strand the last one beside an empty half. It takes the whole row instead. */
+  @media (max-width:1100px){ .w4,.w6,.w8,.w12{grid-column:span 6} .h2{grid-row:span 1}
+    .bento > *:last-child:nth-child(odd){grid-column:span 12} }
+  @media (max-width:700px){ .w4,.w6,.w8,.w12{grid-column:span 12} .page{padding:16px} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>Lakeshore Bike Share, 2025 season</h1>
+      <p>Rides, revenue and station demand across 212 stations · illustrative data for a fictional city</p>
+    </div>
+    <div class="stamp">Reporting window<b>Jan 1 — Dec 31, 2025</b></div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi"><span>Rides</span><b>2.85m</b><i>vs 2.34m in 2024</i></div>
+    <div class="kpi"><span>E-bike share</span><b>37%</b><i>of rides, Apr–Dec</i></div>
+    <div class="kpi"><span>Revenue</span><b>$10.1m</b><i>vs $7.9m in 2024</i></div>
+    <div class="kpi"><span>Median trip</span><b>14 min</b><i>vs 12 min in 2024</i></div>
+  </div>
+
+  <!-- One trend leads (the year-on-year gap that opens in April); where the
+       rides came from sits beside it. Then when people ride, and what the
+       growth was worth. -->
+  <div class="bento">
+    <div class="cell w8"><div class="chart" id="c-rides"></div></div>
+    <div class="cell w4"><div class="chart" id="c-stations"></div></div>
+    <div class="cell w8"><div class="chart" id="c-hours"></div></div>
+    <div class="cell w4"><div class="chart" id="c-bridge"></div></div>
+  </div>
+
+  <footer class="notes">
+    <b>Sources.</b> Trip records and fare-system settlements, 2024–2025 &nbsp;·&nbsp;
+    <b>Definitions.</b> A ride is an unlock longer than one minute; revenue excludes sponsorship &nbsp;·&nbsp;
+    Every figure is illustrative sample data for a fictional city, not a measurement of a real system.
+  </footer>
+</div>
+
+<!-- theme.js MUST load before charts.js; both are inlined by scripts/inline-lib.js -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call
+   with the neutral and series palette, never per-chart colours and never
+   role-by-role (that is how tiles and tooltips get left on the old palette).
+   Generate the block with scripts/extract-theme.js; see references/theming.md.
+   Delete this block when using the default theme.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* Page chrome follows the chart theme, so there is one source of colour truth. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',  t.bg);
+  s.setProperty('--ink',   t.titleColor);
+  s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--hair',  t.grid);
+  s.setProperty('--font',  t.font);
+  // Soft surfaces take the theme's own panel token — the same fill a geofacet
+  // tile uses — so the page and the charts step off the canvas by the same
+  // amount, and a dark palette inverts without any luminance guesswork here.
+  s.setProperty('--surface-soft', t.tileSurface);
+})();
+</script>
+<script>
+const T = Charts.theme;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+Charts.line('c-rides', {
+  title: 'Rides rose 22% in 2025, and the gap opened when e-bikes arrived in April',
+  subtitle: 'Rides per month · thousands · 2025 against 2024',
+  xAxis: { categories: MONTHS },
+  yAxis: { min: 0 },
+  tooltip: { valueSuffix: 'k' },
+  plotOptions: { series: { dataLabels: { enabled: false } } },
+  callouts: [{ x: 3, series: '2025', text: 'E-bikes launch' }],
+  series: [
+    { name: '2024', color: T.muted, lineWidth: 2,
+      data: [96, 101, 138, 186, 244, 281, 302, 297, 255, 201, 136, 104] },
+    { name: '2025', color: T.colors[1], lineWidth: 3,
+      data: [99, 106, 151, 228, 309, 352, 381, 374, 316, 248, 165, 121] }
+  ]
+});
+
+Charts.barList('c-stations', {
+  title: 'Harbor Point and North Campus added the most rides',
+  subtitle: 'Rides added in 2025 over 2024 · thousands · top 7 stations',
+  legend: { enabled: false },
+  plotOptions: { barList: { sort: 'desc', valuePrefix: '+', valueSuffix: 'k', barHeight: 14, rowGap: 9 } },
+  series: [{ name: 'Rides added', data: [
+    { name: 'Harbor Point',   y: 38, color: T.colors[1] },
+    { name: 'North Campus',   y: 31, color: T.colors[1] },
+    { name: 'Pier 9',         y: 27, color: T.muted },
+    { name: 'Union Station',  y: 22, color: T.muted },
+    { name: 'Bluff Road',     y: 19, color: T.muted },
+    { name: 'Market Square',  y: 14, color: T.muted },
+    { name: 'Old Mill',       y: 11, color: T.muted }
+  ] }]
+});
+
+/* Average rides per hour by weekday and hour of day. Weekdays carry two
+   commute peaks; weekends one broad afternoon peak, highest on Saturday. */
+(function () {
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const hours = []; for (let h = 5; h <= 23; h++) hours.push(String(h));
+  const bump = (h, c, w, a) => a * Math.exp(-((h - c) * (h - c)) / (2 * w * w));
+  const data = [];
+  days.forEach((d, y) => {
+    const weekend = y >= 5;
+    hours.forEach((hs, x) => {
+      const h = +hs;
+      let v = 40;
+      if (!weekend) {
+        const fri = y === 4 ? 1.08 : 1;
+        v += bump(h, 8, 1.0, 1250) + bump(h, 17.4, 1.3, 1380 * fri) + bump(h, 12.5, 1.6, 380) + bump(h, 20.5, 1.6, 180 * fri);
+      } else {
+        v += bump(h, 14, 2.6, y === 5 ? 1640 : 1480) + bump(h, 20, 1.6, y === 5 ? 260 : 120);
+      }
+      data.push([x, y, Math.round(v / 10) * 10]);
+    });
+  });
+  Charts.heatmap('c-hours', {
+    title: 'Saturday afternoons are the busiest hours of the week',
+    subtitle: 'Average rides per hour · by weekday and hour of day · 2025',
+    xAxis: { categories: hours },
+    yAxis: { categories: days },
+    plotOptions: { heatmap: { dataLabels: false } },
+    series: [{ name: 'Rides per hour', data: data }]
+  });
+})();
+
+Charts.waterfall('c-bridge', {
+  title: 'E-bike surcharges added $0.9m of the $2.2m revenue gain',
+  subtitle: 'Revenue bridge · USD millions · 2024 → 2025',
+  legend: { enabled: false },
+  tooltip: { valuePrefix: '$', valueSuffix: 'm' },
+  series: [{ name: 'Revenue', data: [
+    { name: '2024', y: 7.9, color: T.defaultColor },
+    { name: 'Ride volume', y: 1.4 },
+    { name: 'E-bike fees', y: 0.9 },
+    { name: 'Members', y: 0.3 },
+    { name: 'Promos', y: -0.4 },
+    { name: '2025', isSum: true }
+  ] }]
+});
+</script>
+</body>
+</html>

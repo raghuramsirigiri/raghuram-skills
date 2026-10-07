@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What e-bikes changed — Report</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- These three tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the library's own contents, so
+     the file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* --paper, --ink, --muted, --soft, --hair and --font are overwritten at load
+     from Charts.theme (sync block near the bottom), so recolouring the charts
+     recolours the page. --bg is the ground behind the paper. */
+  :root { --bg:#efece6; --paper:#f4f4f0; --ink:#111111; --muted:#555555;
+          --soft:#666666; --hair:#dcdbd7; --rule:#cfcdc6; --radius:4px;
+          --surface-soft:#eae8e4;   /* overwritten from Charts.theme.tileSurface below */
+          --font:'Inter','Segoe UI',Arial,Helvetica,sans-serif; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); -webkit-font-smoothing:antialiased; }
+  .paper { max-width:880px; margin:0 auto; background:var(--paper);
+    padding:64px 72px 96px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+  @media (max-width:720px){ .paper{padding:40px 24px} }
+
+  .kicker { font-size:12px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:1.2px; font-weight:700; }
+  h1 { font-size:40px; line-height:1.1; letter-spacing:-0.7px; margin:12px 0 16px; font-weight:700; }
+  .deck { font-size:18px; color:var(--muted); line-height:1.55; margin:0 0 28px; }
+  .byline { font-size:12px; color:var(--soft); border-top:1px solid var(--hair);
+    border-bottom:1px solid var(--hair); padding:12px 0; margin:0 0 40px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .byline b { color:var(--ink); }
+
+  /* Soft surface: a low-contrast fill sets text apart without a rule cutting
+     into the column. --surface-soft is the theme's panel fill, so it follows
+     the theme automatically, light or dark. */
+  .abstract, .note { background:var(--surface-soft); border-radius:var(--radius);
+    padding:18px 22px; margin:0 0 40px; font-size:15px; line-height:1.65; }
+  .abstract b, .note b { text-transform:uppercase; font-size:11px; letter-spacing:1px;
+    display:block; margin-bottom:6px; color:var(--muted); }
+  .note { margin:28px 0; }
+
+  h2 { font-size:24px; font-weight:700; margin:48px 0 12px; letter-spacing:-0.3px; }
+  h2 .n { color:var(--soft); font-weight:700; margin-right:12px; }
+  p { font-size:16px; line-height:1.72; color:#1a1a1a; margin:0 0 18px; }
+
+  .fig { margin:28px 0 32px; }
+  .fig .chart { width:100%; height:380px; background:var(--paper); }
+  /* Tables (table, reportTable, barInsightTable) are as tall as their rows:
+     give them no height, or they stretch and leave a blank band. */
+  .fig .chart.flow { height:auto; }
+  .fig figcaption { font-size:12px; color:var(--soft); margin-top:8px; padding-top:8px;
+    border-top:1px dotted var(--rule); line-height:1.5; }
+  .fig figcaption b { color:var(--ink); margin-right:6px; }
+
+
+  /* minmax(0,1fr), not 1fr: a drawn chart has a fixed-width SVG, and a plain 1fr
+     column never shrinks below it, so a narrower window would push the pair
+     past the paper instead of letting the charts redraw smaller. */
+  .grid2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; margin:28px 0 32px; }
+  .grid2 .fig { margin:0; }
+  .grid2 .fig .chart { height:340px; }
+  @media (max-width:640px){ .grid2{grid-template-columns:1fr} }
+
+  footer.notes { border-top:1px solid var(--hair); margin-top:56px; padding-top:20px;
+    font-size:12px; color:var(--soft); line-height:1.6; }
+  footer.notes b { color:var(--ink); }
+</style>
+</head>
+<body>
+<article class="paper">
+
+  <div class="kicker">Mobility analysis · Lakeshore Bike Share</div>
+  <h1>E-bikes added 925,000 rides in their first season</h1>
+  <p class="deck">They took 437,000 rides from the classic fleet along the way, so the
+    system grew by about half of what the e-bike count alone suggests.</p>
+
+  <div class="byline">
+    <div><b>Planning &amp; Insights</b> · Lakeshore Transit Authority · Published Feb 2026</div>
+    <div>Season Apr — Dec 2025</div>
+  </div>
+
+  <h2><span class="n">01</span>Most of the growth rode in on the new fleet</h2>
+  <p>E-bikes reached the streets in April, and within four months they carried two
+    of every five rides. Classic rides fell over the same months, but by less than
+    e-bikes added, and the net gain held through the autumn.</p>
+
+  <figure class="fig">
+    <div class="chart" id="f1"></div>
+    <figcaption><b>Fig. 1</b> The two fleets move together through the season: e-bikes
+      took share without changing the shape of the year.</figcaption>
+  </figure>
+
+  <h2><span class="n">02</span>The new trips are longer and start on the hills</h2>
+  <p>An e-bike trip from Bluff Road runs twice as far as a classic one from the same
+    stations. In the flat districts by the water the difference is small, because the
+    classic bike was never the obstacle there.</p>
+
+  <figure class="fig">
+    <div class="chart" id="f2"></div>
+    <figcaption><b>Fig. 2</b> The gap is widest where the climb is steepest; Market Square,
+      on the flat, barely moves.</figcaption>
+  </figure>
+
+<div class="note">
+    <b>Recommendation</b>
+    Put the next 300 e-bikes on the hill districts first. Bluff Road, Old Mill and
+    North Campus show the longest new trips, so each new bike there carries the
+    most distance the classic fleet could not.
+  </div>
+
+  <footer class="notes">
+    <b>Sources.</b> Trip records, Apr–Dec 2024 and 2025. <b>Method.</b> Medians of
+    trips over one minute; distances are straight lines between docks, so they
+    understate the real route by a similar share for both fleets. <b>Note.</b> Every figure is illustrative sample data for
+    a fictional city.
+  </footer>
+</article>
+
+<!-- theme.js MUST load before charts.js; both are inlined by scripts/inline-lib.js -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call
+   with the neutral and series palette, never per-chart colours and never
+   role-by-role (that is how tiles and tooltips get left on the old palette).
+   Generate the block with scripts/extract-theme.js; see references/theming.md.
+   Delete this block when using the default theme.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* Page chrome follows the chart theme, so there is one source of colour truth. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--paper', t.bg);
+  s.setProperty('--ink',   t.titleColor);
+  s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--soft',  t.subtitleColor);
+  s.setProperty('--hair',  t.grid);
+  s.setProperty('--font',  t.font);
+  // Soft surfaces take the theme's own panel token — the same fill a geofacet
+  // tile uses — so the page and the charts step off the canvas by the same
+  // amount, and a dark palette inverts without any luminance guesswork here.
+  s.setProperty('--surface-soft', t.tileSurface);
+})();
+</script>
+<script>
+const T = Charts.theme;
+Charts.line('f1', {
+  title: 'E-bike rides reached 153k in July, two-fifths of the month',
+  subtitle: 'Rides per month by fleet · thousands · 2025',
+  xAxis: { categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
+  yAxis: { min: 0 },
+  tooltip: { valueSuffix: 'k' },
+  callouts: [{ x: 3, series: 'E-bike', text: 'E-bikes launch' }],
+  plotOptions: { series: { dataLabels: { enabled: false } } },
+  series: [
+    { name: 'Classic', color: T.muted, lineWidth: 2,
+      data: [99, 106, 151, 170, 196, 214, 228, 224, 192, 156, 108, 81] },
+    { name: 'E-bike', color: T.colors[1], lineWidth: 3,
+      data: [null, null, null, 58, 113, 138, 153, 150, 124, 92, 57, 40] }
+  ]
+});
+
+Charts.dumbbell('f2', {
+  title: 'E-bike trips from Bluff Road run twice as far as classic ones',
+  subtitle: 'Median trip distance by start district · km · Apr–Dec 2025',
+  xAxis: { categories: ['Bluff Road', 'Old Mill', 'North Campus', 'Harbor Point', 'Market Square'] },
+  plotOptions: { dumbbell: { valueSuffix: ' km' } },
+  series: [
+    { name: 'Classic', color: T.muted,      data: [1.9, 1.8, 1.6, 1.4, 1.2] },
+    { name: 'E-bike',  color: T.colors[1],  data: [3.8, 3.3, 3.1, 2.2, 1.4] }
+  ]
+});
+</script>
+</body>
+</html>
