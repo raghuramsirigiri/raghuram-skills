@@ -20,7 +20,7 @@ that can read a file.
 
 📖 **[Full documentation and FAQ →](https://raghuramsirigiri.github.io/raghuram-skills/)**
 
-![Three pages built by the chart-dashboard skill from one fictional bike-share season, shown as overlapping browser windows: a dashboard with KPI tiles, a monthly rides line chart, a station ranking and an hour-by-weekday heatmap; in front of it on the left, an email snapshot with a headline, three figures and a line chart; on the right, a 16:9 slide with a revenue bridge beside its claim](docs/readme/images/hero.png)
+![Three pages built by the chart-dashboard skill from one fictional bike-share season, shown as layered browser windows: a dashboard of a donut, a revenue waterfall, waffle grids, a Sankey of trips by area and fleet, an hour-by-weekday heatmap and a district report table with shaded cells; on the left, an email snapshot with a headline, three figures and a line chart; in front on the right, a 16:9 slide with a revenue bridge beside its claim](docs/readme/images/hero.png)
 
 <sub>A dashboard, an email snapshot and a slide deck, built with the skill's templates from the same data. All six formats are shown one at a time under [Output formats](#output-formats).</sub>
 
@@ -249,7 +249,7 @@ each format, so you can compare how each format handles the same data. Their sou
 
 ### Dashboard
 
-![Dashboard built by the chart-dashboard skill: a bike-share season with four KPI tiles, a line chart of monthly rides in 2025 against 2024 with the e-bike launch marked, a ranked bar list of the stations that added the most rides, an hour-by-weekday heatmap, and a revenue bridge waterfall](docs/readme/images/dashboard.png)
+![Dashboard built by the chart-dashboard skill: a bike-share season as a bento grid of seven panels, each titled with its finding: a donut of rides by fleet, a revenue bridge waterfall, waffle grids of member renewals and empty docks, a Sankey of rides from start area through fleet to end area, an hour-by-weekday heatmap, a report table of six districts with a sparkline, rides, growth and e-bike share cells shaded by value, a members change coloured by sign and a one-line insight per row, and a radar of trip purpose by fleet](docs/readme/images/dashboard.png)
 
 A bento grid with one panel per finding and no prose. This is the default when you
 hand over metrics with no argument attached. The grid comes from the shape of the
@@ -308,7 +308,7 @@ Finished example: [`logistics-network-email/`](examples/logistics-network-email/
 
 ### Editable page
 
-![An editable working copy of the dashboard with its editor open: the line chart is selected and outlined, a side panel offers Type, Text, Data, Style, Callouts and Layout tabs with the chart types it can switch to, and a toolbar at the bottom holds Undo, Redo, Save and Done](docs/readme/images/editable.png)
+![An editable working copy of the dashboard with its editor open: the donut is selected and outlined, a side panel offers Type, Text, Data, Style, Callouts and Layout tabs with the chart types it can switch to and the reason each other type is refused, and a toolbar at the bottom holds Undo, Redo, Save and Done](docs/readme/images/editable.png)
 
 Ask for an editable page and the dashboard, report, deck or email snapshot comes
 with an **Edit page** button. It opens an in-page editor where you can change text
