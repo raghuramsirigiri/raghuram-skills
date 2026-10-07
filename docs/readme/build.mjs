@@ -10,6 +10,10 @@
 // (frame.html) and rendered to images/<name>.png; hero.html lays the framed
 // captures out as one composition in images/hero.png.
 //
+// The same frames are also written for the docs site, at 1x, as WebP in
+// docs/img/ (the README's 2x PNGs are too heavy for a web page), plus
+// docs/img/og.png, the hero at 1x as a PNG for social previews.
+//
 // Needs Node 22+ (global WebSocket) and Chrome. Set CHROME to its path if it is
 // not in the default location.
 import { spawn, execFileSync } from 'node:child_process';
@@ -23,6 +27,7 @@ const ROOT = resolve(HERE, '../..');
 const FINALIZE = join(ROOT, 'plugins/chart-dashboard/skills/chart-dashboard/scripts/finalize.js');
 const OUT = join(HERE, 'images');
 const RAW = join(HERE, 'images/raw');
+const WEB = join(HERE, '../img');
 const CHROME = process.env.CHROME || [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -88,13 +93,13 @@ async function chrome() {
       await send('Page.navigate', { url });
       await sleep(wait);
     },
-    async capture(file, setup) {
+    async capture(file, setup, format = 'png') {
       if (setup) {
         const r = await send('Runtime.evaluate', { expression: setup, awaitPromise: true });
         if (r.result?.exceptionDetails) throw new Error(`${file}: ${r.result.exceptionDetails.exception?.description}`);
         await sleep(600);
       }
-      const shot = await send('Page.captureScreenshot', { format: 'png' });
+      const shot = await send('Page.captureScreenshot', format === 'webp' ? { format, quality: 86 } : { format });
       writeFileSync(file, Buffer.from(shot.result.data, 'base64'));
     },
     async evaluate(expression) {
@@ -108,6 +113,7 @@ async function chrome() {
 const only = process.argv.slice(2);
 const shots = only.length ? SHOTS.filter(s => only.includes(s.name)) : SHOTS;
 mkdirSync(RAW, { recursive: true });
+mkdirSync(WEB, { recursive: true });
 
 const work = mkdtempSync(join(tmpdir(), 'readme-pages-'));
 const browser = await chrome();
@@ -130,15 +136,22 @@ try {
     await browser.open(pathToFileURL(page).href, s);
     await browser.capture(raw, s.setup);
 
-    await browser.open(pathToFileURL(join(HERE, 'frame.html')).href + '?' + new URLSearchParams({
+    const frame = pathToFileURL(join(HERE, 'frame.html')).href + '?' + new URLSearchParams({
       img: pathToFileURL(raw).href, title: s.title, ...(s.fade ? { fade: 1 } : {})
-    }), { w: 1600, h: 1080, scale: 2, wait: 800 });
+    });
+    await browser.open(frame, { w: 1600, h: 1080, scale: 2, wait: 800 });
     await browser.capture(join(OUT, `${s.name}.png`));
-    console.log(`framed   images/${s.name}.png`);
+    await browser.open(frame, { w: 1600, h: 1080, scale: 1, wait: 800 });
+    await browser.capture(join(WEB, `${s.name}.webp`), null, 'webp');
+    console.log(`framed   images/${s.name}.png, docs/img/${s.name}.webp`);
   }
-  await browser.open(pathToFileURL(join(HERE, 'hero.html')).href, { w: 1600, h: 1000, scale: 2, wait: 1200 });
+  const hero = pathToFileURL(join(HERE, 'hero.html')).href;
+  await browser.open(hero, { w: 1600, h: 1000, scale: 2, wait: 1200 });
   await browser.capture(join(OUT, 'hero.png'));
-  console.log('composed images/hero.png');
+  await browser.open(hero, { w: 1600, h: 1000, scale: 1, wait: 1200 });
+  await browser.capture(join(WEB, 'hero.webp'), null, 'webp');
+  await browser.capture(join(WEB, 'og.png'));
+  console.log('composed images/hero.png, docs/img/hero.webp, docs/img/og.png');
 } finally {
   browser.close();
   rmSync(work, { recursive: true, force: true });
