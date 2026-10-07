@@ -33,7 +33,7 @@ const CHROME = process.env.CHROME || [
 // `setup` runs in the page before the capture; `wait` is real time, so
 // charts that freeze or animate have settled.
 const SHOTS = [
-  { name: 'dashboard', page: 'dashboard.html', w: 2240, h: 1400, title: 'Lakeshore Bike Share — Dashboard' },
+  { name: 'dashboard', page: 'dashboard.html', w: 2352, h: 1470, title: 'Lakeshore Bike Share — Dashboard' },
   { name: 'report',    page: 'report.html',    w: 1536, h: 960,  title: 'What e-bikes changed — Report' },
   { name: 'deck',      page: 'deck.html',      w: 1280, h: 800,  title: 'Lakeshore Bike Share — Deck',
     setup: `(() => {

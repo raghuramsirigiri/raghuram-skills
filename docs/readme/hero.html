@@ -32,15 +32,15 @@
     color:#6f6d68; pointer-events:none; }
   .win img { display:block; width:100%; height:auto; }
 
-  /* The dashboard leads and is shown whole (its capture is 2240x1400 css,
-     drawn here at 0.482). The front windows touch it only where no text is:
+  /* The dashboard leads and is shown whole (its capture is 2352x1470 css,
+     drawn here at 0.459). The front windows touch it only where no text is:
      the deck's top-left corner sits in the grid gutters around the radar
-     cell (css x 1467–1483, y 827–843), so it covers that panel whole and the
+     cell (css x 1168–1184, y 827–843), so it covers that panel whole and the
      empty end of the footer; the email overlaps only the dashboard's left
-     padding (css x < 64). Re-measure the cells if the dashboard page changes. */
-  .dash  { left:330px;  top:120px;  width:1080px; z-index:1; }
-  .deck  { left:1041px; top:556px; width:520px;  z-index:3; }
-  .email { left:30px;   top:420px; width:328px;  z-index:2; }
+     padding (css x < 120). Re-measure the cells if the dashboard page changes. */
+  .dash  { left:330px;  top:120px; width:1080px; z-index:1; }
+  .deck  { left:870px;  top:537px; width:620px;  z-index:3; }
+  .email { left:30px;   top:420px; width:340px;  z-index:2; }
 
   .crop { position:relative; overflow:hidden; }
   .crop img { position:absolute; max-width:none; }
