@@ -96,19 +96,22 @@
 
   <!-- Nothing here is a single dominant trend: the season is a set of
        co-equal findings about one change (the e-bike fleet), so the top row
-       is three equal cells. The flows need width. The district scorecard
-       sizes itself, and the radar needs more height than a 340px row leaves
-       it, so both close the page in a content-sized row. -->
-  <div class="bento">
-    <div class="cell w4"><div class="chart" id="c-mix"></div></div>
-    <div class="cell w4"><div class="chart" id="c-bridge"></div></div>
-    <div class="cell w4"><div class="chart" id="c-service"></div></div>
+       is three equal cells. It is content-sized at 440px because the radar
+       needs more height than a 340px row leaves it. The flows need width;
+       the district scorecard sizes itself, with the revenue bridge beside it
+       at the table's height. -->
+  <div class="bento flow">
+    <div class="cell w4"><div class="chart" id="c-mix" style="height:440px"></div></div>
+    <div class="cell w4"><div class="chart" id="c-purpose" style="height:440px"></div></div>
+    <div class="cell w4"><div class="chart" id="c-service" style="height:440px"></div></div>
+  </div>
+  <div class="bento" style="margin-top:16px">
     <div class="cell w8"><div class="chart" id="c-flow"></div></div>
     <div class="cell w4"><div class="chart" id="c-hours"></div></div>
   </div>
   <div class="bento flow">
     <div class="cell w6"><div class="chart" id="c-districts"></div></div>
-    <div class="cell w6"><div class="chart" id="c-purpose" style="height:519px"></div></div>
+    <div class="cell w6"><div class="chart" id="c-bridge" style="height:519px"></div></div>
   </div>
 
   <footer class="notes">

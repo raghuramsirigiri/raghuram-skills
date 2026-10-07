@@ -32,26 +32,34 @@
     color:#6f6d68; pointer-events:none; }
   .win img { display:block; width:100%; height:auto; }
 
-  /* The dashboard leads and is shown whole (its capture is 2352x1470 css,
-     drawn here at 0.459). The front windows touch it only where no text is:
-     the deck's top-left corner sits in the grid gutters around the radar
-     cell (css x 1168–1184, y 827–843), so it covers that panel whole and the
-     empty end of the footer; the email overlaps only the dashboard's left
-     padding (css x < 120). Re-measure the cells if the dashboard page changes. */
-  .dash  { left:330px;  top:120px; width:1080px; z-index:1; }
-  .deck  { left:870px;  top:537px; width:620px;  z-index:3; }
-  .email { left:30px;   top:420px; width:340px;  z-index:2; }
+  /* The dashboard leads; the email and the deck sit in front of its lower
+     corners. Its capture is 2512x1570 css, drawn at 0.43 and cropped above
+     the footer. Every front-window edge that lands on the dashboard sits in
+     a gap, so no line of text is cut:
+       · the deck's corner is in the gutters around the revenue bridge cell
+         (css x 1248–1264, y 939–955), so it covers that panel whole, the
+         panel the slide itself shows;
+       · the email covers the table's district names and sparklines: its
+         right edge is at css x 592, between the sparkline column and the
+         first figure, and its top at css y 1031, between the table's
+         subtitle and its header row.
+     Re-measure if the dashboard page changes. */
+  .dash  { left:190px; top:60px;  width:1080px; z-index:1; }
+  .email { left:54px;  top:537px; width:390px;  z-index:2; }
+  .deck  { left:730px; top:501px; width:640px;  z-index:3; }
 
   .crop { position:relative; overflow:hidden; }
   .crop img { position:absolute; max-width:none; }
   /* Email capture is 1040x650 css with the 600px block at x 220–820 and the
      toolbar above y 66; keep the block with 20px of ground either side. */
+  .dash .crop { aspect-ratio:2512 / 1500; }
+  .dash .crop img { width:100%; left:0; top:0; }
   .email .crop { aspect-ratio:640 / 584; }
   .email .crop img { width:calc(100% * 1040 / 640); left:calc(-100% * 200 / 640); top:-11.3%; }
 </style>
 </head>
 <body>
-  <div class="win dash"><div class="bar"><i></i><i></i><i></i><span>Dashboard</span></div><img src="images/raw/dashboard.png" alt=""></div>
+  <div class="win dash"><div class="bar"><i></i><i></i><i></i><span>Dashboard</span></div><div class="crop"><img src="images/raw/dashboard.png" alt=""></div></div>
   <div class="win email"><div class="bar"><i></i><i></i><i></i><span>Email snapshot</span></div><div class="crop"><img src="images/raw/email.png" alt=""></div></div>
   <div class="win deck"><div class="bar"><i></i><i></i><i></i><span>Slide deck</span></div><img src="images/raw/deck.png" alt=""></div>
 </body>
