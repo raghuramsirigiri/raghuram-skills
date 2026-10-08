@@ -1,7 +1,7 @@
 {
   "name": "chart-dashboard",
-  "description": "Turn any data — a table, CSV, metrics, or notes — into a self-contained HTML dashboard, report, slide deck, printable one-pager or email-safe chart snapshot with SVG charts. Zero dependencies, no CDN, no build step, works offline.",
-  "version": "1.10.2",
+  "description": "Turn any data — a table, CSV, metrics, or notes — into a self-contained HTML dashboard, report, slide deck, printable one-pager, email-safe chart snapshot or Microsoft Teams post with SVG charts. Zero dependencies, no CDN, no build step, works offline.",
+  "version": "1.11.0",
   "author": {
     "name": "Raghuram Sirigiri"
   },
@@ -33,6 +33,7 @@
     "deck",
     "one-pager",
     "email",
+    "microsoft-teams",
     "handout",
     "printable",
     "pdf",

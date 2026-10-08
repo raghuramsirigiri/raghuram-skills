@@ -1,6 +1,6 @@
 ---
 name: chart-dashboard
-description: Build a self-contained HTML dashboard, data-story report, slide deck, printable one-pager, or email-safe chart snapshot from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, a one-page handout or brief to print, or charts to paste into an email (Outlook, Gmail, a weekly update), built from data they provide or describe.
+description: Build a self-contained HTML dashboard, data-story report, slide deck, printable one-pager, email-safe chart snapshot, or Teams post from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, a one-page handout or brief to print, charts to paste into an email (Outlook, Gmail, a weekly update), or an insights post to share in a Microsoft Teams chat or channel, built from data they provide or describe.
 ---
 
 # Chart dashboard
@@ -8,8 +8,9 @@ description: Build a self-contained HTML dashboard, data-story report, slide dec
 Turn whatever information the user gives — a table, pasted numbers, a set of
 metrics, notes, or just a topic and some facts — into a single self-contained
 HTML page of SVG charts rendered with `charts-lib`: a dashboard, a report, a
-slide deck, a one-pager that prints on a single sheet, or an email snapshot
-whose charts survive being pasted into Outlook or Gmail.
+slide deck, a one-pager that prints on a single sheet, an email snapshot
+whose charts survive being pasted into Outlook or Gmail, or a Teams post that
+pastes into a chat or channel as rich text with its charts.
 
 ## Workflow
 
@@ -78,6 +79,18 @@ whose charts survive being pasted into Outlook or Gmail.
      and each chart is frozen into a PNG with alt text when the page opens.
      Nothing in it can be hovered or clicked. The page around the block has a
      **Copy for email** button, and that is how the reader takes it.
+   - **Teams post** — the same one to three findings, shared in a Microsoft
+     Teams chat or channel. Reach for it when the user says "post it in the
+     channel", "share in Teams", "drop it in the Teams chat". Use
+     `templates/teams.html`, and read `references/layout-teams.md` before you
+     start. You write the block as plain semantic HTML with the charts frozen
+     into PNGs, as in the email, and the page sends it two ways. **Copy as
+     picture** paints the whole card, in the skill's design, into one PNG
+     under a one-line text headline, and it looks the same in every Teams
+     theme. **Copy as text** sends real text that can be searched, and Teams
+     restyles it in its own font and theme. The page previews both. When a
+     request names both email and Teams, build each one: the two blocks are
+     each wrong for the other client.
 
    When it's genuinely ambiguous, ask yourself who reads it, whether you will
    be in the room, and whether it ends up on paper. Nobody presents a bento grid
@@ -86,9 +99,9 @@ whose charts survive being pasted into Outlook or Gmail.
    if the page has to stand alone with no one narrating, it is a report,
    however much the user said "slides". And a one-pager is a budget, not a
    size: if the findings genuinely need more than one sheet, build a report and
-   say so, rather than shrinking the type until they fit. The email snapshot is
-   a budget too: past three findings, build the page they belong in, and paste a
-   snapshot of its lead finding.
+   say so, rather than shrinking the type until they fit. The email snapshot and
+   the Teams post are budgets too: past three findings, build the page they
+   belong in, and paste a snapshot of its lead finding.
 
    **Editable or static.** Static is the default. Build an *editable* page
    only when the user asked for one: charts stored as JSON, text marked
@@ -100,7 +113,7 @@ whose charts survive being pasted into Outlook or Gmail.
    from the format's editable template: `dashboard-editable.html`,
    `report-editable.html`, `slides-editable.html` or `email-editable.html`. A
    one-pager has none and is not offered one (`editable.md` § When to build
-   one).
+   one), and neither does a Teams post yet.
 3. **Copy the template.** It lives in this skill's own directory — resolve
    `templates/` relative to the directory containing this SKILL.md, never from a
    hard-coded home path:
@@ -110,14 +123,15 @@ whose charts survive being pasted into Outlook or Gmail.
    <skill-dir>/templates/slides.html     →  ./index.html
    <skill-dir>/templates/onepager.html   →  ./index.html
    <skill-dir>/templates/email.html      →  ./index.html
+   <skill-dir>/templates/teams.html      →  ./index.html
    <skill-dir>/templates/dashboard-editable.html  →  ./index.html   (only when asked for editable)
    <skill-dir>/templates/report-editable.html     →  ./index.html   (only when asked for editable)
    <skill-dir>/templates/slides-editable.html     →  ./index.html   (only when asked for editable)
    <skill-dir>/templates/email-editable.html      →  ./index.html   (only when asked for editable)
    ```
    Do **not** copy `assets/charts-lib/` next to the output. The template's
-   `charts-lib/…` tags are placeholders (the email template has a fourth, for
-   its freeze runtime); leave them exactly as written while you
+   `charts-lib/…` tags are placeholders (the email and Teams templates have a
+   fourth, for their freeze runtime); leave them exactly as written while you
    build the page, and fold the library in as the last step (step 9). Their
    order matters and the inliner preserves it — theme must load before charts.
 4. **Derive the structure from the findings, not from the template.** The
@@ -375,6 +389,12 @@ whose charts survive being pasted into Outlook or Gmail.
    images, the resolved colours, and each PNG's size. That report replaces the
    paper check. The paste into a real mail client is the one step no tool here
    can run, so say so at handover (`layout-email.md` § Verify it).
+
+   **If you built a Teams post,** the same holds with the Teams rules: the
+   checker's rows are `teams-safe block` and `charts freeze to PNG`, and
+   `JSON.stringify(await TeamsSnapshot.freeze())` lints the frozen block. No
+   tool here opens Teams, so say that at handover too (`layout-teams.md`
+   § Verify it).
 
    **If the page has any control, test it** — an untested filter is usually a
    broken filter. With the audit loaded, change each control to a
@@ -664,7 +684,10 @@ hand it over, since the whole point of the format is that it can be printed
 without anyone touching the dialog. An email snapshot ships the same single
 file, and the reader opens it and clicks **Copy for email**; tell them that,
 and that the paste has not been tried in their mail client, so they should
-send a test to themselves first (`layout-email.md` § Hand it over). Write it to the working directory (or where
+send a test to themselves first (`layout-email.md` § Hand it over). A Teams
+post is handed over the same way: say what **Copy as picture** and **Copy
+as text** each give, with the per-chart copy and the PNG files as fallbacks
+(`layout-teams.md` § Hand it over). Write it to the working directory (or where
 the user asked). Then surface
 it however your environment does that — attach or render the file if you can (in
 Claude Code: `SendUserFile` with `display: "render"`); otherwise print the
@@ -691,7 +714,7 @@ and run Node (for `finalize.js` and the static checks). Without Node, inline
 the three library files by hand — paste `charts.css` into a `<style>` and
 `theme.js` then `charts.js` into `<script>` blocks, in that order, replacing the
 placeholder tags. An editable page also gets `assets/page-runtime.js` in a
-`<script>` block after them, and an email snapshot gets
+`<script>` block after them, and an email snapshot or Teams post gets
 `assets/email-snapshot.js` (an editable snapshot gets both, in the template's
 order). Browser preview, the layout audit, screenshots, and
 file attachment are used when available and degrade gracefully when not.

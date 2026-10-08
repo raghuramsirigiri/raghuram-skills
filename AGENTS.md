@@ -6,8 +6,8 @@ Vendor-neutral: no Claude-specific tools, formats, or APIs are required.
 ## What this repo provides
 
 A reusable capability: **turn supplied data into a single self-contained HTML
-dashboard, report, slide deck, printable one-pager or email-safe chart snapshot
-with SVG charts.** No CDN, no npm install, no build step, no runtime dependencies.
+dashboard, report, slide deck, printable one-pager, email-safe chart snapshot or
+Teams post with SVG charts.** No CDN, no npm install, no build step, no runtime dependencies.
 
 The canonical instructions live in
 [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](plugins/chart-dashboard/skills/chart-dashboard/SKILL.md). That file
@@ -16,8 +16,8 @@ is the source of truth — this one only routes you to it.
 ## When to use it
 
 Any request to build a dashboard, analytics page, KPI view, chart deck,
-illustrated data report, one-page printable brief or handout, or charts to paste
-into an email, from data the
+illustrated data report, one-page printable brief or handout, charts to paste
+into an email, or an insights post to share in Microsoft Teams, from data the
 user provides or describes — a table, CSV, pasted numbers, metrics, notes, or a
 topic with figures in it.
 
@@ -28,7 +28,7 @@ topic with figures in it.
 2. Read these before writing chart code — do not guess option names:
    - [`references/chart-api.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md) — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
    - [`references/chart-selection.md`](plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md) — data shape → chart type
-   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md` or `layout-email.md` (read only the one for your format)
+   - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md`, `layout-email.md` or `layout-teams.md` (read only the one for your format)
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
    - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
    - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
@@ -37,7 +37,8 @@ topic with figures in it.
    - [`assets/charts-lib/charts.manifest.json`](plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.manifest.json) — quick per-engine facts (data shape, refusals, sizing)
 3. Start from a template in `plugins/chart-dashboard/skills/chart-dashboard/templates/`: `dashboard.html`,
    `report.html`, `slides.html` (a deck), `onepager.html` (one printed sheet),
-   `email.html` (a chart block to paste into Outlook or Gmail), or
+   `email.html` (a chart block to paste into Outlook or Gmail), `teams.html`
+   (rich text and chart pictures to paste into a Teams chat or channel), or
    `dashboard-editable.html` / `report-editable.html` /
    `slides-editable.html` / `email-editable.html` (only when an editable page
    was asked for; a one-pager has no editable template and isn't offered one).
@@ -91,6 +92,12 @@ topic with figures in it.
   it to one to three findings. No controls and nothing hover-only. Rules and
   budget are in `references/layout-email.md`, and `scripts/check-page.js`
   lints the block.
+- A Teams post is the email snapshot's freeze with the opposite markup:
+  Teams keeps headings, paragraphs, lists and pictures and drops every style,
+  so its block is plain semantic HTML with no class, style or colour, and its
+  charts are drawn through `TeamsSnapshot.draw` so they freeze to PNG. Never
+  reuse the email block for Teams, or the reverse. Rules are in
+  `references/layout-teams.md`.
 - Derive the grid from the shape of the analysis; the dashboard template ships
   without a starter arrangement on purpose. A wide hero cell goes to a finding
   that genuinely leads, not to whatever panel was written first.

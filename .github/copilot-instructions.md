@@ -14,7 +14,7 @@ Before writing chart code, consult:
 
 - `plugins/chart-dashboard/skills/chart-dashboard/references/chart-api.md` — the core API (factories, shared options, sizing); then `references/charts/<type>.md` for only the chart types you use
 - `plugins/chart-dashboard/skills/chart-dashboard/references/chart-selection.md` — data shape → chart type
-- `plugins/chart-dashboard/skills/chart-dashboard/references/layout.md` — rules shared by every format; then `layout-dashboard.md`, `layout-report.md`, `layout-deck.md` or `layout-onepager.md` for the format you picked
+- `plugins/chart-dashboard/skills/chart-dashboard/references/layout.md` — rules shared by every format; then `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md`, `layout-email.md` or `layout-teams.md` for the format you picked
 - `plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md` — callouts, plot bands, forecast notation
 - `plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md` — action titles; where a finding goes
 - `plugins/chart-dashboard/skills/chart-dashboard/references/controls.md` — before adding a filter or dropdown

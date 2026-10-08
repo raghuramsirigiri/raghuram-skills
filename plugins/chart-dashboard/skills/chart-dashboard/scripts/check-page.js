@@ -467,8 +467,11 @@ function sheetFigOf(id) {
 const bentoReady = Object.values(grid).every(v => v != null);
 // And for a chart in an email snapshot's block: the placeholder carries its
 // own px box, which is exactly the PNG it will be frozen into.
+// A Teams post (templates/teams.html) is the same kind of block, marked
+// teams:start/teams:end, and is checked by the same runtime's Teams rules.
+const snapTarget = html.includes('<!-- teams:start') ? 'teams' : 'email';
 const emailBlock = (() => {
-  const a = html.indexOf('<!-- email:start'), b = html.indexOf('<!-- email:end -->');
+  const a = html.indexOf('<!-- ' + snapTarget + ':start'), b = html.indexOf('<!-- ' + snapTarget + ':end -->');
   return a >= 0 && b > a ? html.slice(html.indexOf('-->', a) + 3, b) : null;
 })();
 function emailFigOf(id) {
@@ -479,7 +482,7 @@ function emailFigOf(id) {
   const px = +((/(?:^|;)\s*width\s*:\s*([\d.]+)px/.exec(st) || [])[1] || 0);
   const py = +((/(?:^|;)\s*height\s*:\s*([\d.]+)px/.exec(st) || [])[1] || 0);
   if (!px) return null;
-  return { grid: 'email', cls: 'the email block', flow: !py, px, py: py || null,
+  return { grid: 'email', cls: snapTarget === 'teams' ? 'the Teams block' : 'the email block', flow: !py, px, py: py || null,
     pxOf: () => px, pyOf: () => py };
 }
 const cellFor = id => (bentoReady ? cellOf(id) : null) || sheetFigOf(id) || emailFigOf(id);
@@ -868,40 +871,47 @@ if (!notes.length) {
 // same lint again to the frozen block in the browser — one list, two moments.
 // Each failure here is invisible in the browser that built the page, which is
 // what makes it worth a checker: the page looks perfect until it is forwarded.
+// A Teams post (templates/teams.html) runs the same section against the
+// runtime's Teams rules: plain semantic HTML, since the compose box drops
+// every style, and charts no wider than a message.
+const teamsPost = snapTarget === 'teams';
+const safeRow = teamsPost ? 'teams-safe block' : 'email-safe block';
+const where = teamsPost ? 'Teams does not show' : 'mail clients delete';
 if (emailBlock == null) {
-  ok('email-safe block', 'not an email snapshot');
+  ok('email-safe block', 'not an email snapshot or Teams post');
 } else {
   const { lint } = require(require('path').join(__dirname, '..', 'assets', 'email-snapshot.js'));
-  const r = lint(emailBlock, { frozen: false });
+  const r = lint(emailBlock, { frozen: false, target: snapTarget });
   if (!r.ok) {
     const seen = {};
-    bad('email-safe block', r.fails.filter(f => !seen[f.msg] && (seen[f.msg] = 1))
+    bad(safeRow, r.fails.filter(f => !seen[f.msg] && (seen[f.msg] = 1))
       .map(f => f.rule + ': ' + f.msg).slice(0, 6).join(' | '));
-  } else ok('email-safe block', 'tables, inline styles, system fonts, sized charts with alt text');
-  if (r.warns.length) note('email-safe block', r.warns.map(f => f.msg).join(' | '));
+  } else ok(safeRow, teamsPost ? 'semantic tags only, no styling, sized charts with alt text'
+    : 'tables, inline styles, system fonts, sized charts with alt text');
+  if (r.warns.length) note(safeRow, r.warns.map(f => f.msg).join(' | '));
 
   // The charts themselves: what freezes, what cannot.
   const inBlock = charts.filter(c => emailFigOf(c.id));
   const problems = [], advice = [];
-  const viaSnapshot = new Set([...code.matchAll(/EmailSnapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
+  const viaSnapshot = new Set([...code.matchAll(/(?:Email|Teams)Snapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
   // An editable snapshot (templates/email-editable.html) keeps its charts in
   // the page spec; email-snapshot.js freezes those from the spec, so they
   // count as frozen when that runtime is on the page.
   const freezer = /<script src="charts-lib\/email-snapshot\.js"><\/script>/.test(html) || /root\.EmailSnapshot\s*=/.test(html);
   const viaSpec = new Set(freezer ? specCharts.map(c => c.id) : []);
   for (const c of inBlock) {
-    if (!viaSnapshot.has(c.id) && !viaSpec.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which mail clients delete  → EmailSnapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)" +
+    if (!viaSnapshot.has(c.id) && !viaSpec.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which ' + where + '  → ' + (teamsPost ? 'Teams' : 'Email') + 'Snapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)" +
       (specCharts.length ? ', or load charts-lib/email-snapshot.js so the spec charts freeze' : ''));
     if (GROWS.includes(c.type)) problems.push(c.id + ' (' + c.type + ') is an HTML table the PNG export cannot carry  → write it as a <table> in the block: its text survives image blocking');
     if (!isObj(c.cfg)) continue;
-    if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → make them text rows above the image, where they survive image blocking and dark mode');
-    if (isObj(c.cfg.chart) && c.cfg.chart.transparent) problems.push(c.id + ' is transparent  → drop it: dark-mode mail apps darken the page behind the image, and the dark ink vanishes');
-    if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — an inbox has no tooltip, so every value the reader needs must be printed or in the caption');
+    if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → make them ' + (teamsPost ? 'an <h3> and a paragraph' : 'text rows') + ' above the image, where they survive image blocking and dark mode');
+    if (isObj(c.cfg.chart) && c.cfg.chart.transparent) problems.push(c.id + ' is transparent  → drop it: ' + (teamsPost ? 'Teams' : 'mail apps') + ' in dark mode darken the page behind the image, and the dark ink vanishes');
+    if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — ' + (teamsPost ? 'a chat' : 'an inbox') + ' has no tooltip, so every value the reader needs must be printed or in the caption');
   }
   if (problems.length) bad('charts freeze to PNG', problems.join(' | '));
   else ok('charts freeze to PNG', inBlock.length + ' chart(s), each drawn through ' +
-    (viaSpec.size ? (viaSnapshot.size ? 'EmailSnapshot.draw or the page spec' : 'the page spec') : 'EmailSnapshot.draw'));
-  if (inBlock.length > 3) advice.push(inBlock.length + ' charts — a snapshot carries one to three findings; past that, send the page itself');
+    (viaSpec.size ? (viaSnapshot.size ? 'EmailSnapshot.draw or the page spec' : 'the page spec') : (teamsPost ? 'TeamsSnapshot' : 'EmailSnapshot') + '.draw'));
+  if (inBlock.length > 3) advice.push(inBlock.length + ' charts — ' + (teamsPost ? 'a post' : 'a snapshot') + ' carries one to three findings; past that, send the page itself');
   if (advice.length) note('charts freeze to PNG', advice.join(' | '));
 }
 
