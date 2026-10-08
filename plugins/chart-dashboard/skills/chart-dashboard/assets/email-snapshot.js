@@ -31,6 +31,15 @@
  * copied. Everything outside it — the toolbar, the grey stage — is the page's
  * own chrome and never reaches the email.
  *
+ * A Teams post (templates/teams.html) is the same freeze with a different
+ * destination: its block is id="teams-block", written as plain semantic HTML
+ * because the Teams compose box drops every style, and lint(markup,
+ * { target: 'teams' }) holds its rules. The page calls the runtime
+ * TeamsSnapshot, which is this same object. A post leaves two ways: as text,
+ * rewritten for how Teams draws a message (teamsText), or as one picture of
+ * the whole card as designed (cardPNG, copyCard). Its toolbar also has a
+ * copy-as-picture button per chart.
+ *
  * `lint(markup, { frozen })` is pure and also exported to Node, so
  * scripts/check-page.js applies the same rules to the source that this file
  * applies to the frozen result. One list of rules, two moments.
@@ -61,6 +70,7 @@
   }
 
   function lint(markup, opts) {
+    if (opts && opts.target === 'teams') return lintTeams(markup, opts);
     var frozen = !!(opts && opts.frozen);
     var fails = [], warns = [];
     var fail = function (rule, msg) { fails.push({ rule: rule, msg: msg }); };
@@ -175,8 +185,104 @@
     return { ok: !fails.length, fails: fails, warns: warns };
   }
 
+  // ── the Teams rules ──────────────────────────────────────────────────
+  // A Teams message is not an email. Its compose box keeps the meaning of the
+  // markup (headings, paragraphs, bold, lists, links, a simple table,
+  // pictures) and throws away how it was styled: no class, no inline style
+  // and no colour survives the paste, and Teams sets every message in its own
+  // font and theme (light, dark or high contrast). So the block is plain
+  // semantic HTML, and the charts carry the design, as PNGs.
+  var TEAMS_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h2', 'h3', 'ul', 'ol', 'li',
+    'a', 'blockquote', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'code'];
+  var TEAMS_WIDTH = 540;
+
+  function lintTeams(markup, opts) {
+    var frozen = !!(opts && opts.frozen);
+    var fails = [], warns = [];
+    var fail = function (rule, msg) { fails.push({ rule: rule, msg: msg }); };
+    var warn = function (rule, msg) { warns.push({ rule: rule, msg: msg }); };
+    var h = String(markup || '').replace(/<!--[\s\S]*?-->/g, '');
+    if (!h.trim()) { fail('block', 'the Teams block is empty'); return { ok: false, fails: fails, warns: warns }; }
+
+    var charts = h.match(CHART_DIV) || [];
+    var rest = h.replace(CHART_DIV, '');
+    if (frozen && charts.length) {
+      fail('charts frozen', charts.length + ' chart(s) still live — freeze() did not replace them with images');
+    }
+    charts.forEach(function (tag) {
+      var id = attr(tag, 'id') || '?';
+      var alt = attr(tag, 'data-alt') || '';
+      if (alt.trim().split(/\s+/).length < 6 || !/\d/.test(alt)) {
+        fail('alt text', id + ': data-alt must state the finding with its numbers (6+ words, at least one figure) — ' +
+          'it is what a screen reader, the plain-text copy and a search of the chat get');
+      }
+      var st = attr(tag, 'style') || '';
+      var w = parseFloat(styleProp(st, 'width')), ht = parseFloat(styleProp(st, 'height'));
+      if (!(w > 0) || !(ht > 0) || !/px/.test(styleProp(st, 'width') || '') || !/px/.test(styleProp(st, 'height') || '')) {
+        fail('chart size', id + ': give the chart a fixed width and height in px (style="width:540px;height:240px") — the image is cut at that size');
+      } else if (w > TEAMS_WIDTH) {
+        fail('width', id + ' is ' + w + 'px wide; Teams shrinks a picture wider than ~' + TEAMS_WIDTH + 'px to fit the message, and its labels with it');
+      }
+    });
+
+    // Only the tags the compose box keeps. Anything else is dropped, or
+    // flattened into a paragraph, by the time the message is sent.
+    var seen = {};
+    rest.replace(/<([a-z][a-z0-9]*)\b/gi, function (all, t) {
+      t = t.toLowerCase();
+      if (TEAMS_TAGS.indexOf(t) < 0) seen[t] = (seen[t] || 0) + 1;
+      return all;
+    });
+    Object.keys(seen).forEach(function (t) {
+      fail('teams tags', seen[t] + ' <' + t + '> — ' +
+        (t === 'h1' ? 'Teams sets an h1 as large as a page title; use h2 for the headline and h3 per chart'
+          : t === 'svg' ? 'Teams shows no SVG; charts go in as PNG (draw them with TeamsSnapshot.draw)'
+          : t === 'div' || t === 'span' ? 'the compose box flattens it; write <p>, <h3> or a list'
+          : 'not kept by the Teams compose box'));
+    });
+    if (/\sclass\s*=/i.test(rest)) fail('no styling', 'class= in the block — Teams keeps no class or style sheet; the meaning has to be in the tags');
+    if (/\sstyle\s*=/i.test(rest)) fail('no styling', 'style= in the block — Teams drops inline styles on paste, so colour, size and spacing never arrive; say it with <h3>, <strong> and <em>');
+    if (/\s(bgcolor|color|face|align)\s*=/i.test(rest)) fail('no styling', 'a presentational attribute (color=, bgcolor=, align=) — Teams ignores it');
+    if (/\son[a-z]+\s*=/i.test(rest)) fail('no interactivity', 'an inline event handler (onclick=…) — nothing runs in a chat message');
+    var depth = 0, nested = false;
+    rest.replace(/<(\/?)table\b/gi, function (all, close) {
+      depth += close ? -1 : 1;
+      if (depth > 1) nested = true;
+      return all;
+    });
+    if (nested) fail('simple tables', 'a table inside a table — Teams tables do not nest; lay the post out as paragraphs');
+    var tables = (rest.match(/<table\b/gi) || []).length;
+    if (tables > 1) warn('simple tables', tables + ' tables — a chat post reads best with at most one');
+
+    var imgs = rest.match(/<img\b[^>]*>/gi) || [];
+    imgs.forEach(function (tag, i) {
+      var name = 'image ' + (i + 1);
+      var w = attr(tag, 'width') || '';
+      if (!/^\d+$/.test(w)) fail('image size', name + ' has no numeric width= attribute — without one the 2x PNG pastes at double size');
+      else if (+w > TEAMS_WIDTH) fail('width', name + ' is ' + w + 'px wide; Teams fits a message at about ' + TEAMS_WIDTH + 'px');
+      if (!(attr(tag, 'alt') || '').trim()) fail('alt text', name + ' has no alt text');
+      var src = attr(tag, 'src') || '';
+      if (/^https?:/i.test(src)) warn('remote image', name + ' loads from ' + src.slice(0, 60) + ' — Teams shows it only if every reader can reach that address');
+      else if (frozen && !/^data:image\/(png|jpe?g|gif);/i.test(src)) fail('image format', name + ' is not a PNG/JPEG/GIF — Teams shows no SVG');
+    });
+    if (charts.length + imgs.length > 3) warn('scope', (charts.length + imgs.length) + ' charts — a chat post carries one to three; past that, share the page itself');
+
+    rest.replace(/<a\b[^>]*>/gi, function (tag) {
+      var href = attr(tag, 'href') || '';
+      if (!/^(https?:|mailto:)/i.test(href)) fail('links', 'a link to "' + href.slice(0, 40) + '" — only http(s) and mailto links work once the post leaves this page');
+      return tag;
+    });
+
+    // A message, not a document: Teams refuses a message whose text passes
+    // about 28 KB. Pasted pictures upload separately and do not count.
+    var textKB = Math.round(rest.replace(/<img\b[^>]*>/gi, '').length / 1024);
+    if (textKB > 24) warn('size', 'the text is ~' + textKB + ' KB; Teams refuses a message past about 28 KB — cut it, or share the page');
+
+    return { ok: !fails.length, fails: fails, warns: warns };
+  }
+
   if (typeof module === 'object' && module.exports) {
-    module.exports = { lint: lint, SAFE_FONTS: SAFE_FONTS, MAX_WIDTH: MAX_WIDTH };
+    module.exports = { lint: lint, SAFE_FONTS: SAFE_FONTS, MAX_WIDTH: MAX_WIDTH, TEAMS_WIDTH: TEAMS_WIDTH };
   }
   if (typeof document === 'undefined') return;
 
@@ -190,6 +296,11 @@
   // off screen, rasterises that, and builds the email from a clone of the
   // block. An edit makes the frozen copy stale; it is rebuilt shortly after.
   function editable() { return !!(root.Page && document.getElementById('page-spec')); }
+  // The block, and where it is going: #email-block for a mail client,
+  // #teams-block for a Teams chat. The freeze is the same for both; the rules,
+  // the export and the toolbar differ.
+  function blockEl() { return document.getElementById('email-block') || document.getElementById('teams-block'); }
+  function target() { var b = blockEl(); return b && b.id === 'teams-block' ? 'teams' : 'email'; }
   var busy = null, again = false, stale = false, changed = {};
   var listeners = [];
   function notify() { listeners.forEach(function (fn) { try { fn(); } catch (e) { /* a listener's bug is its own */ } }); }
@@ -338,6 +449,77 @@
 
   function drawnFor(id) { return drawn.filter(function (x) { return x.id === id; }).pop(); }
 
+  // The text copy, written for how Teams actually draws a message rather
+  // than for how the markup reads. Teams sets an h3 smaller than body text
+  // and gives paragraphs no margin, so a post pasted as authored arrives with
+  // its chart titles shrunk and every section run into the next. So each h3
+  // becomes a bold paragraph, and a blank paragraph opens each section and
+  // the closing source line.
+  function teamsText(clone) {
+    var spacer = function (before) {
+      var p = document.createElement('p');
+      p.innerHTML = '&nbsp;';
+      before.parentNode.insertBefore(p, before);
+    };
+    Array.prototype.slice.call(clone.querySelectorAll('h3')).forEach(function (h) {
+      var p = document.createElement('p');
+      var b = document.createElement('strong');
+      while (h.firstChild) b.appendChild(h.firstChild);
+      p.appendChild(b);
+      h.parentNode.replaceChild(p, h);
+      if (p.previousElementSibling) spacer(p);
+    });
+    var last = clone.lastElementChild;
+    if (last && last.previousElementSibling && last.tagName === 'P') spacer(last);
+  }
+
+  // The whole card as one PNG, drawn from the block as it looks on screen:
+  // each element's computed style is written onto a copy, the copy goes into
+  // an SVG foreignObject, and the browser paints that onto a canvas. Every
+  // picture in the block is already a data: URL by now, so nothing taints the
+  // canvas in Chromium (Edge, Chrome). Safari refuses, and says so.
+  function cardPNG(block) {
+    var w = Math.ceil(block.offsetWidth), h = Math.ceil(block.offsetHeight);
+    if (!w || !h) return Promise.reject(new Error('the card is not on screen'));
+    var clone = block.cloneNode(true);
+    var from = [block].concat(Array.prototype.slice.call(block.querySelectorAll('*')));
+    var to = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll('*')));
+    from.forEach(function (n, i) {
+      var cs = getComputedStyle(n), css = '';
+      for (var k = 0; k < cs.length; k++) css += cs[k] + ':' + cs.getPropertyValue(cs[k]) + ';';
+      to[i].setAttribute('style', css);
+      to[i].removeAttribute('id');
+      to[i].removeAttribute('class');
+    });
+    // The card sits in the picture's corner, with no page margin or shadow.
+    clone.style.margin = '0';
+    clone.style.boxShadow = 'none';
+    clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+      '<foreignObject x="0" y="0" width="100%" height="100%">' + new XMLSerializer().serializeToString(clone) +
+      '</foreignObject></svg>';
+    return new Promise(function (ok, no) {
+      var img = new Image();
+      img.onload = function () { ok(img); };
+      img.onerror = function () { no(new Error('the card would not render as an image')); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }).then(function (img) {
+      var c = document.createElement('canvas');
+      c.width = w * 2; c.height = h * 2;
+      var ctx = c.getContext('2d');
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0);
+      return new Promise(function (ok, no) {
+        try { c.toBlob(function (b) { return b ? ok(b) : no(new Error('the canvas gave no PNG')); }, 'image/png'); }
+        catch (e) { no(e); }
+      });
+    }).then(function (blob) {
+      return blobToDataURL(blob).then(function (url) {
+        return { blob: blob, url: url, w: w, h: h, kb: Math.round(blob.size / 1024) };
+      });
+    });
+  }
+
   /**
    * Rasterise every chart in the block, resolve the tokens, and lint the
    * result. On a static snapshot the frozen images replace the live charts on
@@ -348,8 +530,9 @@
     var live = editable();
     if (state.frozen && !(live && stale)) return Promise.resolve(state.report);
     if (busy) { again = true; return busy; }
-    var block = document.getElementById('email-block');
-    if (!block) return Promise.reject(new Error('email-snapshot: no element with id="email-block"'));
+    var block = blockEl();
+    if (!block) return Promise.reject(new Error('email-snapshot: no element with id="email-block" or id="teams-block"'));
+    var teams = target() === 'teams';
     stale = false;
     var problems = [], warns = [], images = [], shots = {};
     var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
@@ -386,8 +569,10 @@
                 img.setAttribute('width', String(w));
                 img.setAttribute('height', String(h));
                 img.setAttribute('alt', altOf(host));
-                img.setAttribute('style', 'display:block;width:' + w + 'px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;');
-                images.push({ id: id, blob: blob, kb: Math.round(blob.size / 1024) });
+                // Teams drops inline styles on paste; width= and height= are
+                // what it keeps, and they are what size the picture.
+                if (!teams) img.setAttribute('style', 'display:block;width:' + w + 'px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;');
+                images.push({ id: id, blob: blob, url: url, w: w, h: h, alt: altOf(host), kb: Math.round(blob.size / 1024) });
                 shots[id] = img;
               });
             }).catch(function (e) {
@@ -414,9 +599,12 @@
         });
         exportClone(clone);
         resolveVars(clone);
+        if (teams) teamsText(clone);
         state.images = images;
         state.html = clone.innerHTML.trim();
         state.text = plainText(clone);
+        var preview = teams && document.getElementById('teams-text-preview');
+        if (preview) preview.innerHTML = state.html;
         // An editable working copy's tab reads "Draft · …"; the email's doesn't.
         var title = (document.title || 'Snapshot').replace(/^(Draft · )+/, '').replace(/[<&]/g, '');
         var ground = toHex(getComputedStyle(document.documentElement).getPropertyValue('--ground').trim() || '#ffffff');
@@ -425,8 +613,19 @@
           '<title>' + title + '</title>\n</head>\n<body style="margin:0;padding:24px 0;background-color:' + ground + ';">\n' +
           state.html + '\n</body>\n</html>\n';
         state.frozen = true;
+        // A Teams post also leaves as one picture of the whole card, for the
+        // reader who wants it to look exactly as designed.
+        if (!teams || live) return;
+        return cardPNG(block).then(function (card) { state.card = card; }, function (e) {
+          state.card = null;
+          warns.push({ rule: 'card', msg: 'the card could not be made into a picture (' + (e && e.message || e) +
+            ') — this browser will not draw HTML onto a canvas; open the file in Edge or Chrome, or use Copy as text' });
+        });
+      })
+      .then(function () {
         state.report = check(problems);
         state.report.warns = warns.concat(state.report.warns);
+        if (state.card) state.report.card = { kb: state.card.kb, width: state.card.w, height: state.card.h };
         // Alt text is written by hand, so it does not follow an edit to the
         // chart's numbers. Say which charts changed since the page opened.
         var edited = Object.keys(changed).filter(function (id) { return shots[id] && block.querySelector('#' + cssId(id) + '[data-alt-key]'); });
@@ -443,11 +642,16 @@
 
   function check(extra) {
     if (!state.frozen && !extra) return { ok: false, fails: [{ rule: 'frozen', msg: 'freeze() has not finished' }], warns: [] };
-    var r = lint(state.html, { frozen: true });
+    var teams = target() === 'teams';
+    var r = lint(state.html, { frozen: true, target: target() });
     if (extra && extra.length) { r.fails = extra.concat(r.fails); r.ok = false; }
     var bytes = new Blob([state.html]).size;
+    r.target = target();
     r.kb = Math.round(bytes / 1024);
     r.images = state.images.map(function (i) { return { id: i.id, kb: i.kb }; });
+    // Teams uploads each pasted picture on its own, and lintTeams has already
+    // weighed the text and counted the charts.
+    if (teams) return r;
     // Gmail clips a message whose HTML passes ~102 KB behind "[Message
     // clipped]". A pasted image becomes an attachment and does not count, so
     // this bites only when the saved file is sent as raw HTML.
@@ -459,15 +663,13 @@
     return r;
   }
 
-  function copy() {
-    if (!state.frozen) return Promise.reject(new Error('freeze() has not finished'));
-    if (busy || stale) return Promise.reject(new Error('the snapshot is still catching up with your last edit — try again in a moment'));
-    // The copy event first: it is synchronous, works from file://, and hands
-    // the clipboard our markup untouched. The async API is the fallback.
+  // The copy event first: it is synchronous, works from file://, and hands
+  // the clipboard our markup untouched. The async API is the fallback.
+  function copyMarkup(html, text) {
     var done = false;
     var on = function (e) {
-      e.clipboardData.setData('text/html', state.html);
-      e.clipboardData.setData('text/plain', state.text);
+      e.clipboardData.setData('text/html', html);
+      e.clipboardData.setData('text/plain', text);
       e.preventDefault();
       done = true;
     };
@@ -477,11 +679,48 @@
     if (done) return Promise.resolve(true);
     if (navigator.clipboard && root.ClipboardItem) {
       return navigator.clipboard.write([new root.ClipboardItem({
-        'text/html': new Blob([state.html], { type: 'text/html' }),
-        'text/plain': new Blob([state.text], { type: 'text/plain' })
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' })
       })]).then(function () { return true; });
     }
     return Promise.reject(new Error('this browser would not write to the clipboard'));
+  }
+
+  function copy() {
+    if (!state.frozen) return Promise.reject(new Error('freeze() has not finished'));
+    if (busy || stale) return Promise.reject(new Error('the snapshot is still catching up with your last edit — try again in a moment'));
+    return copyMarkup(state.html, state.text);
+  }
+
+  // One chart as a picture on the clipboard: the fallback when the rich paste
+  // arrives without its pictures. A bare image/png is what a pasted
+  // screenshot is, and every Teams client takes one; a browser that will not
+  // write one (some refuse from file://) gets the picture as one-image HTML.
+  function copyImage(id) {
+    var shot = state.images.filter(function (i) { return i.id === id; })[0];
+    if (!shot) return Promise.reject(new Error('no frozen chart called ' + id));
+    var asHTML = function () {
+      var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+      return copyMarkup('<img src="' + shot.url + '" width="' + shot.w + '" height="' + shot.h + '" alt="' + esc(shot.alt) + '">', shot.alt + '\n');
+    };
+    if (!(navigator.clipboard && root.ClipboardItem)) return asHTML();
+    return navigator.clipboard.write([new root.ClipboardItem({ 'image/png': shot.blob })])
+      .then(function () { return true; }, asHTML);
+  }
+
+  // The card as a picture, under its headline as real text: the headline is
+  // what shows in the chat list and what a search of the chat finds. Pasted
+  // as HTML, the route already shown to bring pictures into Teams.
+  function copyCard() {
+    if (!state.card) return Promise.reject(new Error(state.frozen ? 'there is no card picture (see the status line)' : 'freeze() has not finished'));
+    var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+    var block = blockEl();
+    var head = block && block.querySelector('h2');
+    var headline = head ? head.textContent.replace(/\s+/g, ' ').trim() : '';
+    var alt = state.text.replace(/\s+/g, ' ').trim();
+    var c = state.card;
+    return copyMarkup((headline ? '<p><strong>' + esc(headline) + '</strong></p>' : '') +
+      '<img src="' + c.url + '" width="' + c.w + '" height="' + c.h + '" alt="' + esc(alt) + '">', state.text);
   }
 
   function save(name, blob) {
@@ -497,8 +736,10 @@
   }
   function saveDocument() { save(slug() + '.email.html', new Blob([state.document], { type: 'text/html' })); }
   function saveImages() {
-    state.images.forEach(function (i, k) {
-      setTimeout(function () { save(slug() + '-' + i.id + '.png', i.blob); }, k * 300);
+    var files = state.images.map(function (i) { return { name: slug() + '-' + i.id + '.png', blob: i.blob }; });
+    if (state.card) files.unshift({ name: slug() + '-card.png', blob: state.card.blob });
+    files.forEach(function (f, k) {
+      setTimeout(function () { save(f.name, f.blob); }, k * 300);
     });
   }
 
@@ -516,18 +757,53 @@
       return b;
     };
     var live = editable();
+    var teams = target() === 'teams';
     var buttons = [
       on('copy', function () {
-        copy().then(function () { say('Copied. Paste into the body of a new message.'); },
+        copy().then(function () { say(teams ? 'Copied. Paste into the Teams message box (Ctrl+V), check the pictures arrived, then send.' : 'Copied. Paste into the body of a new message.'); },
           function (e) { say('Could not copy: ' + e.message + (live ? '.' : '. Select the block and press Ctrl+C instead.')); });
+      }),
+      on('copy-card', function () {
+        copyCard().then(function () { say('Copied the card as a picture. Paste into the Teams message box (Ctrl+V) and send.'); },
+          function (e) { say('Could not copy the card: ' + String(e.message).replace(/\.$/, '') + '. Use Save PNG files and attach the card.'); });
       }),
       on('save-html', saveDocument),
       on('save-png', saveImages)
     ];
+    // A Teams page previews either copy: the card as designed, or the text
+    // copy roughly as Teams will set it.
+    var views = Array.prototype.slice.call(bar.querySelectorAll('[data-snap="view"]'));
+    var show = function (view) {
+      var card = document.getElementById('teams-block'), text = document.getElementById('teams-text-preview');
+      if (!card || !text) return;
+      card.hidden = view === 'text';
+      text.hidden = view !== 'text';
+      views.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-view') === view)); });
+    };
+    views.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-view')); }); });
+    // A Teams page gets one button per chart, made once the charts exist.
+    var perChart = bar.querySelector('[data-snap="charts"]');
+    var chartButtons = function (r) {
+      if (!perChart) return;
+      perChart.textContent = '';
+      r.images.forEach(function (img, k) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = 'Copy chart ' + (k + 1);
+        b.addEventListener('click', function () {
+          copyImage(img.id).then(function () { say('Chart ' + (k + 1) + ' copied as a picture. Paste it where it belongs in the message.'); },
+            function (e) { say('Could not copy the picture: ' + String(e.message).replace(/\.$/, '') + '. Use Save PNG files and attach them.'); });
+        });
+        perChart.appendChild(b);
+        buttons.push(b);
+      });
+    };
     var enable = function (yes) { buttons.forEach(function (b) { if (b) b.disabled = !yes; }); };
     var report = function (r) {
+      chartButtons(r);
       enable(true);
-      var n = r.images.length + ' chart(s) frozen as PNG';
+      var n = r.images.length + ' chart(s) frozen as PNG' + (r.card ? ', and the card as one picture' : '');
+      if (teams && !r.card) r.warns.filter(function (w) { return w.rule === 'card'; }).forEach(function (w) { n += '. Note: ' + w.msg; });
       var notes = r.warns.filter(function (w) { return w.rule === 'alt text' || w.rule === 'chart text'; });
       say(!r.ok ? 'Frozen with problems: ' + r.fails.map(function (f) { return f.msg; }).join(' · ')
         : notes.length ? 'Ready — ' + n + '. ' + notes.map(function (w) { return w.msg; }).join(' · ')
@@ -558,6 +834,10 @@
     freeze: freeze,
     check: function () { return check(); },
     copy: copy,
+    copyImage: copyImage,
+    copyCard: copyCard,
+    /** a Teams post's whole card as one picture: { blob, url, w, h, kb }, or null */
+    get card() { return state.card || null; },
     saveDocument: saveDocument,
     saveImages: saveImages,
     lint: lint,
@@ -570,6 +850,8 @@
     /** fn() after every freeze, including the rebuilds that follow an edit */
     on: function (fn) { listeners.push(fn); }
   };
+  // A Teams page reads better calling it by its own name; it is one runtime.
+  root.TeamsSnapshot = root.EmailSnapshot;
   if (document.readyState === 'complete') setTimeout(wire, 0);
   else root.addEventListener('load', wire);
 })(typeof window !== 'undefined' ? window : this);

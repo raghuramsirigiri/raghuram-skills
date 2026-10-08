@@ -10,8 +10,8 @@ Instructions are shared across all AI tools and live in
 
 **Read `AGENTS.md` first, then `plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`, and follow
 that workflow** whenever the user asks for a dashboard, analytics page, KPI
-view, chart deck, illustrated data report, a one-page brief to print, or charts
-to paste into an email.
+view, chart deck, illustrated data report, a one-page brief to print, charts
+to paste into an email, or a post to share in Microsoft Teams.
 
 Eight rules that break the output if missed:
 
@@ -38,6 +38,10 @@ Eight rules that break the output if missed:
    three findings. Read `references/layout-email.md` before writing. Asked for an
    editable one, start from `templates/email-editable.html` instead (charts in
    the page spec; `references/editable.md` § An editable email snapshot).
+   A Teams post (`templates/teams.html`) freezes its charts the same way
+   (`TeamsSnapshot.draw`), but its block is plain headings, paragraphs and
+   lists with no styling, because Teams drops it. Read
+   `references/layout-teams.md`.
 
 Asked for an editable dashboard, report or deck, start from
 `templates/dashboard-editable.html`, `report-editable.html` or

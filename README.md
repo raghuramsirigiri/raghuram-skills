@@ -107,7 +107,7 @@ pulls in the others:
 
 | Plugin | What it does |
 | --- | --- |
-| `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report, deck, one-pager or email snapshot. |
+| `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report, deck, one-pager, email snapshot or Teams post. |
 | `decisions-only` | A meeting transcript → the decisions and commitments, and nothing else. |
 | `whats-changed` | This period's numbers against last period's → what moved, by how much, and the few lines that explain the total. |
 | `sanity-check` | One spreadsheet, deck or PDF → the mistakes that would embarrass you, ranked into what blocks sending. |
@@ -241,6 +241,7 @@ self-contained HTML file that opens offline.
 | [Slide deck](#slide-deck) | An argument someone presents | "presentation", "slides", "deck" |
 | [One-pager](#one-pager) | A report on one printed sheet | "print it", "one page", "a handout", "for the board pack" |
 | [Email snapshot](#email-snapshot) | One to three findings in an email body | "paste it into the weekly update", "Outlook", "Gmail" |
+| Teams post | One to three findings pasted into a Teams chat or channel | "post it in the channel", "share in Teams" |
 | [Editable page](#editable-page) | Any of the above except the one-pager, changed in the browser | "make it editable", "so I can change the numbers" |
 
 The images below all come from one fictional bike-share season, built once in
@@ -535,6 +536,7 @@ plugins/chart-dashboard/skills/chart-dashboard/
     ├── dashboard-editable.html     # the same, in the editable format
     ├── email.html                  # 600px block to paste into Outlook or Gmail
     ├── email-editable.html         # the same, in the editable format
+    ├── teams.html                  # rich text and chart pictures to paste into Teams
     ├── onepager.html               # one printed sheet, set in columns
     ├── report.html                 # paper-column starting point
     ├── report-editable.html        # the same, in the editable format

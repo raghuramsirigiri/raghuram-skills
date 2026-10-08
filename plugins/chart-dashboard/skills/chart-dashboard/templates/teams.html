@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — Teams post</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- These four tags are placeholders. Run scripts/inline-lib.js on the
+     finished page and they are replaced by the files' own contents, so the
+     file works standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* ── This sheet styles the PAGE, never the post ──────────────────────────
+     A Teams post is two things in one file: the block inside #teams-block,
+     which is what the reader pastes into a Teams chat or channel, and the
+     page around it — a toolbar and a stage — which never leaves this file.
+     The Teams compose box keeps the meaning of the markup (headings,
+     paragraphs, bold, lists, a table, pictures) and drops every class and
+     style, then sets the message in its own font and theme. So the block is
+     plain semantic HTML with no styling at all: see references/layout-teams.md.
+
+     The post leaves two ways. "Copy as picture" paints #teams-block, styled
+     by the rules below, into one PNG: the card exactly as designed. "Copy as
+     text" sends the markup, which Teams restyles; #teams-text-preview shows
+     roughly how. */
+  :root {
+    --card:#fbfaf8; --ground:#eae8e4; --ink:#2a2723; --muted:#77716a;
+    --hair:#e4e1dc; --accent:#2e5bba;
+    /* The face Teams sets its messages in. The charts are set in it too
+       (below), so the text in each PNG matches the text around it. */
+    --font: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  }
+  html, body { margin: 0; background: var(--ground); }
+  body { font: 13px/1.4 system-ui, 'Segoe UI', Arial, sans-serif; color: var(--ink); }
+  .snap-bar {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--hair);
+  }
+  .snap-bar b { font-weight: 600; margin-right: 8px; }
+  .snap-bar button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--hair); background: var(--card); color: var(--ink);
+  }
+  .snap-bar button[data-snap="copy-card"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  .snap-bar button:disabled { opacity: .5; cursor: progress; }
+  .snap-bar [data-snap="charts"] { display: contents; }
+  .snap-views { display: inline-flex; margin-left: 8px; }
+  .snap-views button { border-radius: 0; }
+  .snap-views button:first-child { border-radius: 6px 0 0 6px; }
+  .snap-views button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+  .snap-views button[aria-pressed="true"] { background: var(--hair); font-weight: 600; }
+  .snap-bar [data-snap="status"] { color: var(--muted); flex: 1 1 240px; }
+  .snap-stage { padding: 24px 16px 48px; overflow-x: auto; }
+  /* The card: the email block's design, set from plain tags. It is what
+     "Copy as picture" paints, so these rules ARE the picture. A paragraph
+     that is all <em> is a quiet line: the kicker, a chart's units line, a
+     caption, the source. */
+  #teams-block {
+    width: 588px; margin: 0 auto; padding: 22px 24px 18px; box-sizing: border-box;
+    background: var(--card); border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    font: 14px/21px var(--font); color: var(--ink);
+  }
+  #teams-block h2 { font-size: 20px; line-height: 26px; font-weight: bold; margin: 0 0 6px; }
+  #teams-block h3 { font-size: 15px; line-height: 20px; font-weight: bold; margin: 14px 0 2px;
+    padding-top: 14px; border-top: 1px solid var(--hair); }
+  #teams-block p { margin: 0 0 12px; }
+  #teams-block p:has(> em:only-child) { font-size: 12px; line-height: 16px; color: var(--muted); margin-bottom: 8px; }
+  #teams-block p:has(> em:only-child) em { font-style: normal; }
+  #teams-block > p:first-of-type { margin-bottom: 4px; }
+  #teams-block h2 + p { margin-bottom: 18px; }
+  #teams-block > p:last-of-type { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 11px; line-height: 15px; }
+  #teams-block img, #teams-block .chart { display: block; margin: 0 0 6px; }
+  #teams-block table { border-collapse: collapse; margin: 4px 0 14px; min-width: 50%; }
+  #teams-block th { font-size: 12px; line-height: 16px; color: var(--muted); font-weight: normal; }
+  #teams-block th, #teams-block td { border-bottom: 1px solid var(--hair); padding: 6px 16px 6px 0; text-align: left; }
+  #teams-block td + td, #teams-block th + th { text-align: right; padding-right: 0; }
+  #teams-block ul, #teams-block ol { margin: 0 0 12px; padding-left: 20px; }
+  [hidden] { display: none !important; }
+  /* The text copy, set roughly the way Teams sets a pasted message: no
+     paragraph margins, its own full-width table, its own font. Teams applies
+     its theme on top (light, dark, or the sender's bubble colour), so this is
+     an approximation; the picture copy is the exact one. */
+  #teams-text-preview {
+    width: 572px; margin: 0 auto; padding: 10px 16px 12px; box-sizing: border-box;
+    background: #ffffff; color: #242424; border-radius: 6px;
+    font: 14px/20px 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  #teams-text-preview p, #teams-text-preview h2 { margin: 0; font-size: 14px; line-height: 20px; }
+  #teams-text-preview h2 { font-weight: 700; }
+  #teams-text-preview img { display: block; max-width: 100%; height: auto; margin: 2px 0; border-radius: 4px; }
+  #teams-text-preview table { width: 100%; border-collapse: collapse; margin: 2px 0 10px; }
+  #teams-text-preview th, #teams-text-preview td { border: 1px solid #d1d1d1; padding: 2px 8px; text-align: left; }
+  #teams-text-preview th { background: #ebebeb; text-align: center; }
+  #teams-text-preview ul, #teams-text-preview ol { margin: 6px 0; padding-left: 40px; }
+  @media print { .snap-bar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- The toolbar. email-snapshot.js wires every button, adds a Copy chart N
+     button per chart into [data-snap="charts"], switches the preview between
+     the picture and the text copy, and reports the freeze in the status line;
+     keep the data-snap names as written. -->
+<div class="snap-bar" id="snap-bar">
+  <b>Teams post</b>
+  <button type="button" data-snap="copy-card">Copy as picture</button>
+  <button type="button" data-snap="copy">Copy as text</button>
+  <span data-snap="charts"></span>
+  <button type="button" data-snap="save-png">Save PNG files</button>
+  <span class="snap-views" role="group" aria-label="Preview">
+    <button type="button" data-snap="view" data-view="card" aria-pressed="true">Picture</button>
+    <button type="button" data-snap="view" data-view="text" aria-pressed="false">Text in Teams</button>
+  </span>
+  <span data-snap="status"></span>
+</div>
+
+<div class="snap-stage">
+<div id="teams-block">
+<!-- teams:start
+     Everything between these two markers is the post. Rules (checked by
+     scripts/check-page.js, and again on the frozen block by freeze()):
+       · only p, br, strong, em, h2, h3, ul, ol, li, a, blockquote, a simple
+         table, img — Teams flattens or drops everything else
+       · no class, no style=, no color= — Teams keeps none of them, so any
+         emphasis is <strong> or <em>, never a colour
+       · a chart is an empty div with class "chart", an id, a data-alt that
+         states the finding with its numbers, and a px width (at most 540)
+         and height; draw it with TeamsSnapshot.draw and freeze() swaps it
+         for a PNG
+       · the chart's title is an <h3> in the block, not in the image -->
+<p><em>KICKER · scope · Week ending DATE</em></p>
+<h2>Headline: the one finding this post exists to share</h2>
+<p>One or two sentences: what changed, and what the reader should take from it. In a busy channel this is what people read before they decide whether to open the pictures.</p>
+
+<!-- One chart. Its title is an h3 above the image and its units line a
+     paragraph, so they read in Teams' own theme, light or dark, and turn up
+     in a search of the chat; the line under it carries the source or the one
+     number the picture can't. -->
+<h3>The trend, with the moment that changed it marked</h3>
+<p><em>Units · scope · period</em></p>
+<div class="chart" id="c1" style="width:540px;height:230px" data-alt="Line chart: the measure rose from 3.8 in week 1 to a peak of 7.4 in week 4, then settled near 5.6 by week 12."></div>
+<p><em>Caption: the source, or the one number the chart cannot show.</em></p>
+
+<p><em>Source: SOURCE. A snapshot taken DATE — the figures will not update.</em></p>
+<!-- teams:end -->
+</div>
+<!-- The text copy, filled in by the runtime once the charts are frozen and
+     shown when the toolbar's "Text in Teams" preview is on. Leave it empty. -->
+<div id="teams-text-preview" hidden></div>
+</div>
+
+<!-- theme.js MUST load before charts.js; all four are inlined by scripts/inline-lib.js -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script src="charts-lib/email-snapshot.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call,
+   never per-chart colours. Generate it with scripts/extract-theme.js; see
+   references/theming.md. Delete this block when using the default theme.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* The post's one sanctioned metric change: the charts are set in the face
+   Teams sets its messages in, so the text baked into each PNG matches the
+   text around it. Nothing else about the type scale changes. */
+Charts.applyMetrics({ font: getComputedStyle(document.documentElement).getPropertyValue('--font').trim() });
+
+/* Page chrome follows the chart theme — one source of colour truth. The
+   block itself carries no colour: Teams sets it. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',   t.bg);
+  s.setProperty('--ground', t.tileSurface);
+  s.setProperty('--ink',    t.titleColor);
+  s.setProperty('--muted',  t.secondaryColor);
+  s.setProperty('--hair',   t.grid);
+  s.setProperty('--accent', t.highlight);
+})();
+</script>
+<script>
+/* One example chart, for the mechanics a Teams post adds to the usual ones:
+
+     · DRAW THROUGH TeamsSnapshot.draw(factory, id, config). That is what
+       freezes it: once the page has loaded, each chart is rasterised to a 2x
+       PNG and swapped into the block as an <img>. A chart drawn with a bare
+       Charts.line('c1', …) stays an SVG, which Teams does not show.
+     · NO TITLE OR SUBTITLE IN THE CONFIG. They are an h3 and a paragraph in
+       the block.
+     · NOTHING IS HOVER-ONLY. There is no tooltip in a chat. Leave data labels
+       on, and put the numbers that matter in data-alt as well.
+     · NO transparent: true. Teams in dark mode darkens the message but not the
+       picture, and a transparent chart's dark ink lands on a dark background.
+
+   Chart options for every type are in references/charts/<type>.md — don't
+   guess option names. */
+TeamsSnapshot.draw(Charts.line, 'c1', {
+  xAxis: { categories: ['Week 1','Week 2','Week 3','Week 4','Week 5','Week 6',
+                        'Week 7','Week 8','Week 9','Week 10','Week 11','Week 12'] },
+  legend: { enabled: false },
+  callouts: [{ x: 3, text: 'What happened here' }],
+  series: [{ name: 'Measure', type: 'line', color: Charts.theme.colors[1],
+    data: [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
+});
+</script>
+</body>
+</html>
