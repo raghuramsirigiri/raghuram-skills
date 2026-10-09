@@ -194,7 +194,7 @@ It ships as two files like any editable page. Both freeze and both have
 
 ## Build and verify
 
-The steps are the same as for any page (SKILL.md steps 7–8):
+The steps are the same as for any page (SKILL.md steps 7–8, in full in `verify-and-ship.md`):
 
 1. `node <skill-dir>/scripts/finalize.js index.html --stage` stages
    `charts-lib/` with the three editable-page files in it.

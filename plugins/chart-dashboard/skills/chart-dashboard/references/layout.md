@@ -44,7 +44,7 @@ own file — read that one and skip the others:
   per-panel fix for one cramped cell.
 - Header carries title, one-line scope, and the reporting window — nothing else.
   No self-authored summary banner, insight strip, or editorial adjectives; see
-  the copy rules in SKILL.md. (In a deck the cover does this job, and the
+  `design-rules.md` § Nothing on the page that isn't data. (In a deck the cover does this job, and the
   generated per-slide footer carries the running context.)
 - Footer carries sources, definitions, and a note if any figure is illustrative.
   A deck has no room for that strip on every slide: put it on a closing slide.

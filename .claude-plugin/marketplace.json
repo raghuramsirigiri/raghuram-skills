@@ -12,7 +12,7 @@
       "name": "chart-dashboard",
       "source": "./plugins/chart-dashboard",
       "description": "Turn any data — a table, CSV, pasted numbers, metrics, or notes — into a self-contained HTML dashboard, illustrated report, slide deck, printable one-pager, email-safe chart snapshot or Microsoft Teams post with interactive SVG charts. Picks the right chart type for your data automatically. No CDN, no build step, no runtime dependencies, works offline.",
-      "version": "1.11.0",
+      "version": "1.11.1",
       "author": {
         "name": "Raghuram Sirigiri"
       },

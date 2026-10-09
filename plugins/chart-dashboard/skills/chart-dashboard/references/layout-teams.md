@@ -182,7 +182,7 @@ copy the figures. Keep it to a handful of rows, and use one table per post.
 - **Never `transparent: true`.** Teams in dark mode darkens the message but
   not the picture. An opaque chart shows as a light card in a dark thread,
   which is legible.
-- **Emphasis follows the usual rule** (SKILL.md § Make the chart show the
+- **Emphasis follows the usual rule** (`design-rules.md` § Make the chart show the
   finding).
 
 ## Type

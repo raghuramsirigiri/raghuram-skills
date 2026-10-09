@@ -17,6 +17,8 @@ Before writing chart code, consult:
 - `plugins/chart-dashboard/skills/chart-dashboard/references/layout.md` — rules shared by every format; then `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md`, `layout-email.md` or `layout-teams.md` for the format you picked
 - `plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md` — callouts, plot bands, forecast notation
 - `plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md` — action titles; where a finding goes
+- `plugins/chart-dashboard/skills/chart-dashboard/references/design-rules.md` — emphasis, legends, chart count, the one design system
+- `plugins/chart-dashboard/skills/chart-dashboard/references/verify-and-ship.md` — static check, browser audit, `finalize.js` (SKILL.md steps 7–8)
 - `plugins/chart-dashboard/skills/chart-dashboard/references/controls.md` — before adding a filter or dropdown
 - `plugins/chart-dashboard/skills/chart-dashboard/references/theming.md` — brand recolour and the generator scripts
 - `plugins/chart-dashboard/skills/chart-dashboard/references/editable.md` — only when an editable page was asked for; start from the format's `templates/*-editable.html` (dashboard, report, slides, email — none for a one-pager)
