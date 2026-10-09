@@ -31,6 +31,8 @@ topic with figures in it.
    - [`references/layout.md`](plugins/chart-dashboard/skills/chart-dashboard/references/layout.md) — rules shared by every format; routes to `layout-dashboard.md`, `layout-report.md`, `layout-deck.md`, `layout-onepager.md`, `layout-email.md` or `layout-teams.md` (read only the one for your format)
    - [`references/annotation.md`](plugins/chart-dashboard/skills/chart-dashboard/references/annotation.md) — callouts, plot bands, forecast vs. measured notation
    - [`references/narrative.md`](plugins/chart-dashboard/skills/chart-dashboard/references/narrative.md) — action titles; where a finding goes (title, insight column, or card)
+   - [`references/design-rules.md`](plugins/chart-dashboard/skills/chart-dashboard/references/design-rules.md) — emphasis, legends, chart count, the one design system: the full form of SKILL.md's rules
+   - [`references/verify-and-ship.md`](plugins/chart-dashboard/skills/chart-dashboard/references/verify-and-ship.md) — the static check, the browser audit and `finalize.js` (SKILL.md steps 7–8)
    - [`references/controls.md`](plugins/chart-dashboard/skills/chart-dashboard/references/controls.md) — read before adding a filter or dropdown
    - [`references/theming.md`](plugins/chart-dashboard/skills/chart-dashboard/references/theming.md) — brand recolour, and the two scripts under `scripts/` that generate it
    - [`references/editable.md`](plugins/chart-dashboard/skills/chart-dashboard/references/editable.md) — only when the user asked for an editable page

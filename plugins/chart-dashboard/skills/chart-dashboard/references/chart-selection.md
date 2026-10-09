@@ -261,8 +261,8 @@ none of the charts proves alone. Use it for:
 - **A profile past three radars.** Small radars in panels, one per profile.
 
 Don't use it for charts that each stand on their own: those go in separate grid
-cells, each with its own title. Nor is it a way to fit more on the page. SKILL.md's rule that
-*"a panel whose title needs 'and' is two panels"* is about separate claims. An
+cells, each with its own title. Nor is it a way to fit more on the page. The rule that
+*"a panel whose title needs 'and' is two panels"* (`design-rules.md`) is about separate claims. An
 "and" that joins two halves of **one** claim, which only the pair can prove, is
 what `panels` is for.
 
@@ -511,7 +511,7 @@ Then **replace the legend with end-of-line labels**: `lineLabels: 'inline'`
 draws each series name at the end of its own line, tinted to that line's color,
 so the muted series get muted labels for free and the reader never traces a
 swatch back to a stroke. This is the one sanctioned alternative to the top
-legend (see SKILL.md § Legends go in one place) — use it on every line panel of
+legend (see `design-rules.md` § Legends go in one place) — use it on every line panel of
 the page or none.
 
 **A moment, not a series** — *"The drop came after the March update"*. The line

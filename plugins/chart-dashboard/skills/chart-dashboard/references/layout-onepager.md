@@ -219,7 +219,7 @@ and still say to reprint from a browser preview after editing.
 
 ## Verify it as paper
 
-The usual three steps (SKILL.md step 7), with one addition and one subtraction:
+The usual three steps (SKILL.md step 7; `verify-and-ship.md`), with one addition and one subtraction:
 
 - `check-page.js` does the arithmetic — the sheet plus its `@page` margin against
   both papers, the figures in each column against the column, each chart against

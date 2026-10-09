@@ -1,10 +1,25 @@
 {
   "entries": [
     {
+      "path": "../plugins/action-titles/skills"
+    },
+    {
       "path": "../plugins/chart-dashboard/skills"
     },
     {
+      "path": "../plugins/chart-honesty/skills"
+    },
+    {
       "path": "../plugins/decisions-only/skills"
+    },
+    {
+      "path": "../plugins/exec-brief/skills"
+    },
+    {
+      "path": "../plugins/sanity-check/skills"
+    },
+    {
+      "path": "../plugins/whats-changed/skills"
     }
   ]
 }

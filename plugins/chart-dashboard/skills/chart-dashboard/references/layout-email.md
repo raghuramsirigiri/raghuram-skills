@@ -103,7 +103,7 @@ band: the checker takes ~60px off the minimum for a chart with no title.
 
 At most three, in one nested table row. Each is a number with **one line saying
 what it is**. No arrows, no red or green, no "▲ 12%". The template's
-dashboard-tile rules apply (SKILL.md § One design system), and so does the
+dashboard-tile rules apply (`design-rules.md` § One design system), and so does the
 one-pager's warning: a number set larger than the headline becomes the loudest
 thing in the email. The template sizes them at 18px under a 20px headline. Skip
 the row when the headline already states the figure.
@@ -168,7 +168,7 @@ the page, which is why they need a checker.
   the image, so a transparent chart's dark ink lands on a dark background. The
   default opaque `theme.bg` shows as a light card in a dark message, which is
   legible.
-- **Emphasis follows the usual rule** (SKILL.md § Make the chart show the
+- **Emphasis follows the usual rule** (`design-rules.md` § Make the chart show the
   finding): accent the subject when the title names it, and mute the rest.
 
 ## Colour and type

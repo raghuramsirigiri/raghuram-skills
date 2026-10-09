@@ -95,7 +95,7 @@ Notes on the construction:
 and the smoothing routine *drops null points* rather than breaking the path — so
 a genuine hole in the data is silently drawn as an unbroken trend through it.
 
-This collides directly with the honesty rule in SKILL.md § 1: a missing week is
+This collides directly with the honesty rule in SKILL.md (rule 1): a missing week is
 a gap, not a zero — and a gap the reader cannot see is no better than a zero.
 
 ```js
