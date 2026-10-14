@@ -134,6 +134,17 @@ page only makes it a bigger broken page, and its exit code is the gate: a
 non-zero exit means you are not done. It removes a sibling `charts-lib/`
 only when that folder holds exactly the three files it staged, so a folder
 of your own that happens to share the name survives.
+
+**No Node?** `scripts/finalize.sh` (sh and awk) and `scripts/finalize.ps1`
+(Windows PowerShell) take the same arguments. With Node on PATH they just run
+`finalize.js`. Without it they stage, inline, clean up and split an editable
+page byte for byte as `finalize.js` would, and fail only if a `charts-lib/`
+reference survives inlining. They cannot run `check-page.js`, so they print
+`UNCHECKED` on stderr and still exit 0. Tell the user the static checks were
+skipped, and lean harder on the browser audit if you have one:
+```bash
+sh <skill-dir>/scripts/finalize.sh index.html
+```
 The result is one ~590 KB HTML file that opens over `file://` with no server,
 no network, and no sibling folder. Some rules that follow from that:
 - **Never reintroduce a `<script src>` or `<link href>` to anything.** No CDN
