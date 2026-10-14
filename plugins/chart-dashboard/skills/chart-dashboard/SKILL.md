@@ -228,9 +228,9 @@ which is which.
 
 Nothing here requires a specific agent or vendor: it needs file reads from this
 directory, writing an HTML file, and Node for `finalize.js` and the checks.
-Without Node, inline the library by hand — `charts.css` into a `<style>`, then
-`theme.js` and `charts.js` into `<script>` blocks in that order, replacing the
-placeholder tags; an editable page adds `assets/page-runtime.js` after them, and
-an email or Teams snapshot adds `assets/email-snapshot.js` (an editable snapshot
-gets both, in the template's order). Browser preview, the audit, screenshots and
-file attachment are used when available and degrade gracefully when not.
+If you are not sure Node is installed, run `sh <skill-dir>/scripts/finalize.sh`
+(or `scripts/finalize.ps1` on Windows) with the same arguments: it hands over to
+`finalize.js` when Node is there, and otherwise stages, inlines and splits the
+page identically but cannot run `check-page.js` — it prints `UNCHECKED`, and
+you say the static checks were skipped. Browser preview, the audit, screenshots
+and file attachment are used when available and degrade gracefully when not.

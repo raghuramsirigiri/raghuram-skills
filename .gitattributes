@@ -25,3 +25,6 @@
 *.otf   binary
 *.zip   binary
 *.mp4   binary
+
+# Shell scripts run under sh, which chokes on CRLF.
+*.sh text eol=lf

@@ -129,7 +129,8 @@ if (EDITOR_INLINE.test(shipped) || EDITOR_TAG.test(shipped)) {
   let fin = shipped.replace(EDITOR_INLINE, '').replace(EDITOR_TAG, '');
   if (!/<meta name="page-edition"/.test(fin)) fin = fin.replace(/<head>/i, '<head>\n<meta name="page-edition" content="final">');
   fs.writeFileSync(finalCopy, fin);
-  if (path.resolve(target) !== path.resolve(finalCopy)) fs.unlinkSync(target);
+  // Re-running on the working copy itself must not delete the file it just wrote.
+  if (![finalCopy, workingCopy].some(p => path.resolve(p) === path.resolve(target))) fs.unlinkSync(target);
   console.log('editable page: wrote ' + path.basename(finalCopy) + ' (final, to share) and ' +
     path.basename(workingCopy) + ' (editable working copy)');
   const a = run('check-page.js', [finalCopy, '--final']).status;
