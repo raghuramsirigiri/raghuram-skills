@@ -126,3 +126,83 @@ test('horizontal bars are sized by the height: too many rows want h2, too few dr
   assert.ok(!few.passed, few.line);
   assert.match(few.line, /drop the h2/);
 });
+
+// ── cells match their chart's shape ──────────────────────────────────
+// A cell is a shape (width over height), and the span alone doesn't say which:
+// w8 h2 is the same shape as w4. Round charts want square-ish cells, a short
+// series doesn't fill a strip, and a few list rows float in a wide band.
+const SHAPE = "cells match their chart's shape";
+const line = n => `Charts.line('c1', { title: 'T', xAxis: { categories: [${
+  Array.from({ length: n }, (_, i) => `'Week ${i + 1}'`).join(',')}] }, series: [{ name: 'A', data: [${Array(n).fill(1).join(',')}] }] });`;
+const donut = `Charts.donut('c1', { title: 'T', series: [{ data: [{ name: 'A', y: 1 }, { name: 'B', y: 2 }] }] });`;
+
+test('a donut in a one-row w6 fails as a half-empty card; in a w4 or w6 h2 it passes', () => {
+  const r = check('donut-w6', { cell: 'w6', call: donut }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /c1 \(donut\) in w6 \(2\.\d:1\): .*% of the card is empty {2}→ w4/);
+  assert.ok(check('donut-w4', { cell: 'w4', call: donut }, SHAPE).passed);
+  assert.ok(check('donut-w6h2', { cell: 'w6 h2', call: donut }, SHAPE).passed);
+  assert.ok(!check('donut-w4h2', { cell: 'w4 h2', call: donut }, SHAPE).passed);
+});
+
+test('a twelve-point line in a w8 strip fails; as w6, w8 h2, or with 24+ points it passes', () => {
+  const r = check('line12-w8', { cell: 'w8', call: line(12) }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /12 points flattened into a strip \(earned at 24\+\) {2}→ w4 or w6, or w8 h2/);
+  assert.ok(check('line12-w6', { cell: 'w6', call: line(12) }, SHAPE).passed);
+  assert.ok(check('line12-w8h2', { cell: 'w8 h2', call: line(12) }, SHAPE).passed);
+  assert.ok(check('line30-w8', { cell: 'w8', call: line(30) }, SHAPE).passed);
+  const band = check('line30-w12', { cell: 'w12', call: line(30) }, SHAPE);
+  assert.ok(!band.passed, band.line);
+  assert.match(band.line, /flattened into a band \(earned at 40\+\) {2}→ w8/);
+});
+
+test('a plotted chart in a tall narrow cell fails', () => {
+  const r = check('line12-w4h2', { cell: 'w4 h2', call: line(12) }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /tall and narrow/);
+});
+
+test('a scatter is never a strip', () => {
+  const call = `Charts.scatter('c1', { title: 'T', series: [{ data: [[1, 2], [3, 4]] }] });`;
+  assert.ok(!check('scatter-w8', { cell: 'w8', call }, SHAPE).passed);
+  assert.ok(check('scatter-w6', { cell: 'w6', call }, SHAPE).passed);
+});
+
+test('columns earn a strip by bars across; a column misfit already reported as slabs is not reported twice', () => {
+  assert.ok(!check('cols8-w8', { cell: 'w8', call: cols(8) }, SHAPE).passed);
+  assert.ok(check('cols14-w8', { cell: 'w8', call: cols(14) }, SHAPE).passed);
+  // Five columns across w12 are slabs: that row names the fix, this one stays quiet.
+  assert.ok(check('cols5-w12-shape', { cell: 'w12', call: cols(5) }, SHAPE).passed);
+});
+
+test('a few list rows in a wide band fail; the same list in a w6 passes', () => {
+  const r = check('bar4-w8', { cell: 'w8', call: bars(4) }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /4 rows in a wide band .* {2}→ w4 or w6/);
+  assert.ok(check('bar4-w6', { cell: 'w6', call: bars(4) }, SHAPE).passed);
+});
+
+test('tables in a flow row are not held to a shape', () => {
+  assert.ok(check('table-flow-shape', { cell: 'w12', flow: true,
+    call: `Charts.table('c1', { columns: [], rows: [] });` }, SHAPE).passed);
+});
+
+test('a chart with its own pixel height in a flow row is held to that box', () => {
+  const file = path.join(dir, 'donut-flow-fixed.html');
+  fs.writeFileSync(file, `${CSS}<div class="page"><div class="bento flow">` +
+    `<div class="cell w8"><div class="chart" id="c1" style="height:300px"></div></div></div></div>\n<script>\n${donut}\n</script>\n`);
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const line = out.split('\n').find(l => l.includes(SHAPE));
+  assert.match(line, /FAIL .*c1 \(donut\) in w8 at 300px/);
+});
+
+test('a three-stage sankey across a band fails; in a w6 it passes', () => {
+  const call = `Charts.sankey('c1', { title: 'T', stages: ['A', 'B', 'C'], series: [{ data: [['a', 'b', 1], ['b', 'c', 1]] }] });`;
+  const r = check('sankey3-w12', { cell: 'w12', call }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /3 stages stretched into a band {2}→ w6/);
+  assert.ok(check('sankey3-w6', { cell: 'w6', call }, SHAPE).passed);
+  // Without stage headers the depth comes from the links.
+  assert.ok(!check('sankey3-links-w12', { cell: 'w12', call: call.replace("stages: ['A', 'B', 'C'], ", '') }, SHAPE).passed);
+});

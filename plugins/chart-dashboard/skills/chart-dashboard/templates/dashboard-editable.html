@@ -99,10 +99,12 @@
   </div>
 
   <!-- THE GRID IS NOT A TEMPLATE — BUILD IT FROM YOUR PANEL PLAN
-       (references/layout-dashboard.md § Compose the grid from the findings). One chart
-       div per cell; each id must have an entry in #page-spec below. -->
+       (references/layout-dashboard.md). Size each panel's cell from its chart
+       type and value count first (§ First, the cell each chart wants), then
+       pack the cells into rows (§ Then compose the rows). One chart div per
+       cell; each id must have an entry in #page-spec below. -->
   <div class="bento">
-    <div class="cell w12"><div class="chart" id="c1"></div></div>
+    <div class="cell w6"><div class="chart" id="c1"></div></div>
   </div>
   <!-- Tables size themselves to their rows, so they go in a content-sized
        "bento flow" row, never a fixed cell or an h2. -->
