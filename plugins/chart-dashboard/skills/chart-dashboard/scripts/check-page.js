@@ -492,6 +492,7 @@ if (!sized.length) {
   ok('charts fit their cells', 'no charts in a sized grid');
   ok('titles fit their charts', 'no charts in a sized grid');
   ok('bars sized to their cell', 'no charts in a sized grid');
+  ok("cells match their chart's shape", 'no charts in a sized grid');
 } else {
   const tooSmall = [], cramped = [];
   // The manifest's minWidth/minHeight are the sizes a chart WANTS. No engine
@@ -556,16 +557,18 @@ if (!sized.length) {
       '  → shorten it, move the qualifier to the subtitle, or widen the cell — the cut-off tail is usually the finding');
   } else ok('titles fit their charts', 'every chart title fits in two lines at its cell width');
 
-  // Advice, not a failure: the manifest's own thresholds for when a chart
-  // wants more width than a half-page cell gives it.
-  const crowded = sized.filter(c => c.cell.w < 8 && isObj(c.cfg)).map(c => {
+  // Advice, not a failure: an x-axis long enough to want more width than its
+  // cell gives it. The way up is not always a one-row w8 — that strip has to be
+  // earned (the shape check below) — so the advice names the taller cells too.
+  const crowded = sized.filter(c => c.cell.w && isObj(c.cfg)).map(c => {
     const cats = catsOf(c.cfg);
-    if (c.type === 'line' && cats && cats.length >= 12) return c.id + ': line over ' + cats.length + ' points';
-    if (c.type === 'waterfall' && Array.isArray(c.cfg.data) && c.cfg.data.length >= 8) return c.id + ': waterfall with ' + c.cfg.data.length + ' steps';
-    if (c.type === 'heatmap' && cats && cats.length >= 25) return c.id + ': heatmap with ' + cats.length + ' columns';
+    const steps = Array.isArray(c.cfg.data) ? c.cfg.data.length : 0;
+    if (c.type === 'line' && c.cell.w < 6 && cats && cats.length >= 24) return c.id + ': line over ' + cats.length + ' points in ' + c.cell.cls;
+    if (c.type === 'waterfall' && c.cell.w < 6 && steps >= 12) return c.id + ': waterfall with ' + steps + ' steps in ' + c.cell.cls;
+    if (c.type === 'heatmap' && c.cell.w < 8 && cats && cats.length >= 25) return c.id + ': heatmap with ' + cats.length + ' columns in ' + c.cell.cls;
     return null;
   }).filter(Boolean);
-  if (crowded.length) note('crowded axes', crowded.join(' | ') + ' in a cell narrower than w8 — consider w8 or w12 (manifest gridSpanWhen)');
+  if (crowded.length) note('crowded axes', crowded.join(' | ') + ' — consider w6, w8 h2, or the w8/w12 strip a long axis earns (layout-dashboard.md § Plotted charts: count across)');
 
   // The other direction: a cell too big for its data. The engine divides the
   // plot evenly between categories and a bar takes 48% of its slot (group and
@@ -670,6 +673,74 @@ if (!sized.length) {
   }
   if (misfit.length) bad('bars sized to their cell', misfit.join(' | '));
   else ok('bars sized to their cell', 'every column and bar chart has room per category without slab-wide bars');
+
+  // A cell is a shape, and every chart has one it reads in. Charts stretch to
+  // whatever cell they get, so a wrong shape never errors: a donut in a one-row
+  // w6 draws its ring at the 330px height and leaves half the card empty, a
+  // twelve-point line across a w8 flattens into a 3:1 strip, and three dumbbell
+  // rows float in a 1,000px band. The span alone can't say this — w8 h2 is the
+  // same shape as w4 — so the test is the cell's own width over height, which
+  // also keeps a page with taller custom rows honest. Families and thresholds:
+  // references/layout-dashboard.md § First, the cell each chart wants.
+  // At the template's 1600px: w4 1.5, w6 2.3, w8 3.1, w12 4.7; h2 halves them.
+  const SHAPE = { roundMax: 1.9, roundMin: 0.8, plotMin: 0.85, strip: 2.6, band: 3.8,
+    // Values across that earn a strip / a band, per plotted chart.
+    line: [24, 40], column: [12, 20], waterfall: [12, 20], listedMax: 6 };
+  const ROUND = /^(donut|pie|radar|packedBubble|waffle)$/;
+  const PLOTTED = /^(line|column|histogram|histogramPercent|histogramCumulative|waterfall|scatter|bubble)$/;
+  const LISTED = /^(bar|barList|dumbbell)$/;
+  const barFlagged = new Set(misfit.map(s => s.split(' ')[0]));
+  const across = c => {
+    const cfg = c.cfg;
+    const series = Array.isArray(cfg.series) ? cfg.series.filter(isObj) : [];
+    const n = (catsOf(cfg) || []).length ||
+      (Array.isArray(cfg.data) ? cfg.data.length : 0) ||
+      Math.max(0, ...series.map(s => Array.isArray(s.data) ? s.data.length : 0));
+    if (c.type !== 'column') return n;
+    // Grouped columns put k bars in every slot, so they fill a strip sooner.
+    const po = isObj(cfg.plotOptions) ? cfg.plotOptions : {};
+    const stacked = [po.column, po.series].some(p => isObj(p) && p.stacking);
+    return stacked ? n : n * Math.max(1, series.length);
+  };
+  const shapeMisfit = [];
+  for (const c of sized) {
+    if (c.cell.grid !== 'bento' || c.cell.flow || !isObj(c.cfg) || barFlagged.has(c.id)) continue;
+    const r = c.cell.px / c.cell.py;
+    const where = c.id + ' (' + c.type + ') in ' + c.cell.cls + ' (' + r.toFixed(1) + ':1)';
+    if (ROUND.test(c.type)) {
+      if (r > SHAPE.roundMax) {
+        shapeMisfit.push(where + ': drawn at the cell height, so ~' + Math.round(100 * (1 - 1 / r)) +
+          '% of the card is empty  → w4, or w6 h2 if it leads; give the spare width to a neighbour');
+      } else if (r < SHAPE.roundMin) {
+        shapeMisfit.push(where + ': a tall column with the ring in its middle  → a one-row w4');
+      }
+    } else if (PLOTTED.test(c.type)) {
+      if (r < SHAPE.plotMin) {
+        shapeMisfit.push(where + ': tall and narrow, with nothing to fill the height  → one row, or w8 h2 if it leads');
+        continue;
+      }
+      if (r <= SHAPE.strip) continue;
+      if (/^(scatter|bubble)$/.test(c.type)) {
+        shapeMisfit.push(where + ': a relationship needs height as much as width  → w6, or w6 h2 / w8 h2 if it leads');
+        continue;
+      }
+      const earn = SHAPE[c.type];
+      const n = across(c);
+      if (!earn || !n) continue;
+      const need = r > SHAPE.band ? earn[1] : earn[0];
+      if (n >= need) continue;
+      const unit = c.type === 'line' ? 'points' : c.type === 'waterfall' ? 'steps' : 'bars across';
+      shapeMisfit.push(where + ': ' + n + ' ' + unit + ' flattened into a ' + (r > SHAPE.band ? 'band' : 'strip') +
+        ' (earned at ' + need + '+)  → ' + (n >= earn[0] ? 'w8' : 'w4 or w6, or w8 h2 if it leads'));
+    } else if (LISTED.test(c.type)) {
+      const n = across(c);
+      if (r > SHAPE.strip && n && n <= SHAPE.listedMax) {
+        shapeMisfit.push(where + ': ' + n + ' rows in a wide band — width only adds bar length  → w4 or w6');
+      }
+    }
+  }
+  if (shapeMisfit.length) bad("cells match their chart's shape", shapeMisfit.join(' | '));
+  else ok("cells match their chart's shape", 'no round chart in a landscape card, no short series stretched into a strip');
 }
 
 // ── 2c. donut and pie options are where the engine reads them ────────

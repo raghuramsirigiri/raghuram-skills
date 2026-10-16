@@ -56,9 +56,12 @@ That cuts both ways, and both failures are common:
   them into eight panels by stacking unrelated series onto shared axes. Let the
   page be long.
 
-When there are only a few panels, widen them (`w6`/`w8`/`w12`) so the grid still
-reads as a designed page rather than a half-empty one — a two-panel dashboard is
-two big panels, not two small panels marooned top-left.
+When there are only a few panels, make them bigger so the grid still reads as a
+designed page rather than a half-empty one. A two-panel dashboard is two big
+panels, not two small panels marooned top-left. Grow them taller as well as
+wider (`w6 h2`, `w8 h2`) so each keeps the shape its chart wants: a donut or a
+twelve-point line stretched across a one-row `w12` is a strip with a chart lost
+in it (`references/layout-dashboard.md` § First, the cell each chart wants).
 
 Reports work the same way: a figure exists because a claim in the prose needs
 evidence. A section that states no claim needs no chart, and a claim the reader

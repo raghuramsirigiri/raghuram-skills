@@ -118,13 +118,26 @@
   <!-- THE GRID IS NOT A TEMPLATE — BUILD IT FROM YOUR PANEL PLAN.
        There is deliberately no starter arrangement here, because whatever
        arrangement shipped in this file would end up on every page this skill
-       produces regardless of the data. Derive the rows instead:
-         · one trend dominates  → w8 h2 hero + w4 / w4 beside it
+       produces regardless of the data. Two passes, in this order:
+       1. Give each panel its natural cell from its chart type and value count,
+          before any row exists. A cell is a shape: w4 ≈ 1.4:1, w6 ≈ 2:1,
+          w8 ≈ 3:1 strip, w12 ≈ 4.5:1 band; h2 doubles the height, so
+          w8 h2 ≈ 1.4:1 and w6 h2 ≈ 1:1.
+         · donut / pie / radar / waffle → w4 (never a w6+ one-row card)
+         · line / column / scatter      → w4 or w6; w8 h2 when it leads.
+                                          A one-row w8/w12 strip only for a
+                                          long x: 24+ line points, 12+ columns
+         · horizontal bar / barList     → height from rows (3–13 one row,
+                                          7–33 h2), w4–w6 wide
+         · tables                       → a "bento flow" row, wide
+       2. Then pack those cells into rows that add up to twelve:
+         · one trend dominates  → w8 h2 hero + w4 / w4 stacked beside it
          · two things compared  → w6 + w6
-         · a ranking leads      → w12 across the top
-         · a funnel / sequence  → w12 first
+         · a ranking leads      → barInsightTable in a flow row, or a w4 h2
+                                  bar beside the w8 h2 that cuts it
+         · a funnel / sequence  → waterfall or sankey first, sized by its steps
          · nothing dominates    → w4 · w4 · w4 of equal weight
-         · geography leads      → w8 geofacet + w4 h2 ranked list
+         · geography leads      → w8 h2 geofacet + w4 h2 ranked list
          · a scorecard / review → reportTable in a "bento flow" row first
          · rows carry several measures, a note, or a trend each
                                 → a table (table / barInsightTable /
@@ -132,13 +145,13 @@
          · one measure, several segments, and the comparison is the point
                                 → Charts.panels small multiples, one scale
        Full derivation, and the rule that a hero must be earned, in
-       references/layout-dashboard.md § Compose the grid from the findings.
-       Spans: w4 w6 w8 w12 (columns), h2 (double height), chosen from each
-       chart's value count — 5 columns want w4/w6, not w12 (layout-dashboard.md § Size
-       each cell from its data). One chart div per
-       cell, ids in sync with the script below. Replace this whole block. -->
+       references/layout-dashboard.md (§ First, the cell each chart wants, then
+       § Then compose the rows). A lead gets room by going h2, never by
+       stretching across a row. One chart div per cell, ids in sync with the
+       script below. Replace this whole block: the four-bar placeholder below
+       is a w6 because four rows want a short, landscape cell. -->
   <div class="bento">
-    <div class="cell w12"><div class="chart" id="c1"></div></div>
+    <div class="cell w6"><div class="chart" id="c1"></div></div>
   </div>
   <!-- Tables size themselves to their rows, so they go in a content-sized
        "bento flow" row, never a fixed cell or an h2. -->

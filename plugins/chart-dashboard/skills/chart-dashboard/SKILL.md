@@ -64,8 +64,10 @@ configs.
 
 1. **Extract the data.** Pull every number, category, and time series out of the
    user's input into a short plan: for each planned panel note *title, data
-   shape, chart type, and the data it takes* — the data shape *before* the chart
-   type. The shape says what one item carries: one number, a number per period,
+   shape, chart type, the data it takes, and how many values run across or down
+   it* (categories, points, rows, slices). Note the data shape *before* the
+   chart type, and the value count before any layout, because step 4 sizes the
+   cell from it. The shape says what one item carries: one number, a number per period,
    several measures, a number plus a note, a trend plus a figure, a flow, or raw
    values. Skip that and every row with several things in it becomes a column
    chart. A pasted table with three or more numeric columns, a note against each
@@ -108,13 +110,24 @@ configs.
    placeholders (the email and Teams templates have a fourth, for their freeze
    runtime). Leave them exactly as written; step 8 folds the library in.
 
-4. **Derive the structure from the findings, not from the template.** The
-   dashboard template ships a placeholder two-cell grid on purpose. Before
-   writing markup, name the dominant shape of the analysis (one trend, a
-   head-to-head, a ranking, a funnel, a distribution, parallel equal measures,
-   geography) and whether one panel is genuinely the reason the page exists.
-   Worked derivations: `layout-dashboard.md` § Compose the grid from the
-   findings. Then check:
+4. **Derive the structure from the findings and the charts, not from the
+   template.** The dashboard template ships a placeholder two-cell grid on
+   purpose. Two passes, in this order:
+   - **Size each panel's cell first, from its chart type and its values**,
+     before any row exists. Round charts (donut, pie, radar, waffle) want a
+     square-ish `w4`. Lines, columns and scatters want `w4`/`w6`, or `w8 h2`
+     when they lead, and only a long x-axis earns a one-row `w8`/`w12` strip.
+     Horizontal bars take their height from the row count. Tables are wide in
+     a flow row. Write the cell into the step-1 plan
+     (`layout-dashboard.md` § First, the cell each chart wants).
+   - **Then pack those cells into rows**: name the dominant shape of the
+     analysis (one trend, a head-to-head, a ranking, a funnel, a distribution,
+     parallel equal measures, geography) and whether one panel is genuinely the
+     reason the page exists (`layout-dashboard.md` § Then compose the rows). A
+     lead gets room by going `h2`, never by stretching across a row. If the
+     cells won't pack, change the panel or the chart, not the cell.
+
+   Then check:
    - **A hero must be earned.** `w8 h2` only when one finding dominates.
    - **A wide line + a donut + a small panel** on top is this skill's reflex;
      keep it only if the data put it there.
@@ -124,8 +137,8 @@ configs.
      panel shows, or rows the reader looks up.
    - **Tables size themselves** — a `<div class="bento flow">` row, never a fixed
      cell or `.h2` (`layout-dashboard.md` § Tables size themselves).
-   - **Size each cell from its data**, not its rank: count the categories once
-     step 5 has picked the chart (`layout-dashboard.md` § Size each cell).
+   - **No chart stretched out of shape**: no donut in a `w6`+ one-row card, no
+     12-point line or 4-bar list across a `w8`/`w12` strip.
 
    *One-pager:* write the claims as sentences first, then pick `--cols` and each
    figure's `--fig-h` from the content and do the budget in
