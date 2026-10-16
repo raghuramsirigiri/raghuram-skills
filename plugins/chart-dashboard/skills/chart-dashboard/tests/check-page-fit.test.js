@@ -187,3 +187,22 @@ test('tables in a flow row are not held to a shape', () => {
   assert.ok(check('table-flow-shape', { cell: 'w12', flow: true,
     call: `Charts.table('c1', { columns: [], rows: [] });` }, SHAPE).passed);
 });
+
+test('a chart with its own pixel height in a flow row is held to that box', () => {
+  const file = path.join(dir, 'donut-flow-fixed.html');
+  fs.writeFileSync(file, `${CSS}<div class="page"><div class="bento flow">` +
+    `<div class="cell w8"><div class="chart" id="c1" style="height:300px"></div></div></div></div>\n<script>\n${donut}\n</script>\n`);
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const line = out.split('\n').find(l => l.includes(SHAPE));
+  assert.match(line, /FAIL .*c1 \(donut\) in w8 at 300px/);
+});
+
+test('a three-stage sankey across a band fails; in a w6 it passes', () => {
+  const call = `Charts.sankey('c1', { title: 'T', stages: ['A', 'B', 'C'], series: [{ data: [['a', 'b', 1], ['b', 'c', 1]] }] });`;
+  const r = check('sankey3-w12', { cell: 'w12', call }, SHAPE);
+  assert.ok(!r.passed, r.line);
+  assert.match(r.line, /3 stages stretched into a band {2}→ w6/);
+  assert.ok(check('sankey3-w6', { cell: 'w6', call }, SHAPE).passed);
+  // Without stage headers the depth comes from the links.
+  assert.ok(!check('sankey3-links-w12', { cell: 'w12', call: call.replace("stages: ['A', 'B', 'C'], ", '') }, SHAPE).passed);
+});

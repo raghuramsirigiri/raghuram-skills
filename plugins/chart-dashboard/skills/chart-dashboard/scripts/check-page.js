@@ -435,7 +435,18 @@ function cellOf(id) {
   if (!w) return null;
   const h = +((/\bh(\d+)\b/.exec(cls) || [])[1] || 1);
   const flow = /^class="bento[^"]*\bflow\b/.test(code.slice(gridAt, gridAt + 60));
-  return { grid: 'bento', cls: cls.replace(/\bcell\b\s*/, '').trim(), w, flow,
+  // A chart given its own pixel height inside a flow row is a fixed box, not
+  // a content-sized one: a donut at style="height:440px" in a w4 flow cell is
+  // as much a shape as one in a 340px grid row, and is checked as one.
+  const tagAt = code.lastIndexOf('<', at);
+  const tag = code.slice(tagAt, code.indexOf('>', at) + 1);
+  const fixed = flow ? +((/style="(?:[^"]*?[;\s])?height\s*:\s*([\d.]+)px/.exec(tag) || [])[1] || 0) : 0;
+  const name = cls.replace(/\bcell\b\s*/, '').trim();
+  if (fixed) {
+    return { grid: 'bento', cls: name + ' at ' + fixed + 'px', w, flow: false,
+      px: cellPx(w), py: fixed, pxOf: cellPx, pyOf: () => fixed };
+  }
+  return { grid: 'bento', cls: name, w, flow,
     px: cellPx(w), py: flow ? null : cellPy(h), pxOf: cellPx, pyOf: cellPy };
 }
 
@@ -685,7 +696,25 @@ if (!sized.length) {
   // At the template's 1600px: w4 1.5, w6 2.3, w8 3.1, w12 4.7; h2 halves them.
   const SHAPE = { roundMax: 1.9, roundMin: 0.8, plotMin: 0.85, strip: 2.6, band: 3.8,
     // Values across that earn a strip / a band, per plotted chart.
-    line: [24, 40], column: [12, 20], waterfall: [12, 20], listedMax: 6 };
+    line: [24, 40], column: [12, 20], waterfall: [12, 20], listedMax: 6,
+    sankeyShort: 3, sankeyBand: 3.0 };
+  const sankeyDepth = cfg => {
+    const s = Array.isArray(cfg.series) ? cfg.series.find(isObj) : null;
+    const links = s && Array.isArray(s.data) ? s.data.map(l => Array.isArray(l) ? [l[0], l[1]] : isObj(l) ? [l.from, l.to] : null).filter(Boolean) : [];
+    if (!links.length) return 0;
+    const out = new Map();
+    for (const [a, b] of links) { if (!out.has(a)) out.set(a, []); out.get(a).push(b); }
+    const memo = new Map();
+    const depth = (n, seen) => {
+      if (memo.has(n)) return memo.get(n);
+      if (seen.has(n)) return 1;   // a cycle: count it once rather than loop
+      seen.add(n);
+      const d = 1 + Math.max(0, ...(out.get(n) || []).map(m => depth(m, seen)));
+      seen.delete(n); memo.set(n, d);
+      return d;
+    };
+    return Math.max(...[...out.keys()].map(n => depth(n, new Set())));
+  };
   const ROUND = /^(donut|pie|radar|packedBubble|waffle)$/;
   const PLOTTED = /^(line|column|histogram|histogramPercent|histogramCumulative|waterfall|scatter|bubble)$/;
   const LISTED = /^(bar|barList|dumbbell)$/;
@@ -736,6 +765,14 @@ if (!sized.length) {
       const n = across(c);
       if (r > SHAPE.strip && n && n <= SHAPE.listedMax) {
         shapeMisfit.push(where + ': ' + n + ' rows in a wide band — width only adds bar length  → w4 or w6');
+      }
+    } else if (c.type === 'sankey') {
+      // Columns of nodes: the stage headers when given, else the longest path
+      // through the links. Two or three columns spread across a band are long
+      // thin ribbons with the nodes squashed to slivers.
+      const n = Array.isArray(c.cfg.stages) ? c.cfg.stages.length : sankeyDepth(c.cfg);
+      if (n && n <= SHAPE.sankeyShort && r > SHAPE.sankeyBand) {
+        shapeMisfit.push(where + ': ' + n + ' stages stretched into a band  → w6, or a taller cell (layout-dashboard.md § The four shape families)');
       }
     }
   }

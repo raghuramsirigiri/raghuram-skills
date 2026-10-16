@@ -135,7 +135,9 @@ stacked `w4`s.
 `check-page.js` runs these sums. "Bars sized to their cell" checks column and
 bar counts and names the span that fits. "Cells match their chart's shape"
 fails a round chart in a landscape cell, a plotted chart in a strip its
-x-axis hasn't earned, and a short list in a wide band.
+x-axis hasn't earned, a short list in a wide band, and a two- or three-stage
+sankey stretched past 3:1. A chart given its own pixel height in a flow row
+is checked as the fixed box it is.
 
 ## Then compose the rows from those cells
 
