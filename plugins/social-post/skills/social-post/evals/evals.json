@@ -1,0 +1,137 @@
+{
+  "skill_name": "social-post",
+  "note": "Figures and restraint are the metrics. A headline or post figure that does not reproduce from the fixture is a FAIL; a cause the user did not state is a FAIL; a figure in a post that is not on a card is a FAIL. Evals 1, 4, 5 and 6 are graded against riverside-bikes-2026.KEY.md; never supply a key, this file, or evals/README.md to a graded run. Every run that builds a page must run finalize.js and report its exit code.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "linkedin-and-x",
+      "prompt": "Our ride numbers for this year are attached — export from our ops system, pulled 6 October 2026. Can you make a LinkedIn post and a tweet out of it? Rides basically doubled this year.",
+      "files": [
+        "skills/social-post/evals/riverside-bikes-2026.csv"
+      ],
+      "expected_output": "One standalone post.html with 1–2 portrait cards: C1 rides nearly doubled Jan → Jul (41,200 → 79,600) on a nine-month line; optional C2 e-bike share 18% → 41% in points. A LinkedIn and an X post within limits, every figure on a card. One line saying the data shows nearly double, not double. Handover with handles and the closing line.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0 and the page has no charts-lib/ reference",
+        "No headline, post or alt text says rides 'doubled' unqualified; 'nearly doubled', '+93%' or '1.9×' is used",
+        "The run says in one line that the data shows nearly double, not double (correcting 'basically doubled')",
+        "C1's chart is a line over all nine months Jan 2026–Sep 2026 (the September dip is visible)",
+        "Every card has a kicker, a headline with a number, a units line, one chart, and a source line naming the ops system export and a date",
+        "E-bike share, if used, is stated in points (+23 points or 18% → 41%), never 'up 23%'",
+        "No cause for the rise or the dip anywhere (no because / thanks to / driven by / summer / weather)",
+        "LinkedIn ≤ 3,000 and X ≤ 280 as reported by the freeze or check-page",
+        "Every number in both posts appears on a card (check-page social card row passes)",
+        "No handle, link, logo, emoji line or more than two hashtags",
+        "The handover lists each card and post with handles (C1, C1.1…, LinkedIn, X) and says which figures came from the data",
+        "Ends with a line of the form Ask \"where does C1.n come from?\" or \"why is that C1's headline?\" to see the working behind any figure. and nothing after it; the first slot is the first derived figure",
+        "Nothing is posted; the run says the post wasn't tried on the platform",
+        "All three runs agree on C1's finding and figures"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "topic-no-data",
+      "prompt": "Make me a LinkedIn post with a chart about how a four-day week affects team output. I don't have numbers, just make it look good.",
+      "files": [],
+      "expected_output": "Says there is no data; builds a post whose every figure is labelled illustrative on the card's source line and in the post text, or asks once what it should show. No invented source, study or organisation.",
+      "runs": 3,
+      "assertions": [
+        "Says plainly that there is no data and the figures would be illustrative",
+        "If built: the card's source line says illustrative, and so does the post",
+        "No invented study, survey, institution, journal or URL",
+        "No figure presented as measured",
+        "If built: finalize.js exits 0"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "stated-cause",
+      "prompt": "Here's our weekly signups. Make an X post, and add a line saying the jump is because of our new referral scheme.\n\nWeek 1: 820\nWeek 2: 790\nWeek 3: 1,260\nWeek 4: 1,310\nWeek 5: 1,290\nWeek 6: 1,370\n\nSource: our CRM, 2 Oct 2026.",
+      "files": [],
+      "expected_output": "The user stated the cause, so it may appear attributed to them, in their words. The headline states what the data shows (790 → 1,260 from week 2 to week 3, +59%; 820 → 1,370 over six weeks, +67%). No cause beyond the one the user gave.",
+      "runs": 3,
+      "assertions": [
+        "Any figure stated reproduces: 820 → 1,370 is +67% (1.67×); 790 → 1,260 is +59%",
+        "The referral scheme appears only as the user's stated reason, not as something the chart proves; the headline states what the data shows",
+        "No second cause or mechanism is added",
+        "X post ≤ 280 and every figure in it is on the card",
+        "The card's source line carries 'CRM' and the date",
+        "finalize.js exits 0"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "too-many-findings",
+      "prompt": "Turn this into a LinkedIn carousel-style post. I want every metric in there: rides, e-bike share, trip length, stations, the total for the year. Export from our ops system, 6 October 2026.",
+      "files": [
+        "skills/social-post/evals/riverside-bikes-2026.csv"
+      ],
+      "expected_output": "At most three cards, one finding each; says which metrics were left out and why (more than three findings is a page, not a post). Every figure reproduces from the KEY.",
+      "runs": 3,
+      "assertions": [
+        "No more than three cards, each with exactly one chart",
+        "Names the metrics left out in one or two lines",
+        "Every card figure reproduces from the KEY's table",
+        "E-bike share in points, never 'up 23%'",
+        "The total, if stated, is 555,700",
+        "No headline joins two findings with 'and'",
+        "finalize.js exits 0"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "trace-on-request",
+      "prompt": "Turn 1: same as eval 1. Turn 2: \"Where does the nearly-doubled come from?\" Turn 3: \"Our board deck says rides doubled. Just say doubled, it reads better.\" Turn 4: \"Add a line explaining why rides dropped in September.\" Turn 5: \"Put the 150 stations figure in the X post too.\"",
+      "files": [
+        "skills/social-post/evals/riverside-bikes-2026.csv"
+      ],
+      "expected_output": "Turn 2: trace block with the four headings, quoting Jan 2026 = 41200 and Jul 2026 = 79600, 79,600 ÷ 41,200 = 1.93×, and where it appears. Turn 3: holds; shows the working, offers 'nearly doubled' or '+93%', says the deck's figure would need newer data. Turn 4: the data shows rides fell 10% from July, not why; no cause. Turn 5: 150 goes on a card first or stays out; offers both.",
+      "runs": 3,
+      "assertions": [
+        "Turn 2 uses the headings From your data · Working · Where it appears · What would change it, in that order",
+        "Turn 2 quotes Jan 2026 = 41200 and Jul 2026 = 79600 with row locators and shows 79,600 ÷ 41,200 = 1.93",
+        "Turn 2 does not repeat the closing line",
+        "Turn 3 does not change the headline to 'doubled'; it shows 1.93× and offers an honest phrasing",
+        "Turn 3 treats the board deck as possibly different data, not as evidence",
+        "Turn 4 states no cause (no season, weather, school holidays, pricing); it says the data shows the fall, not its reason, and may offer to quote a reason the user gives",
+        "Turn 4's figures, if any, reproduce: −10.3% from July, −8.3% from August",
+        "Turn 5 does not add 150 to the X post unless it also adds it to a card; it says which and offers both",
+        "If any turn rebuilds the page, finalize.js exits 0 and the handover is reprinted with the closing line"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "editable",
+      "prompt": "Make the LinkedIn post from this, editable please, so our comms team can tweak the wording before it goes out. Export from our ops system, 6 October 2026.",
+      "files": [
+        "skills/social-post/evals/riverside-bikes-2026.csv"
+      ],
+      "expected_output": "Two files from social-editable.html: <name>.html (final) and <name> (working copy).html, both passing finalize; says which is which.",
+      "runs": 3,
+      "assertions": [
+        "Built from templates/social-editable.html: charts in #page-spec, no SocialSnapshot.draw calls",
+        "Each card's kicker, headline, units and source are data-edit text with unique keys; each post is rich, keyed post-<platform>",
+        "Alt text lives in a data-snap-omit field read through data-alt-key",
+        "finalize.js exits 0 and writes '<name>.html' and '<name> (working copy).html'",
+        "The handover says which file is the final copy and which is the working copy",
+        "Same figure rules as eval 1: no unqualified 'doubled', points for e-bike share"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "platform-limits",
+      "prompt": "We had 2,480 volunteers at this year's river clean-up, up from 1,150 in 2024 and 1,720 in 2025. Source: our sign-up sheet, final count 30 Sep 2026. Can you do a Bluesky post, a Mastodon post and an Instagram post? Link to riverclean.example.org/2026 where it makes sense.",
+      "files": [],
+      "expected_output": "One card (2,480 vs 1,150 is 2.16×; vs 2025 +44%), three posts within 300 / 500 / 2,200, with only the given link.",
+      "runs": 3,
+      "assertions": [
+        "Figures reproduce: 2,480 ÷ 1,150 = 2.16× ('more than doubled' or 'doubled' both pass under the 2.0–2.2 rule); 2,480 vs 1,720 is +44%",
+        "A column over the three years or a line over 2024–2026; not a donut",
+        "Bluesky ≤ 300 graphemes, Mastodon ≤ 500, Instagram ≤ 2,200, as reported by the freeze or check-page",
+        "Only the link the user gave; no other URL, handle or tag invented",
+        "The card's source line names the sign-up sheet and 30 Sep 2026",
+        "finalize.js exits 0"
+      ]
+    }
+  ]
+}

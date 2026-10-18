@@ -2,7 +2,9 @@
 
 The skill ships a copy of `charts-lib` in
 `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/`, built from
-`svg-charts/charts-lib`. When the skill needs a library change, it is written
+`svg-charts/charts-lib`. `plugins/social-post/skills/social-post/assets/charts-lib/`
+holds a second, identical copy, so that plugin installs on its own; everything
+below about "the copy" applies to both. When the skill needs a library change, it is written
 up here until it lands in `svg-charts`; then the copy is re-synced and the
 section is deleted, so that syncing the library again never silently removes
 behaviour the skill depends on.
@@ -48,6 +50,8 @@ U=svg-charts/charts-lib
 S=claude-chart-dashboard/plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib
 (cd $U && node _build.js && node --test test/*.test.js)
 cp $U/charts.js $U/theme.js $U/charts.css $U/charts.manifest.json $S/
+cp $U/charts.js $U/theme.js $U/charts.css $U/charts.manifest.json \
+  claude-chart-dashboard/plugins/social-post/skills/social-post/assets/charts-lib/
 ```
 
 Then, in this repo:
@@ -55,7 +59,9 @@ Then, in this repo:
 1. Re-apply every section above marked *applied in the skill copy*, and run
    `node --test plugins/chart-dashboard/skills/chart-dashboard/tests/*.test.js`.
    `upstream-notes.test.js` fails if an applied change went missing, or if a
-   proposed one has landed upstream (then delete its section).
+   proposed one has landed upstream (then delete its section). Then
+   `node --test plugins/social-post/skills/social-post/tests/*.test.js`:
+   `shared-files.test.js` fails if the two copies differ.
 2. Read upstream's `git log` and the diff of its agent docs
    (`.agents/skills/charts-lib/`) and `README.md` since the last sync, and
    carry anything a page author needs into `references/chart-api.md` (shared

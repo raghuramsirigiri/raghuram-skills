@@ -19,6 +19,9 @@
       "path": "../plugins/sanity-check/skills"
     },
     {
+      "path": "../plugins/social-post/skills"
+    },
+    {
       "path": "../plugins/whats-changed/skills"
     }
   ]

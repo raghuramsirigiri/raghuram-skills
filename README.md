@@ -112,6 +112,7 @@ pulls in the others:
 | `whats-changed` | This period's numbers against last period's → what moved, by how much, and the few lines that explain the total. |
 | `sanity-check` | One spreadsheet, deck or PDF → the mistakes that would embarrass you, ranked into what blocks sending. |
 | `exec-brief` | A long thread or document → one bottom-line sentence, at most three points, and one ask. |
+| `social-post` | Data → a social media post: chart cards painted at each platform's picture size, and the words for each platform. The social format on its own. |
 
 Install any of them the same way — `/plugin install <name>@raghuram-skills`.
 

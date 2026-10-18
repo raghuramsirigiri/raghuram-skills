@@ -128,6 +128,14 @@ topic with figures in it.
   plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-notes.test.js` checks the copy against
   what the note claims. Docs under `references/` are the skill's own — when the
   library behaves surprisingly, saying so there is the fix to make here.
+- `plugins/social-post/` makes social posts on their own, so it carries its
+  **own copy** of `charts-lib`, the freeze runtime (`assets/email-snapshot.js`),
+  the editable-page runtime, `scripts/` and the two social templates. Those
+  files must stay identical to chart-dashboard's: a change to one goes into
+  both in the same commit, and `node --test
+  plugins/social-post/skills/social-post/tests/shared-files.test.js` fails
+  on any drift. A library sync copies into both (`CHARTS-LIB-UPSTREAM.md`
+  § Syncing the copy). Its `references/` are its own.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
@@ -176,6 +184,10 @@ plugins/decisions-only/
 plugins/whats-changed/      same shape as decisions-only
 plugins/sanity-check/       same shape as decisions-only
 plugins/exec-brief/         same shape as decisions-only
+plugins/social-post/
+  .claude-plugin/plugin.json
+  skills/social-post/       SKILL.md, references/, templates/, assets/, scripts/, tests/, evals/
+                            (assets/, scripts/ and the templates are copies of chart-dashboard's)
 examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin

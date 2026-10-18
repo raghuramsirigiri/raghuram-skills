@@ -1,0 +1,853 @@
+{
+  "$comment": [
+    "Machine-readable description of every factory on the Charts namespace.",
+    "This is the SINGLE SOURCE OF TRUTH for chart selection and for laying charts",
+    "out in a grid. _build.js inlines it into charts.js as Charts.meta and fails",
+    "the build if a factory here has no implementation or an implementation has no",
+    "entry here, so the two cannot drift apart.",
+    "",
+    "Field meanings:",
+    "  data        the shape the factory expects, in one line",
+    "  requires    hard preconditions; the engine refuses and names an alternative",
+    "  refuses     what it will not draw, and what to use instead",
+    "  selfSizing  true = grows to its content when the container has no height",
+    "  aspect      free | radial | grid — radial and grid keep their shape and",
+    "              centre in whatever box they are given, so they are safe anywhere",
+    "  minWidth    below this, labels crowd",
+    "  minHeight   below this, the chart stops being readable",
+    "  gridSpan    tracks to occupy in a multi-column grid; never span every track",
+    "  api         what the returned handle answers to; every chart has redraw, update,",
+    "              on, off, toSVG, toPNG, destroy and getData, plus anything particular to that engine",
+    "  notes       the one thing a caller most often gets wrong"
+  ],
+  "version": 1,
+  "events": {
+    "$comment": "Subscribe with handle.on(type, fn) or config.events: { type: fn }. Listeners survive resizes and update().",
+    "render": "{ reason: init | resize | fonts | update }",
+    "hover": "{ name, series?, index?, ...values } once per mark the pointer enters; shared-tooltip charts give points[]",
+    "hoverEnd": "the detail of the hover that ended",
+    "click": "the hover detail of what was clicked; nothing over empty space",
+    "legendToggle": "{ series, visible, index }",
+    "destroy": "{}"
+  },
+  "plotBox": {
+    "left": 62,
+    "right": 20,
+    "$comment": "Every axis engine draws its plot into this box and starts it at titleBlockH + legendZone + plotGap, so charts in a grid align without the grid doing anything. Charts.bar sizes its left gutter to its own row labels; barInsightTable is a table whose rules span the content width."
+  },
+  "grid": {
+    "minCellWidth": 480,
+    "recommendedGap": 16,
+    "alignItems": "stretch",
+    "spanRule": "Use `grid-column: span 2` for the wide families. Never `1 / -1`: that means 'every track', which reads as 2-of-2 on a two-column grid and silently becomes 3-of-3 when a third column appears.",
+    "heightRule": "A height on the container is an instruction to fill it; no height means grow to content. Be consistent across a grid or rows will not align.",
+    "preferPanels": "When charts belong to one exhibit, use Charts.panels instead of a hand-rolled grid: one shared title, up to 4 across, and every panel gets the same height."
+  },
+  "charts": {
+    "line": {
+      "purpose": "A value over a continuous or temporal x.",
+      "data": "series[].data as [x, y] pairs, or bare numbers indexed 0..n",
+      "requires": [],
+      "refuses": [
+        "named xAxis.categories — a line across names implies an order and a distance that do not exist; use column, or give each category its own series over a date/numeric x"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 5+ series or a 12+ point category axis",
+      "keyOptions": [
+        "type: line|spline|step",
+        "xAxis.type: datetime",
+        "yAxis.type: logarithmic",
+        "lineLabels",
+        "chart.zoomType"
+      ],
+      "notes": "Dates as categories are accepted; names are not.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries",
+        "addPoint",
+        "shift"
+      ]
+    },
+    "column": {
+      "purpose": "Compare a value across named categories.",
+      "data": "series[].data as numbers + xAxis.categories",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "keyOptions": [
+        "plotOptions.column.stacking: normal|percent",
+        "series[].scenario",
+        "yAxis.plotLines",
+        "chart.options3d"
+      ],
+      "notes": "Category labels are never dropped; crowding is solved by wrapping, staggering then rotating.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "bar": {
+      "purpose": "Column chart on its side; use when category names are long.",
+      "data": "series[].data as numbers + xAxis.categories",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "keyOptions": [
+        "plotOptions.bar.stacking",
+        "tooltip.absoluteX for population pyramids"
+      ],
+      "notes": "Its value axis is labelled ABOVE the plot, so it reserves topAxisBand and its left gutter is sized to its row labels. Its plot therefore starts lower and further right than the other axis charts.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "barList": {
+      "purpose": "A ranked list. No axis, category label above each bar.",
+      "data": "one series of [name, value] pairs or [{name, y}]",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 360,
+      "minHeight": 200,
+      "gridSpan": 1,
+      "keyOptions": [
+        "sort: desc|asc",
+        "colorByPoint",
+        "valueSuffix",
+        "barHeight",
+        "rowGap"
+      ],
+      "notes": "Long category names are free here — they are not squeezed into a left gutter.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "dumbbell": {
+      "purpose": "The gap between two states, per category.",
+      "data": "exactly two series over the same categories, in the same order",
+      "requires": [
+        "exactly 2 series"
+      ],
+      "refuses": [
+        "1 series — use barList or bar",
+        "3+ series — use bar with grouped series; a third dot reads as a range with a midpoint"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 240,
+      "gridSpan": 1,
+      "keyOptions": [
+        "sort: desc|asc|delta",
+        "showDelta",
+        "deltaFormat: percent",
+        "connectorBySign",
+        "connectorArrow"
+      ],
+      "notes": "Rows pair up by position, not by name.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "histogram": {
+      "purpose": "The shape of a distribution. Bins raw numbers itself.",
+      "data": "data: [ ...numbers ] at the top level, or the first series' data",
+      "requires": [
+        "raw measurements, not pre-aggregated counts"
+      ],
+      "refuses": [
+        "named xAxis.categories — counting how often each name occurs is a bar chart; use column"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 280,
+      "gridSpan": 1,
+      "keyOptions": [
+        "bins",
+        "binWidth",
+        "mean",
+        "median",
+        "barGap",
+        "xAxis.title"
+      ],
+      "notes": "null, '' and booleans are counted out rather than coerced, and named in a footnote. Bars touch because the axis is continuous.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getBins",
+        "getStats"
+      ]
+    },
+    "histogramPercent": {
+      "purpose": "The same bins as a share of the total.",
+      "data": "data: [ ...numbers ]",
+      "requires": [
+        "raw measurements"
+      ],
+      "refuses": [
+        "named xAxis.categories — counting how often each name occurs is a bar chart; use column"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 280,
+      "gridSpan": 1,
+      "keyOptions": [
+        "bins",
+        "binWidth",
+        "mean",
+        "median"
+      ],
+      "notes": "Identical to histogram except the y-axis.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getBins",
+        "getStats"
+      ]
+    },
+    "histogramCumulative": {
+      "purpose": "What share fell at or below each value (an ogive).",
+      "data": "data: [ ...numbers ]",
+      "requires": [
+        "raw measurements"
+      ],
+      "refuses": [
+        "named xAxis.categories — counting how often each name occurs is a bar chart; use column"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 280,
+      "gridSpan": 1,
+      "keyOptions": [
+        "bins",
+        "binWidth"
+      ],
+      "notes": "Y-axis always runs 0 to 100%.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getBins",
+        "getStats"
+      ]
+    },
+    "waterfall": {
+      "purpose": "How a total got from one value to another: an opening balance, signed steps that each start where the last one ended, and a closing total measured from zero.",
+      "data": "series[0].data — numbers or { name, y } for the steps, { name, isSum: true } for a total the engine computes",
+      "requires": [
+        "exactly one series",
+        "numeric values in every step — a blank one shifts every bar after it"
+      ],
+      "refuses": [
+        "more than one series — every bar stands on where the last one ended, so a second bridge has no ground of its own; use column with grouped series, or one waterfall per panel in panels",
+        "a declared total that does not match the steps before it — the unexplained gap is the one thing this chart exists to reveal, so it is named rather than drawn; omit the y and the total computes itself",
+        "data with no steps, only totals — a row of independent totals is column, or bar when the names are long"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 280,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 8+ steps, or when the step names need slanting",
+      "keyOptions": [
+        "point.isSum: true",
+        "plotOptions.waterfall.connectors",
+        "plotOptions.waterfall.showSign",
+        "plotOptions.waterfall.upColor|downColor|sumColor",
+        "yAxis.plotLines"
+      ],
+      "notes": "The value axis always includes zero: every bar is read against it, and a cropped axis would make the totals misreport their own size.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSteps",
+        "getTotal"
+      ]
+    },
+    "sankey": {
+      "purpose": "Where an amount goes: nodes in left-to-right columns, joined by bands whose thickness is how much moved — the split, the merge and the loss are the reading.",
+      "data": "series[0].data as [from, to, weight] or { from, to, weight }; optional series[0].nodes: [{ id, name?, color?, column? }]",
+      "requires": [
+        "exactly one series of links",
+        "a weight of zero or more on every link",
+        "links that only ever flow forward — no loops"
+      ],
+      "refuses": [
+        "more than one series — two networks overlaid would split each other’s nodes; put every link in one series, or one sankey per panel in panels",
+        "a negative or non-numeric weight — a band cannot be thinner than nothing; a signed net flow is waterfall",
+        "a link from a node to itself, or a loop — a node on a cycle has no column to sit in; break it into stages, or show the from/to amounts as a table"
+      ],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 300,
+      "gridSpan": 2,
+      "gridSpanWhen": "1 only for 2–3 columns with short node names",
+      "keyOptions": [
+        "series[0].nodes[].column",
+        "plotOptions.sankey.linkColor: source|target|gradient|neutral|<css>",
+        "plotOptions.sankey.colorBy: level|source|node|none",
+        "plotOptions.sankey.dropLabel|dropoff",
+        "stages: [name per column] (shown as a header row)",
+        "plotOptions.sankey.nodeWidth|nodePadding",
+        "plotOptions.sankey.align: justify|left",
+        "plotOptions.sankey.valuePrefix|valueSuffix"
+      ],
+      "notes": "Every column shares one pixels-per-unit scale, so node heights compare across columns; a node is as tall as the larger of its in- and outflow, and whatever a stage receives but does not pass on flows into a counter-coloured 'Unaccounted' node in the next column, with its amount and share.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getLinks",
+        "getNodes"
+      ]
+    },
+    "heatmap": {
+      "purpose": "A value per cell of a grid whose two directions are ordered — hour × weekday, week × cohort, bin × bin — drawn as colour, so the pattern is the reading.",
+      "data": "series[0].data as [x, y, value] or { x, y, value }, x and y a category name or its index; xAxis.categories name the columns left to right, yAxis.categories the rows top to bottom",
+      "requires": [
+        "exactly one series",
+        "xAxis.categories and yAxis.categories, in reading order",
+        "at most one value per cell"
+      ],
+      "refuses": [
+        "more than one series — a cell holds one colour, so a second series would paint over the first; one heatmap per measure in panels",
+        "two values for the same cell — the chart would show whichever came last; aggregate first",
+        "a non-numeric value — null means no data and is drawn as an empty outline, never as zero",
+        "a cell naming a row or column not in the categories"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 260,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 25+ columns",
+      "keyOptions": [
+        "colorAxis.min/max (pin the domain so two heatmaps share a scale)",
+        "plotOptions.heatmap.color (one hue instead of the ramp)",
+        "plotOptions.heatmap.upColor|downColor (the diverging pair)",
+        "plotOptions.heatmap.dataLabels: false",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false (hides the colour key)",
+        "plotOptions.heatmap.autoHeight"
+      ],
+      "notes": "Colour is the least precise encoding there is: use this for the pattern across ordered rows and columns. Two sets of unrelated names is table with highlight: scale, which prints the numbers — validate() warns. Values crossing zero diverge through aboveThreshold/belowThreshold, the same scale table uses. In-cell numbers are drawn only when every one of them fits.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "calendarHeatmap": {
+      "purpose": "One cell per day — weeks as columns, weekdays as rows — so weekly rhythm and the days that broke it show at a glance.",
+      "data": "series[0].data as [date, value] or { date, value }; date a timestamp, a Date, or \"YYYY-MM-DD\"",
+      "requires": [
+        "exactly one series",
+        "daily values — at most one per day",
+        "at most four calendar years"
+      ],
+      "refuses": [
+        "more than one series — one heatmap per measure in panels",
+        "two values for the same day — aggregate first",
+        "values weekly or coarser — a calendar would be mostly empty days; use line with a datetime axis, or column",
+        "more than four calendar years — each day becomes a speck; use line, or one calendarHeatmap per year in panels"
+      ],
+      "selfSizing": true,
+      "aspect": "grid",
+      "minWidth": 480,
+      "minHeight": 200,
+      "gridSpan": 2,
+      "gridSpanWhen": "1 for three months or less",
+      "keyOptions": [
+        "plotOptions.heatmap.weekStart: 1 (Monday) | 0 (Sunday)",
+        "plotOptions.heatmap.cellSize (largest day, default 30)",
+        "colorAxis.min/max",
+        "plotOptions.heatmap.color",
+        "plotOptions.heatmap.valuePrefix|valueSuffix|decimals",
+        "legend.enabled: false"
+      ],
+      "notes": "Days stay square, so a calendar fills the WIDTH and sits at the top of a tall box; give it no height and it grows to its bands. Up to a year of data is one continuous band of whole months; longer spans take a band per calendar year. Days with no value are drawn as empty outlines, never as zero; days outside the data's range (a band's lead-in and run-out) take a faint fill and no outline. A Date object is read in local time, a timestamp in UTC.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "table": {
+      "purpose": "Exact numbers a reader will look up rather than estimate: rows optionally grouped under headings, columns optionally grouped under a spanning header, cells optionally coloured by sign or on a scale.",
+      "data": "columns: [{ key, name, group?, prefix?, suffix?, decimals?, showSign?, highlight?: 'sign'|'scale'|fn, scale? }] + rows: [{ name, group?, <key>: value }]",
+      "requires": [
+        "at least one column and one row",
+        "a unique key on every column"
+      ],
+      "refuses": [
+        "no columns or no rows",
+        "a column without a key, or two columns with the same key",
+        "a column coloured by value (highlight: 'sign' or 'scale') that holds no numbers",
+        "columns sharing a colour scale but not a unit — one shade would stand for two kinds of number; give each its own scale",
+        "column groups on some columns but not all — the header would be uneven; group every column, or put the qualifier in the column name",
+        "the rows of one group not next to each other — the heading would be drawn twice and read as two groups; sort the rows"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 160,
+      "gridSpan": 2,
+      "gridSpanWhen": "1 with 4 or fewer data columns",
+      "keyOptions": [
+        "columns[].group",
+        "columns[].highlight: sign|scale|function",
+        "columns[].scale (shared colour domain)",
+        "rows[].group",
+        "plotOptions.table.striped|threshold|columnGroupDivider|labelHeader"
+      ],
+      "notes": "Numbers are never truncated: headers and row labels wrap, and a table wider than its container scrolls sideways. A blank is drawn as a dash and left out of the colour scale — it is not zero.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getRows"
+      ]
+    },
+    "reportTable": {
+      "purpose": "A table whose cells are not only numbers: each column is a kind — text, insight (headline + description), kpi (one large stat) or chart (any chart type, one per row).",
+      "data": "columns: [{ key, name, kind: 'text'|'insight'|'kpi'|'chart', group?, chart?: { type, ...defaults } }] + rows: [{ name (text or { head, body }), group?, <key>: value }] — insight values are { head, body }, kpi values a number or { value, note, fill }, text values a string or { text, fill }, chart values that chart's config or a bare data array",
+      "requires": [
+        "at least one column and one row",
+        "a unique key on every column",
+        "chart columns name a chart type"
+      ],
+      "refuses": [
+        "everything table refuses about column keys, column groups and row groups",
+        "a column with no kind, or kind 'number' — a table-sized figure looks small beside charts and stats; use kpi",
+        "a column kind other than text, insight, kpi or chart",
+        "a chart column with no chart.type, an unknown type, or a type that is a whole exhibit — panels, table, barInsightTable, reportTable"
+      ],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 640,
+      "minHeight": 200,
+      "gridSpan": 2,
+      "keyOptions": [
+        "columns[].kind",
+        "columns[].chart",
+        "columns[].sharedScale",
+        "columns[].colorBySign (kpi)",
+        "columns[].colorByScale + scale (kpi)",
+        "per-cell fill on kpi, text and insight values",
+        "rows[].group",
+        "plotOptions.reportTable.rowHeight|sharedScale|striped|dividers|labelHeader"
+      ],
+      "notes": "Chart cells drop their own title and legend; named series are shown once above the table. line/column/bar/dumbbell cells in one column share a value scale unless sharedScale: false.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getRows",
+        "charts"
+      ]
+    },
+    "barInsightTable": {
+      "purpose": "One row read as a sentence: label, bars, what it means, the number to remember.",
+      "data": "series + a parallel rows[] of {insight, description, stat}, or points carrying those keys",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 640,
+      "minHeight": 260,
+      "gridSpan": 2,
+      "keyOptions": [
+        "autoStat",
+        "statColorBySign",
+        "columns",
+        "descriptionLines"
+      ],
+      "notes": "Four columns of content need the width; with 2+ series the stat writes itself as the change from first to last.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "waffle": {
+      "purpose": "Make a proportion countable — 'x in 100'.",
+      "data": "[{name, y, description}] — one panel per statistic",
+      "requires": [],
+      "refuses": [
+        "negative values — clamped to zero; a part-of-whole grid cannot show them"
+      ],
+      "selfSizing": true,
+      "aspect": "grid",
+      "minWidth": 300,
+      "minHeight": 240,
+      "gridSpan": 1,
+      "keyOptions": [
+        "rows",
+        "cols",
+        "total",
+        "fillDirection",
+        "dotSize"
+      ],
+      "notes": "Spare height grows the DOT, not the gaps — the value is the number of dots, and a dot is one unit at any size.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "radar": {
+      "purpose": "One profile per series across the same named axes — the SHAPE is the reading.",
+      "data": "series[].data as numbers, one per xAxis.categories entry, in that order",
+      "requires": [
+        "3+ xAxis.categories",
+        "every axis in the same unit, on one shared scale"
+      ],
+      "refuses": [
+        "fewer than 3 axes — the polygon collapses to a line or a spoke; use column, or dumbbell for two states"
+      ],
+      "selfSizing": false,
+      "aspect": "radial",
+      "minWidth": 360,
+      "minHeight": 320,
+      "gridSpan": 1,
+      "gridSpanWhen": "2 with 9+ axes or long axis names",
+      "keyOptions": [
+        "yAxis.min/max",
+        "plotOptions.radar.shape: polygon|circle",
+        "plotOptions.radar.fillOpacity",
+        "plotOptions.radar.startAngle",
+        "plotOptions.radar.markers",
+        "series[].dashStyle"
+      ],
+      "notes": "The scale starts at zero and is shared by every axis — on a radial scale a cropped baseline multiplies the AREA of a difference, and per-axis scales make the shape meaningless. Mixed units want normalising to a common index first. Past ~4 series the polygons overlap into mush; use panels of small radars instead.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "donut": {
+      "purpose": "Parts of one whole, few categories.",
+      "data": "one series of [name, value] pairs",
+      "requires": [],
+      "refuses": [
+        "negative values — dropped from the ring, the total and the legend, and named in a footnote; use a bar chart"
+      ],
+      "selfSizing": false,
+      "aspect": "radial",
+      "minWidth": 320,
+      "minHeight": 300,
+      "gridSpan": 1,
+      "keyOptions": [
+        "innerSize",
+        "startAngle/endAngle",
+        "variableRadius",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
+        "showPercentages"
+      ],
+      "notes": "The ring grows until the narrower axis binds, so it is safe in any cell. Auto-shows a legend at 2+ wedges, which makes it start lower than a legend-less neighbour.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "pie": {
+      "purpose": "Donut with no hole.",
+      "data": "one series of [name, value] pairs",
+      "requires": [],
+      "refuses": [
+        "negative values — dropped from the ring, the total and the legend, and named in a footnote; use a bar chart"
+      ],
+      "selfSizing": false,
+      "aspect": "radial",
+      "minWidth": 320,
+      "minHeight": 300,
+      "gridSpan": 1,
+      "keyOptions": [
+        "startAngle/endAngle",
+        "centerText: { value, label, valueFontSize, color }, or a bare string/number for value; omit value for the ring total",
+        "showPercentages"
+      ],
+      "notes": "Alias of donut with innerSize 0.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "scatter": {
+      "purpose": "Relationship between two numeric variables.",
+      "data": "series[].data as [x, y] pairs",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 280,
+      "gridSpan": 1,
+      "keyOptions": [
+        "series[].regression",
+        "series[].showLabels",
+        "marker.symbol",
+        "xAxis.min/max"
+      ],
+      "notes": "Point labels only draw for points that carry a name.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "bubble": {
+      "purpose": "Scatter with a third value as area.",
+      "data": "series[].data as [x, y, z] triples",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": false,
+      "aspect": "free",
+      "minWidth": 480,
+      "minHeight": 300,
+      "gridSpan": 1,
+      "keyOptions": [
+        "plotOptions.bubble.minSize/maxSize"
+      ],
+      "notes": "z maps to AREA, not radius.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "packedBubble": {
+      "purpose": "Relative magnitudes with no axes; one cluster per series.",
+      "data": "series[].data as [name, value] pairs",
+      "requires": [],
+      "refuses": [],
+      "selfSizing": false,
+      "aspect": "radial",
+      "minWidth": 320,
+      "minHeight": 300,
+      "gridSpan": 1,
+      "keyOptions": [],
+      "notes": "Cluster positions are settled by simulation and move slightly between renders.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "getSeries"
+      ]
+    },
+    "geofacet": {
+      "purpose": "One tile per region, positioned to approximate a map.",
+      "data": "{CODE: value} | [[code, value]] | [{code, value, name}]",
+      "requires": [
+        "chart.grid — 'us' by default, or an array of {code, row, col}"
+      ],
+      "refuses": [
+        "the name/y point shape every other engine takes — it needs code/value"
+      ],
+      "selfSizing": false,
+      "aspect": "grid",
+      "minWidth": 460,
+      "minHeight": 420,
+      "gridSpan": 1,
+      "keyOptions": [
+        "chart.variant: bar|heat|gauge",
+        "max",
+        "min",
+        "showEmpty",
+        "borderRadius"
+      ],
+      "notes": "Tiles stay square and cap at maxTileSize, centring the leftover as margin, so it fits a single cell at 480px and does not need extra width.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG"
+      ]
+    },
+    "panels": {
+      "purpose": "Several charts as ONE exhibit under one shared title.",
+      "data": "charts: [ { type, ...that chart's own config } ]",
+      "requires": [
+        "each entry names a factory on the Charts namespace"
+      ],
+      "refuses": [],
+      "selfSizing": true,
+      "aspect": "free",
+      "minWidth": 640,
+      "minHeight": 300,
+      "gridSpan": 2,
+      "maxColumns": 4,
+      "keyOptions": [
+        "columns",
+        "panelHeight",
+        "gap",
+        "rowGap",
+        "separators"
+      ],
+      "notes": "Prefer this over a hand-rolled grid when charts belong together. panelHeight reaches the self-sizing types too, so a row's panels end on one line.",
+      "api": [
+        "redraw",
+        "update",
+        "on",
+        "off",
+        "destroy",
+        "getData",
+        "toSVG",
+        "toPNG",
+        "charts",
+        "panels"
+      ]
+    }
+  }
+}

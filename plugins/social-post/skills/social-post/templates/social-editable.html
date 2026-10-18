@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — social post</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- EDITABLE VARIANT of social.html. Build from this file only when the
+     user asked for an editable post; the rules are in references/editable.md
+     and references/layout-social.md.
+     These tags are placeholders. Run scripts/finalize.js on the finished
+     page and they are replaced by the files' own contents, so the file works
+     standalone. Leave them exactly as written until then. -->
+<link rel="stylesheet" href="charts-lib/charts.css">
+<style>
+  /* ── A social post: pictures that travel, and the words that go with them ─
+     The block inside #social-block holds two things. Each .card is painted
+     into one PNG at 2.5x its CSS size, which is the size each platform asks
+     for, so these rules ARE the picture. Each pre.post is the text for one
+     platform, counted the way that platform counts it. Nothing leaves as
+     markup, so the cards may use this sheet freely.
+
+     A card is laid out at about the size a phone shows it: a 1080px picture
+     is drawn ~400px wide in a feed. That is why the type below looks large
+     for a desktop and why it must stay that size. See
+     references/layout-social.md. */
+  :root {
+    --card:#fbfaf8; --ground:#eae8e4; --ink:#2a2723; --muted:#77716a;
+    --hair:#e4e1dc; --accent:#2e5bba;
+    --font: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  html, body { margin: 0; background: var(--ground); }
+  body { font: 13px/1.4 system-ui, 'Segoe UI', Arial, sans-serif; color: var(--ink); }
+  .snap-bar {
+    /* Below the editor's working-copy banner, which sets --pe-draft-h. */
+    position: sticky; top: var(--pe-draft-h, 0px); z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--hair);
+  }
+  .snap-bar b { font-weight: 600; margin-right: 8px; }
+  .snap-bar button, .card-actions button, .post-meta button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--hair); background: var(--card); color: var(--ink);
+  }
+  .card-actions button:first-of-type { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .snap-bar [data-snap="status"] { color: var(--muted); flex: 1 1 240px; }
+
+  #social-block {
+    display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; align-items: flex-start;
+    padding: 28px 16px 56px;
+  }
+  .cards { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .card-actions, .post-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); max-width: 480px; }
+  .card-actions { margin-bottom: 22px; }
+  .card-actions span, .post-meta span { flex: 1 1 100%; }
+  .post-meta .over { color: #b3261e; font-weight: 600; }
+
+  /* ── The card. Its size is the picture's: never change these three ── */
+  .card {
+    box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--card); color: var(--ink); font-family: var(--font);
+    padding: 22px 24px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  }
+  .card[data-size="portrait"]  { width: 432px; height: 540px; }   /* → 1080 × 1350 */
+  .card[data-size="square"]    { width: 432px; height: 432px; }   /* → 1080 × 1080 */
+  .card[data-size="landscape"] { width: 480px; height: 270px; padding: 14px 18px 10px; }   /* → 1200 × 675 */
+  .card .kicker { margin: 0 0 6px; font-size: 11px; line-height: 14px; color: var(--muted); }
+  .card h2 { margin: 0 0 6px; font-size: 22px; line-height: 27px; font-weight: 700; text-wrap: balance; }
+  .card .units { margin: 0 0 10px; font-size: 12px; line-height: 16px; color: var(--muted); }
+  .card[data-size="landscape"] .kicker { margin-bottom: 3px; }
+  .card[data-size="landscape"] h2 { font-size: 17px; line-height: 21px; margin-bottom: 3px; }
+  .card[data-size="landscape"] .units { margin-bottom: 4px; font-size: 11px; line-height: 14px; }
+  /* The chart takes whatever height the text leaves it. */
+  .card .chart { flex: 1 1 auto; min-height: 0; width: 100%; }
+  .card img { display: block; flex: none; }
+  .card .source {
+    display: flex; justify-content: space-between; gap: 12px;
+    margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--hair);
+    font-size: 10px; line-height: 13px; color: var(--muted);
+  }
+  .card[data-size="landscape"] .source { margin-top: 4px; padding-top: 5px; }
+  .card .source .by { white-space: nowrap; font-weight: 600; color: var(--ink); }
+
+  /* ── The words, one per platform ── */
+  .posts { display: flex; flex-direction: column; gap: 8px; width: 420px; max-width: 100%; }
+  pre.post {
+    margin: 0 0 18px; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere;
+    background: var(--card); border: 1px solid var(--hair); border-radius: 6px;
+    font: 14px/20px system-ui, 'Segoe UI', Helvetica, Arial, sans-serif; color: var(--ink);
+  }
+  pre.post .below-fold { color: var(--muted); }
+  /* An editable post's alt text sits under its card for whoever edits the
+     page: shown in edit mode, never painted (it is outside the card) and
+     hidden from everyone else. */
+  [data-snap-omit] { display: none; }
+  html[data-page-editing] [data-snap-omit] { display: block; }
+  .alt-edit { max-width: 480px; margin: 0; font-size: 12px; line-height: 16px; color: var(--muted); }
+  pre.post .below-fold::before { content: '…more'; display: block; margin: 2px 0; font-size: 11px; color: var(--muted); border-top: 1px dashed var(--hair); }
+  @media print { .snap-bar { display: none; } }
+</style>
+</head>
+<body>
+
+<!-- The toolbar. email-snapshot.js adds Copy picture, Save PNG and Copy alt
+     text under each card and Copy text over each post, repaints the pictures
+     after every edit, and reports it in the status line; keep the data-snap
+     names as written. -->
+<div class="snap-bar" id="snap-bar">
+  <b>Social post</b>
+  <button type="button" data-snap="save-png">Save all PNGs</button>
+  <span data-snap="status"></span>
+</div>
+
+<div id="social-block">
+<!-- social:start
+     Everything between these two markers is the post. Rules (checked by
+     scripts/check-page.js, and again on the painted cards by freeze()):
+       · each finding is one <div class="card" data-size="portrait|square|
+         landscape">, holding a kicker, an <h2> that states the finding, a
+         units line, at most ONE chart, and a <p class="source"> with a date
+       · the picture travels without the words, so the headline, units,
+         source and date are on the card, never only in the post
+       · a chart is an empty div with class "chart", an id and a
+         data-alt-key naming its alt-text field; its entry in #page-spec
+         draws it, and freeze() paints a picture of it into the card
+       · the alt-text field sits right AFTER its card, marked data-snap-omit,
+         so it is never painted and shows only in edit mode
+       · nothing to hover or click: no tooltip, no control, no link
+       · one <pre class="post" data-platform="…">, marked rich, per
+         platform asked for; every figure in it must also be on a card
+       · every piece of text a reader might change carries data-edit and a
+         unique data-key (references/editable.md) -->
+<div class="cards">
+  <div class="card" data-size="portrait">
+    <p class="kicker" data-edit="text" data-key="c1-kicker">ORGANISATION · scope · Weeks 1–12, 2026</p>
+    <h2 data-edit="text" data-key="c1-headline">Headline finding, not a topic label: the measure peaked at 7.4 in week 4</h2>
+    <p class="units" data-edit="text" data-key="c1-units">Units · what is counted · weekly</p>
+    <div class="chart" id="c1" data-alt-key="c1-alt"></div>
+    <p class="source"><span data-edit="text" data-key="c1-source">Source: SOURCE · snapshot of DATE 2026</span><span class="by" data-edit="text" data-key="c1-by">NAME, only if the user gave one</span></p>
+  </div>
+  <p class="alt-edit" data-snap-omit><b>Alt text, not on the picture:</b> <span data-edit="text" data-key="c1-alt">Line chart: the measure rose from 3.8 in week 1 to a peak of 7.4 in week 4, then settled near 5.6 by week 12.</span></p>
+</div>
+
+<div class="posts">
+<pre class="post" data-platform="linkedin" data-edit="rich" data-key="post-linkedin">The measure peaked at 7.4 in week 4, nearly double where it started (3.8), and has settled near 5.6 since.
+
+One or two sentences on why it moved, in the user's words. Then what the reader should take from it, or what happens next.
+
+Source: SOURCE, weeks 1–12 of 2026.</pre>
+<pre class="post" data-platform="x" data-edit="rich" data-key="post-x">The measure peaked at 7.4 in week 4, nearly double its start, then settled near 5.6 by week 12. Source: SOURCE.</pre>
+</div>
+<!-- social:end -->
+</div>
+
+<!-- THE POST'S CHARTS. One entry per chart element in a card: its id, a
+     chart type from charts.manifest.json, and a config that is plain JSON —
+     no functions, no Charts.theme lookups, no computed values. Colours are
+     literal hex from the theme in use. The social rules still apply: NO
+     title or subtitle (they are the card's headline and units line), few
+     marks, nothing hover-only. Options are in references/charts/<type>.md. -->
+<script type="application/json" id="page-spec">
+{
+  "version": 1,
+  "charts": {
+    "c1": {
+      "type": "line",
+      "config": {
+        "xAxis": { "categories": ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6",
+                                  "Week 7", "Week 8", "Week 9", "Week 10", "Week 11", "Week 12"] },
+        "legend": { "enabled": false },
+        "callouts": [{ "x": 3, "text": "Peak: 7.4" }],
+        "series": [{ "name": "Measure", "type": "line", "color": "#2323FF",
+          "data": [3.8, 4.1, 5.2, 7.4, 6.9, 6.1, 5.8, 5.7, 5.5, 5.6, 5.4, 5.6] }]
+      }
+    }
+  }
+}
+</script>
+
+<!-- theme.js MUST load before charts.js. All of these are inlined by
+     scripts/finalize.js. -->
+<script src="charts-lib/theme.js"></script>
+<script src="charts-lib/charts.js"></script>
+<script>
+/* Brand recolour goes HERE, before any chart is drawn — one applyPalette call,
+   never per-chart colours. See references/theming.md.
+
+Charts.applyPalette({ n0: '…', n0a: '…', n1: '…', n8: '…', s1: '…', s2: '…' });
+*/
+
+/* The post's one sanctioned metric change: the charts are set in the card's
+   face, so the text in each chart matches the headline above it. */
+Charts.applyMetrics({ font: getComputedStyle(document.documentElement).getPropertyValue('--font').trim() });
+
+/* The card follows the chart theme — one source of colour truth — so the
+   chart sits flush on it. */
+(function () {
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card',   t.bg);
+  s.setProperty('--ground', t.tileSurface);
+  s.setProperty('--ink',    t.titleColor);
+  s.setProperty('--muted',  t.secondaryColor);
+  s.setProperty('--hair',   t.grid);
+  s.setProperty('--accent', t.highlight);
+})();
+</script>
+<!-- chart-convert.js lets a chart switch type; page-runtime.js draws every
+     chart in #page-spec; email-snapshot.js paints the cards and repaints
+     them after each edit; page-editor.js adds the "Edit page" button.
+     No other chart code on an editable post. -->
+<script src="charts-lib/chart-convert.js"></script>
+<script src="charts-lib/page-runtime.js"></script>
+<script src="charts-lib/email-snapshot.js"></script>
+<script src="charts-lib/page-editor.js"></script>
+</body>
+</html>

@@ -227,6 +227,34 @@
         "review",
         "before-you-send"
       ]
+    },
+    {
+      "name": "social-post",
+      "source": "./plugins/social-post",
+      "description": "Turn data you supply — a table, CSV, pasted numbers or notes — into a social media post with a chart: one to three chart cards painted as pictures at each platform's size, with the headline, units, source and date in the picture, plus the words to post for LinkedIn, X, Bluesky, Threads, Mastodon or Instagram, each within that platform's limit. Every figure in the words is on a card, and none is invented. One standalone HTML file with copy buttons; it never posts for you. No CDN, no build step, works offline.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "social-media",
+        "social-post",
+        "linkedin",
+        "twitter",
+        "x",
+        "bluesky",
+        "threads",
+        "mastodon",
+        "instagram",
+        "chart",
+        "data-visualization",
+        "infographic",
+        "alt-text",
+        "png",
+        "offline",
+        "zero-dependency"
+      ]
     }
   ]
 }
