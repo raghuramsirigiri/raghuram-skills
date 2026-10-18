@@ -1,6 +1,6 @@
 ---
 name: chart-dashboard
-description: Build a self-contained HTML dashboard, data-story report, slide deck, printable one-pager, email-safe chart snapshot, or Teams post from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, a one-page handout or brief to print, charts to paste into an email (Outlook, Gmail, a weekly update), or an insights post to share in a Microsoft Teams chat or channel, built from data they provide or describe.
+description: Build a self-contained HTML dashboard, data-story report, slide deck, printable one-pager, email-safe chart snapshot, Teams post, or social media post (chart cards sized for LinkedIn, X, Bluesky, Instagram) from supplied information (metrics, tables, notes, pasted data, a topic), rendered with the bundled zero-dependency charts-lib SVG chart library. Use whenever the user asks for a dashboard, analytics page, KPI/bento view, illustrated report, a presentation, slides or a deck, a one-page handout or brief to print, charts to paste into an email (Outlook, Gmail, a weekly update), an insights post to share in a Microsoft Teams chat or channel, or a chart to post on LinkedIn, X, Bluesky, Threads, Mastodon or Instagram, built from data they provide or describe.
 ---
 
 # Chart dashboard
@@ -9,8 +9,9 @@ Turn whatever information the user gives — a table, pasted numbers, a set of
 metrics, notes, or just a topic and some facts — into a single self-contained
 HTML page of SVG charts rendered with `charts-lib`: a dashboard, a report, a
 slide deck, a one-pager that prints on a single sheet, an email snapshot
-whose charts survive being pasted into Outlook or Gmail, or a Teams post that
-pastes into a chat or channel as rich text with its charts.
+whose charts survive being pasted into Outlook or Gmail, a Teams post that
+pastes into a chat or channel as rich text with its charts, or a social post:
+chart cards painted at each platform's picture size, with the words to post.
 
 `<skill-dir>` below is the directory holding this file
 (`${CLAUDE_SKILL_DIR}` where the agent expands it). Resolve `templates/`,
@@ -87,28 +88,29 @@ configs.
    | One-pager | A report on one printed sheet: "print it", "one page", "a handout", "for the board pack", "pin it up", "a PDF to attach". Columns of prose and figures — a page of charts with no sentences is a dashboard — never a KPI tile row; pack it. | `onepager.html` | `layout-onepager.md` |
    | Email snapshot | 1–3 findings pasted into an email body: "the weekly update", "drop it into an email", Outlook/Gmail, "email-safe". Mail clients delete SVG, strip styles and run no script, so: a 600px inline-styled table; charts freeze to PNG with alt text; **Copy for email** button. | `email.html` | `layout-email.md` |
    | Teams post | 1–3 findings in a Teams chat or channel: "post it in the channel", "share in Teams". Plain semantic HTML, charts frozen to PNG; **Copy as picture** and **Copy as text**. | `teams.html` | `layout-teams.md` |
+   | Social post | 1–3 findings for a public feed: "post it on LinkedIn", "a tweet with the chart", Bluesky, Instagram, "for socials". One finding per card; headline, units, source and date painted *into* the picture (it travels without the words); 1080x1350 / 1080x1080 / 1200x675 PNGs, plus one post per platform within its limit. | `social.html` | `layout-social.md` |
 
    When it's ambiguous, ask who reads it, whether you'll be in the room, and
    whether it ends up on paper — nobody presents a bento grid to a board, and
    nobody watches a five-section narrative to see if last night's numbers moved.
    The deck is the one format that assumes a presenter: a page that must stand alone with nobody
    narrating is a report, however much the user said "slides". A one-pager,
-   email and Teams post are budgets: past one sheet build a report, past three
-   findings build the page they belong in and snapshot its lead finding. A
-   request naming both email and Teams gets both blocks — each is wrong for the
-   other client.
+   email, Teams and social post are budgets: past one sheet build a report,
+   past three findings build the page they belong in and snapshot its lead
+   finding. A request naming both email and Teams gets both blocks — each is
+   wrong for the other client.
 
    **Static unless asked.** Build an *editable* page (charts as JSON, an **Edit
    page** button) only when the user asked; read `references/editable.md` first
    and start from `dashboard-editable.html`, `report-editable.html`,
-   `slides-editable.html` or `email-editable.html`. A one-pager and a Teams post
-   have no editable form. If they didn't ask, offer it once at handover (Output).
+   `slides-editable.html`, `email-editable.html` or `social-editable.html`. A
+   one-pager and a Teams post have no editable form. If they didn't ask, offer it once at handover (Output).
 
 3. **Copy the template** from `<skill-dir>/templates/<name>.html` to
    `./index.html` (or where the user asked). Do **not** copy
    `assets/charts-lib/` beside it: the template's `charts-lib/…` tags are
-   placeholders (the email and Teams templates have a fourth, for their freeze
-   runtime). Leave them exactly as written; step 8 folds the library in.
+   placeholders (the email, Teams and social templates have a fourth, for
+   their freeze runtime). Leave them exactly as written; step 8 folds the library in.
 
 4. **Derive the structure from the findings and the charts, not from the
    template.** The dashboard template ships a placeholder two-cell grid on
@@ -199,8 +201,8 @@ configs.
    index.html` and fix what it reports; then in a browser at 1440x900, load
    `charts-lib/audit.js` and run `ChartsAudit.run()` until `ok` is true, and
    `ChartsAudit.tryControl()` on every control; one screenshot at the end. Each
-   format adds its own check (deck and one-pager paper checks, the email and
-   Teams freeze lint) — they're in that file. Without a browser, the static
+   format adds its own check (deck and one-pager paper checks, the email, Teams
+   and social freeze lint) — they're in that file. Without a browser, the static
    check is the floor; say the layout wasn't checked in one.
 
 8. **Fold the library in and ship one file:**
@@ -226,11 +228,14 @@ any, were illustrative. Per format, also say:
 - **Teams post** — what **Copy as picture** and **Copy as text** each give, with
   the per-chart copy and PNG files as fallbacks (`layout-teams.md` § Hand it
   over).
+- **Social post** — per card **Copy picture**, **Save PNG**, **Copy alt text**;
+  per platform **Copy text**; nothing was posted, so they publish it
+  (`layout-social.md` § Hand it over).
 
 On the **first** page in a conversation, if the user didn't ask for an editable
 page, end with a one-line offer, such as: *"Want an editable version, so you can
 switch chart types and change the text or numbers yourself without rerunning
-this?"* Once only, and never for a one-pager. Build it only on a yes.
+this?"* Once only, and never for a one-pager or Teams post. Build it only on a yes.
 
 An editable page ships as **two files**: `<name>.html` (final, no editor, safe
 to share) and `<name> (working copy).html` (editable, with a "Working copy"

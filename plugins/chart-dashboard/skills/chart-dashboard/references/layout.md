@@ -1,9 +1,9 @@
 # Page layouts
 
-Six formats. Pick one; don't blend prose-heavy narrative into a bento grid,
+Seven formats. Pick one; don't blend prose-heavy narrative into a bento grid,
 don't turn a deck into a report by filling its slides with paragraphs, don't
 shrink a dashboard onto a sheet of paper and call it a one-pager, and don't
-paste a dashboard into an email or a Teams chat and hope.
+paste a dashboard into an email, a Teams chat or a social feed and hope.
 
 This file holds what they share. The rules for the format you picked are in its
 own file — read that one and skip the others:
@@ -16,8 +16,9 @@ own file — read that one and skip the others:
 | One-pager | `templates/onepager.html` | `layout-onepager.md` — the fixed sheet, the column budget, what to cut |
 | Email snapshot | `templates/email.html` | `layout-email.md` — the 600px table block, charts frozen to PNG, what a mail client strips |
 | Teams post | `templates/teams.html` | `layout-teams.md` — semantic rich text, charts frozen to PNG, what the Teams compose box drops |
+| Social post | `templates/social.html` | `layout-social.md` — chart cards painted at each platform's picture size, the words counted per platform |
 
-## All six
+## All seven
 
 - Colors come from `Charts.theme`, which is derived from `Charts.palette`. All
   three templates carry the same sync block, copying the theme's canvas, ink,
@@ -50,13 +51,15 @@ own file — read that one and skip the others:
   A deck has no room for that strip on every slide: put it on a closing slide.
 - Everything ships as **one** HTML file with the library inlined — no sibling
   folder, no CDN, no build step. See SKILL.md step 8.
-- The email snapshot and the Teams post are the exceptions to "charts are
-  live SVG". A mail client deletes SVG and Teams shows none, so their charts
-  are frozen into PNGs when the page opens, and everything above about the
-  page's CSS stops at the edge of the block. The email block carries its
-  styles inline (`layout-email.md`); the Teams block carries none, because
-  Teams keeps none (`layout-teams.md`).
-- Two of the six are **fixed-size**: a deck slide is 1280x720, a one-pager's
+- The email snapshot, the Teams post and the social post are the exceptions
+  to "charts are live SVG". A mail client deletes SVG, Teams shows none, and a
+  feed takes only pictures, so their charts are frozen into PNGs when the page
+  opens, and everything above about the page's CSS stops at the edge of the
+  block. The email block carries its styles inline (`layout-email.md`); the
+  Teams block carries none, because Teams keeps none (`layout-teams.md`); a
+  social card is painted whole into one picture, so its styles are the page's
+  own (`layout-social.md`).
+- Two of the seven are **fixed-size** pages: a deck slide is 1280x720, a one-pager's
   sheet is 730x990 (or 990x730 landscape). Both keep those authored pixels and
   are scaled to the window by a transform, so what is on screen is what comes
   out of the printer, and both crop rather than scrolling when something
@@ -88,6 +91,11 @@ badly in a different context:
   the email block: Teams drops every style, so a styled table pastes as a
   jumble. The post is plain headings, paragraphs and lists with the charts as
   PNGs, set in Teams' own font and theme. Same budget: one to three findings.
+- **"Post it on LinkedIn", "a tweet with the chart", "for our socials"** —
+  the social post's case (`templates/social.html`). The picture travels
+  without the words, so the finding, units, source and date are painted into
+  the card, which is laid out at phone size and exported at 1080x1350,
+  1080x1080 or 1200x675. One finding per card, one to three cards.
 - **"Send it round", "for the board pack"** as a file or link: it will be read
   alone, without you narrating. Lean on subtitles and callouts to carry the
   context you would otherwise say out loud.

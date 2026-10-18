@@ -11,7 +11,8 @@ Instructions are shared across all AI tools and live in
 **Read `AGENTS.md` first, then `plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`, and follow
 that workflow** whenever the user asks for a dashboard, analytics page, KPI
 view, chart deck, illustrated data report, a one-page brief to print, charts
-to paste into an email, or a post to share in Microsoft Teams.
+to paste into an email, a post to share in Microsoft Teams, or a chart to post
+on LinkedIn, X, Bluesky or Instagram.
 
 Eight rules that break the output if missed:
 
@@ -41,7 +42,12 @@ Eight rules that break the output if missed:
    A Teams post (`templates/teams.html`) freezes its charts the same way
    (`TeamsSnapshot.draw`), but its block is plain headings, paragraphs and
    lists with no styling, because Teams drops it. Read
-   `references/layout-teams.md`.
+   `references/layout-teams.md`. A social post (`templates/social.html`)
+   paints each card whole into a platform-sized PNG (`SocialSnapshot.draw`),
+   with the headline, source and date in the picture; every figure in the
+   post text must be on a card. Read `references/layout-social.md`; an
+   editable one starts from `templates/social-editable.html`
+   (`references/editable.md` § An editable social post).
 
 Asked for an editable dashboard, report or deck, start from
 `templates/dashboard-editable.html`, `report-editable.html` or

@@ -480,7 +480,9 @@ const bentoReady = Object.values(grid).every(v => v != null);
 // own px box, which is exactly the PNG it will be frozen into.
 // A Teams post (templates/teams.html) is the same kind of block, marked
 // teams:start/teams:end, and is checked by the same runtime's Teams rules.
-const snapTarget = html.includes('<!-- teams:start') ? 'teams' : 'email';
+// A social post (templates/social.html) is marked social:start/social:end;
+// its charts fill their card, so they carry no px box of their own.
+const snapTarget = html.includes('<!-- teams:start') ? 'teams' : html.includes('<!-- social:start') ? 'social' : 'email';
 const emailBlock = (() => {
   const a = html.indexOf('<!-- ' + snapTarget + ':start'), b = html.indexOf('<!-- ' + snapTarget + ':end -->');
   return a >= 0 && b > a ? html.slice(html.indexOf('-->', a) + 3, b) : null;
@@ -982,9 +984,14 @@ if (!notes.length) {
 // A Teams post (templates/teams.html) runs the same section against the
 // runtime's Teams rules: plain semantic HTML, since the compose box drops
 // every style, and charts no wider than a message.
+// A social post runs it against the social rules: one finding per card,
+// everything the reader needs painted into the picture, and post text that
+// fits each platform and states no figure the card does not show.
 const teamsPost = snapTarget === 'teams';
-const safeRow = teamsPost ? 'teams-safe block' : 'email-safe block';
-const where = teamsPost ? 'Teams does not show' : 'mail clients delete';
+const socialPost = snapTarget === 'social';
+const safeRow = teamsPost ? 'teams-safe block' : socialPost ? 'social card' : 'email-safe block';
+const where = teamsPost ? 'Teams does not show' : socialPost ? 'cannot be painted into the card' : 'mail clients delete';
+const runtimeName = teamsPost ? 'TeamsSnapshot' : socialPost ? 'SocialSnapshot' : 'EmailSnapshot';
 if (emailBlock == null) {
   ok('email-safe block', 'not an email snapshot or Teams post');
 } else {
@@ -995,30 +1002,33 @@ if (emailBlock == null) {
     bad(safeRow, r.fails.filter(f => !seen[f.msg] && (seen[f.msg] = 1))
       .map(f => f.rule + ': ' + f.msg).slice(0, 6).join(' | '));
   } else ok(safeRow, teamsPost ? 'semantic tags only, no styling, sized charts with alt text'
+    : socialPost ? 'one finding per card, headline and dated source on the picture, posts within each platform limit'
     : 'tables, inline styles, system fonts, sized charts with alt text');
   if (r.warns.length) note(safeRow, r.warns.map(f => f.msg).join(' | '));
 
   // The charts themselves: what freezes, what cannot.
-  const inBlock = charts.filter(c => emailFigOf(c.id));
+  const inBlock = charts.filter(c => emailFigOf(c.id) || (socialPost && emailBlock.includes('id="' + c.id + '"')));
   const problems = [], advice = [];
-  const viaSnapshot = new Set([...code.matchAll(/(?:Email|Teams)Snapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
+  const viaSnapshot = new Set([...code.matchAll(/(?:Email|Teams|Social)Snapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
   // An editable snapshot (templates/email-editable.html) keeps its charts in
   // the page spec; email-snapshot.js freezes those from the spec, so they
   // count as frozen when that runtime is on the page.
   const freezer = /<script src="charts-lib\/email-snapshot\.js"><\/script>/.test(html) || /root\.EmailSnapshot\s*=/.test(html);
   const viaSpec = new Set(freezer ? specCharts.map(c => c.id) : []);
   for (const c of inBlock) {
-    if (!viaSnapshot.has(c.id) && !viaSpec.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which ' + where + '  → ' + (teamsPost ? 'Teams' : 'Email') + 'Snapshot.draw(Charts.' + c.type + ", '" + c.id + "', …)" +
+    if (!viaSnapshot.has(c.id) && !viaSpec.has(c.id)) problems.push(c.id + ' is drawn with Charts.' + c.type + '(…) directly — it stays an SVG, which ' + where + '  → ' + runtimeName + '.draw(Charts.' + c.type + ", '" + c.id + "', …)" +
       (specCharts.length ? ', or load charts-lib/email-snapshot.js so the spec charts freeze' : ''));
     if (GROWS.includes(c.type)) problems.push(c.id + ' (' + c.type + ') is an HTML table the PNG export cannot carry  → write it as a <table> in the block: its text survives image blocking');
     if (!isObj(c.cfg)) continue;
-    if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → make them ' + (teamsPost ? 'an <h3> and a paragraph' : 'text rows') + ' above the image, where they survive image blocking and dark mode');
-    if (isObj(c.cfg.chart) && c.cfg.chart.transparent) problems.push(c.id + ' is transparent  → drop it: ' + (teamsPost ? 'Teams' : 'mail apps') + ' in dark mode darken the page behind the image, and the dark ink vanishes');
-    if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — ' + (teamsPost ? 'a chat' : 'an inbox') + ' has no tooltip, so every value the reader needs must be printed or in the caption');
+    if (c.cfg.title || c.cfg.subtitle) problems.push(c.id + ' has a title/subtitle in its config  → ' + (socialPost
+      ? "make them the card's <h2> and units line, set at the card's larger type"
+      : 'make them ' + (teamsPost ? 'an <h3> and a paragraph' : 'text rows') + ' above the image, where they survive image blocking and dark mode'));
+    if (!socialPost && isObj(c.cfg.chart) && c.cfg.chart.transparent) problems.push(c.id + ' is transparent  → drop it: ' + (teamsPost ? 'Teams' : 'mail apps') + ' in dark mode darken the page behind the image, and the dark ink vanishes');
+    if (c.cfg.dataLabels === false) advice.push(c.id + ' turns data labels off — ' + (teamsPost ? 'a chat' : socialPost ? 'a picture' : 'an inbox') + ' has no tooltip, so every value the reader needs must be printed or in the caption');
   }
   if (problems.length) bad('charts freeze to PNG', problems.join(' | '));
   else ok('charts freeze to PNG', inBlock.length + ' chart(s), each drawn through ' +
-    (viaSpec.size ? (viaSnapshot.size ? 'EmailSnapshot.draw or the page spec' : 'the page spec') : (teamsPost ? 'TeamsSnapshot' : 'EmailSnapshot') + '.draw'));
+    (viaSpec.size ? (viaSnapshot.size ? 'EmailSnapshot.draw or the page spec' : 'the page spec') : runtimeName + '.draw'));
   if (inBlock.length > 3) advice.push(inBlock.length + ' charts — ' + (teamsPost ? 'a post' : 'a snapshot') + ' carries one to three findings; past that, send the page itself');
   if (advice.length) note('charts freeze to PNG', advice.join(' | '));
 }
