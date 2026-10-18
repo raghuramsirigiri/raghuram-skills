@@ -85,6 +85,7 @@ Each format but the one-pager has its template already in this format:
 | Report | `templates/report-editable.html` |
 | Deck | `templates/slides-editable.html` |
 | Email snapshot | `templates/email-editable.html` (see [An editable email snapshot](#an-editable-email-snapshot)) |
+| Social post | `templates/social-editable.html` (see [An editable social post](#an-editable-social-post)) |
 
 Each keeps its static template's stylesheet and layouts, and differs only in
 the three parts above, so everything in that format's `layout-*.md` still
@@ -191,6 +192,52 @@ titles are text rows, and at most three findings. What changes:
 
 It ships as two files like any editable page. Both freeze and both have
 **Copy for email**; only the working copy has the editor.
+
+## An editable social post
+
+`templates/social-editable.html` is `social.html` in this format, with the
+same stylesheet. Everything in `layout-social.md` still holds: one finding per
+card, the headline, units, source and date on the picture, and every figure in
+the post text on a card. What changes:
+
+- **Charts are spec entries, not `SocialSnapshot.draw` calls**, with no
+  `title` or `subtitle`. Load `email-snapshot.js` after `page-runtime.js`.
+  The live charts stay SVG for the editor. Each freeze draws a copy of every
+  chart off screen at the card's 2.5x scale and paints the card with that
+  picture in the chart's place.
+- **Every edit repaints the cards.** Half a second after a change, the cards
+  are painted again and each post is recounted against its limit. The status
+  line says *Repainting the pictures…*, and Copy picture, Save PNG and Copy
+  text wait until it finishes.
+- **Mark each card's text and each post.** The kicker, headline, units line,
+  the source span and the `by` span are `text`, one key each (`c1-headline`,
+  `c1-source`, …). Each `<pre class="post">` is `rich`, keyed `post-<platform>`.
+  Enter in a post inserts a line break (`<br>`), which the counter and Copy
+  text read as a newline. It does not start a paragraph, which the sanitiser
+  would flatten into the line above.
+- **Alt text is an edit-only field after its card**, not an attribute. The
+  chart names it with `data-alt-key="c1-alt"`, and the paragraph right after
+  the card holds it:
+  ```html
+  <p class="alt-edit" data-snap-omit><b>Alt text, not on the picture:</b>
+    <span data-edit="text" data-key="c1-alt">Line chart: the measure rose from 3.8 …</span></p>
+  ```
+  It sits outside the card so it is never painted, and the shared stylesheet
+  shows it only in edit mode. **Copy alt text** and the checker read it
+  through the key. As on the email, a change to a chart's data flags its alt
+  text until it is edited.
+- **No fold marking on the page.** A static post greys the words below
+  "…more". An editable one leaves the marked text alone and gives the fold in
+  each post's counter line.
+- **Removing** a card or a post in the editor removes it from the pictures
+  and the counts.
+- **A card is a fixed frame, but an overflow can't go unnoticed.** Unlike
+  a one-pager, an edit that lengthens a headline is checked half a second
+  later: the repaint's `card overflow` and `chart room` checks put it in the
+  status line, and an over-limit post turns its counter red.
+
+It ships as two files like any editable page. Both paint their cards and
+have the copy buttons. Only the working copy has the editor.
 
 ## Build and verify
 

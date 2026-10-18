@@ -103,8 +103,8 @@ configs.
    **Static unless asked.** Build an *editable* page (charts as JSON, an **Edit
    page** button) only when the user asked; read `references/editable.md` first
    and start from `dashboard-editable.html`, `report-editable.html`,
-   `slides-editable.html` or `email-editable.html`. A one-pager, a Teams post and
-   a social post have no editable form. If they didn't ask, offer it once at handover (Output).
+   `slides-editable.html`, `email-editable.html` or `social-editable.html`. A
+   one-pager and a Teams post have no editable form. If they didn't ask, offer it once at handover (Output).
 
 3. **Copy the template** from `<skill-dir>/templates/<name>.html` to
    `./index.html` (or where the user asked). Do **not** copy
@@ -235,7 +235,7 @@ any, were illustrative. Per format, also say:
 On the **first** page in a conversation, if the user didn't ask for an editable
 page, end with a one-line offer, such as: *"Want an editable version, so you can
 switch chart types and change the text or numbers yourself without rerunning
-this?"* Once only, and never for a one-pager, Teams post or social post. Build it only on a yes.
+this?"* Once only, and never for a one-pager or Teams post. Build it only on a yes.
 
 An editable page ships as **two files**: `<name>.html` (final, no editor, safe
 to share) and `<name> (working copy).html` (editable, with a "Working copy"

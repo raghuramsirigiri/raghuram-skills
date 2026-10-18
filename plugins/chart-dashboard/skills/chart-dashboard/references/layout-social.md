@@ -229,5 +229,5 @@ publishes it.
 - No invented handle, logo, link, or engagement line.
 - No "Key insight" banner or emoji decoration. The header rules in
   `layout.md` apply.
-- No editable variant. If the user asks for one, say so and offer a static
-  post rebuilt on request.
+- No editor unless asked. An editable post starts from
+  `templates/social-editable.html` (`editable.md` § An editable social post).

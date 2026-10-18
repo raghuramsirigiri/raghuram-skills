@@ -60,7 +60,7 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   on LinkedIn", "a tweet with the chart", "for Bluesky". See
   `logistics-network-social/`.
 
-The dashboard, report, deck and email snapshot can also be built **editable** on
+The dashboard, report, deck, email snapshot and social post can also be built **editable** on
 request, with an **Edit page** button that opens an in-page editor for text,
 numbers, chart types and colours. A one-pager is the exception: an editor lets
 someone lengthen a title on a page with no scrollbar, and the sheet would crop it

@@ -420,8 +420,16 @@
       var alts = [];
       charts.forEach(function (tag) {
         var id = attr(tag, 'id') || '?';
-        alts.push(attr(tag, 'data-alt') || '');
-        checkAlt(id, attr(tag, 'data-alt') || '');
+        var alt = attr(tag, 'data-alt') || '';
+        // An editable post keeps the alt text in a marked element the reader
+        // can edit (data-alt-key names its data-key), not in an attribute.
+        var altKey = attr(tag, 'data-alt-key');
+        if (altKey) {
+          var km = new RegExp('\\sdata-key="' + altKey.replace(/[.*+?^${}()|[\]\\]/g, function (ch) { return '\\' + ch; }) + '"[^>]*>([^<]*)<').exec(h);
+          alt = km ? decodeText(km[1]) : '';
+        }
+        alts.push(alt);
+        checkAlt(id, alt);
         if (/\sstyle\s*=\s*"[^"]*\bwidth\s*:/i.test(tag)) warn('chart size', id + ' sets its own width — the card sizes the chart; leave the placeholder to fill it');
       });
       imgs.forEach(function (tag, k) {
@@ -649,7 +657,7 @@
   // Draw a spec chart again where nobody sees it, at its box's size and with
   // no animation, and rasterise that. The live chart is the editor's, so it
   // is never touched.
-  function offscreenPNG(id, w, h) {
+  function offscreenPNG(id, w, h, scale) {
     var entry = root.Page.getChart(id);
     if (!entry || typeof Charts[entry.type] !== 'function') return Promise.reject(new Error('not in the page spec'));
     var box = document.createElement('div');
@@ -662,7 +670,7 @@
     var done = function () { if (handle && handle.destroy) handle.destroy(); box.remove(); };
     try { handle = Charts[entry.type](box, cfg); } catch (e) { done(); return Promise.reject(e); }
     if (handle && handle.error) { var err = handle.error; done(); return Promise.reject(new Error(err)); }
-    return frames(2).then(function () { return handle.toPNG({ scale: 2 }); })
+    return frames(2).then(function () { return handle.toPNG({ scale: scale || 2 }); })
       .then(function (blob) { done(); return blob; }, function (e) { done(); throw e; });
   }
 
@@ -700,7 +708,9 @@
   // The SVG is given the full pixel size and a viewBox at the card's own, so
   // the browser lays the card out at its CSS size and rasterises it at the
   // export size, rather than painting it small and stretching the bitmap.
-  function cardPNG(block, scale) {
+  // On an editable page `shots` maps each live chart's id to its picture,
+  // painted in the chart's place: the live SVG belongs to the editor.
+  function cardPNG(block, scale, shots) {
     var k = scale || 2;
     var w = Math.ceil(block.offsetWidth), h = Math.ceil(block.offsetHeight);
     if (!w || !h) return Promise.reject(new Error('the card is not on screen'));
@@ -711,9 +721,19 @@
       var cs = getComputedStyle(n), css = '';
       for (var k = 0; k < cs.length; k++) css += cs[k] + ':' + cs.getPropertyValue(cs[k]) + ';';
       to[i].setAttribute('style', css);
+      if (shots && n.id && shots[n.id]) to[i].setAttribute('data-chart-id', n.id);
       to[i].removeAttribute('id');
       to[i].removeAttribute('class');
     });
+    if (shots) {
+      Array.prototype.slice.call(clone.querySelectorAll('[data-chart-id]')).forEach(function (n) {
+        var shot = shots[n.getAttribute('data-chart-id')];
+        if (!shot) return;
+        var img = shot.cloneNode(true);
+        img.setAttribute('style', 'display:block;flex:none;margin:0;width:' + shot.getAttribute('width') + 'px;height:' + shot.getAttribute('height') + 'px');
+        n.replaceWith(img);
+      });
+    }
     // The card sits in the picture's corner, with no page margin or shadow.
     clone.style.margin = '0';
     clone.style.boxShadow = 'none';
@@ -1060,21 +1080,49 @@
   // measured (its frame, and anything running out of it) and painted at
   // 2.5x into the picture that gets posted. The posts' words are counted the
   // way each platform counts them.
-  function cardsOf(block) { return Array.prototype.slice.call(block.querySelectorAll('.card')); }
+  //
+  // An editable post (templates/social-editable.html) keeps its charts in
+  // page-runtime's spec and its words in marked text. There the live charts
+  // stay SVG for the editor: each freeze draws a copy of every chart off
+  // screen, and paints the card with that picture in the chart's place. An
+  // edit makes the pictures stale; they are painted again shortly after.
+  function live(n) { return !n.closest('[data-page-removed]'); }
+  function cardsOf(block) { return Array.prototype.filter.call(block.querySelectorAll('.card'), live); }
+  function chartsOf(el) {
+    return Array.prototype.filter.call(el.querySelectorAll('.chart'), function (n) {
+      return live(n) && !(n.parentElement && n.parentElement.closest('.chart'));
+    });
+  }
   function typeOf(factory) {
     return Object.keys(root.Charts || {}).filter(function (k) { return Charts[k] === factory; })[0] || '';
   }
+  function chartTypeOf(id) {
+    var d = drawnFor(id);
+    if (d) return typeOf(d.factory);
+    var entry = editable() && root.Page.getChart(id);
+    return entry ? entry.type : '';
+  }
   function cardAlt(card) {
     var head = card.querySelector('h2');
-    var parts = [head ? head.textContent : ''].concat(Array.prototype.map.call(card.querySelectorAll('img[alt]'), function (i) { return i.getAttribute('alt'); }));
-    return parts.map(function (s) { return String(s || '').replace(/\s+/g, ' ').trim().replace(/([^.!?])$/, '$1.'); })
+    var alts = Array.prototype.map.call(card.querySelectorAll('img[alt]'), function (i) { return i.getAttribute('alt'); })
+      .concat(chartsOf(card).map(altOf));
+    return [head ? head.textContent : ''].concat(alts)
+      .map(function (s) { return String(s || '').replace(/\s+/g, ' ').trim().replace(/([^.!?])$/, '$1.'); })
       .filter(function (s) { return s && s !== '.'; }).join(' ');
   }
+  // A post's words as posted: its line breaks are newlines in the source and
+  // <br> once the reader has edited it.
+  function postText(pre) {
+    var clone = pre.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll('br'), function (b) { b.replaceWith('\n'); });
+    Array.prototype.forEach.call(clone.querySelectorAll('[data-page-ui]'), function (n) { n.remove(); });
+    return clone.textContent.replace(/^\s*\n|\s+$/g, '');
+  }
   function postsOf(block) {
-    return Array.prototype.map.call(block.querySelectorAll('pre.post'), function (pre) {
+    return Array.prototype.filter.call(block.querySelectorAll('pre.post'), live).map(function (pre) {
       var platform = pre.getAttribute('data-platform');
       var spec = PLATFORMS[platform] || { name: platform, limit: 0 };
-      var text = pre.textContent.replace(/^\s*\n|\s+$/g, '');
+      var text = postText(pre);
       return { el: pre, platform: platform, name: spec.name, text: text, length: postLength(text, platform), limit: spec.limit, fold: spec.fold || 0 };
     });
   }
@@ -1082,6 +1130,7 @@
   function spillOf(card) {
     var r = card.getBoundingClientRect(), worst = 0;
     Array.prototype.forEach.call(card.querySelectorAll('*'), function (n) {
+      if (n.closest('.chart')) return;   // a live chart's own SVG is its business
       var b = n.getBoundingClientRect();
       if (!b.width || !b.height) return;
       worst = Math.max(worst, b.bottom - r.bottom, b.right - r.right);
@@ -1090,30 +1139,39 @@
   }
 
   function freezeSocial() {
-    if (state.frozen) return Promise.resolve(state.report);
-    if (busy) return busy;
+    var isLive = editable();
+    if (state.frozen && !(isLive && stale)) return Promise.resolve(state.report);
+    if (busy) { again = true; return busy; }
     var block = blockEl();
-    var problems = [], warns = [], images = [], cards = [];
+    stale = false;
+    var problems = [], warns = [], images = [], cards = [], shots = {};
     var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
     busy = fontsReady.then(function () { return frames(2); })
       .then(function () { return new Promise(function (ok) { setTimeout(ok, 250); }); })
       .then(function () {
-        var hosts = Array.prototype.filter.call(block.querySelectorAll('.chart'), function (n) {
-          return !(n.parentElement && n.parentElement.closest('.chart'));
-        });
-        return hosts.reduce(function (p, host) {
+        return chartsOf(block).reduce(function (p, host) {
           return p.then(function () {
             var id = host.id, d = drawnFor(id);
-            if (!d) { problems.push({ rule: 'charts frozen', msg: (id || 'a chart') + ' was not drawn with SocialSnapshot.draw, so it cannot be frozen' }); return; }
-            if (d.handle && d.handle.error) { problems.push({ rule: 'chart drew', msg: id + ': ' + d.handle.error }); return; }
+            var inSpec = isLive && root.Page.getChart(id);
+            if (!d && !inSpec) {
+              problems.push({ rule: 'charts frozen', msg: (id || 'a chart') + ' was not drawn with SocialSnapshot.draw' +
+                (isLive ? ' or the page spec' : '') + ', so it cannot be frozen' });
+              return;
+            }
+            if (inSpec && inSpec.config && (inSpec.config.title || inSpec.config.subtitle)) {
+              warns.push({ rule: 'chart text', msg: id + ' has a title or subtitle inside the chart — the card\'s headline and units line already carry them' });
+            }
+            if (d && d.handle && d.handle.error) { problems.push({ rule: 'chart drew', msg: id + ': ' + d.handle.error }); return; }
             var w = Math.round(host.offsetWidth), h = Math.round(host.offsetHeight);
-            var meta = root.Charts && Charts.meta && Charts.meta.charts && Charts.meta.charts[typeOf(d.factory)];
+            var type = chartTypeOf(id);
+            var meta = root.Charts && Charts.meta && Charts.meta.charts && Charts.meta.charts[type];
             if (h < 110) {
               problems.push({ rule: 'chart room', msg: id + ' has only ' + h + 'px of the card left — shorten the headline or the units line, or use a taller size' });
             } else if (meta && (w < meta.minWidth * 0.6 || h < (meta.minHeight - 60) * 0.6)) {
-              warns.push({ rule: 'chart room', msg: id + ' is ' + w + 'x' + h + ', well under the ' + meta.minWidth + 'x' + (meta.minHeight - 60) + ' a ' + typeOf(d.factory) + ' wants — fewer categories, or a taller card' });
+              warns.push({ rule: 'chart room', msg: id + ' is ' + w + 'x' + h + ', well under the ' + meta.minWidth + 'x' + (meta.minHeight - 60) + ' a ' + type + ' wants — fewer categories, or a taller card' });
             }
-            return d.handle.toPNG({ scale: SOCIAL_SCALE }).then(function (blob) {
+            var png = d ? d.handle.toPNG({ scale: SOCIAL_SCALE }) : offscreenPNG(id, w, h, SOCIAL_SCALE);
+            return png.then(function (blob) {
               return blobToDataURL(blob).then(function (url) {
                 var img = document.createElement('img');
                 img.setAttribute('src', url);
@@ -1121,8 +1179,13 @@
                 img.setAttribute('height', String(h));
                 img.setAttribute('alt', altOf(host));
                 images.push({ id: id, blob: blob, url: url, w: w, h: h, alt: altOf(host), kb: Math.round(blob.size / 1024) });
-                if (d.handle.destroy) d.handle.destroy();
-                host.replaceWith(img);
+                shots[id] = img;
+                // A static post shows on screen exactly what is posted. An
+                // editable one keeps its live chart for the editor.
+                if (!isLive) {
+                  if (d.handle.destroy) d.handle.destroy();
+                  host.replaceWith(img);
+                }
               });
             }).catch(function (e) { problems.push({ rule: 'chart drew', msg: id + ': ' + (e && e.message || e) }); });
           });
@@ -1130,7 +1193,11 @@
       })
       .then(function () {
         var clone = block.cloneNode(true);
-        Array.prototype.slice.call(clone.querySelectorAll('[data-page-ui]')).forEach(function (n) { n.remove(); });
+        Array.prototype.slice.call(clone.querySelectorAll('[data-page-ui],[data-page-removed]')).forEach(function (n) { n.remove(); });
+        Object.keys(shots).forEach(function (id) {
+          var host = clone.querySelector('#' + cssId(id));
+          if (host) host.replaceWith(shots[id].cloneNode(true));
+        });
         state.html = clone.innerHTML.trim();
         state.images = images;
         state.posts = postsOf(block);
@@ -1144,7 +1211,7 @@
             }
             var spill = spillOf(card);
             if (spill > 1) problems.push({ rule: 'card overflow', msg: name + ': content runs ' + spill + 'px past the frame and would be cut off the picture — shorten the text, or use a taller size' });
-            return cardPNG(card, SOCIAL_SCALE).then(function (png) {
+            return cardPNG(card, SOCIAL_SCALE, isLive ? shots : null).then(function (png) {
               cards.push({ index: i, size: size, blob: png.blob, url: png.url, w: png.pw, h: png.ph, kb: png.kb, alt: cardAlt(card) });
             }, function (e) {
               warns.push({ rule: 'card', msg: name + ' could not be painted into a picture (' + (e && e.message || e) + ') — this browser will not draw HTML onto a canvas; open the file in Edge or Chrome' });
@@ -1157,11 +1224,17 @@
         state.frozen = true;
         state.report = checkSocial(problems);
         state.report.warns = warns.concat(state.report.warns);
+        // Alt text is written by hand, so it does not follow an edit to the
+        // chart's numbers. Say which charts changed since the page opened.
+        var edited = Object.keys(changed).filter(function (id) { return shots[id] && block.querySelector('#' + cssId(id) + '[data-alt-key]'); });
+        if (edited.length) state.report.warns.push({ rule: 'alt text', msg: 'The data in ' + edited.join(' and ') + ' changed. Check that ' +
+          (edited.length > 1 ? 'their alt text still states' : 'its alt text still states') + ' the right numbers (shown under each card in edit mode).' });
         document.documentElement.setAttribute('data-email', state.report.ok ? 'frozen' : 'problems');
         busy = null;
+        if (again) { again = false; stale = true; return freezeSocial(); }
         notify();
         return state.report;
-      }, function (e) { busy = null; throw e; });
+      }, function (e) { busy = null; again = false; throw e; });
     return busy;
   }
 
@@ -1190,9 +1263,16 @@
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; });
     return Promise.reject(new Error('this browser would not write to the clipboard'));
   }
+  function ready() {
+    if (busy || stale) return Promise.reject(new Error('the pictures are still catching up with your last edit — try again in a moment'));
+    return Promise.resolve();
+  }
   function cardAt(i) {
-    var c = (state.cards || []).filter(function (x) { return x.index === i; })[0];
-    return c ? Promise.resolve(c) : Promise.reject(new Error(state.frozen ? 'card ' + (i + 1) + ' has no picture (see the status line)' : 'freeze() has not finished'));
+    return ready().then(function () {
+      var c = (state.cards || []).filter(function (x) { return x.index === i; })[0];
+      if (!c) throw new Error(state.frozen ? 'card ' + (i + 1) + ' has no picture (see the status line)' : 'freeze() has not finished');
+      return c;
+    });
   }
   // A bare image/png is what a pasted screenshot is, and every compose box
   // takes one.
@@ -1205,11 +1285,14 @@
   function cardFile(c) { return slug() + '-' + c.size + '-' + c.w + 'x' + c.h + '.png'; }
   function saveCard(i) { return cardAt(i).then(function (c) { save(cardFile(c), c.blob); }); }
   function saveCards() {
-    (state.cards || []).forEach(function (c, k) { setTimeout(function () { save(cardFile(c), c.blob); }, k * 300); });
+    return ready().then(function () {
+      (state.cards || []).forEach(function (c, k) { setTimeout(function () { save(cardFile(c), c.blob); }, k * 300); });
+    });
   }
 
   // What a reader sees before "…more", marked on the page: the rest of the
-  // post is set muted after a fold line.
+  // post is set muted after a fold line. Not on an editable post, where the
+  // words are marked text the editor owns.
   function showFold(p) {
     if (!p.fold || Array.from(p.text).length <= p.fold) return;
     var chars = Array.from(p.text);
@@ -1225,66 +1308,117 @@
 
   function wireSocial() {
     var block = blockEl();
+    var isLive = editable();
     var bar = document.getElementById('snap-bar');
     var status = bar && bar.querySelector('[data-snap="status"]');
     var say = function (t) { if (status) status.textContent = t; };
+    var buttons = [];
     var button = function (label, fn) {
       var b = document.createElement('button');
       b.type = 'button';
       b.textContent = label;
       b.addEventListener('click', fn);
+      buttons.push(b);
       return b;
     };
+    var enable = function (yes) { buttons.forEach(function (b) { b.disabled = !yes; }); };
     var all = bar && bar.querySelector('[data-snap="save-png"]');
-    if (all) { all.disabled = true; all.addEventListener('click', saveCards); }
-    say('Freezing the charts and painting the cards…');
-    freezeSocial().then(function (r) {
+    if (all) {
+      buttons.push(all);
+      all.addEventListener('click', function () { saveCards().catch(function (e) { say('Could not save: ' + e.message); }); });
+    }
+    // An edited post's line breaks: Enter inside a post is a new line, not
+    // a new paragraph the sanitiser would flatten into the line above.
+    Array.prototype.forEach.call(block.querySelectorAll('pre.post'), function (pre) {
+      pre.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || !pre.isContentEditable) return;
+        e.preventDefault();
+        e.stopPropagation();
+        document.execCommand('insertLineBreak');
+      }, true);
+    });
+
+    var wired = false, labels = { cards: [], posts: [] };
+    var build = function () {
       cardsOf(block).forEach(function (card, i) {
-        var c = state.cards.filter(function (x) { return x.index === i; })[0];
         var spec = SOCIAL_SIZES[card.getAttribute('data-size')];
         var row = document.createElement('div');
         row.className = 'card-actions';
         row.setAttribute('data-page-ui', '');
         var label = document.createElement('span');
-        label.textContent = spec ? (c ? c.w + '×' + c.h : '') + ' · ' + spec.ratio + ' · ' + spec.for : 'unknown size';
         row.appendChild(label);
-        if (c) {
-          row.appendChild(button('Copy picture', function () {
-            copyCardImage(i).then(function () { say('Card ' + (i + 1) + ' copied as a picture. Paste it into the post (Ctrl+V), then add the alt text.'); },
-              function (e) { say('Could not copy the picture: ' + String(e.message).replace(/\.$/, '') + '. Use Save PNG and attach the file.'); });
-          }));
-          row.appendChild(button('Save PNG', function () { saveCard(i); }));
-          row.appendChild(button('Copy alt text', function () {
-            copyPlain(c.alt).then(function () { say('Alt text for card ' + (i + 1) + ' copied (' + c.alt.length + ' characters). Paste it into the picture\'s description field.'); },
-              function (e) { say('Could not copy: ' + e.message); });
-          }));
-        }
-        card.parentNode.insertBefore(row, card.nextSibling);
+        labels.cards.push({ el: label, spec: spec, index: i });
+        row.appendChild(button('Copy picture', function () {
+          copyCardImage(i).then(function () { say('Card ' + (i + 1) + ' copied as a picture. Paste it into the post (Ctrl+V), then add the alt text.'); },
+            function (e) { say('Could not copy the picture: ' + String(e.message).replace(/\.$/, '') + '. Use Save PNG and attach the file.'); });
+        }));
+        row.appendChild(button('Save PNG', function () { saveCard(i).catch(function (e) { say('Could not save: ' + e.message); }); }));
+        row.appendChild(button('Copy alt text', function () {
+          cardAt(i).then(function (c) {
+            return copyPlain(c.alt).then(function () { say('Alt text for card ' + (i + 1) + ' copied (' + c.alt.length + ' characters). Paste it into the picture\'s description field.'); });
+          }).catch(function (e) { say('Could not copy: ' + e.message); });
+        }));
+        // After the card and after its alt-text field, if it has one.
+        var after = card.nextElementSibling && card.nextElementSibling.hasAttribute('data-snap-omit') ? card.nextElementSibling : card;
+        after.parentNode.insertBefore(row, after.nextSibling);
       });
       state.posts.forEach(function (p) {
         var row = document.createElement('div');
         row.className = 'post-meta';
         row.setAttribute('data-page-ui', '');
         var label = document.createElement('span');
-        var over = p.limit && p.length > p.limit;
-        label.textContent = p.name + ' · ' + p.length.toLocaleString() + ' / ' + (p.limit || 0).toLocaleString() +
-          (p.fold ? ' · first ' + p.fold + ' show before "…more"' : '');
-        if (over) label.className = 'over';
         row.appendChild(label);
+        labels.posts.push({ el: label, pre: p.el });
         row.appendChild(button('Copy text', function () {
-          copyPlain(p.text).then(function () { say(p.name + ' text copied. Paste it into the post, then add the picture.'); },
-            function (e) { say('Could not copy: ' + e.message + '. Select the text and press Ctrl+C instead.'); });
+          ready().then(function () {
+            var now = state.posts.filter(function (x) { return x.el === p.el; })[0];
+            if (!now) throw new Error('this post was removed');
+            return copyPlain(now.text).then(function () { say(now.name + ' text copied. Paste it into the post, then add the picture.'); });
+          }).catch(function (e) { say('Could not copy: ' + e.message + '. Select the text and press Ctrl+C instead.'); });
         }));
         p.el.parentNode.insertBefore(row, p.el);
-        showFold(p);
+        if (!isLive) showFold(p);
       });
+    };
+    var report = function (r) {
+      if (!wired) { build(); wired = true; }
+      labels.cards.forEach(function (l) {
+        var c = state.cards.filter(function (x) { return x.index === l.index; })[0];
+        l.el.textContent = l.spec ? (c ? c.w + '×' + c.h : 'not painted') + ' · ' + l.spec.ratio + ' · ' + l.spec.for : 'unknown size';
+      });
+      labels.posts.forEach(function (l) {
+        var p = state.posts.filter(function (x) { return x.el === l.pre; })[0];
+        if (!p) return;
+        l.el.textContent = p.name + ' · ' + p.length.toLocaleString() + ' / ' + (p.limit || 0).toLocaleString() +
+          (p.fold ? ' · first ' + p.fold + ' show before "…more"' : '');
+        l.el.className = p.limit && p.length > p.limit ? 'over' : '';
+      });
+      enable(true);
       if (all) all.disabled = !state.cards.length;
       var n = state.cards.length + ' card(s) painted (' + state.cards.map(function (c) { return c.w + '×' + c.h; }).join(', ') + ')';
-      var card = r.warns.filter(function (w) { return w.rule === 'card'; });
+      var notes = r.warns.filter(function (w) { return w.rule === 'card' || w.rule === 'alt text' || w.rule === 'chart text'; });
       say(!r.ok ? 'Frozen with problems: ' + r.fails.map(function (f) { return f.msg; }).join(' · ')
-        : card.length ? n + '. Note: ' + card.map(function (w) { return w.msg; }).join(' · ')
-        : 'Ready — ' + n + '. Copy a picture and its text into the post.');
-    }, function (e) { if (all) all.disabled = false; say('Could not freeze: ' + e.message); });
+        : notes.length ? 'Ready — ' + n + '. ' + notes.map(function (w) { return w.msg; }).join(' · ')
+        : 'Ready — ' + n + (isLive && root.PageEditor ? '. Edits repaint the pictures as you make them.' : '. Copy a picture and its text into the post.'));
+    };
+    var failed = function (e) { enable(true); say('Could not freeze: ' + e.message); };
+    enable(false);
+    say('Freezing the charts and painting the cards…');
+    freezeSocial().then(report, failed);
+    if (!isLive) return;
+    var timer = null;
+    root.Page.on(function (change) {
+      if (change && change.kind === 'chart' && change.id) changed[String(change.id).split('::')[0]] = 1;
+      // Editing a chart's alt text answers the warning for that chart.
+      if (change && change.kind === 'text') {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-alt-key="' + cssId(change.id) + '"]'), function (n) { delete changed[n.id]; });
+      }
+      stale = true;
+      enable(false);
+      say('Repainting the pictures…');
+      clearTimeout(timer);
+      timer = setTimeout(function () { freezeSocial().then(report, failed); }, 500);
+    });
   }
 
   root.EmailSnapshot = {

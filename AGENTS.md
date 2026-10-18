@@ -45,7 +45,7 @@ topic with figures in it.
    `social.html` (chart cards painted at each platform's picture size, with
    the words to post), or
    `dashboard-editable.html` / `report-editable.html` /
-   `slides-editable.html` / `email-editable.html` (only when an editable page
+   `slides-editable.html` / `email-editable.html` / `social-editable.html` (only when an editable page
    was asked for; a one-pager has no editable template and isn't offered one).
 4. When you want a worked reference, read one of the finished pages in
    `examples/` — `logistics-network-dashboard/` (dashboard, most chart types),

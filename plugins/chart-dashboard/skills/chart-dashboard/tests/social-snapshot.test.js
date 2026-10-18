@@ -172,3 +172,68 @@ test('finalize stages and inlines the freeze runtime, then cleans up', () => {
   assert.ok(shipped.includes('root.SocialSnapshot = root.EmailSnapshot'), 'the freeze runtime was not inlined');
   assert.ok(!fs.existsSync(path.join(dir, 'ship', 'charts-lib')), 'staged folder left behind');
 });
+
+// ── the editable variant ─────────────────────────────────────────────
+// social-editable.html is social.html in the format of references/editable.md:
+// charts in #page-spec, text marked data-edit, alt text in an edit-only field
+// after its card. It shares social.html's stylesheet, so the two cannot
+// drift, and ships as a final copy and a working copy.
+const EDITABLE = path.join(__dirname, '..', 'templates', 'social-editable.html');
+const lf = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
+
+test('editable: the template passes its own checks, editable row included', () => {
+  const out = runCheck(EDITABLE);
+  assert.match(row(out, 'social card'), /PASS/, out);
+  assert.match(row(out, 'charts freeze to PNG'), /PASS.*page spec/, out);
+  assert.match(row(out, 'editable page'), /PASS/, out);
+  assert.doesNotMatch(row(out, 'editable page'), /locked/, out);
+  assert.doesNotMatch(out, /\bFAIL\b/, out);
+});
+
+test('editable: every chart is a spec entry, none drawn by code, every key unique', () => {
+  const html = lf(EDITABLE);
+  const ids = [...html.matchAll(/<div class="chart[^"]*" id="([^"]+)"/g)].map(m => m[1]);
+  const spec = JSON.parse(html.match(/<script type="application\/json" id="page-spec">([\s\S]*?)<\/script>/)[1]);
+  assert.deepStrictEqual(Object.keys(spec.charts).sort(), ids.slice().sort());
+  assert.doesNotMatch(html, /(?:Social|Email)Snapshot\.draw\(|Charts\.(?!theme\b|applyPalette\b|applyMetrics\b)\w+\(\s*['"]/, 'chart code would lock its chart');
+  const keys = [...html.matchAll(/\sdata-key="([^"]+)"/g)].map(m => m[1]);
+  assert.deepStrictEqual(keys.filter((k, i) => keys.indexOf(k) !== i), []);
+  for (const k of ['c1-headline', 'c1-source', 'c1-alt', 'post-linkedin', 'post-x']) assert.ok(keys.includes(k), 'no key ' + k);
+  // Each post is rich text, so Enter can insert a line break the sanitiser keeps.
+  assert.match(html, /<pre class="post" data-platform="x" data-edit="rich"/);
+});
+
+test('editable: it keeps the static template\'s charts and stylesheet', () => {
+  const style = h => h.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const ids = h => [...h.matchAll(/<div class="chart[^"]*" id="([^"]+)"/g)].map(m => m[1]);
+  const a = lf(EDITABLE), b = lf(TEMPLATE);
+  assert.strictEqual(style(a), style(b), 'the stylesheet drifted from social.html');
+  assert.deepStrictEqual(ids(a), ids(b));
+});
+
+test('editable: alt text is read through its key, and checked like data-alt', () => {
+  const keyed = alt => '<div class="cards"><div class="card" data-size="portrait"><h2>Tickets hit 410</h2>' +
+    '<div class="chart" id="c1" data-alt-key="c1-alt"></div><p class="source">Source: helpdesk, 2026</p></div>' +
+    '<p class="alt-edit" data-snap-omit><span data-edit="text" data-key="c1-alt">' + alt + '</span></p></div>';
+  assert.deepStrictEqual(social(keyed('Line chart: tickets rose from 120 to 410 in nine weeks.')).fails, []);
+  assert.ok(rules(social(keyed('a chart of tickets'))).includes('alt text'));
+  // A figure only in the alt-text field still counts as on the card.
+  assert.deepStrictEqual(social(keyed('Line chart: tickets rose from 120 to 410 in nine weeks.') +
+    posts(['x', 'Up from 120 to 410.'])).fails, []);
+});
+
+test('editable: finalize ships a final copy and a working copy', () => {
+  const page = path.join(dir, 'editable', 'post.html');
+  fs.mkdirSync(path.dirname(page));
+  fs.copyFileSync(EDITABLE, page);
+  const f = spawnSync(process.execPath, [FINALIZE, page], { encoding: 'utf8' });
+  assert.strictEqual(f.status, 0, f.stdout + f.stderr);
+  const fin = fs.readFileSync(page, 'utf8');
+  const work = fs.readFileSync(path.join(dir, 'editable', 'post (working copy).html'), 'utf8');
+  for (const out of [fin, work]) {
+    assert.ok(!/src="charts-lib\//.test(out), 'a charts-lib reference survived');
+    assert.ok(out.includes('root.SocialSnapshot = root.EmailSnapshot'), 'the freeze runtime was not inlined');
+  }
+  assert.ok(!fin.includes('window.PageEditor ='), 'the final copy still carries the editor');
+  assert.ok(work.includes('window.PageEditor ='), 'the working copy lost the editor');
+});
