@@ -40,6 +40,13 @@
  * the whole card as designed (cardPNG, copyCard). Its toolbar also has a
  * copy-as-picture button per chart.
  *
+ * A social post (templates/social.html) is the same freeze again, for a
+ * feed: its block is id="social-block", and what leaves is not markup at all
+ * but one picture per card, painted at the exact pixels a platform wants
+ * (1080x1350, 1080x1080, 1200x675), plus the words that go with it, counted
+ * the way each platform counts them. lint(markup, { target: 'social' })
+ * holds its rules, and the page calls the runtime SocialSnapshot.
+ *
  * `lint(markup, { frozen })` is pure and also exported to Node, so
  * scripts/check-page.js applies the same rules to the source that this file
  * applies to the frozen result. One list of rules, two moments.
@@ -71,6 +78,7 @@
 
   function lint(markup, opts) {
     if (opts && opts.target === 'teams') return lintTeams(markup, opts);
+    if (opts && opts.target === 'social') return lintSocial(markup, opts);
     var frozen = !!(opts && opts.frozen);
     var fails = [], warns = [];
     var fail = function (rule, msg) { fails.push({ rule: rule, msg: msg }); };
@@ -281,8 +289,218 @@
     return { ok: !fails.length, fails: fails, warns: warns };
   }
 
+  // ── the social rules ─────────────────────────────────────────────────
+  // A feed is the one place the picture IS the post. It is reposted,
+  // screenshotted and quoted without the words under it, so everything the
+  // reader needs (the finding, the units, the source, the date) is painted
+  // into the card. Nothing survives as markup, so the block may use classes
+  // and the page's style sheet freely; what it may not do is depend on a
+  // pointer, a tooltip or a caption that has not travelled with it.
+  //
+  // Each card is laid out at about the size a phone shows it (432 or 480 CSS
+  // px wide) and painted at 2.5x, which lands on the pixels the platforms
+  // ask for. Designed at 1080px instead, its 11px chart labels would arrive
+  // on a phone at 4px.
+  var SOCIAL_SCALE = 2.5;
+  var SOCIAL_SIZES = {
+    portrait:  { w: 432, h: 540, ratio: '4:5',  for: 'LinkedIn and Instagram feeds, where a taller picture takes more of the screen' },
+    square:    { w: 432, h: 432, ratio: '1:1',  for: 'any feed; the safe shape when one picture goes everywhere' },
+    landscape: { w: 480, h: 270, ratio: '16:9', for: 'X, Bluesky and Threads, which show it uncropped in the timeline' }
+  };
+  // How long a post may be, and how each platform counts. Checked 2026-10
+  // against third-party references, since the platforms publish few of these;
+  // references/layout-social.md keeps the same table, with what is unsure.
+  //   x         weighted: CJK and emoji count 2, every link 23 (twitter-text)
+  //   grapheme  Bluesky counts what a reader sees as one character
+  //   url23     Mastodon counts every link as 23, whatever its length
+  //   fold      the characters shown before "…see more" / "…more"
+  var PLATFORMS = {
+    linkedin:  { name: 'LinkedIn',  limit: 3000, count: 'char', fold: 140, tags: 3 },
+    x:         { name: 'X',         limit: 280,  count: 'x', tags: 2 },
+    bluesky:   { name: 'Bluesky',   limit: 300,  count: 'grapheme', tags: 3 },
+    threads:   { name: 'Threads',   limit: 500,  count: 'char', tags: 1 },
+    mastodon:  { name: 'Mastodon',  limit: 500,  count: 'url23', tags: 5 },
+    instagram: { name: 'Instagram', limit: 2200, count: 'char', fold: 125, tags: 5 }
+  };
+  var ALT_MAX = 1000;          // X's limit per picture, the lowest of the published ones
+  var ALT_WARN = 300;          // LinkedIn's is unpublished; ~300 is the figure guides give
+  var URL_RE = /\bhttps?:\/\/[^\s<>"]+/gi;
+  var CARD_OPEN = /<div\b[^>]*\bclass="card"[^>]*>/gi;
+
+  function graphemes(s) {
+    if (typeof Intl === 'object' && Intl.Segmenter) {
+      return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s), function (x) { return x.segment; });
+    }
+    return Array.from(s);
+  }
+  // twitter-text's v3 weights: these ranges (Latin, Greek, Cyrillic, most
+  // punctuation) count 1; everything else, CJK and emoji included, counts 2.
+  function lightCP(cp) { return cp <= 4351 || (cp >= 8192 && cp <= 8205) || (cp >= 8208 && cp <= 8223) || (cp >= 8242 && cp <= 8247); }
+
+  /** The length a platform reports for a post, counted its way. */
+  function postLength(text, platform) {
+    var how = (PLATFORMS[platform] || {}).count || 'char';
+    var urls = 0;
+    var t = String(text || '').normalize ? String(text || '').normalize('NFC') : String(text || '');
+    if (how === 'x' || how === 'url23') t = t.replace(URL_RE, function () { urls++; return ''; });
+    if (how === 'grapheme') return graphemes(t).length;
+    if (how === 'x') {
+      return urls * 23 + graphemes(t).reduce(function (n, g) {
+        var cps = Array.from(g);
+        return n + (cps.length === 1 && lightCP(cps[0].codePointAt(0)) ? 1 : 2);
+      }, 0);
+    }
+    return urls * 23 + Array.from(t).length;
+  }
+
+  var NAMED = { rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', mdash: '—', ndash: '–',
+    hellip: '…', middot: '·', rarr: '→', minus: '−', times: '×' };
+  function decodeText(s) {
+    return String(s || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'").replace(/&#(\d+);/g, function (_, n) { return String.fromCodePoint(+n); })
+      .replace(/&#x([0-9a-f]+);/gi, function (_, n) { return String.fromCodePoint(parseInt(n, 16)); })
+      .replace(/&(rsquo|lsquo|rdquo|ldquo|mdash|ndash|hellip|middot|rarr|minus|times);/g, function (_, n) { return NAMED[n]; })
+      .replace(/&amp;/g, '&');
+  }
+  // Every figure in a piece of text, normalised so "1,240" and "1240" match,
+  // and "93.0" and "93". Links are not figures.
+  function figuresIn(s) {
+    var out = [];
+    String(s || '').replace(URL_RE, ' ').replace(/\d[\d,]*(?:\.\d+)?/g, function (m) {
+      var v = parseFloat(m.replace(/,(?=\d{3}\b)/g, '').replace(/,/g, ''));
+      if (isFinite(v)) out.push(String(v));
+      return m;
+    });
+    return out;
+  }
+
+  // What a post's words do that a reader scrolls past. Warnings, not
+  // failures: each is a habit of machine-written posts, and each has the
+  // rare honest use.
+  var VOICE = [
+    [/\b(agree|thoughts|right)\?\s*$/im, 'ends on a question asked only to draw comments'],
+    [/\b(comment|drop a comment) below\b|\blike if\b|\btag (someone|a friend)\b|\brepost if\b|\bfollow (me )?for more\b/i, 'asks for engagement instead of earning it'],
+    [/^\s*(in today'?s (fast-paced )?world|let'?s dive in|here'?s the thing|unpopular opinion|i'?m (thrilled|excited|humbled) to)/im, 'opens on a stock phrase; open on the finding'],
+    [/\b(delve|game[- ]chang\w*|revolutioni[sz]\w*|unlock(s|ing)? the power)\b/i, 'uses a word that reads as machine-written']
+  ];
+
+  function lintSocial(markup, opts) {
+    var frozen = !!(opts && opts.frozen);
+    var fails = [], warns = [];
+    var fail = function (rule, msg) { fails.push({ rule: rule, msg: msg }); };
+    var warn = function (rule, msg) { warns.push({ rule: rule, msg: msg }); };
+    var h = String(markup || '').replace(/<!--[\s\S]*?-->/g, '');
+    if (!h.trim()) { fail('block', 'the social block is empty'); return { ok: false, fails: fails, warns: warns }; }
+
+    var postsAt = h.search(/<div\b[^>]*\bclass="posts"/i);
+    var cardsPart = postsAt >= 0 ? h.slice(0, postsAt) : h;
+    var postsPart = postsAt >= 0 ? h.slice(postsAt) : '';
+    var opens = [], m;
+    CARD_OPEN.lastIndex = 0;
+    while ((m = CARD_OPEN.exec(cardsPart))) opens.push(m.index);
+    if (!opens.length) fail('cards', 'no <div class="card" data-size="…"> in the block — the card is the picture that gets posted');
+    if (opens.length > 3) warn('scope', opens.length + ' cards — a post carries one to three cards, one finding each; past that it is a carousel or a page');
+
+    var onCards = {};
+    opens.forEach(function (at, i) {
+      var c = cardsPart.slice(at, i + 1 < opens.length ? opens[i + 1] : cardsPart.length);
+      var name = 'card ' + (i + 1);
+      var open = c.slice(0, c.indexOf('>') + 1);
+      var size = attr(open, 'data-size');
+      if (!SOCIAL_SIZES[size]) fail('card size', name + ' has data-size="' + (size || '') + '" — use portrait (1080x1350), square (1080x1080) or landscape (1200x675)');
+
+      var charts = c.match(CHART_DIV) || [];
+      var rest = c.replace(CHART_DIV, '');
+      var imgs = rest.match(/<img\b[^>]*>/gi) || [];
+      if (frozen && charts.length) fail('charts frozen', name + ': ' + charts.length + ' chart(s) still live — freeze() did not replace them with images');
+      if (charts.length + (frozen ? imgs.length : 0) > 1) {
+        fail('one finding per card', name + ' holds ' + (charts.length + (frozen ? imgs.length : 0)) + ' charts — a feed picture is read in a second and a half; give each finding its own card');
+      }
+      var alts = [];
+      charts.forEach(function (tag) {
+        var id = attr(tag, 'id') || '?';
+        alts.push(attr(tag, 'data-alt') || '');
+        checkAlt(id, attr(tag, 'data-alt') || '');
+        if (/\sstyle\s*=\s*"[^"]*\bwidth\s*:/i.test(tag)) warn('chart size', id + ' sets its own width — the card sizes the chart; leave the placeholder to fill it');
+      });
+      imgs.forEach(function (tag, k) {
+        var src = attr(tag, 'src') || '';
+        if (/^https?:/i.test(src)) fail('images', name + ': image ' + (k + 1) + ' loads from ' + src.slice(0, 60) + ' — a remote picture stops the card painting; embed it as a data: URI');
+        else if (frozen && !/^data:image\//i.test(src)) fail('images', name + ': image ' + (k + 1) + ' is not an embedded picture');
+        if (frozen) alts.push(attr(tag, 'alt') || '');
+      });
+      function checkAlt(id, alt) {
+        if (alt.trim().split(/\s+/).length < 6 || !/\d/.test(alt)) {
+          fail('alt text', id + ': data-alt must state the finding with its numbers (6+ words, at least one figure) — it is what a screen reader, and a feed with images off, gets');
+        } else if (alt.length > ALT_MAX) {
+          fail('alt text', id + ': data-alt is ' + alt.length + ' characters; X takes ' + ALT_MAX + ' per picture');
+        } else if (alt.length > ALT_WARN) {
+          warn('alt text', id + ': data-alt is ' + alt.length + ' characters; LinkedIn may cut it near ' + ALT_WARN);
+        }
+      }
+
+      var head = /<h2\b[^>]*>([\s\S]*?)<\/h2>/i.exec(c);
+      var headline = head ? decodeText(head[1]).replace(/\s+/g, ' ').trim() : '';
+      if (!headline) fail('headline', name + ' has no <h2> — the headline states the finding, in the picture, because the picture travels without the post');
+      else {
+        var max = size === 'landscape' ? 80 : 95;
+        if (headline.length > max) warn('headline', name + ': the headline is ' + headline.length + ' characters; past ~' + max + ' it runs to a third line and takes the chart\'s room');
+      }
+      var src = /<p\b[^>]*\bclass="source"[^>]*>([\s\S]*?)<\/p>/i.exec(c);
+      var source = src ? decodeText(src[1]).replace(/\s+/g, ' ').trim() : '';
+      if (!source) fail('source', name + ' has no <p class="source"> — a reposted chart with no source is a rumour; name where the numbers came from');
+      else if (!/\b(19|20)\d{2}\b|\bQ[1-4]\b|\bFY\s?\d{2}\b/i.test(source + ' ' + decodeText(c))) {
+        warn('source', name + ' carries no date or period — a screenshot is reposted for months; say when the figures are from');
+      }
+
+      BANNED_TAGS.forEach(function (t) {
+        var n = (rest.match(new RegExp('<' + t + '\\b', 'gi')) || []).length;
+        if (n) fail('nothing to click', name + ': ' + n + ' <' + t + '> — ' +
+          (t === 'svg' ? 'a chart goes in as a placeholder drawn with SocialSnapshot.draw, and is frozen to a picture' : 'a picture has no pointer and runs no script'));
+      });
+      if (/\son[a-z]+\s*=/i.test(rest)) fail('nothing to click', name + ': an inline event handler — nothing runs in a picture');
+      if (/\stitle\s*=/i.test(rest)) warn('nothing to click', name + ': a title= tooltip — hover text never reaches the picture; put it on the card or drop it');
+
+      figuresIn(decodeText(c) + ' ' + alts.join(' ')).forEach(function (f) { onCards[f] = 1; });
+    });
+
+    // The words that go with the picture, one <pre class="post"> per platform.
+    var posts = [], pm, PRE = /<pre\b([^>]*)>([\s\S]*?)<\/pre>/gi;
+    while ((pm = PRE.exec(postsPart))) posts.push({ platform: attr('<pre' + pm[1] + '>', 'data-platform'), text: decodeText(pm[2]).replace(/^\s*\n|\s+$/g, '') });
+    if (!posts.length) warn('post text', 'no <pre class="post" data-platform="…"> — write the words that go with the picture, one per platform');
+    var seenP = {};
+    posts.forEach(function (p) {
+      var spec = PLATFORMS[p.platform];
+      if (!spec) { fail('platform', 'a post for "' + (p.platform || '') + '" — use one of ' + Object.keys(PLATFORMS).join(', ')); return; }
+      if (seenP[p.platform]) warn('platform', 'two posts for ' + spec.name + ' — keep the one you mean');
+      seenP[p.platform] = 1;
+      var n = postLength(p.text, p.platform);
+      if (!p.text.trim()) fail('post text', 'the ' + spec.name + ' post is empty');
+      else if (n > spec.limit) fail('length', 'the ' + spec.name + ' post is ' + n + ' characters as ' + spec.name + ' counts them; it takes ' + spec.limit);
+      if (spec.fold && p.text.trim()) {
+        var lead = Array.from(p.text).slice(0, spec.fold).join('');
+        if (!/\d/.test(lead)) warn('hook', 'the first ' + spec.fold + ' characters of the ' + spec.name + ' post carry no figure — they are all a reader sees before "…more"; lead with the finding');
+      }
+      var missing = figuresIn(p.text).filter(function (f) { return !onCards[f] && !(+f < 10 && /^\d$/.test(f)); });
+      if (missing.length) {
+        fail('numbers on the card', 'the ' + spec.name + ' post states ' + missing.slice(0, 5).join(', ') +
+          ', which no card shows — every figure in the words must be on the picture (headline, units, caption or alt text), or it is unsourced');
+      }
+      var tags = (p.text.match(/(^|\s)#[\p{L}\p{N}_]+/gu) || []).length;
+      if (tags > spec.tags) warn('hashtags', 'the ' + spec.name + ' post has ' + tags + ' hashtags; past ' + spec.tags + ' it reads as reach-seeking rather than reporting');
+      var emojiLines = (p.text.match(/^\s*\p{Extended_Pictographic}/gmu) || []).length;
+      if (emojiLines > 1) warn('voice', 'the ' + spec.name + ' post starts ' + emojiLines + ' lines with an emoji — emoji bullets read as templated; write the sentence');
+      VOICE.forEach(function (v) { if (v[0].test(p.text)) warn('voice', 'the ' + spec.name + ' post ' + v[1]); });
+      if (/(^|\s)(https?:\/\/)?(localhost|127\.0\.0\.1)\b/i.test(p.text)) fail('links', 'the ' + spec.name + ' post links to a local address no reader can open');
+    });
+
+    return { ok: !fails.length, fails: fails, warns: warns };
+  }
+
   if (typeof module === 'object' && module.exports) {
-    module.exports = { lint: lint, SAFE_FONTS: SAFE_FONTS, MAX_WIDTH: MAX_WIDTH, TEAMS_WIDTH: TEAMS_WIDTH };
+    module.exports = { lint: lint, SAFE_FONTS: SAFE_FONTS, MAX_WIDTH: MAX_WIDTH, TEAMS_WIDTH: TEAMS_WIDTH,
+      SOCIAL_SIZES: SOCIAL_SIZES, SOCIAL_SCALE: SOCIAL_SCALE, PLATFORMS: PLATFORMS, postLength: postLength };
   }
   if (typeof document === 'undefined') return;
 
@@ -299,8 +517,9 @@
   // The block, and where it is going: #email-block for a mail client,
   // #teams-block for a Teams chat. The freeze is the same for both; the rules,
   // the export and the toolbar differ.
-  function blockEl() { return document.getElementById('email-block') || document.getElementById('teams-block'); }
-  function target() { var b = blockEl(); return b && b.id === 'teams-block' ? 'teams' : 'email'; }
+  // #social-block for a feed, where what leaves is one picture per card.
+  function blockEl() { return document.getElementById('email-block') || document.getElementById('teams-block') || document.getElementById('social-block'); }
+  function target() { var b = blockEl(); return b && b.id === 'teams-block' ? 'teams' : b && b.id === 'social-block' ? 'social' : 'email'; }
   var busy = null, again = false, stale = false, changed = {};
   var listeners = [];
   function notify() { listeners.forEach(function (fn) { try { fn(); } catch (e) { /* a listener's bug is its own */ } }); }
@@ -314,7 +533,7 @@
     var cfg = Object.assign({}, config);
     cfg.chart = Object.assign({}, config && config.chart, { animation: false });
     var handle = factory(id, cfg);
-    drawn.push({ id: id, handle: handle });
+    drawn.push({ id: id, handle: handle, factory: factory });
     return handle;
   }
 
@@ -478,7 +697,11 @@
   // an SVG foreignObject, and the browser paints that onto a canvas. Every
   // picture in the block is already a data: URL by now, so nothing taints the
   // canvas in Chromium (Edge, Chrome). Safari refuses, and says so.
-  function cardPNG(block) {
+  // The SVG is given the full pixel size and a viewBox at the card's own, so
+  // the browser lays the card out at its CSS size and rasterises it at the
+  // export size, rather than painting it small and stretching the bitmap.
+  function cardPNG(block, scale) {
+    var k = scale || 2;
     var w = Math.ceil(block.offsetWidth), h = Math.ceil(block.offsetHeight);
     if (!w || !h) return Promise.reject(new Error('the card is not on screen'));
     var clone = block.cloneNode(true);
@@ -495,7 +718,8 @@
     clone.style.margin = '0';
     clone.style.boxShadow = 'none';
     clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+    var pw = Math.round(w * k), ph = Math.round(h * k);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + pw + '" height="' + ph + '" viewBox="0 0 ' + w + ' ' + h + '">' +
       '<foreignObject x="0" y="0" width="100%" height="100%">' + new XMLSerializer().serializeToString(clone) +
       '</foreignObject></svg>';
     return new Promise(function (ok, no) {
@@ -505,17 +729,15 @@
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     }).then(function (img) {
       var c = document.createElement('canvas');
-      c.width = w * 2; c.height = h * 2;
-      var ctx = c.getContext('2d');
-      ctx.scale(2, 2);
-      ctx.drawImage(img, 0, 0);
+      c.width = pw; c.height = ph;
+      c.getContext('2d').drawImage(img, 0, 0, pw, ph);
       return new Promise(function (ok, no) {
         try { c.toBlob(function (b) { return b ? ok(b) : no(new Error('the canvas gave no PNG')); }, 'image/png'); }
         catch (e) { no(e); }
       });
     }).then(function (blob) {
       return blobToDataURL(blob).then(function (url) {
-        return { blob: blob, url: url, w: w, h: h, kb: Math.round(blob.size / 1024) };
+        return { blob: blob, url: url, w: w, h: h, pw: pw, ph: ph, kb: Math.round(blob.size / 1024) };
       });
     });
   }
@@ -527,6 +749,7 @@
    * rebuilds the email from the page as it now is; an edit marks it stale.
    */
   function freeze() {
+    if (target() === 'social') return freezeSocial();
     var live = editable();
     if (state.frozen && !(live && stale)) return Promise.resolve(state.report);
     if (busy) { again = true; return busy; }
@@ -641,6 +864,7 @@
   }
 
   function check(extra) {
+    if (target() === 'social') return checkSocial(extra);
     if (!state.frozen && !extra) return { ok: false, fails: [{ rule: 'frozen', msg: 'freeze() has not finished' }], warns: [] };
     var teams = target() === 'teams';
     var r = lint(state.html, { frozen: true, target: target() });
@@ -747,6 +971,7 @@
   // half-wired Copy button. On an editable page it also follows the edits:
   // each one disables the buttons until the email has been rebuilt from it.
   function wire() {
+    if (target() === 'social') return wireSocial();
     var bar = document.getElementById('snap-bar');
     if (!bar) return;
     var status = bar.querySelector('[data-snap="status"]');
@@ -829,6 +1054,239 @@
     });
   }
 
+  // ── a social post, in a browser ──────────────────────────────────────
+  // Each chart is frozen at the card's own scale, so the painted card
+  // carries a chart bitmap exactly as sharp as its type. Then each card is
+  // measured (its frame, and anything running out of it) and painted at
+  // 2.5x into the picture that gets posted. The posts' words are counted the
+  // way each platform counts them.
+  function cardsOf(block) { return Array.prototype.slice.call(block.querySelectorAll('.card')); }
+  function typeOf(factory) {
+    return Object.keys(root.Charts || {}).filter(function (k) { return Charts[k] === factory; })[0] || '';
+  }
+  function cardAlt(card) {
+    var head = card.querySelector('h2');
+    var parts = [head ? head.textContent : ''].concat(Array.prototype.map.call(card.querySelectorAll('img[alt]'), function (i) { return i.getAttribute('alt'); }));
+    return parts.map(function (s) { return String(s || '').replace(/\s+/g, ' ').trim().replace(/([^.!?])$/, '$1.'); })
+      .filter(function (s) { return s && s !== '.'; }).join(' ');
+  }
+  function postsOf(block) {
+    return Array.prototype.map.call(block.querySelectorAll('pre.post'), function (pre) {
+      var platform = pre.getAttribute('data-platform');
+      var spec = PLATFORMS[platform] || { name: platform, limit: 0 };
+      var text = pre.textContent.replace(/^\s*\n|\s+$/g, '');
+      return { el: pre, platform: platform, name: spec.name, text: text, length: postLength(text, platform), limit: spec.limit, fold: spec.fold || 0 };
+    });
+  }
+  // Anything drawn past the card's frame is sliced off the picture.
+  function spillOf(card) {
+    var r = card.getBoundingClientRect(), worst = 0;
+    Array.prototype.forEach.call(card.querySelectorAll('*'), function (n) {
+      var b = n.getBoundingClientRect();
+      if (!b.width || !b.height) return;
+      worst = Math.max(worst, b.bottom - r.bottom, b.right - r.right);
+    });
+    return Math.round(worst);
+  }
+
+  function freezeSocial() {
+    if (state.frozen) return Promise.resolve(state.report);
+    if (busy) return busy;
+    var block = blockEl();
+    var problems = [], warns = [], images = [], cards = [];
+    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    busy = fontsReady.then(function () { return frames(2); })
+      .then(function () { return new Promise(function (ok) { setTimeout(ok, 250); }); })
+      .then(function () {
+        var hosts = Array.prototype.filter.call(block.querySelectorAll('.chart'), function (n) {
+          return !(n.parentElement && n.parentElement.closest('.chart'));
+        });
+        return hosts.reduce(function (p, host) {
+          return p.then(function () {
+            var id = host.id, d = drawnFor(id);
+            if (!d) { problems.push({ rule: 'charts frozen', msg: (id || 'a chart') + ' was not drawn with SocialSnapshot.draw, so it cannot be frozen' }); return; }
+            if (d.handle && d.handle.error) { problems.push({ rule: 'chart drew', msg: id + ': ' + d.handle.error }); return; }
+            var w = Math.round(host.offsetWidth), h = Math.round(host.offsetHeight);
+            var meta = root.Charts && Charts.meta && Charts.meta.charts && Charts.meta.charts[typeOf(d.factory)];
+            if (h < 110) {
+              problems.push({ rule: 'chart room', msg: id + ' has only ' + h + 'px of the card left — shorten the headline or the units line, or use a taller size' });
+            } else if (meta && (w < meta.minWidth * 0.6 || h < (meta.minHeight - 60) * 0.6)) {
+              warns.push({ rule: 'chart room', msg: id + ' is ' + w + 'x' + h + ', well under the ' + meta.minWidth + 'x' + (meta.minHeight - 60) + ' a ' + typeOf(d.factory) + ' wants — fewer categories, or a taller card' });
+            }
+            return d.handle.toPNG({ scale: SOCIAL_SCALE }).then(function (blob) {
+              return blobToDataURL(blob).then(function (url) {
+                var img = document.createElement('img');
+                img.setAttribute('src', url);
+                img.setAttribute('width', String(w));
+                img.setAttribute('height', String(h));
+                img.setAttribute('alt', altOf(host));
+                images.push({ id: id, blob: blob, url: url, w: w, h: h, alt: altOf(host), kb: Math.round(blob.size / 1024) });
+                if (d.handle.destroy) d.handle.destroy();
+                host.replaceWith(img);
+              });
+            }).catch(function (e) { problems.push({ rule: 'chart drew', msg: id + ': ' + (e && e.message || e) }); });
+          });
+        }, Promise.resolve());
+      })
+      .then(function () {
+        var clone = block.cloneNode(true);
+        Array.prototype.slice.call(clone.querySelectorAll('[data-page-ui]')).forEach(function (n) { n.remove(); });
+        state.html = clone.innerHTML.trim();
+        state.images = images;
+        state.posts = postsOf(block);
+        return cardsOf(block).reduce(function (p, card, i) {
+          return p.then(function () {
+            var size = card.getAttribute('data-size'), spec = SOCIAL_SIZES[size], name = 'card ' + (i + 1);
+            if (!spec) return;   // lint names it
+            var ow = card.offsetWidth, oh = card.offsetHeight;
+            if (Math.abs(ow - spec.w) > 1 || Math.abs(oh - spec.h) > 1) {
+              problems.push({ rule: 'card size', msg: name + ' is ' + ow + 'x' + oh + ' on screen, not ' + spec.w + 'x' + spec.h + ' — keep the template\'s .card size rules, or the picture will not be ' + Math.round(spec.w * SOCIAL_SCALE) + 'x' + Math.round(spec.h * SOCIAL_SCALE) });
+            }
+            var spill = spillOf(card);
+            if (spill > 1) problems.push({ rule: 'card overflow', msg: name + ': content runs ' + spill + 'px past the frame and would be cut off the picture — shorten the text, or use a taller size' });
+            return cardPNG(card, SOCIAL_SCALE).then(function (png) {
+              cards.push({ index: i, size: size, blob: png.blob, url: png.url, w: png.pw, h: png.ph, kb: png.kb, alt: cardAlt(card) });
+            }, function (e) {
+              warns.push({ rule: 'card', msg: name + ' could not be painted into a picture (' + (e && e.message || e) + ') — this browser will not draw HTML onto a canvas; open the file in Edge or Chrome' });
+            });
+          });
+        }, Promise.resolve());
+      })
+      .then(function () {
+        state.cards = cards;
+        state.frozen = true;
+        state.report = checkSocial(problems);
+        state.report.warns = warns.concat(state.report.warns);
+        document.documentElement.setAttribute('data-email', state.report.ok ? 'frozen' : 'problems');
+        busy = null;
+        notify();
+        return state.report;
+      }, function (e) { busy = null; throw e; });
+    return busy;
+  }
+
+  function checkSocial(extra) {
+    if (!state.frozen && !extra) return { ok: false, fails: [{ rule: 'frozen', msg: 'freeze() has not finished' }], warns: [] };
+    var r = lint(state.html, { frozen: true, target: 'social' });
+    if (extra && extra.length) { r.fails = extra.concat(r.fails); r.ok = false; }
+    r.target = 'social';
+    r.cards = (state.cards || []).map(function (c) { return { size: c.size, width: c.w, height: c.h, kb: c.kb }; });
+    r.posts = (state.posts || []).map(function (p) { return { platform: p.platform, length: p.length, limit: p.limit }; });
+    r.images = state.images.map(function (i) { return { id: i.id, kb: i.kb }; });
+    (state.cards || []).forEach(function (c) {
+      if (c.kb > 5000) r.warns.push({ rule: 'size', msg: 'card ' + (c.index + 1) + ' is ' + c.kb + ' KB; X refuses a picture past 5 MB' });
+      if (c.alt.length > ALT_MAX) r.warns.push({ rule: 'alt text', msg: 'card ' + (c.index + 1) + '\'s alt text (headline plus chart) is ' + c.alt.length + ' characters; X takes ' + ALT_MAX });
+    });
+    return r;
+  }
+
+  function copyPlain(text) {
+    var done = false;
+    var on = function (e) { e.clipboardData.setData('text/plain', text); e.preventDefault(); done = true; };
+    document.addEventListener('copy', on);
+    try { document.execCommand('copy'); } catch (e) { /* fall through */ }
+    document.removeEventListener('copy', on);
+    if (done) return Promise.resolve(true);
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; });
+    return Promise.reject(new Error('this browser would not write to the clipboard'));
+  }
+  function cardAt(i) {
+    var c = (state.cards || []).filter(function (x) { return x.index === i; })[0];
+    return c ? Promise.resolve(c) : Promise.reject(new Error(state.frozen ? 'card ' + (i + 1) + ' has no picture (see the status line)' : 'freeze() has not finished'));
+  }
+  // A bare image/png is what a pasted screenshot is, and every compose box
+  // takes one.
+  function copyCardImage(i) {
+    return cardAt(i).then(function (c) {
+      if (!(navigator.clipboard && root.ClipboardItem)) throw new Error('this browser will not put a picture on the clipboard');
+      return navigator.clipboard.write([new root.ClipboardItem({ 'image/png': c.blob })]).then(function () { return true; });
+    });
+  }
+  function cardFile(c) { return slug() + '-' + c.size + '-' + c.w + 'x' + c.h + '.png'; }
+  function saveCard(i) { return cardAt(i).then(function (c) { save(cardFile(c), c.blob); }); }
+  function saveCards() {
+    (state.cards || []).forEach(function (c, k) { setTimeout(function () { save(cardFile(c), c.blob); }, k * 300); });
+  }
+
+  // What a reader sees before "…more", marked on the page: the rest of the
+  // post is set muted after a fold line.
+  function showFold(p) {
+    if (!p.fold || Array.from(p.text).length <= p.fold) return;
+    var chars = Array.from(p.text);
+    var above = document.createElement('span'), below = document.createElement('span');
+    above.textContent = chars.slice(0, p.fold).join('');
+    below.textContent = chars.slice(p.fold).join('');
+    below.className = 'below-fold';
+    below.title = 'Below "…more" on ' + p.name;
+    p.el.textContent = '';
+    p.el.appendChild(above);
+    p.el.appendChild(below);
+  }
+
+  function wireSocial() {
+    var block = blockEl();
+    var bar = document.getElementById('snap-bar');
+    var status = bar && bar.querySelector('[data-snap="status"]');
+    var say = function (t) { if (status) status.textContent = t; };
+    var button = function (label, fn) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      return b;
+    };
+    var all = bar && bar.querySelector('[data-snap="save-png"]');
+    if (all) { all.disabled = true; all.addEventListener('click', saveCards); }
+    say('Freezing the charts and painting the cards…');
+    freezeSocial().then(function (r) {
+      cardsOf(block).forEach(function (card, i) {
+        var c = state.cards.filter(function (x) { return x.index === i; })[0];
+        var spec = SOCIAL_SIZES[card.getAttribute('data-size')];
+        var row = document.createElement('div');
+        row.className = 'card-actions';
+        row.setAttribute('data-page-ui', '');
+        var label = document.createElement('span');
+        label.textContent = spec ? (c ? c.w + '×' + c.h : '') + ' · ' + spec.ratio + ' · ' + spec.for : 'unknown size';
+        row.appendChild(label);
+        if (c) {
+          row.appendChild(button('Copy picture', function () {
+            copyCardImage(i).then(function () { say('Card ' + (i + 1) + ' copied as a picture. Paste it into the post (Ctrl+V), then add the alt text.'); },
+              function (e) { say('Could not copy the picture: ' + String(e.message).replace(/\.$/, '') + '. Use Save PNG and attach the file.'); });
+          }));
+          row.appendChild(button('Save PNG', function () { saveCard(i); }));
+          row.appendChild(button('Copy alt text', function () {
+            copyPlain(c.alt).then(function () { say('Alt text for card ' + (i + 1) + ' copied (' + c.alt.length + ' characters). Paste it into the picture\'s description field.'); },
+              function (e) { say('Could not copy: ' + e.message); });
+          }));
+        }
+        card.parentNode.insertBefore(row, card.nextSibling);
+      });
+      state.posts.forEach(function (p) {
+        var row = document.createElement('div');
+        row.className = 'post-meta';
+        row.setAttribute('data-page-ui', '');
+        var label = document.createElement('span');
+        var over = p.limit && p.length > p.limit;
+        label.textContent = p.name + ' · ' + p.length.toLocaleString() + ' / ' + (p.limit || 0).toLocaleString() +
+          (p.fold ? ' · first ' + p.fold + ' show before "…more"' : '');
+        if (over) label.className = 'over';
+        row.appendChild(label);
+        row.appendChild(button('Copy text', function () {
+          copyPlain(p.text).then(function () { say(p.name + ' text copied. Paste it into the post, then add the picture.'); },
+            function (e) { say('Could not copy: ' + e.message + '. Select the text and press Ctrl+C instead.'); });
+        }));
+        p.el.parentNode.insertBefore(row, p.el);
+        showFold(p);
+      });
+      if (all) all.disabled = !state.cards.length;
+      var n = state.cards.length + ' card(s) painted (' + state.cards.map(function (c) { return c.w + '×' + c.h; }).join(', ') + ')';
+      var card = r.warns.filter(function (w) { return w.rule === 'card'; });
+      say(!r.ok ? 'Frozen with problems: ' + r.fails.map(function (f) { return f.msg; }).join(' · ')
+        : card.length ? n + '. Note: ' + card.map(function (w) { return w.msg; }).join(' · ')
+        : 'Ready — ' + n + '. Copy a picture and its text into the post.');
+    }, function (e) { if (all) all.disabled = false; say('Could not freeze: ' + e.message); });
+  }
+
   root.EmailSnapshot = {
     draw: draw,
     freeze: freeze,
@@ -838,6 +1296,14 @@
     copyCard: copyCard,
     /** a Teams post's whole card as one picture: { blob, url, w, h, kb }, or null */
     get card() { return state.card || null; },
+    /** a social post's pictures, one per card: [{ index, size, w, h, kb, alt, blob, url }] */
+    get cards() { return state.cards || []; },
+    /** a social post's words: [{ platform, name, text, length, limit, fold }] */
+    get posts() { return (state.posts || []).map(function (p) { var o = Object.assign({}, p); delete o.el; return o; }); },
+    copyCardImage: copyCardImage,
+    saveCard: saveCard,
+    saveCards: saveCards,
+    postLength: postLength,
     saveDocument: saveDocument,
     saveImages: saveImages,
     lint: lint,
@@ -852,6 +1318,7 @@
   };
   // A Teams page reads better calling it by its own name; it is one runtime.
   root.TeamsSnapshot = root.EmailSnapshot;
+  root.SocialSnapshot = root.EmailSnapshot;
   if (document.readyState === 'complete') setTimeout(wire, 0);
   else root.addEventListener('load', wire);
 })(typeof window !== 'undefined' ? window : this);

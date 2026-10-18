@@ -107,7 +107,7 @@ pulls in the others:
 
 | Plugin | What it does |
 | --- | --- |
-| `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report, deck, one-pager, email snapshot or Teams post. |
+| `chart-dashboard` | This one. Data → a self-contained HTML dashboard, report, deck, one-pager, email snapshot, Teams post or social post. |
 | `decisions-only` | A meeting transcript → the decisions and commitments, and nothing else. |
 | `whats-changed` | This period's numbers against last period's → what moved, by how much, and the few lines that explain the total. |
 | `sanity-check` | One spreadsheet, deck or PDF → the mistakes that would embarrass you, ranked into what blocks sending. |
@@ -242,7 +242,8 @@ self-contained HTML file that opens offline.
 | [One-pager](#one-pager) | A report on one printed sheet | "print it", "one page", "a handout", "for the board pack" |
 | [Email snapshot](#email-snapshot) | One to three findings in an email body | "paste it into the weekly update", "Outlook", "Gmail" |
 | Teams post | One to three findings pasted into a Teams chat or channel | "post it in the channel", "share in Teams" |
-| [Editable page](#editable-page) | Any of the above except the one-pager, changed in the browser | "make it editable", "so I can change the numbers" |
+| Social post | One to three chart cards for a feed, painted at 1080x1350, 1080x1080 or 1200x675, with the text for each platform | "post it on LinkedIn", "a tweet with the chart", "for Bluesky" |
+| [Editable page](#editable-page) | Any of the above except the one-pager, Teams post and social post, changed in the browser | "make it editable", "so I can change the numbers" |
 
 The images below all come from one fictional bike-share season, built once in
 each format, so you can compare how each format handles the same data. Their sources are in
@@ -537,6 +538,7 @@ plugins/chart-dashboard/skills/chart-dashboard/
     ├── email.html                  # 600px block to paste into Outlook or Gmail
     ├── email-editable.html         # the same, in the editable format
     ├── teams.html                  # rich text and chart pictures to paste into Teams
+    ├── social.html                 # chart cards sized for LinkedIn, X, Bluesky, Instagram
     ├── onepager.html               # one printed sheet, set in columns
     ├── report.html                 # paper-column starting point
     ├── report-editable.html        # the same, in the editable format

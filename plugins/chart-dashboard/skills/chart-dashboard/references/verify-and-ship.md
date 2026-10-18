@@ -101,6 +101,13 @@ checker's rows are `teams-safe block` and `charts freeze to PNG`, and
 tool here opens Teams, so say that at handover too (`layout-teams.md`
 § Verify it).
 
+**If you built a social post,** the checker's rows are `social card` and
+`charts freeze to PNG`, and `JSON.stringify(await SocialSnapshot.freeze())`
+paints each card and reports its picture size, each post's length against
+its platform's limit, and any card whose content runs past its frame or
+leaves the chart under 110px. No tool here opens a social platform, so say
+so at handover (`layout-social.md` § Verify it).
+
 **If the page has any control, test it** — an untested filter is usually a
 broken filter. With the audit loaded, change each control to a
 non-default value:

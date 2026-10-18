@@ -1,10 +1,10 @@
-# Examples — dashboards, reports, slide decks, one-pagers and email snapshots built by the chart-dashboard skill
+# Examples — dashboards, reports, slide decks, one-pagers, email snapshots and social posts built by the chart-dashboard skill
 
 Finished output from the [chart-dashboard Claude Skill](../README.md). Every folder
 is fully self-contained: download `index.html`, double-click it, and it renders —
 no server, no network, no build step, no npm install.
 
-Each example shows one of the five formats the skill produces, across most of the
+Each example shows one of the formats the skill produces, across most of the
 chart families in the bundled `charts-lib` renderer. The full list of families —
 including radar, scatter, bubble and the `panels` compositor — is in the
 [main README](../README.md#which-chart-types-are-supported).
@@ -16,9 +16,10 @@ including radar, scatter, bubble and the `panels` compositor — is in the
 | [`ev-retrospective/`](ev-retrospective/) | **Report** | Narrative analysis in a paper column — numbered sections, figures with interpretive captions, pull quotes, source notes | [screenshot](ev-retrospective/screenshot.png) |
 | [`q4-ecommerce/`](q4-ecommerce/) | **Dashboard** | 20-panel bento grid: revenue trend with annotated spikes, channel and device mix, category comparisons, funnel and cohort views, full-width composition | [screenshot](q4-ecommerce/screenshot.png) |
 | [`logistics-network-email/`](logistics-network-email/) | **Email snapshot** (single file, 600px block) | The logistics dashboard's Q2 data cut to an email: a headline, three figures, a weekly on-time line with its real gap and a callout, a signed column of cost drivers, and the busiest lanes as a plain email table. Charts freeze to PNG when the page opens; **Copy for email** puts the block on the clipboard | [screenshot](logistics-network-email/screenshot.png) |
+| [`logistics-network-social/`](logistics-network-social/) | **Social post** (single file, two chart cards plus post text) | The same Q2 cut as the email, for a feed: a portrait card (1080×1350) with the weekly on-time line, its real gap and a callout, and a landscape card (1200×675) with the signed cost drivers. Each card carries its headline, units, source and date in the picture; LinkedIn, X and Bluesky posts sit beside them, counted against each platform's limit, and every figure in them is on a card | [screenshot](logistics-network-social/screenshot.png) (the exported portrait card) |
 | [`support-operations-brief/`](support-operations-brief/) | **One-pager** (single file, one printed page) | Two packed columns: a line against a dashed service-level target, a ranked bar list, a column chart, a second bar list, six prose sections, a findings list, two stat pairs and a method note | [screenshot](support-operations-brief/screenshot.png) |
 
-## The five formats, and when the skill picks each
+## The formats, and when the skill picks each
 
 - **Dashboard** — a monitoring surface. One panel per finding, no prose, nothing
   telling the reader what to think. The default when you hand over metrics with no
@@ -49,6 +50,15 @@ including radar, scatter, bubble and the `panels` compositor — is in the
   paste into a new message. Triggered by "paste it into the weekly update",
   "something I can drop into an email", "Outlook", "Gmail". See
   `logistics-network-email/`.
+
+- **Social post** — one to three chart cards for LinkedIn, X, Bluesky, Threads,
+  Mastodon or Instagram, plus the words to post with them. A feed picture is
+  reposted without its words, so each card carries its own headline, units,
+  source and date, and is painted at the platform's size: 1080×1350, 1080×1080
+  or 1200×675. Every figure in the post text must be on a card. Open the file,
+  click **Copy picture** and **Copy text**, paste both. Triggered by "post it
+  on LinkedIn", "a tweet with the chart", "for Bluesky". See
+  `logistics-network-social/`.
 
 The dashboard, report, deck and email snapshot can also be built **editable** on
 request, with an **Edit page** button that opens an in-page editor for text,
