@@ -80,10 +80,9 @@ which file to read and when.
    the emphasis code), then `references/chart-api.md` and only the `references/charts/<type>.md`
    files for the types you use, in one read. Never guess an option name.
    Draw every chart through `SocialSnapshot.draw(Charts.<type>, 'id', config)`,
-   the id in single quotes (`check-page.js` reads only those), with no title
-   or subtitle in the config, and give it a `data-alt` that states the
-   finding with its numbers. When a card marks a forecast, a target
-   or an event, read `references/annotation.md`.
+   with no title or subtitle in the config, and give it a `data-alt` that
+   states the finding with its numbers. When a card marks a forecast, a
+   target or an event, read `references/annotation.md`.
 
 6. **If the user pointed at a brand** (site, stylesheet, hex codes), recolour
    and change nothing else. Read `references/theming.md`, then run

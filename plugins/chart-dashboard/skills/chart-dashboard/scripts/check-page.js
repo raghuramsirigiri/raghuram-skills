@@ -95,9 +95,12 @@ const ids = [
   ...[...code.matchAll(/id="(c\d+|f\d+)"/g)].map(m => m[1])
 ].filter((v, i, a) => a.indexOf(v) === i);
 // Both call shapes: Charts.bar('c1', …) and the draw(Charts.bar, 'c1', …)
-// helper that destroys the previous chart first (controls.md).
-const CALL = /Charts\.(\w+)\s*[(,]\s*'([^']+)'/g;
-const codeCalls = [...code.matchAll(CALL)].map(m => m[2]);
+// helper that destroys the previous chart first (controls.md). The id may sit
+// in single, double or back quotes: group 2 is the quote, group 3 the id.
+// Charts.validate("table", …) and applyPreset('…') take a string too but draw
+// nothing, and the inlined library mentions validate in its own messages.
+const CALL = /Charts\.(?!(?:validate|applyPreset|applyPalette|applyMetrics)\b)(\w+)\s*[(,]\s*(['"`])([^'"`]+)\2/g;
+const codeCalls = [...code.matchAll(CALL)].map(m => m[3]);
 const calls = codeCalls.concat(specCharts.map(c => c.id));
 const orphan = ids.filter(i => !calls.includes(i));
 const ghost = calls.filter(c => !ids.includes(c));
@@ -121,7 +124,7 @@ if (!ids.length && !calls.length) {
 // height.
 const GROWS = ['table', 'reportTable', 'barInsightTable'];
 const boxed = [...code.matchAll(CALL)]
-  .map(m => ({ 1: m[1], 2: m[2] }))
+  .map(m => ({ 1: m[1], 2: m[3] }))
   .concat(specCharts.map(c => ({ 1: c.type, 2: c.id })))
   .filter(m => GROWS.includes(m[1]))
   .filter(m => {
@@ -296,10 +299,10 @@ function linesIn(type, cfg, id) {
 
 const found = [];
 // Both call shapes again: Charts.line('c1', {…}) and draw(Charts.line, 'c1', {…}).
-const LINE_CALL = /Charts\.(line|panels|reportTable)\s*[(,]\s*(?:'([^']*)'|"([^"]*)")\s*,\s*/g;
+const LINE_CALL = /Charts\.(line|panels|reportTable)\s*[(,]\s*(['"`])([^'"`]*)\2\s*,\s*/g;
 for (const m of code.matchAll(LINE_CALL)) {
   const at = m.index + m[0].length;
-  const id = m[2] || m[3];
+  const id = m[3];
   const cfg = code[at] === '{' ? parseLiteral(code, at) : UNKNOWN;   // a variable config — count it, can't read it
   found.push(...linesIn(m[1], cfg, id));
 }
@@ -413,12 +416,12 @@ function readSheet() {
 }
 const sheet = readSheet();
 // Every chart the page draws, with the config literal when it is one.
-const ANY_CALL = /Charts\.(\w+)\s*[(,]\s*(?:'([^']*)'|"([^"]*)")\s*,\s*/g;
+const ANY_CALL = /Charts\.(\w+)\s*[(,]\s*(['"`])([^'"`]*)\2\s*,\s*/g;
 const charts = [...code.matchAll(ANY_CALL)]
   .filter(m => manifest && manifest.charts[m[1]])
   .map(m => {
     const at = m.index + m[0].length;
-    return { type: m[1], id: m[2] || m[3], cfg: code[at] === '{' ? parseLiteral(code, at) : UNKNOWN };
+    return { type: m[1], id: m[3], cfg: code[at] === '{' ? parseLiteral(code, at) : UNKNOWN };
   })
   .concat(specCharts.filter(c => manifest && manifest.charts[c.type]).map(c => ({ type: c.type, id: c.id, cfg: c.config })));
 
@@ -1009,7 +1012,7 @@ if (emailBlock == null) {
   // The charts themselves: what freezes, what cannot.
   const inBlock = charts.filter(c => emailFigOf(c.id) || (socialPost && emailBlock.includes('id="' + c.id + '"')));
   const problems = [], advice = [];
-  const viaSnapshot = new Set([...code.matchAll(/(?:Email|Teams|Social)Snapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*['"]([^'"]+)['"]/g)].map(m => m[2]));
+  const viaSnapshot = new Set([...code.matchAll(/(?:Email|Teams|Social)Snapshot\.draw\s*\(\s*Charts\.(\w+)\s*,\s*(['"`])([^'"`]+)\2/g)].map(m => m[3]));
   // An editable snapshot (templates/email-editable.html) keeps its charts in
   // the page spec; email-snapshot.js freezes those from the spec, so they
   // count as frozen when that runtime is on the page.
