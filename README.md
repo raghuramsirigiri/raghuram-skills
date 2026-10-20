@@ -160,7 +160,7 @@ tool reads:
 ```markdown
 ## Dashboards, reports, decks and one-pagers
 When asked to build a dashboard, analytics page, data report, slide deck or
-one-page printable brief,
+one-page printable brief,  
 follow `.agent-skills/chart-dashboard/SKILL.md`.
 ```
 
