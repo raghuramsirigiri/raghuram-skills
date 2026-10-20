@@ -33,6 +33,9 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
     month names (`'Jan'…'Dec'`), weekday names (`'Mon'…'Sun'`), or one stem
     numbered upwards (`'Q1'…'Q4'`, `'Week 1'…'Week 12'`, `'Band 1'…'Band 5'`).
     A shuffled or partial run fails both, as does an unordered set of names.
+    `Charts.validate('line', …)` refuses runs that pass only test (2), such as
+    `'Jan'…'Sep'` or `'Q1'…'Q3'`, though the chart draws them: when you call
+    validate, use dated labels (`'Jan 2026'…`).
     Date-parsing categories collapse to a coarser calendar period (day → week →
     month → quarter → year) as the axis gets crowded.
   - Logarithmic Y: `yAxis: { type: 'logarithmic' }` — **strictly positive

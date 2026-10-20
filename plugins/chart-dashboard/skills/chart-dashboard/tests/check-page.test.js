@@ -95,6 +95,27 @@ test('a direct Charts.line over named categories still fails', () => {
   assert.match(r.row, /c1: Retail, Wholesale/);
 });
 
+// A chart id may be written in any of JavaScript's three quote styles, in
+// either call shape. Reading only one of them reports a drawn panel as
+// unwired (and misses the line on it). Charts.validate takes a quoted type,
+// not an id, and the inlined library mentions it in its own messages.
+test('chart ids in single, double and back quotes all count as wired', () => {
+  const file = path.join(dir, 'quote-styles.html');
+  fs.writeFileSync(file,
+    '<div class="chart" id="c1"></div>\n<div class="chart" id="c2"></div>\n<div class="chart" id="c3"></div>\n' +
+    '<script>\n' +
+    "Charts.column('c1', { xAxis: { categories: ['North', 'South'] }, series: [{ name: 'x', data: [1, 2] }] });\n" +
+    'SocialSnapshot.draw(Charts.line, "c2", { xAxis: { categories: ["Jan 2026", "Feb 2026"] }, series: [{ name: "x", data: [1, 2] }] });\n' +
+    'draw(Charts.bar, `c3`, { xAxis: { categories: [`North`, `South`] }, series: [{ name: `x`, data: [1, 2] }] });\n' +
+    'var hint = \'Charts.validate("table", config) lists every problem at once.\';\n' +
+    '</script>\n');
+  const out = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' }).stdout;
+  const wired = out.split('\n').find(l => l.includes('panels wired to charts'));
+  assert.match(wired, /^\s*PASS.*3 panels, all wired/, out);
+  const lines = out.split('\n').find(l => l.includes('line x-axes ordered'));
+  assert.match(lines, /1 line chart/, out);
+});
+
 test('a page with no lines reports none', () => {
   const r = lineCheck('no-lines', `
     Charts.column('c1', { xAxis: { categories: ['North', 'South'] }, series: [{ name: 'x', data: [1, 2] }] });`);
