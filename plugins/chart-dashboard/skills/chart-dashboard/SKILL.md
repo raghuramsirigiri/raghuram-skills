@@ -28,8 +28,8 @@ These apply for the whole build, including after a long conversation.
 
 1. **Never invent numbers that read as real measurements.** A topic with no data
    gets figures labelled illustrative *on the page*. A missing value is a gap
-   (`null`), not a zero, drawn with `type: 'line'` so the spline doesn't bridge
-   it — a zero draws a collapse that never happened. An interpolated or modelled
+   (`null`), not a zero, which every line type draws as a break in the path —
+   a zero draws a collapse that never happened. An interpolated or modelled
    value never joins a measured trend as another point, however it is dashed or
    footnoted: readers remember the shape, not the caveat. Give estimates their
    own panel or leave the hole visible. Numbers carried forward from an older page

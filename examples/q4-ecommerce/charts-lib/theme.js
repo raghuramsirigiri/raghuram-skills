@@ -179,6 +179,12 @@
      belowThreshold: c.counter,
      positive: c.s2,
      negative: c.counter,
+     // Good and bad, used only when a chart is told which way is better
+     // (automatic charts' `better` hint, a dumbbell's `better`). Taken from
+     // the theme's own directional pair, never a colour of their own, so a
+     // palette or preset change recolours them with everything else.
+     favorable: c.s2,
+     unfavorable: c.counter,
      trend: c.s2,
      connectorLabel: c.n5,
      connectorLine: c.n7,   // donut callout rule — darker than the label text it carries
@@ -202,7 +208,9 @@
      colors: [c.s1, c.s2, c.s3, c.s4, c.s5, c.s6, c.s7],
      defaultColor: c.s1,
 
-     // ── Gradient endpoints (donut, bubble) ──────────────────────────────
+     // ── Gradient endpoints (bubble size scale) ──────────────────────────
+     // A sequential encoding, so two ends of one ramp. Categorical marks (pie
+     // slices, packed bubbles) take `colors` in order instead.
      gradientStart: c.s1,
      gradientEnd: c.s2,
 
@@ -498,6 +506,50 @@
         calloutPad: 10, calloutMaxWidth: 240, calloutLeaderWidth: 1.6,
         calloutAnchorRadius: 5,
         legendRowHeight: 24, legendGap: 22, legendIconSize: 14, legendIconGap: 8
+      }
+    },
+
+    // The one CATEGORICAL identity in the set, and a deliberate exception to
+    // the single-hue rule above: the Bauhaus primaries (HueAtlas: red #C8302A,
+    // yellow #E8C018, blue #1E3878 on Studio White #F5F2E8 and Black #1A1A18).
+    // It is dark because that is where the palette works as data. The earlier
+    // Bauhaus preset put the yellow on white at 1.95:1; on Bauhaus Black the
+    // same yellow is 9.9:1 and becomes the series that carries furthest.
+    //
+    //   • Red and blue are lifted for the ground (blue all the way to a sky
+    //     tint so s2 takes black text at 6.4:1); white is the fourth primary.
+    //   • s5–s7 are the deep blue, deep red and a pale blue tail, so the ramp
+    //     still walks lightness. Worst s1–s4 pair under any CVD simulation is
+    //     ΔE 16; worst over all seven is ΔE 11.
+    //   • `counter` repeats s3's red on purpose, as Okabe–Ito once did:
+    //     blue against red is the Bauhaus opposition, and a threshold chart is
+    //     single-series so s3 is never on it.
+    //   • Callout ink is Workshop Gold, the palette's own detail colour —
+    //     the one hue that is not a series in the first four slots.
+    bauhausNight: {
+      label: 'Bauhaus Night',
+      note: 'Dark. Yellow, blue, red and white on Bauhaus Black, geometric type, heavy rules.',
+      palette: {
+        n0: '#1a1a18', n0a: '#262622', n1: '#36352f',
+        n3: '#8a8680', n2: '#9d9992', n2a: '#b1ada5',
+        n4: '#a9a59d', n5: '#b8b4ac', n6: '#c8c4bb',
+        n7: '#ddd9cf', n8: '#f5f2e8', n9: '#ebe7dc',
+        nInverse: '#1a1a18',
+        s1: '#e8c018', s2: '#86a2ea', s3: '#e5483e', s4: '#f5f2e8',
+        s5: '#4a68c0', s6: '#a8302a', s7: '#c4d0ee',
+        accent: '#2a3a68', annotation: '#c89620', counter: '#e5483e'
+      },
+      // A poster, so the rules are drawn rather than hinted: a heavy axis and
+      // spine, 3.5px lines, square legend keys a size up. Geometric type for
+      // the same reason — Futura where it exists, Century Gothic on Windows.
+      metrics: {
+        font: "'Futura','Century Gothic','Avenir Next','Josefin Sans',Arial,sans-serif",
+        titleSize: 20, titleWeight: 700, categoryWeight: 600,
+        valueWeight: 700, legendWeight: 600,
+        lineWidth: 3.5, axisWidth: 2, gridWidth: 0.6, spineWidth: 1.4,
+        tickLength: 6, tickWidth: 1.6,
+        calloutLeaderWidth: 1.6, calloutAnchorRadius: 4.5,
+        legendIconSize: 13
       }
     }
   };

@@ -9,7 +9,7 @@ How a total got from one value to another: an opening balance, signed steps that
 Charts.waterfall('container', {
   title: 'Operating profit bridge, FY25 → FY26',
   series: [{ data: [
-    { name: 'FY25', y: 120 },
+    { name: 'FY25', y: 120, isOpening: true },
     { name: 'Price', y: 18 },
     { name: 'Volume', y: 9 },
     { name: 'Input costs', y: -22 },
@@ -18,7 +18,7 @@ Charts.waterfall('container', {
 });
 ```
 
-- **Data**: `series[0].data` as numbers or `{ name, y }` steps; `{ name, isSum: true }` for a total the engine computes (omit `y`).
+- **Data**: `series[0].data` as numbers or `{ name, y }` steps; `{ name, isSum: true }` for a total the engine computes (omit `y`). Mark the first point `isOpening: true` when it is an opening balance (`FY25` above): it is drawn and legended as a total, not as an increase.
 - **Exactly one series**, numeric value on every step (a blank shifts every bar after it). Two bridges → `column` with grouped series, or one waterfall per panel in `panels`.
 - **Refuses** a declared total that doesn't match its steps (the gap is named, not drawn) and data with only totals (that's `column`/`bar`).
 - **Options**: `plotOptions.waterfall.connectors`, `showSign`, `upColor` / `downColor` / `sumColor`; `yAxis.plotLines`.

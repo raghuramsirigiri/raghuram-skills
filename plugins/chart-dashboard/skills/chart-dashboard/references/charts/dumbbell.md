@@ -31,8 +31,16 @@ Charts.dumbbell('container', {
   change. Off by default, so source order is kept.
 - **The change writes itself**: a right-aligned column carries the delta per
   row. `showDelta: false` drops it; `deltaFormat: 'percent'` states it as a
-  percentage of the first value; `deltaFormat: fn(delta, row)` takes over.
-  `deltaColorBySign` (on) tints it with the above/below-threshold roles.
+  percentage of the first value. Values with a `%` suffix default to
+  `deltaFormat: 'points'` (40% → 57% is `+17 pts`, not `+17%`);
+  `deltaFormat: 'value'` keeps the plain level; `deltaFormat: fn(delta, row)`
+  takes over. `deltaColorBySign` (on) tints it with the above/below-threshold
+  roles: direction, not a judgement.
+- **Good and bad**: `better: 'higher' | 'lower'` says which way is good; the
+  change (and a `connectorBySign` rod or arrow) then takes the theme's
+  `favorable` / `unfavorable` colours instead of the sign colours. Set it only
+  when the user's data or brief says which way is good — never infer it from
+  a metric's name.
 - **Value labels** sit *outside* the pair — lower value left of the left dot,
   higher right of the right dot — so neither lands on the rod however close the
   two states are. Each takes its own dot's color (`valueColor: 'series'`).

@@ -7,7 +7,7 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
 - **Stacking**: `plotOptions.column.stacking: 'normal' | 'percent'`
 - **Padding**: `pointPadding`, `groupPadding`
 - **3D effect**: `chart: { options3d: { enabled: true, depth: 40 } }`
-- **Negative values**: bars flip below zero baseline; `negativeColor` overrides bar color for negatives.
+- **Negative values**: bars flip below zero baseline; `negativeColor` overrides bar color for negatives (below `series[i].threshold`, 0 unless set). Labels and tooltips keep the sign (`-2.5%`).
   Data labels and tooltips show the value with its sign (`-2.5`), and so does
   `{y}` in `dataLabels.format`.
 - **Population pyramid**: horizontal bar + a series with all-negative values + `tooltip.absoluteX:true`.

@@ -157,7 +157,10 @@ var Charts = window.Charts = window.Charts || {};
     tickColor: 'labelColor',
     categoryColor: 'titleColor',
     valueColor: 'titleColor',
-    connectorLine: 'labelColor'
+    connectorLine: 'labelColor',
+    // Good/bad are the theme's directional pair, never colours of their own.
+    favorable: 'aboveThreshold',
+    unfavorable: 'belowThreshold'
   };
 
   // Older names for two tokens, still accepted. `positive` and `negative` read
@@ -278,15 +281,27 @@ var Charts = window.Charts = window.Charts || {};
   // so the live visibility is written into the config the re-run will read.
   // Only series-level visibility travels: donut toggles individual slices,
   // whose config entries are often bare numbers with nowhere to record it.
+  //
+  // So do points a live feed added with addPoint/shift: the re-run reads the
+  // config, which never had them, so a resize used to throw the whole stream
+  // away. They go into a copy of the config — returned, for the caller to keep
+  // — so the caller's own data arrays are never written to.
   function carryStateForward(inner, opts) {
-    if (!inner || typeof inner.getSeries !== 'function') return;
-    if (!opts || !Array.isArray(opts.series)) return;
+    if (!inner || typeof inner.getSeries !== 'function') return opts;
+    if (!opts || !Array.isArray(opts.series)) return opts;
     const live = inner.getSeries();
-    if (!Array.isArray(live)) return;
+    if (!Array.isArray(live)) return opts;
     live.forEach(function (s, i) {
       if (opts.series[i] && typeof opts.series[i] === 'object') {
         opts.series[i].visible = s.visible !== false;
       }
+    });
+    const data = typeof inner._liveData === 'function' ? inner._liveData() : null;
+    if (!data) return opts;
+    return Object.assign({}, opts, {
+      series: opts.series.map(function (s, i) {
+        return data[i] && s && typeof s === 'object' ? Object.assign({}, s, { data: data[i] }) : s;
+      })
     });
   }
 
@@ -472,65 +487,83 @@ var Charts = window.Charts = window.Charts || {};
     node.animate(frames, { duration: ms, delay: delay || 0, easing: EASE, fill: 'backwards' });
   }
 
-  function animateEnter(el, opts) {
-    chartSvgs(el).forEach(function (svg) {
-      const ms = durationOf(opts, ENTER_MS);
-      const bars = own(svg, BAR_MARKS);
-      let dots = own(svg, 'circle');
-      const lines = own(svg, 'path').filter(isStrokedLine);
-      const fills = own(svg, FADE_MARKS);
-      const areas = own(svg, 'path').filter(function (p) {
-        return !isStrokedLine(p) && fills.indexOf(p) < 0 && !p.closest('marker, defs, clipPath') &&
-          p.getAttribute('fill') && p.getAttribute('fill') !== 'none';
-      });
-      if (!(bars.length + dots.length + lines.length + fills.length + areas.length)) return;
+  // Both animations measure every mark first and only then start any. A
+  // started animation changes its mark's computed style, so measuring the
+  // next mark after it made the browser recompute style for every animation
+  // running so far: interleaved, a 390-bar update() held the page for close
+  // to half a second, against 5ms with animation off.
 
-      // Where the plot starts, measured before anything moves (a growing bar
-      // starts at its baseline): the highest mark, gridline or axis. A value
-      // label over the tallest bar sits below the top gridline; the heading and
-      // the legend sit above both.
-      const plotTop = Math.min.apply(null, bars.concat(lines, fills, areas, own(svg, 'line')).map(function (m) {
-        return m.getBoundingClientRect().top;
-      }));
-      const markTop = isFinite(plotTop) ? plotTop : -Infinity;
-      // A dot above the plot is a legend swatch, not data.
-      dots = dots.filter(function (d) { return d.getBoundingClientRect().top >= markTop - 1; });
-      const count = bars.length + dots.length + lines.length + fills.length + areas.length;
-      if (!count) return;
-      if (count > MAX_ANIMATED) { play(svg, [{ opacity: 0 }, { opacity: 1 }], ms); return; }
-      const stagger = function (i, n) { return n > 1 ? Math.round(STAGGER_MS * i / (n - 1)) : 0; };
-      const anchors = barAnchors(bars);
-      bars.forEach(function (b, i) {
-        const origin = { bottom: '0% 100%', top: '0% 0%', left: '0% 0%', right: '100% 0%' }[anchors[i]];
-        const from = anchors[i] === 'bottom' || anchors[i] === 'top' ? 'scale(1, 0)' : 'scale(0, 1)';
-        const fixed = { transformBox: 'fill-box', transformOrigin: origin };
-        play(b, [Object.assign({ transform: from }, fixed), Object.assign({ transform: 'scale(1, 1)' }, fixed)], ms, stagger(i, bars.length));
-      });
-      dots.forEach(function (d, i) {
-        const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
-        play(d, [Object.assign({ transform: 'scale(0)', opacity: 0 }, fixed), Object.assign({ transform: 'scale(1)', opacity: 1 }, fixed)],
-          ms * 0.6, ms * 0.3 + stagger(i, dots.length));
-      });
-      lines.forEach(function (p) {
+  function animateEnter(el, opts) {
+    const ms = durationOf(opts, ENTER_MS);
+    chartSvgs(el).map(planEnter).forEach(function (plan) {
+      if (plan) playEnter(plan, ms);
+    });
+  }
+
+  /** Everything animateEnter needs to know about one svg, read before anything plays. */
+  function planEnter(svg) {
+    const bars = own(svg, BAR_MARKS);
+    let dots = own(svg, 'circle');
+    const paths = own(svg, 'path');
+    const lines = paths.filter(isStrokedLine);
+    const fills = own(svg, FADE_MARKS);
+    const areas = paths.filter(function (p) {
+      return !isStrokedLine(p) && fills.indexOf(p) < 0 && !p.closest('marker, defs, clipPath') &&
+        p.getAttribute('fill') && p.getAttribute('fill') !== 'none';
+    });
+    if (!(bars.length + dots.length + lines.length + fills.length + areas.length)) return null;
+
+    // Where the plot starts, measured before anything moves (a growing bar
+    // starts at its baseline): the highest mark, gridline or axis. A value
+    // label over the tallest bar sits below the top gridline; the heading and
+    // the legend sit above both.
+    const plotTop = Math.min.apply(null, bars.concat(lines, fills, areas, own(svg, 'line')).map(function (m) {
+      return m.getBoundingClientRect().top;
+    }));
+    const markTop = isFinite(plotTop) ? plotTop : -Infinity;
+    // A dot above the plot is a legend swatch, not data.
+    dots = dots.filter(function (d) { return d.getBoundingClientRect().top >= markTop - 1; });
+    const count = bars.length + dots.length + lines.length + fills.length + areas.length;
+    if (!count) return null;
+    if (count > MAX_ANIMATED) return { svg: svg, whole: true };
+    return {
+      svg: svg, bars: bars, anchors: barAnchors(bars), dots: dots, fills: fills.concat(areas),
+      lines: lines.map(function (p) {
         let len = 0;
         try { len = p.getTotalLength(); } catch (e) { len = 0; }
-        if (!(len > 0)) return;
-        play(p, [{ strokeDasharray: len + ' ' + len, strokeDashoffset: len },
-                 { strokeDasharray: len + ' ' + len, strokeDashoffset: 0 }], ms * 1.3);
-      });
-      fills.concat(areas).forEach(function (f, i, all) {
-        const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
-        play(f, [Object.assign({ opacity: 0, transform: 'scale(0.92)' }, fixed), Object.assign({ opacity: 1, transform: 'scale(1)' }, fixed)],
-          ms, stagger(i, all.length));
-      });
-
+        return { node: p, len: len };
+      }).filter(function (l) { return l.len > 0; }),
       // Labels on and around the marks arrive once the marks have; the heading
       // and the legend, which sit above every mark, are there from the start.
-      own(svg, 'text').forEach(function (t) {
-        if (t.getBoundingClientRect().bottom <= markTop + 1) return;
-        play(t, [{ opacity: 0 }, { opacity: 1 }], ms * 0.5, ms * 0.6);
-      });
+      texts: own(svg, 'text').filter(function (t) { return t.getBoundingClientRect().bottom > markTop + 1; })
+    };
+  }
+
+  function playEnter(plan, ms) {
+    if (plan.whole) { play(plan.svg, [{ opacity: 0 }, { opacity: 1 }], ms); return; }
+    const stagger = function (i, n) { return n > 1 ? Math.round(STAGGER_MS * i / (n - 1)) : 0; };
+    plan.bars.forEach(function (b, i) {
+      const anchor = plan.anchors[i];
+      const origin = { bottom: '0% 100%', top: '0% 0%', left: '0% 0%', right: '100% 0%' }[anchor];
+      const from = anchor === 'bottom' || anchor === 'top' ? 'scale(1, 0)' : 'scale(0, 1)';
+      const fixed = { transformBox: 'fill-box', transformOrigin: origin };
+      play(b, [Object.assign({ transform: from }, fixed), Object.assign({ transform: 'scale(1, 1)' }, fixed)], ms, stagger(i, plan.bars.length));
     });
+    plan.dots.forEach(function (d, i) {
+      const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
+      play(d, [Object.assign({ transform: 'scale(0)', opacity: 0 }, fixed), Object.assign({ transform: 'scale(1)', opacity: 1 }, fixed)],
+        ms * 0.6, ms * 0.3 + stagger(i, plan.dots.length));
+    });
+    plan.lines.forEach(function (l) {
+      play(l.node, [{ strokeDasharray: l.len + ' ' + l.len, strokeDashoffset: l.len },
+                    { strokeDasharray: l.len + ' ' + l.len, strokeDashoffset: 0 }], ms * 1.3);
+    });
+    plan.fills.forEach(function (f, i, all) {
+      const fixed = { transformBox: 'fill-box', transformOrigin: '50% 50%' };
+      play(f, [Object.assign({ opacity: 0, transform: 'scale(0.92)' }, fixed), Object.assign({ opacity: 1, transform: 'scale(1)' }, fixed)],
+        ms, stagger(i, all.length));
+    });
+    plan.texts.forEach(function (t) { play(t, [{ opacity: 0 }, { opacity: 1 }], ms * 0.5, ms * 0.6); });
   }
 
   /** Where each bar and dot is, keyed by svg, mark kind and position in draw order. */
@@ -549,40 +582,57 @@ var Charts = window.Charts = window.Charts || {};
    * element's own units with its screen matrix.
    */
   function animateUpdate(el, before, opts) {
-    chartSvgs(el).forEach(function (svg, si) {
-      const ms = durationOf(opts, UPDATE_MS);
-      const moved = [];
+    const ms = durationOf(opts, UPDATE_MS);
+    // Read: where every mark in every svg is now.
+    const plans = chartSvgs(el).map(function (svg, si) {
+      const marks = [];
       [['bar', BAR_MARKS], ['dot', 'circle']].forEach(function (kind) {
         own(svg, kind[1]).forEach(function (node, i) {
-          const was = before[si + '|' + kind[0] + '|' + i];
-          const now = node.getBoundingClientRect();
-          const m = node.getScreenCTM && node.getScreenCTM();
-          moved.push(node);
-          if (!was || !m || !now.width && !now.height) {
-            play(node, [{ opacity: 0 }, { opacity: 1 }], ms);
-            return;
-          }
-          // Screen pixels to the element's user units (no rotation in chart marks).
-          const ux = m.a || 1, uy = m.d || 1;
-          const sx = now.width ? was.width / now.width : 1;
-          const sy = now.height ? was.height / now.height : 1;
-          const dx = (was.left - now.left) / ux, dy = (was.top - now.top) / uy;
-          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
-          const fixed = { transformBox: 'fill-box', transformOrigin: '0% 0%' };
-          play(node, [Object.assign({ transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' }, fixed),
-                      Object.assign({ transform: 'none' }, fixed)], ms);
+          marks.push({ node: node, was: before[si + '|' + kind[0] + '|' + i],
+            now: node.getBoundingClientRect(), m: node.getScreenCTM && node.getScreenCTM() });
         });
       });
-      // Everything that is not a bar or a dot is new drawing: let it arrive.
-      own(svg, 'path').concat(own(svg, FADE_MARKS)).forEach(function (n) {
-        if (moved.indexOf(n) < 0) play(n, [{ opacity: 0 }, { opacity: 1 }], ms * 0.8);
+      const moved = marks.map(function (k) { return k.node; });
+      return {
+        marks: marks,
+        // Everything that is not a bar or a dot is new drawing: let it arrive.
+        fresh: own(svg, 'path').concat(own(svg, FADE_MARKS)).filter(function (n) { return moved.indexOf(n) < 0; }),
+        texts: own(svg, 'text')
+      };
+    });
+    // Write: start every animation.
+    plans.forEach(function (plan) {
+      plan.marks.forEach(function (k) {
+        const node = k.node, was = k.was, now = k.now, m = k.m;
+        if (!was || !m || !now.width && !now.height) {
+          play(node, [{ opacity: 0 }, { opacity: 1 }], ms);
+          return;
+        }
+        // Screen pixels to the element's user units (no rotation in chart marks).
+        const ux = m.a || 1, uy = m.d || 1;
+        const sx = now.width ? was.width / now.width : 1;
+        const sy = now.height ? was.height / now.height : 1;
+        const dx = (was.left - now.left) / ux, dy = (was.top - now.top) / uy;
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+        const fixed = { transformBox: 'fill-box', transformOrigin: '0% 0%' };
+        play(node, [Object.assign({ transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + sx + ', ' + sy + ')' }, fixed),
+                    Object.assign({ transform: 'none' }, fixed)], ms);
       });
-      own(svg, 'text').forEach(function (t) { play(t, [{ opacity: 0.2 }, { opacity: 1 }], ms * 0.6, ms * 0.3); });
+      plan.fresh.forEach(function (n) { play(n, [{ opacity: 0 }, { opacity: 1 }], ms * 0.8); });
+      plan.texts.forEach(function (t) { play(t, [{ opacity: 0.2 }, { opacity: 1 }], ms * 0.6, ms * 0.3); });
     });
   }
 
-  function makeResponsive(factory, container, opts) {
-    if (insideFactory) return factory(container, opts);
+  /**
+   * `prepare`, when given, turns the caller's config into the one drawn, on
+   * every draw. `opts` stays the caller's own config, so update() merges a
+   * patch into what the caller wrote and prepares it again. Charts.autoFill
+   * uses this: a patch to a sorted chart is in the caller's order, and must be
+   * re-sorted with its labels, not merged by position into the sorted copy.
+   */
+  function makeResponsive(factory, container, opts, prepare) {
+    if (insideFactory) return factory(container, prepare ? prepare(opts) : opts);
+    const drawn = function () { return prepare ? prepare(opts) : opts; };
 
     const el = typeof container === 'string'
       ? (typeof document !== 'undefined' ? document.getElementById(container) : null)
@@ -611,14 +661,16 @@ var Charts = window.Charts = window.Charts || {};
     // that makes the page tall enough to scroll narrows its own container by
     // the scrollbar, and the observer below would never redraw it.
     let drawnW = el ? Math.round(el.clientWidth) : 0;
-    let inner = runFactory(factory, container, opts, emitter);
+    let inner = runFactory(factory, container, drawn(), emitter);
     if (el && animates(opts)) animateEnter(el, opts);
     let destroyed = false;
     let frame = 0, ro = null;
     let drawnH = el ? Math.round(el.clientHeight) : 0;
 
     function rerender(reason) {
-      carryStateForward(inner, opts);
+      // update() has already carried state, then merged its patch over it; a
+      // second carry here would put the streamed points back over the patch.
+      if (reason !== 'update') opts = carryStateForward(inner, opts);
       // Only an update is a change a reader should watch happen. A resize or a
       // font swap redraws the same data, and animating it would be noise.
       const before = reason === 'update' && el && animates(opts) ? captureMarks(el) : null;
@@ -630,7 +682,7 @@ var Charts = window.Charts = window.Charts || {};
       if (el) el.style.minHeight = el.offsetHeight + 'px';
       inner.destroy();
       if (el) drawnW = Math.round(el.clientWidth);
-      inner = runFactory(factory, container, opts, emitter);
+      inner = runFactory(factory, container, drawn(), emitter);
       if (el) { el.style.minHeight = hold; drawnH = Math.round(el.clientHeight); }
       if (before) animateUpdate(el, before, opts);
       emitter.emit('render', { reason: reason });
@@ -681,7 +733,7 @@ var Charts = window.Charts = window.Charts || {};
        */
       update: function (patch) {
         if (destroyed) return handle;
-        carryStateForward(inner, opts);
+        opts = carryStateForward(inner, opts);
         opts = mergeConfig(opts || {}, patch || {});
         if (patch && 'events' in patch) subscribeConfig();
         rerender('update');
@@ -884,16 +936,22 @@ var Charts = window.Charts = window.Charts || {};
     const info = chartDescription(opts, typeName, getData);
     const id = 'chart-a11y-' + (++_a11yId);
 
+    // The name is an aria-label, not a <title> child. Browsers draw an svg's
+    // <title> as a native tooltip wherever the pointer rests on the chart, so
+    // every hover showed the chart's own title in a black box beside the real
+    // tooltip. The accessible name is the same either way.
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-labelledby', id + '-t' + (info.desc ? ' ' + id + '-d' : ''));
-    // Prepended so they are the first thing encountered inside the graphic.
-    const titleEl = el('title', { id: id + '-t' });
-    titleEl.textContent = info.title;
-    svg.insertBefore(titleEl, svg.firstChild);
+    svg.setAttribute('aria-label', info.title);
+    svg.removeAttribute('aria-labelledby');
+    svg.removeAttribute('aria-describedby');
+    svg.querySelectorAll(':scope > desc[id^="chart-a11y-"]').forEach(function (d) { d.remove(); });
+    // <desc> draws nothing, so the description can stay inside the graphic,
+    // first thing encountered in it.
     if (info.desc) {
       const descEl = el('desc', { id: id + '-d' });
       descEl.textContent = info.desc;
-      svg.insertBefore(descEl, titleEl.nextSibling);
+      svg.insertBefore(descEl, svg.firstChild);
+      svg.setAttribute('aria-describedby', id + '-d');
     }
 
     // The tooltip is a mouse affordance duplicating what the table already
@@ -966,7 +1024,76 @@ var Charts = window.Charts = window.Charts || {};
     };
     if (parts.getSeries) api.getSeries = parts.getSeries;
     if (parts.extras) for (const k in parts.extras) api[k] = parts.extras[k];
+    // Internal, for carryStateForward: not enumerable, so the responsive
+    // handle does not forward it as public API.
+    if (parts.liveData) Object.defineProperty(api, '_liveData', { value: parts.liveData });
     return api;
+  }
+
+  /**
+   * The refusal panel: the chart's title, then a bold headline saying what is
+   * wrong and a wrapped detail saying what to do instead, drawn where the
+   * chart would have been. Nine engines carried their own copy of this.
+   *
+   * `parts` is what chartAPI takes, plus `engine`, the name the console
+   * warning carries. The handle mirrors the drawn chart's (pass its extras as
+   * no-ops), so feature-detection on a refused chart does not lie, and
+   * `error` holds the headline.
+   */
+  function refusalChart(container, T, opts, W, H, headline, detail, parts) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[charts-lib ' + parts.engine + '] ' + headline + ' ' + detail);
+    }
+    const titleLH = Math.round(T.titleSize * (T.titleLineHeight != null ? T.titleLineHeight : 1.24));
+    const subLH = Math.round(T.subtitleSize * (T.subtitleLineHeight != null ? T.subtitleLineHeight : 1.34));
+    const x = T.headingGutter;
+    const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
+    svg.style.background = canvasColor(opts, T.bg);
+    svg.style.display = 'block';
+    container.appendChild(svg);
+    let y = 34;
+    if (opts.title) {
+      wrapHeading(opts.title, T.titleSize, W - x * 2, 2, true).forEach(function (l) {
+        txt(l, { x: x, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
+          'font-family': T.font }, svg);
+        y += titleLH;
+      });
+      y += 10;
+    }
+    const cy = Math.max(y + 20, H / 2 - 10);
+    // The detail sits below however many lines the headline actually took: at a
+    // fixed 26px it lands on top of the second line whenever the headline wraps,
+    // which is exactly when the message is longest and most needed.
+    const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
+    headLines.forEach(function (l, i) {
+      txt(l, { x: x, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
+        fill: T.titleColor, 'font-family': T.font }, svg);
+    });
+    wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach(function (l, i) {
+      txt(l, { x: x, y: cy + (headLines.length - 1) * 18 + 26 + i * subLH, 'font-size': T.subtitleSize,
+        'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
+    });
+    return chartAPI(createLifecycle(container), {
+      opts: parts.opts || opts, typeName: parts.typeName,
+      getData: function () { return []; },
+      getSeries: parts.getSeries,
+      extras: Object.assign({}, parts.extras, { error: headline })
+    });
+  }
+
+  /**
+   * The hover tooltip every engine positions over its chart: a themed, hidden
+   * div appended to the container. `extraCss` is appended, so it overrides
+   * (waffle wraps its long captions instead of keeping one line).
+   */
+  function createTooltip(container, T, extraCss) {
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
+      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
+      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
+      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;' + (extraCss || '');
+    container.appendChild(tip);
+    return tip;
   }
 
   // ── keyboard ───────────────────────────────────────────────────────────
@@ -1469,6 +1596,43 @@ var Charts = window.Charts = window.Charts || {};
     }
   }
 
+  /**
+   * The one value formatter the axis engines share, so an axis tick, a data
+   * label and a tooltip say a number the same way. `o`:
+   *   prefix, suffix  wrapped around the number ("$", "%")
+   *   decimals        fixed places; below 1,000 when compact
+   *   maxDecimals     with no `decimals`, round to at most this many
+   *   compact         1,000 and up as 1.2k / 3.4M / 5.6B
+   * `nf` is the chart's number formatter (makeNumberFormatter). A negative
+   * with a prefix reads "-$3", never "$-3"; with no prefix the sign is left to
+   * `nf`, so a locale's own minus sign is kept.
+   */
+  function formatNumber(v, o, nf) {
+    o = o || {};
+    nf = nf || addCommas;
+    const n = +v, a = Math.abs(n);
+    let body;
+    if (o.compact && a >= 1e3) {
+      const unit = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : [1e3, 'k'];
+      body = nf((n / unit[0]).toFixed(1)) + unit[1];
+    } else if (o.decimals != null) {
+      body = nf(n.toFixed(o.decimals));
+    } else if (o.maxDecimals != null) {
+      body = nf(n === Math.floor(n) ? String(n) : String(+n.toFixed(o.maxDecimals)));
+    } else {
+      body = nf(n);
+    }
+    if (!o.prefix) return body + (o.suffix || '');
+    const neg = /^[-−]/.test(body);
+    return (neg ? '-' : '') + o.prefix + (neg ? body.slice(1) : body) + (o.suffix || '');
+  }
+
+  /** The prefix every series shares, for an axis that serves them all; '' when they differ. */
+  function commonPrefix(series) {
+    const ps = series.map(s => s.valuePrefix || '');
+    return ps.length && ps.every(p => p === ps[0]) ? ps[0] : '';
+  }
+
   const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   /** Short month names for the date-axis label thinner. */
@@ -1892,6 +2056,71 @@ var Charts = window.Charts = window.Charts || {};
     if (!a || !b) return 1;
     const la = luminance(a), lb = luminance(b);
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+  // Whichever of the theme's two text inks reads better on `fill`.
+  function inkOn(T, fill) {
+    return contrast(fill, T.inverseText) > contrast(fill, T.titleColor) ? T.inverseText : T.titleColor;
+  }
+
+  // ── categorical fills (donut / pie, packed bubble) ─────────────────────
+  // Marks that are each their own category take the palette in order, s1 to
+  // s7, so seven slices are seven theme colours. They used to share a ramp
+  // between s1 and s2 only, which on a black-and-blue palette made a seven
+  // slice pie seven navies nobody could tell apart.
+  //
+  // Past the palette's length there is no colour left to give, so the marks
+  // walk the whole palette as one path, s1 → s2 → … → s7, rather than one
+  // pair of it. The walk is in OKLab because equal steps there look like
+  // equal steps: in RGB the midpoint of two saturated hues dips muddy and
+  // dark, and two neighbouring slices can come out nearly the same.
+  function srgbToLinear(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function linearToSrgb(v) {
+    v = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+    return Math.max(0, Math.min(255, Math.round(v * 255)));
+  }
+  function toOklab(rgb) {
+    const [r, g, b] = rgb.map(srgbToLinear);
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  }
+  function fromOklab(lab) {
+    const l = Math.pow(lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2], 3);
+    const m = Math.pow(lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2], 3);
+    const s = Math.pow(lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2], 3);
+    const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s].map(linearToSrgb);
+    return '#' + rgb.map(v => (v < 16 ? '0' : '') + v.toString(16)).join('');
+  }
+  /**
+   * `n` fills for `n` categorical marks drawn from `stops` (a palette, the
+   * theme's `colors` unless a chart was given its own). Up to the palette's
+   * length each mark takes its own stop; beyond it the marks are spread
+   * evenly along the palette in OKLab, first stop to last. A stop that is not
+   * a parseable colour (a CSS variable, a named colour) cannot be walked, so
+   * then the palette repeats instead.
+   */
+  function categoryColors(stops, n) {
+    stops = (stops || []).filter(Boolean);
+    if (n <= 0 || !stops.length) return [];
+    if (n <= stops.length) return stops.slice(0, n);
+    const labs = stops.map(parseColor);
+    if (stops.length === 1 || labs.some(c => !c)) return Array.from({ length: n }, (_, i) => stops[i % stops.length]);
+    const pts = labs.map(toOklab);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const p = i / (n - 1) * (pts.length - 1);
+      const k = Math.min(pts.length - 2, Math.floor(p)), t = p - k;
+      // The two ends are the palette's own colours, exactly as written.
+      if (t === 0) { out.push(stops[k]); continue; }
+      if (k === pts.length - 2 && t === 1) { out.push(stops[k + 1]); continue; }
+      out.push(fromOklab(pts[k].map((v, j) => v + (pts[k + 1][j] - v) * t)));
+    }
+    return out;
   }
 
   // ── value → colour scale (table, reportTable, heatmap) ─────────────────
@@ -2712,8 +2941,9 @@ var Charts = window.Charts = window.Charts || {};
     describeChart: describeChart, chartDescription: chartDescription,
     resolveTheme: resolveTheme, CHART_DEFAULTS: CHART_DEFAULTS,
     createLifecycle: createLifecycle, chartAPI: chartAPI, makeResponsive: makeResponsive,
+    refusalChart: refusalChart, createTooltip: createTooltip,
     el: el, txt: txt, esc: esc, cssColor: cssColor, cssNumber: cssNumber, cssFont: cssFont, addCommas: addCommas,
-    makeNumberFormatter: makeNumberFormatter, monthNames: monthNames,
+    makeNumberFormatter: makeNumberFormatter, formatNumber: formatNumber, commonPrefix: commonPrefix, monthNames: monthNames,
     measureText: measureText, _clearTextCache: function () { _measureCache.clear(); },
     niceTicks: niceTicks, _headW: _headW, _clipLine: _clipLine, wrapHeading: wrapHeading,
     textW: textW, truncate: truncate, ellipsize: ellipsize, wrapAxisLabel: wrapAxisLabel,
@@ -2723,7 +2953,8 @@ var Charts = window.Charts = window.Charts || {};
     calloutOverlap: calloutOverlap, measureCalloutBox: measureCalloutBox, drawCalloutBox: drawCalloutBox, drawCalloutLeader: drawCalloutLeader,
     drawCallouts: drawCallouts,
     tableProblems: tableProblems, tableIsBlank: tableIsBlank, allocateWidths: allocateWidths,
-    parseColor: parseColor, mix: mix, contrast: contrast, scaleColor: scaleColor, centerTextOf: centerTextOf,
+    parseColor: parseColor, mix: mix, contrast: contrast, inkOn: inkOn, categoryColors: categoryColors,
+    scaleColor: scaleColor, centerTextOf: centerTextOf,
     isTransparent: isTransparent, canvasColor: canvasColor,
     reportTableProblems: reportTableProblems, REPORT_KINDS: REPORT_KINDS, REPORT_EXCLUDED: REPORT_EXCLUDED,
     sankeyGraph: sankeyGraph, sankeyProblems: sankeyProblems,
@@ -2742,7 +2973,7 @@ var Charts = window.Charts = window.Charts || {};
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { monthNames, layoutCategoryAxis, labelsFit, isContinuousCats, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, dlEnabled, drawCallouts, NS } = window.ChartsShared;
+  const { refusalChart, createTooltip, monthNames, layoutCategoryAxis, labelsFit, isContinuousCats, makeNumberFormatter, formatNumber, commonPrefix, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, dlEnabled, drawCallouts, NS } = window.ChartsShared;
   // --- theme tokens (populated from window.Charts.theme at render time) ---
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
@@ -2921,10 +3152,16 @@ var Charts = window.Charts = window.Charts || {};
     return d.trim();
   }
   // Monotone cubic (PCHIP-like) for smooth curves without overshoot.
+  // A null point is a gap: each unbroken run is curved on its own, so the
+  // curve never bridges missing data.
   function pchipPath(pts) {
-    const P = pts.filter(p => p !== null);
+    const runs = [[]];
+    pts.forEach(p => { if (p === null) runs.push([]); else runs[runs.length - 1].push(p); });
+    return runs.filter(r => r.length).map(pchipRun).join(' ');
+  }
+  function pchipRun(P) {
     const n = P.length;
-    if (n < 2) return linePath(pts);
+    if (n < 2) return linePath(P);
     const xs = P.map(p => p[0]);
     const ys = P.map(p => p[1]);
     const h = [], delta = [], m = [];
@@ -2956,8 +3193,8 @@ var Charts = window.Charts = window.Charts || {};
     for (let i = 0; i < pts.length; i++) {
       if (pts[i] === null) continue;
       const [x, y] = pts[i];
-      if (!d) { d = 'M ' + x + ' ' + y; continue; }
-      const [px, py] = pts[i - 1] || [x, y];
+      if (!d || pts[i - 1] === null) { d += (d ? ' ' : '') + 'M ' + x + ' ' + y; continue; }
+      const [px, py] = pts[i - 1];
       if (mode === 'center') { const mx = (px + x) / 2; d += ` L ${mx} ${py} L ${mx} ${y} L ${x} ${y}`; }
       else if (mode === 'right') { d += ` L ${x} ${py} L ${x} ${y}`; }
       else { d += ` L ${px} ${y} L ${x} ${y}`; }
@@ -2975,11 +3212,16 @@ var Charts = window.Charts = window.Charts || {};
     }
   }
 
+  // A missing value (null, undefined or NaN y) in any of the data forms is a
+  // null point: a gap in the line, with no marker, label or tooltip row.
+  // Read as a number it would be 0, a dive to the baseline the data never made.
+  function missing(y) { return y === null || y === undefined || Number.isNaN(y); }
   function normalizePoints(data, xType, categories) {
     return data.map((d, i) => {
       if (d === null || d === undefined) return null;
-      if (typeof d === 'number') return { x: i, y: d, name: categories ? categories[i] : String(i) };
-      if (Array.isArray(d)) return { x: d[0], y: d[1] };
+      if (typeof d === 'number') return missing(d) ? null : { x: i, y: d, name: categories ? categories[i] : String(i) };
+      if (Array.isArray(d)) return missing(d[1]) ? null : { x: d[0], y: d[1] };
+      if (missing(d.y)) return null;
       return { x: d.x !== undefined ? d.x : i, y: d.y, name: d.name, marker: d.marker };
     });
   }
@@ -3035,41 +3277,10 @@ var Charts = window.Charts = window.Charts || {};
 
 
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib line] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: 20, y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
-            'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      // The detail sits below however many lines the headline actually took: at a
-      // fixed 26px it lands on top of the second line whenever the headline wraps,
-      // which is exactly when the message is longest and most needed. The wrap is
-      // measured at T.noticeSize too - it was measuring at a hardcoded 13 and drawing
-      // at the token, so a themed noticeSize wrapped to the wrong width.
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
-          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      return chartAPI(createLifecycle(container), {
-      opts: opts, typeName: "Line chart",
-        getData: () => [], getSeries: () => [],
-        extras: { addPoint() {}, shift() {}, error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'line', typeName: "Line chart",
+        getSeries: () => [],
+        extras: { addPoint() {}, shift() {} }
       });
     }
 
@@ -3233,42 +3444,54 @@ var Charts = window.Charts = window.Charts || {};
         dashStyle: s.dashStyle, step: s.step,
         negativeColor: s.negativeColor, threshold: s.threshold != null ? s.threshold : 0,
         visible: s.visible !== false,
-        valueSuffix: s.valueSuffix || (opts.tooltip && opts.tooltip.valueSuffix) || '',
+        // The axis suffix is the default, as on column/bar, so a "%" on the
+        // axis reaches the labels and the tooltip too.
+        valueSuffix: s.valueSuffix || (opts.tooltip && opts.tooltip.valueSuffix) || valueSuffix,
         valuePrefix: s.valuePrefix || (opts.tooltip && opts.tooltip.valuePrefix) || '',
         valueDecimals: s.valueDecimals != null ? s.valueDecimals : (opts.tooltip && opts.tooltip.valueDecimals)
       };
     });
 
     // Compute ranges
-    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    let xMin = Infinity, xMax = -Infinity, yMin, yMax, yTicks;
     seriesDefs.forEach(s => s.points.forEach(p => {
       if (!p) return;
       if (p.x < xMin) xMin = p.x;
       if (p.x > xMax) xMax = p.x;
-      if (p.y < yMin) yMin = p.y;
-      if (p.y > yMax) yMax = p.y;
     }));
     if (xAxis.categories) { xMin = 0; xMax = xAxis.categories.length - 1; }
     if (xAxis.min != null) xMin = xAxis.min;
     if (xAxis.max != null) xMax = xAxis.max;
-    if (yAxis.min != null) yMin = yAxis.min;
-    if (yAxis.max != null) yMax = yAxis.max;
     if (xMin === xMax) { xMin -= 1; xMax += 1; }
+    computeYRange();
 
+    // The y-axis fits the data, so it is recomputed when addPoint/shift change
+    // the data: fixed at the first sample's range, a live value above it was
+    // clipped out of the plot without a sign. The y labels float in a fixed
+    // left margin, so new ticks need no re-layout.
     // clean_charts: y baseline is min(0, min); ticks via MaxNLocator(nbins=5)
-    let yTicks;
-    if (isLog) {
-      if (yMin <= 0) yMin = 1;
-      yTicks = logTicks(yMin, yMax);
-      yMin = yTicks[0]; yMax = yTicks[yTicks.length - 1];
-    } else {
-      let yLo = Math.min(0, yMin);
-      let yHi = yMax;
-      if (yAxis.min != null) yLo = yAxis.min;
-      if (yAxis.max != null) yHi = yAxis.max;
-      const pad = (yHi - yLo) * 0.05;
-      yTicks = niceTicks(yLo, yHi + pad, 5);
-      yMin = yTicks[0]; yMax = yTicks[yTicks.length - 1];
+    function computeYRange() {
+      yMin = Infinity; yMax = -Infinity;
+      seriesDefs.forEach(s => s.points.forEach(p => {
+        if (!p) return;
+        if (p.y < yMin) yMin = p.y;
+        if (p.y > yMax) yMax = p.y;
+      }));
+      if (yAxis.min != null) yMin = yAxis.min;
+      if (yAxis.max != null) yMax = yAxis.max;
+      if (isLog) {
+        if (yMin <= 0) yMin = 1;
+        yTicks = logTicks(yMin, yMax);
+        yMin = yTicks[0]; yMax = yTicks[yTicks.length - 1];
+      } else {
+        let yLo = Math.min(0, yMin);
+        let yHi = yMax;
+        if (yAxis.min != null) yLo = yAxis.min;
+        if (yAxis.max != null) yHi = yAxis.max;
+        const pad = (yHi - yLo) * 0.05;
+        yTicks = niceTicks(yLo, yHi + pad, 5);
+        yMin = yTicks[0]; yMax = yTicks[yTicks.length - 1];
+      }
     }
 
     let viewMin = xMin, viewMax = xMax;
@@ -3290,6 +3513,10 @@ var Charts = window.Charts = window.Charts || {};
 
     // Layers
     const defs = el('defs', {}, svg);
+    // What render() puts in defs (the negativeColor clips), emptied with the
+    // layers each render: appended to defs itself, every redraw left two
+    // more clipPaths behind, which a live feed turned into thousands.
+    const defsLive = el('g', {}, defs);
     const gBands = el('g', {}, svg);
     const gGrid  = el('g', {}, svg);
     const gSeries = el('g', {}, svg);
@@ -3310,6 +3537,8 @@ var Charts = window.Charts = window.Charts || {};
     gSeries.setAttribute('clip-path', 'url(#' + clipId + ')');
     gMarkers.setAttribute('clip-path', 'url(#' + clipId + ')');
 
+    // Ticks, labels and tooltips share formatNumber (see bar.js). Ticks serve
+    // every series, so they carry a prefix only when all share it.
     function formatY(v) {
       if (isLog) {
         const e = Math.round(Math.log10(v));
@@ -3318,17 +3547,17 @@ var Charts = window.Charts = window.Charts || {};
           return v.toString();
         }
       }
-      const s = (v === Math.floor(v)) ? String(v) : (+v.toFixed(3)).toString();
-      return addCommas(s) + (valueSuffix || '');
+      return formatNumber(v, { maxDecimals: 3,
+        prefix: commonPrefix(seriesDefs.filter(s => s.visible)), suffix: valueSuffix }, addCommas);
     }
 
     function formatValue(v, s) {
-      const d = s.valueDecimals;
-      const val = d != null ? (+v).toFixed(d) : v;
-      return (s.valuePrefix || '') + addCommas(val) + (s.valueSuffix || '');
+      return formatNumber(v, { decimals: s.valueDecimals, prefix: s.valuePrefix, suffix: s.valueSuffix }, addCommas);
     }
 
     function render() {
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      defsLive.innerHTML = '';
       gBands.innerHTML = '';
       gGrid.innerHTML = '';
       gSeries.innerHTML = '';
@@ -3402,9 +3631,9 @@ var Charts = window.Charts = window.Charts || {};
             const tY = yScale(s.threshold);
             const posId = 'p-' + Math.random().toString(36).slice(2);
             const negId = 'n-' + Math.random().toString(36).slice(2);
-            const cp1 = el('clipPath', { id: posId }, defs);
+            const cp1 = el('clipPath', { id: posId }, defsLive);
             el('rect', { x: M.l, y: M.t, width: IW, height: Math.max(0, tY - M.t) }, cp1);
-            const cp2 = el('clipPath', { id: negId }, defs);
+            const cp2 = el('clipPath', { id: negId }, defsLive);
             el('rect', { x: M.l, y: tY, width: IW, height: Math.max(0, M.t + IH - tY) }, cp2);
             el('path', { d: path, stroke: s.color, 'stroke-width': s.lineWidth, fill: 'none',
               'stroke-linejoin': 'round', 'stroke-linecap': 'round',
@@ -3599,9 +3828,7 @@ var Charts = window.Charts = window.Charts || {};
     }
 
     // ---- interaction ----
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     const crosshair = el('line', { x1: 0, x2: 0, y1: M.t, y2: M.t + IH, stroke: T.axis,
       'stroke-width': 1, 'stroke-dasharray': '3 3', style: 'display:none;pointer-events:none' }, gInteract);
@@ -3634,7 +3861,7 @@ var Charts = window.Charts = window.Charts || {};
         points: rows.map(r => ({ series: r.s.name, x: r.p.x, y: r.p.y })) });
       let html = `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(header)}</div>`;
       rows.forEach(r => {
-        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(r.s.color)};border-radius:2px"></span><span style="color:${cssColor(T.labelColor)}">${esc(r.s.name)}: </span><b style="color:${cssColor(T.titleColor)}">${esc(formatValue(r.p.y, r.s) + valueSuffix)}</b></div>`;
+        html += `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;background:${cssColor(r.s.color)};border-radius:2px"></span><span style="color:${cssColor(T.labelColor)}">${esc(r.s.name)}: </span><b style="color:${cssColor(T.titleColor)}">${esc(formatValue(r.p.y, r.s))}</b></div>`;
       });
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
@@ -3708,6 +3935,26 @@ var Charts = window.Charts = window.Charts || {};
       container.appendChild(resetBtn);
     }
 
+    // addPoint/shift change the data at once (getSeries sees it) but draw on
+    // the next frame, so a feed that pushes ten points, or one per series,
+    // in a frame costs one render rather than ten. A hidden tab, where frames
+    // do not run, draws once when it is shown again.
+    let frame = 0;
+    function scheduleLiveRender() {
+      recomputeXRange();
+      computeYRange();
+      liveData = true;
+      if (frame) return;
+      if (typeof requestAnimationFrame !== 'function') { render(); return; }
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (!life.destroyed) render();
+      });
+    }
+    // Set once a live update has changed the data, so a resize carries the
+    // streamed points into the redrawn chart instead of the config's own.
+    let liveData = false;
+
     function recomputeXRange() {
       let mn = Infinity, mx = -Infinity;
       seriesDefs.forEach(s => s.points.forEach(p => {
@@ -3775,14 +4022,17 @@ var Charts = window.Charts = window.Charts || {};
       },
       getData: () => seriesDefs,
       getSeries: () => seriesDefs,
+      // The streamed points in config form, for makeResponsive to redraw from.
+      liveData: () => liveData ? seriesDefs.map(s => s.points.map(p =>
+        p && { x: p.x, y: p.y, name: p.name, marker: p.marker })) : null,
       extras: {
         addPoint(seriesIndex, x, y) {
-          seriesDefs[seriesIndex].points.push({ x, y });
-          recomputeXRange(); render();
+          seriesDefs[seriesIndex].points.push(missing(y) ? null : { x, y });
+          scheduleLiveRender();
         },
         shift(seriesIndex) {
           seriesDefs[seriesIndex].points.shift();
-          recomputeXRange(); render();
+          scheduleLiveRender();
         }
       }
     });
@@ -3808,7 +4058,7 @@ var Charts = window.Charts = window.Charts || {};
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { monthNames, layoutCategoryAxis, makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, ellipsize, wrapAxisLabel, dlEnabled, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
+  const { createTooltip, monthNames, layoutCategoryAxis, makeNumberFormatter, formatNumber, commonPrefix, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, ellipsize, wrapAxisLabel, dlEnabled, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
   // clean_charts tokens
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
@@ -4089,6 +4339,8 @@ var Charts = window.Charts = window.Charts || {};
         scenario: s.scenario,
         stack: s.stack != null ? s.stack : 0,
         negativeColor: s.negativeColor,
+        // negativeColor applies below this value (0 unless set), as on line.
+        threshold: s.threshold != null ? s.threshold : 0,
         visible: s.visible !== false,
         valueSuffix: s.valueSuffix || (opts.tooltip && opts.tooltip.valueSuffix) || valueSuffix,
         valuePrefix: s.valuePrefix || (opts.tooltip && opts.tooltip.valuePrefix) || '',
@@ -4158,16 +4410,24 @@ var Charts = window.Charts = window.Charts || {};
     // overlap one already drawn is dropped, so what survives is always
     // readable. Widths are estimated, as everywhere else in the engines.
     const labelBoxes = [];
-    function placeLabel(cx, cy, text, anchor) {
+    // Every value label drawn, inside a bar or not: what a target line steps
+    // around. Kept apart from labelBoxes, which decides outside placement.
+    const drawnBoxes = [];
+    function labelBox(cx, cy, text, anchor) {
       const w = String(text).length * T.valueSize * 0.60 + 4, h = 13;
       const x1 = anchor === 'end' ? cx - w : anchor === 'start' ? cx : cx - w / 2;
-      const box = { x1: x1, x2: x1 + w, y1: cy - h, y2: cy + 3 };
-      if (labelBoxes.some(b => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
-        return false;
-      }
+      return { x1: x1, x2: x1 + w, y1: cy - h, y2: cy + 3 };
+    }
+    const overlaps = (box, list) => list.some(b => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1);
+    function placeLabel(cx, cy, text, anchor) {
+      const box = labelBox(cx, cy, text, anchor);
+      if (overlaps(box, labelBoxes)) return false;
       labelBoxes.push(box);
+      drawnBoxes.push(box);
       return true;
     }
+    // An inside label: always drawn, recorded only for the target line.
+    function noteInside(cx, cy, text, anchor) { drawnBoxes.push(labelBox(cx, cy, text, anchor)); }
     const gAxes = el('g', {}, svg);
     const gAnnot = el('g', {}, svg);   // callouts sit above bars and labels
     const gLegend = el('g', {}, svg);
@@ -4187,19 +4447,20 @@ var Charts = window.Charts = window.Charts || {};
     function catCenterX(i, n) { return M.l + ((i + 0.5) / n) * IW; }
     function catCenterY(i, n) { return M.t + ((i + 0.5) / n) * IH; }
 
+    // Axis ticks, data labels and tooltips all go through formatNumber, so a
+    // prefix, suffix or precision the config sets reaches every one of them.
+    // Ticks serve every series, so they carry a prefix only when all share it.
     function fmtY(v) {
-      const abs = Math.abs(v);
-      let s;
-      if (abs >= 1e9) s = addCommas((v/1e9).toFixed(1)) + 'B';
-      else if (abs >= 1e6) s = addCommas((v/1e6).toFixed(1)) + 'M';
-      else if (abs >= 1e3) s = addCommas((v/1e3).toFixed(1)) + 'k';
-      else s = addCommas((v === Math.floor(v)) ? String(v) : (+v.toFixed(3)).toString());
-      return s + valueSuffix;
+      return formatNumber(v, { compact: true, maxDecimals: 3,
+        prefix: commonPrefix(seriesDefs.filter(s => s.visible)), suffix: valueSuffix }, addCommas);
+    }
+    function fmtLabel(v, s) {
+      return formatNumber(v, { compact: true, maxDecimals: 3, decimals: s.valueDecimals,
+        prefix: s.valuePrefix, suffix: s.valueSuffix }, addCommas);
     }
     function formatValue(v, s) {
-      const d = s.valueDecimals;
-      const raw = d != null ? (+v).toFixed(d) : (v === Math.floor(v) ? String(v) : String(+v.toFixed(3)));
-      return (s.valuePrefix || '') + addCommas(raw) + (s.valueSuffix || '');
+      return formatNumber(v, { maxDecimals: 3, decimals: s.valueDecimals,
+        prefix: s.valuePrefix, suffix: s.valueSuffix }, addCommas);
     }
 
     // A value as shown in a label or tooltip. Signed, except in a population
@@ -4233,6 +4494,7 @@ var Charts = window.Charts = window.Charts || {};
       barAnchors.length = 0;
       barRects.length = 0;
       labelBoxes.length = 0;   // placement is per render
+      drawnBoxes.length = 0;
       gAxes.innerHTML = '';
       computeScales();
       const n = categories.length || (seriesDefs[0] ? seriesDefs[0].points.length : 0);
@@ -4435,17 +4697,38 @@ var Charts = window.Charts = window.Charts || {};
       (ax.plotLines || []).forEach(pl => {
         if (pl.value == null) return;
         const p = pos(clamp(pl.value));
-        const attrs = inverted
-          ? { x1: p, x2: p, y1: M.t, y2: M.t + IH }
-          : { x1: M.l, x2: M.l + IW, y1: p, y2: p };
-        el('line', Object.assign(attrs, {
+        const style = {
           stroke: pl.color || T.axis, 'stroke-width': pl.width || 1.5,
-          'stroke-dasharray': DASH[pl.dashStyle || 'ShortDash'] || '4 2' }), gAxes);
+          'stroke-dasharray': DASH[pl.dashStyle || 'ShortDash'] || '4 2' };
+        // A value label at the line's height would be struck through, so
+        // the line breaks around it: [from, to] spans along the line to skip.
+        const PAD = 3;
+        const gaps = drawnBoxes
+          .filter(b => inverted ? (b.x1 - PAD < p && p < b.x2 + PAD) : (b.y1 - PAD < p && p < b.y2 + PAD))
+          .map(b => inverted ? [b.y1 - PAD, b.y2 + PAD] : [b.x1 - PAD, b.x2 + PAD])
+          .sort((a, b) => a[0] - b[0]);
+        let from = inverted ? M.t : M.l;
+        const end = inverted ? M.t + IH : M.l + IW;
+        const seg = (a, b) => {
+          if (b - a < 1) return;
+          el('line', Object.assign(inverted ? { x1: p, x2: p, y1: a, y2: b } : { x1: a, x2: b, y1: p, y2: p }, style), gAxes);
+        };
+        gaps.forEach(g => { seg(from, Math.min(g[0], end)); from = Math.max(from, g[1]); });
+        seg(from, end);
         if (pl.label && pl.label.text) {
-          // Label rides the end of the mark, inside the plot area.
-          const la = inverted
-            ? { x: p + 5, y: M.t + 12, 'text-anchor': 'start' }
-            : { x: M.l + IW, y: p - 5, 'text-anchor': 'end' };
+          // Label rides an end of the mark, inside the plot area, at the
+          // first spot clear of value labels and bars: above the line at its
+          // far end, then below it, then the near end (for bars: right of
+          // the line at the top, then left, then the bottom).
+          const tries = inverted
+            ? [{ x: p + 5, y: M.t + 12, 'text-anchor': 'start' }, { x: p - 5, y: M.t + 12, 'text-anchor': 'end' },
+               { x: p + 5, y: M.t + IH - 4, 'text-anchor': 'start' }, { x: p - 5, y: M.t + IH - 4, 'text-anchor': 'end' }]
+            : [{ x: M.l + IW, y: p - 5, 'text-anchor': 'end' }, { x: M.l + IW, y: p + 14, 'text-anchor': 'end' },
+               { x: M.l, y: p - 5, 'text-anchor': 'start' }, { x: M.l, y: p + 14, 'text-anchor': 'start' }];
+          const bars = barRects.map(b => ({ x1: b.x, x2: b.x + b.w, y1: b.y, y2: b.y + b.h }));
+          const fits = t => !overlaps(labelBox(t.x, t.y, pl.label.text, t['text-anchor']), drawnBoxes.concat(bars));
+          const la = tries.find(fits) || tries[0];
+          drawnBoxes.push(labelBox(la.x, la.y, pl.label.text, la['text-anchor']));
           txt(pl.label.text, Object.assign(la, { 'font-size': T.pointLabelSize, 'font-weight': T.valueWeight,
             fill: pl.color || T.axis, 'font-family': T.font }), gAxes);
         }
@@ -4523,7 +4806,7 @@ var Charts = window.Charts = window.Charts || {};
         const val = (p.y != null) ? p.y : (p.high != null ? `${p.low}–${p.high}` : '');
         const label = s.dataLabels.format
           ? String(s.dataLabels.format).replace('{y}', shownValue(val))
-          : (typeof val === 'number' ? fmtY(shownValue(val)) : val);
+          : (typeof val === 'number' ? fmtLabel(shownValue(val), s) : val);
 
         // Estimated label width — the engines size text without measuring it.
         const labelW = String(label).length * T.valueSize * 0.60;
@@ -4537,6 +4820,7 @@ var Charts = window.Charts = window.Charts || {};
             // an above-bar label would land on its neighbour. Segments too
             // short to hold the number simply go unlabelled.
             if (h >= T.valueSize + 6) {
+              noteInside(x + w / 2, y + h / 2 + T.valueSize * 0.36, label, 'middle');
               txt(label, { x: x + w / 2, y: y + h / 2 + T.valueSize * 0.36, 'text-anchor': 'middle',
                 'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
                 'font-family': T.font }, gLabels);
@@ -4556,6 +4840,7 @@ var Charts = window.Charts = window.Charts || {};
             // one — inside the bar when it fits, just outside when it does not.
             const outward = valueForLabel < 0;
             if (w >= labelW + 12) {
+              noteInside(outward ? x + 6 : x + w - 6, ly, label, outward ? 'start' : 'end');
               txt(label, { x: outward ? x + 6 : x + w - 6, y: ly,
                 'text-anchor': outward ? 'start' : 'end',
                 'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
@@ -4571,6 +4856,7 @@ var Charts = window.Charts = window.Charts || {};
           } else if (w >= labelW + 12) {
             // Several segments on this side: the only honest place for the
             // number is inside the segment it belongs to.
+            noteInside(x + w / 2, ly, label, 'middle');
             txt(label, { x: x + w / 2, y: ly, 'text-anchor': 'middle',
               'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor),
               'font-family': T.font }, gLabels);
@@ -4580,8 +4866,11 @@ var Charts = window.Charts = window.Charts || {};
           const total = xScaleVal(ranges.yMax) - xScaleVal(ranges.yMin);
           const threshold = total * 0.15;
           // An outlined (plan) bar has no fill to sit a label on, so it always
-          // takes the outside placement regardless of length.
-          if (w >= threshold && paint.fill !== T.bg) {
+          // takes the outside placement regardless of length. A bar shorter
+          // than its own label goes outside too: drawn inside, the label's
+          // start would be cut off ("260.0k" read as "0.0k").
+          if (w >= threshold && w >= labelW + 12 && paint.fill !== T.bg) {
+            noteInside(x + w - 6, y + h/2 + 4, label, 'end');
             txt(label, { x: x + w - 6, y: y + h/2 + 4, 'text-anchor': 'end',
               'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: contrastText(barColor), 'font-family': T.font }, gLabels);
           } else if (placeLabel(x + w + 6, y + h/2 + 4, label, 'start')) {
@@ -4594,14 +4883,12 @@ var Charts = window.Charts = window.Charts || {};
 
     function pickColor(s, p) {
       if (p.color) return p.color;
-      if (s.negativeColor && p.y != null && p.y < 0) return s.negativeColor;
+      if (s.negativeColor && p.y != null && p.y < s.threshold) return s.negativeColor;
       return s.color;
     }
 
     // Interaction — shared tooltip
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     const crosshair = el('rect', { x: 0, y: 0, width: 0, height: 0,
       fill: T.hoverInk, 'fill-opacity': 0.04, style: 'display:none;pointer-events:none' }, gInteract);
@@ -4728,7 +5015,7 @@ Charts.bar = function (container, opts) {
  * Clean-charts-styled donut chart engine.
  * Matches clean_charts/plots/donut.py:
  *  - Cream bg, Inter, top-left title/subtitle
- *  - Black → blue gradient wedges (get_gradient_colors)
+ *  - Wedges take the theme palette in order (s1…s7), a ramp past seven
  *  - T.bg-colored 2px separators between wedges (cutout look)
  *  - Callout: radial-out → diagonal-to-elbow → horizontal-to-label-column
  *  - Fixed label columns at outer chart margins (left/right)
@@ -4739,7 +5026,7 @@ Charts.bar = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, calloutKey, drawCallouts, measureText, centerTextOf, NS } = window.ChartsShared;
+  const { createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, calloutKey, drawCallouts, measureText, centerTextOf, categoryColors, NS } = window.ChartsShared;
   // ── Heading wrapping ────────────────────────────────────────────────
   // Titles wrap to at most 2 lines, subtitles to at most 3; whatever does
   // not fit is clipped with an ellipsis. Widths are estimated (not measured)
@@ -4747,27 +5034,6 @@ Charts.bar = function (container, opts) {
   const TITLE_LINES = 2, SUB_LINES = 3;
   // Heading metrics are derived in applyTheme() from the size + line-height
   // tokens, so a bigger titleSize opens up its own leading.
-  function hex2rgb(hex) {
-    const c = hex.replace('#','');
-    const n = parseInt(c.length === 3 ? c.split('').map(x=>x+x).join('') : c, 16);
-    return [(n>>16)&255,(n>>8)&255,n&255];
-  }
-  function rgb2hex(r,g,b) {
-    return '#' + [r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
-  }
-  function gradientColors(startHex, endHex, n) {
-    if (n <= 0) return [];
-    if (n === 1) return [startHex];
-    const [r1,g1,b1] = hex2rgb(startHex);
-    const [r2,g2,b2] = hex2rgb(endHex);
-    const out = [];
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      out.push(rgb2hex(r1+(r2-r1)*t, g1+(g2-g1)*t, b1+(b2-b1)*t));
-    }
-    return out;
-  }
-
   function parseSize(v, ref) {
     if (v == null) return null;
     if (typeof v === 'number') return v;
@@ -5164,12 +5430,18 @@ Charts.bar = function (container, opts) {
     const userSetStartAngle = plotOpts.startAngle != null;
     const autoRotate = plotOpts.autoRotate !== false;
 
-    // Data + gradient colors (clean-charts default black → blue)
-    const startCol = plotOpts.startColor || opts.startColor || T.gradientStart;
-    const endCol   = plotOpts.endColor   || opts.endColor   || T.gradientEnd;
-    // Colors span the slices that will actually be drawn, so dropping a bad
-    // point does not leave a gap in the gradient.
-    const gradList = gradientColors(startCol, endCol, rawData.length);
+    // Slice fills: each slice is its own category, so it takes the palette in
+    // order (plotOptions.pie.colors, else the theme's s1–s7), and only a pie
+    // with more slices than colours walks the palette as a ramp. An explicit
+    // startColor / endColor still asks for the old two-colour ramp. Colours
+    // span the slices that will actually be drawn, so dropping a bad point
+    // does not leave a gap in the sequence.
+    const startCol = plotOpts.startColor || opts.startColor;
+    const endCol   = plotOpts.endColor   || opts.endColor;
+    const palette = plotOpts.colors && plotOpts.colors.length ? plotOpts.colors
+      : (startCol || endCol) ? [startCol || T.gradientStart, endCol || T.gradientEnd]
+      : T.colors;
+    const gradList = categoryColors(palette, rawData.length);
 
     const data = rawData.map((d, i) => {
       let name, y, z, color, sliced, visible;
@@ -5602,9 +5874,7 @@ Charts.bar = function (container, opts) {
     }
 
     // Tooltip
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function showTooltip(d, ev) {
       const total = data.filter(x=>x.visible).reduce((s,x)=>s+x.y, 0);
@@ -5688,12 +5958,12 @@ Charts.pie = function (container, opts) {
  *  - Points/bubbles have white edges
  *  - Trend line dashed blue
  *  - Legend at top-left (below subtitle) for grouped scatter
- *  - Packed bubble via physics relaxation
+ *  - Packed bubble via physics relaxation, one palette colour per bubble
  * Interactions: hover point/bubble -> enlarge + tooltip; legend toggle.
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, calloutKey, drawCallouts, categoryColors, inkOn, formatNumber, NS } = window.ChartsShared;
   // clean_charts tokens
   // ── Heading wrapping ────────────────────────────────────────────────
   // Titles wrap to at most 2 lines, subtitles to at most 3; whatever does
@@ -5946,9 +6216,10 @@ Charts.pie = function (container, opts) {
       };
     });
 
-    // Auto-assign colors: gradient across series for scatter groups; single default for a single series
+    // Auto-assign colors: several series are several categories, so they take
+    // the palette in order; a single series takes the default colour.
     if (seriesDefs.length > 1) {
-      const grad = gradientColors(T.gradientStart, T.gradientEnd, seriesDefs.length);
+      const grad = categoryColors(T.colors, seriesDefs.length);
       seriesDefs.forEach((s, i) => { if (!s.color) s.color = grad[i]; });
     } else {
       seriesDefs.forEach(s => { if (!s.color) s.color = T.defaultColor; });
@@ -6121,13 +6392,18 @@ Charts.pie = function (container, opts) {
       const packedOpts = (opts.plotOptions && opts.plotOptions.packedbubble) || {};
       const minR = parseFloat(packedOpts.minSize || 15) / 2;
       const maxR = parseFloat(packedOpts.maxSize || 55) / 2;
-      const grad = gradientColors(T.gradientStart, T.gradientEnd, 100);
-      flat.forEach(b => {
+      // One series of packed bubbles is a set of named categories, like the
+      // slices of a pie, so each bubble takes the palette in data order (a
+      // ramp along the whole palette past seven). Size already says how big
+      // each one is; a black-to-blue shade by size said it again and left a
+      // dozen bubbles in near-identical navies.
+      const grad = categoryColors(T.colors, flat.length);
+      flat.forEach((b, i) => {
         const t = (maxV === minV) ? 1 : Math.sqrt((b.p.y - minV) / (maxV - minV));
         b.r = minR + t * (maxR - minR);
-        // A bubble's own color wins; otherwise one series is shaded by size
+        // A bubble's own color wins; otherwise one series takes the palette
         // and several series take their series color.
-        b._fillColor = b.p.color || ((n === 1) ? grad[Math.min(99, Math.floor(t * 99))] : b.s.color);
+        b._fillColor = b.p.color || ((n === 1) ? grad[i] : b.s.color);
       });
       packLayout(flat, W, H, {
         cx: M.l + IW / 2, cy: M.t + IH / 2,
@@ -6137,16 +6413,19 @@ Charts.pie = function (container, opts) {
         b.x = Math.max(M.l + b.r + 2, Math.min(M.l + IW - b.r - 2, b.x));
         b.y = Math.max(M.t + b.r + 2, Math.min(M.t + IH - b.r - 2, b.y));
       });
-      flat.forEach((b, i) => {
-        drawPoint(gPoints, b.s, b.p, b.x, b.y, b.r, seriesDefs.indexOf(b.s), i, false, b._fillColor);
+      flat.forEach(b => {
+        // data-pi indexes the point within its own series, which is what the
+        // hover handler looks it up by. It used to be the bubble's position
+        // across every series, so with two clusters the second showed the
+        // wrong point's tooltip.
+        drawPoint(gPoints, b.s, b.p, b.x, b.y, b.r, seriesDefs.indexOf(b.s), b.s.points.indexOf(b.p), false, b._fillColor);
         pointAnchors.push({ series: b.s.name, name: b.p.name != null ? String(b.p.name) : null,
           px: b.p.x, py: b.p.y, x: b.x, y: b.y });
         markRects.push({ x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 });
         if (b.r > 16 && b.p.name) {
-          // Use white text on dark fill, dark on light
-          const [rr,gg,bb] = hex2rgb(b._fillColor);
-          const L = 0.299*rr + 0.587*gg + 0.114*bb;
-          const col = L < 140 ? T.inverseText : T.titleColor;
+          // The name takes whichever text ink contrasts more with its fill:
+          // a palette's light end needs dark ink, its dark end inverse ink.
+          const col = inkOn(T, b._fillColor);
           txt(b.p.name, { x: b.x, y: b.y + 4, 'text-anchor': 'middle',
             'font-size': Math.min(T.tooltipSize, b.r * 0.42), 'font-weight': T.valueWeight,
             fill: col, 'font-family': T.font, style: 'pointer-events:none' }, gLabels);
@@ -6241,18 +6520,37 @@ Charts.pie = function (container, opts) {
     }
 
     // Tooltip
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
-    function showTip(s, p, ev) {
+    // Each tooltip number is named for what it measures: the axis title when
+    // the axis has one ("Ad spend ($k): 45"), the bare letter only when it
+    // does not, and formatted the way the axis formats it. A bubble's size has
+    // no axis, so it takes plotOptions.bubble.sizeLabel, else "Size".
+    const axisName = (t, letter) => (typeof t === 'string' && t) || letter;
+    const xName = axisName(xTitle, 'x'), yName = axisName(yTitle, 'y');
+    const bubbleOpts = (opts.plotOptions && opts.plotOptions.bubble) || {};
+    const sizeName = bubbleOpts.sizeLabel || 'Size';
+    // A packed bubble has no axes at all. Its one number is the point's value,
+    // named by plotOptions.packedbubble.valueLabel, else by its series (the
+    // header already carries the point's own name).
+    const packedTipOpts = (opts.plotOptions && opts.plotOptions.packedbubble) || {};
+    const axisFmt = (ax, suffix) => v => formatNumber(v, { prefix: ax.prefix, suffix, decimals: ax.decimals }, addCommas);
+    const fmtX = axisFmt(xAxis, xSuffix), fmtY = axisFmt(yAxis, ySuffix);
+
+    function showTip(s, p, ev, fill) {
       const header = p.name || s.name;
+      const line = (name, value) => `${esc(name)}: <b style="color:${cssColor(T.titleColor)}">${esc(value)}</b>`;
+      const parts = isPacked
+        ? [line(packedTipOpts.valueLabel || (p.name ? s.name : 'Value'), addCommas(p.y) + s.valueSuffix)]
+        : [line(xName, fmtX(p.x)), line(yName, fmtY(p.y))]
+          .concat(p.z != null ? [line(sizeName, addCommas(String(p.z)) + s.valueSuffix)] : []);
       let html = `<div style="font-size:${cssNumber(T.tooltipSize)}px;font-weight:${cssNumber(T.valueWeight)};color:${cssColor(T.titleColor)};margin-bottom:2px">${esc(header)}</div>`;
-      html += `<div><span style="display:inline-block;width:9px;height:9px;background:${cssColor(s.color)};border-radius:50%;margin-right:6px"></span>`
-        + `x: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(String(p.x)) + xSuffix)}</b>, `
-        + `y: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(p.y) + ySuffix)}</b>`
-        + (p.z != null ? `, z: <b style="color:${cssColor(T.titleColor)}">${esc(addCommas(String(p.z)) + s.valueSuffix)}</b>` : '')
-        + `</div>`;
+      // The swatch is the hovered mark's own fill: a bubble shaded by size or
+      // a packed bubble in its palette colour is not its series colour.
+      const swatch = `<span style="display:inline-block;width:9px;height:9px;background:${cssColor(fill || s.color)};border-radius:50%;margin-right:6px"></span>`;
+      // One line per number. Axis titles are long enough that three on one
+      // line ran off a narrow card.
+      html += parts.map((pt, i) => `<div style="padding-left:${i ? 15 : 0}px">${i ? '' : swatch}${pt}</div>`).join('');
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
       const rect = svg.getBoundingClientRect();
@@ -6294,7 +6592,7 @@ Charts.pie = function (container, opts) {
         if (s) {
           const p = s.points[pi] || s.points.find(Boolean);
           life.hover({ name: p.name || s.name, series: s.name, index: pi, x: p.x, y: p.y, z: p.z });
-          showTip(s, p, ev);
+          showTip(s, p, ev, target.getAttribute('fill'));
         }
       } else {
         clearHover();
@@ -6353,7 +6651,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, textW, truncate, dlEnabled, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, textW, truncate, dlEnabled, calloutKey, drawCallouts, NS } = window.ChartsShared;
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
   // option says nothing.
@@ -6654,9 +6952,7 @@ Charts.packedBubble = function (container, opts) {
     })();
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     life.on(svg, 'mousemove', ev => {
       const target = ev.target;
@@ -6736,7 +7032,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, textW, truncate, dlEnabled, calloutTheme, calloutKey, measureCalloutBox, drawCalloutBox, drawCalloutLeader, NS } = window.ChartsShared;
+  const { createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, wrapHeading, textW, truncate, dlEnabled, calloutTheme, calloutKey, measureCalloutBox, drawCalloutBox, drawCalloutLeader, NS } = window.ChartsShared;
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
   // option says nothing.
@@ -6963,9 +7259,7 @@ Charts.packedBubble = function (container, opts) {
     container_.appendChild(svg);
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;`;
-    container_.appendChild(tooltip);
+    const tooltip = createTooltip(container_, T);
 
     let bars = [], H = 0;
 
@@ -7315,7 +7609,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, _clipLine, wrapHeading, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
+  const { createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, _clipLine, wrapHeading, calloutKey, measureCalloutBox, drawCallouts, NS } = window.ChartsShared;
   // ── Text estimation / wrapping (same approach as the other engines:
   // widths are estimated, not measured, so layout is settled before
   // anything reaches the DOM) ──────────────────────────────────────────
@@ -7619,9 +7913,7 @@ Charts.packedBubble = function (container, opts) {
     })();
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = `position:absolute;pointer-events:none;background:${cssColor(T.bg)};border:1px solid ${cssColor(T.tooltipBorder)};border-radius:4px;padding:6px 8px;font:${cssNumber(T.tooltipSize)}px ${cssFont(T.font)};box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;max-width:260px;white-space:normal;z-index:10;`;
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T, 'max-width:260px;white-space:normal;');
 
     function clearHL() {
       points.forEach(q => q._dots.forEach(d => { d.style.opacity = ''; }));
@@ -7692,7 +7984,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, wrapHeading, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { createTooltip, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, wrapHeading, calloutKey, drawCallouts, NS } = window.ChartsShared;
   // ── Heading wrapping ────────────────────────────────────────────────
   // Titles wrap to at most 2 lines, subtitles to at most 3; whatever does
   // not fit is clipped with an ellipsis. Widths are estimated (not measured)
@@ -7888,11 +8180,7 @@ Charts.packedBubble = function (container, opts) {
       fill: T.hoverInk, 'fill-opacity': 0.04,
       style: 'display:none;pointer-events:none' }, svg);
 
-    const tip = document.createElement('div');
-    tip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' + cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
-      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tip);
+    const tip = createTooltip(container, T);
 
     function showTip(html, evt) {
       tip.innerHTML = html;
@@ -8081,7 +8369,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { refusalChart, createTooltip, makeNumberFormatter, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, calloutKey, drawCallouts, NS } = window.ChartsShared;
   // --- theme tokens (populated from window.Charts.theme at render time) ---
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
@@ -8132,43 +8420,9 @@ Charts.packedBubble = function (container, opts) {
 
 
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib radar] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: 20, y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
-            'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      // The detail sits below however many lines the headline actually took: at a
-      // fixed 26px it lands on top of the second line whenever the headline wraps,
-      // which is exactly when the message is longest and most needed. The wrap is
-      // measured at T.noticeSize too - it was measuring at a hardcoded 13 and drawing
-      // at the token, so a themed noticeSize wrapped to the wrong width.
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: 20, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
-          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      // Mirrors the real radar API: a refused chart must not advertise methods
-      // the drawn one lacks, or feature-detection on the handle lies.
-      return chartAPI(createLifecycle(container), {
-      opts: opts, typeName: "Radar chart",
-        getData: () => [], getSeries: () => [],
-        extras: { error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'radar', typeName: "Radar chart",
+        getSeries: () => []
       });
     }
     applyTheme();
@@ -8512,11 +8766,7 @@ Charts.packedBubble = function (container, opts) {
         stroke: T.hoverInk, 'stroke-opacity': 0.35, 'stroke-width': T.tickWidth }, gHover);
     }
 
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function showTooltip(idx, ev) {
       const rows = seriesDefs.filter(s => s.visible).map(s =>
@@ -8677,7 +8927,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, textW, ellipsize, wrapAxisLabel, dlEnabled, calloutTheme, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { refusalChart, createTooltip, makeNumberFormatter, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, textW, ellipsize, wrapAxisLabel, dlEnabled, calloutTheme, calloutKey, drawCallouts, NS } = window.ChartsShared;
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
   // option says nothing.
@@ -8769,39 +9019,8 @@ Charts.packedBubble = function (container, opts) {
 
 
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib dumbbell] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight, fill: T.titleColor,
-            'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      // The detail sits below however many lines the headline actually took: at a
-      // fixed 26px it lands on top of the second line whenever the headline wraps,
-      // which is exactly when the message is longest and most needed.
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
-          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      return chartAPI(createLifecycle(container), {
-      opts: opts, typeName: "Dumbbell chart",
-        getData: function () { return []; },
-        extras: { error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'dumbbell', typeName: "Dumbbell chart"
       });
     }
 
@@ -8883,7 +9102,21 @@ Charts.packedBubble = function (container, opts) {
     const compact = !!(opts.chart && opts.chart.compact);
     const showDelta = plot.showDelta != null ? plot.showDelta !== false : !compact;
     const deltaAsPercent = plot.deltaFormat === 'percent';
+    // The difference between two percentages is percentage points: 40% to
+    // 57% is +17 pts, not +17% (that would be a relative change of 42%).
+    // So values that carry a % default to points; deltaFormat: 'value'
+    // keeps the old reading.
+    const pctValues = String(valueSuffix).trim() === '%' ||
+      (plot.format != null && /\{y\}\s*%/.test(String(plot.format)));
+    const deltaAsPoints = plot.deltaFormat === 'points' || (plot.deltaFormat == null && pctValues);
     const deltaColorBySign = plot.deltaColorBySign !== false;
+    // Sign colours say which way a row moved and nothing more. `better:
+    // 'higher' | 'lower'` says which way is good, and only then do the
+    // favorable/unfavorable roles replace them: a change's colour is its
+    // sign times that polarity.
+    const polarity = plot.better === 'higher' ? 1 : plot.better === 'lower' ? -1 : 0;
+    const upCol = polarity ? (polarity > 0 ? T.favorable : T.unfavorable) : T.aboveThreshold;
+    const downCol = polarity ? (polarity > 0 ? T.unfavorable : T.favorable) : T.belowThreshold;
     const connectorBySign = plot.connectorBySign === true;
     const showArrow = plot.connectorArrow === true;
     const showGrid = plot.gridlines !== false;
@@ -8908,6 +9141,7 @@ Charts.packedBubble = function (container, opts) {
         return (pct > 0 ? '+' : pct < 0 ? '−' : '') + addCommas(Math.abs(+pct.toFixed(1))) + '%';
       }
       const d = +r.delta.toPrecision(12);
+      if (deltaAsPoints) return (d > 0 ? '+' : d < 0 ? '−' : '') + addCommas(Math.abs(d)) + ' pts';
       return (d > 0 ? '+' : d < 0 ? '−' : '') + fmt(Math.abs(d));
     };
 
@@ -9100,7 +9334,7 @@ Charts.packedBubble = function (container, opts) {
       : r.delta > 0 ? 'P' : r.delta < 0 ? 'M' : 'N');
     if (showArrow) {
       const defs = el('defs', {}, svg);
-      [[uid + 'P', T.aboveThreshold], [uid + 'M', T.belowThreshold], [uid + 'N', rodColor]]
+      [[uid + 'P', upCol], [uid + 'M', downCol], [uid + 'N', rodColor]]
         .forEach(pair => {
           const mk = el('marker', { id: pair[0], viewBox: '0 0 10 10', refX: 8, refY: 5,
             markerWidth: 4.5, markerHeight: 4.5, orient: 'auto-start-reverse',
@@ -9132,7 +9366,7 @@ Charts.packedBubble = function (container, opts) {
       // The rod, drawn between the two dot centres and under them, so the dots
       // cap it rather than sitting on a line that runs through them.
       const rodCol = connectorBySign
-        ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : rodColor)
+        ? (r.delta > 0 ? upCol : r.delta < 0 ? downCol : rodColor)
         : rodColor;
       if (hi - lo > 0.5) {
         const attrs = { x1: lo, y1: cy, x2: hi, y2: cy, stroke: rodCol,
@@ -9169,7 +9403,7 @@ Charts.packedBubble = function (container, opts) {
       // the ends of the rods.
       if (showDelta) {
         const dc = deltaColorBySign
-          ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : T.secondaryColor)
+          ? (r.delta > 0 ? upCol : r.delta < 0 ? downCol : T.secondaryColor)
           : T.valueColor;
         txt(deltaText(r), { x: rightEdge, y: cy + T.valueSize * 0.36, 'text-anchor': 'end',
           'font-size': T.valueSize, 'font-weight': T.valueWeight, fill: dc, 'font-family': T.font }, gText);
@@ -9218,11 +9452,7 @@ Charts.packedBubble = function (container, opts) {
     })();
 
     // ── Tooltip (same treatment as the other engines) ───────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function clearHover() {
       rows.forEach(q => { if (q._hit) q._hit.setAttribute('fill', 'transparent'); });
@@ -9241,7 +9471,7 @@ Charts.packedBubble = function (container, opts) {
         const dot = c => '<span style="display:inline-block;width:9px;height:9px;background:' +
           cssColor(c) + ';border-radius:50%;margin-right:6px"></span>';
         const dCol = deltaColorBySign
-          ? (r.delta > 0 ? T.aboveThreshold : r.delta < 0 ? T.belowThreshold : T.titleColor) : T.titleColor;
+          ? (r.delta > 0 ? upCol : r.delta < 0 ? downCol : T.titleColor) : T.titleColor;
         tooltip.innerHTML =
           '<div style="font-size:' + T.tooltipSize + 'px;font-weight:' + T.valueWeight + ';color:' + cssColor(T.titleColor) +
             ';margin-bottom:3px">' + esc(r.name) + '</div>' +
@@ -9311,7 +9541,7 @@ Charts.packedBubble = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, textW, dlEnabled, calloutKey, drawCallouts, NS } = window.ChartsShared;
+  const { refusalChart, createTooltip, makeNumberFormatter, cssColor, resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks, wrapHeading, textW, dlEnabled, calloutKey, drawCallouts, NS } = window.ChartsShared;
   // Resolve a dataLabels option to a boolean. Accepts `true`/`false` directly or
   // an `{enabled}` object, and falls back to the engine's default when the
   // option says nothing.
@@ -9371,43 +9601,9 @@ Charts.packedBubble = function (container, opts) {
 
 
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib histogram] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      // The detail sits below however many lines the headline actually took: at a
-      // fixed 26px it lands on top of the second line whenever the headline wraps,
-      // which is exactly when the message is longest and most needed.
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16), 'font-size': T.subtitleSize,
-          'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      return chartAPI(createLifecycle(container), {
-      opts: opts, typeName: "Histogram",
-        getData: function () { return []; },
-        extras: {
-          getBins: function () { return []; },
-          getStats: function () { return null; },
-          error: headline
-        }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'histogram', typeName: "Histogram",
+        extras: { getBins: function () { return []; }, getStats: function () { return null; } }
       });
     }
 
@@ -9811,11 +10007,7 @@ Charts.packedBubble = function (container, opts) {
     })();
 
     // ── Tooltip ─────────────────────────────────────────────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) + ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function clearHover() {
       bins.forEach(b => { if (b._node) b._node.style.opacity = '1'; });
@@ -9917,7 +10109,9 @@ Charts.histogramCumulative = function (container, opts) {
  *    waterfall and a column chart side by side sit on the same baselines
  *  - Theme tokens only — no literal colors in the draw code. Increases take
  *    `aboveThreshold`, decreases `belowThreshold`, totals `defaultColor`:
- *    a total is not a change and should not be coloured as one.
+ *    a total is not a change and should not be coloured as one. A first
+ *    point with `isOpening: true` is the opening balance and takes the total
+ *    colour too.
  *  - Data labels on by default, dropped individually where they will not fit
  *  - Hover highlight + tooltip, callouts in the band above the bars
  *
@@ -9946,7 +10140,7 @@ Charts.histogramCumulative = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { monthNames, layoutCategoryAxis, makeNumberFormatter, cssFont, cssNumber, cssColor,
+  const { refusalChart, createTooltip, monthNames, layoutCategoryAxis, makeNumberFormatter, cssNumber, cssColor,
           resolveTheme, chartAPI, createLifecycle, el, txt, esc, addCommas, niceTicks,
           wrapHeading, textW, dlEnabled, calloutKey, drawCallouts, NS } = window.ChartsShared;
 
@@ -9993,6 +10187,10 @@ Charts.histogramCumulative = function (container, opts) {
     // balance, so the connector leaving it would have to jump a distance the
     // chart never drew.
     if (d.isSum || d.isIntermediateSum) out.kind = 'sum';
+    // `isOpening` on the first point: an opening balance. It is added like
+    // any first step (from zero), but drawn and legended as the total it is,
+    // not as an increase: "Opening 1,240" did not rise by 1,240.
+    if (i === 0 && d.isOpening && out.kind === 'delta') out.opening = true;
     const raw = d.y != null ? d.y : d.value;
     if (out.kind === 'delta') {
       const v = +raw;
@@ -10032,38 +10230,9 @@ Charts.histogramCumulative = function (container, opts) {
 
     // Refusal / empty panel, same shape as the other engines'.
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib waterfall] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      // The detail sits below however many lines the headline actually took, so
-      // a wrapped headline does not have the explanation drawn through it.
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
-          'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      return chartAPI(createLifecycle(container), {
-        opts: opts, typeName: 'Waterfall',
-        getData: function () { return []; },
-        extras: { getSteps: function () { return []; }, error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'waterfall', typeName: 'Waterfall',
+        extras: { getSteps: function () { return []; } }
       });
     }
 
@@ -10185,13 +10354,13 @@ Charts.histogramCumulative = function (container, opts) {
     // hole standing at the wrong height. On by default whenever the chart
     // actually uses more than one role.
     const roles = [];
-    if (steps.some(s => s.kind === 'delta' && s.y >= 0)) {
+    if (steps.some(s => s.kind === 'delta' && !s.opening && s.y >= 0)) {
       roles.push({ name: plot.increaseLabel || 'Increase', color: plot.upColor || T.aboveThreshold });
     }
-    if (steps.some(s => s.kind === 'delta' && s.y < 0)) {
+    if (steps.some(s => s.kind === 'delta' && !s.opening && s.y < 0)) {
       roles.push({ name: plot.decreaseLabel || 'Decrease', color: plot.downColor || T.belowThreshold });
     }
-    if (steps.some(s => s.kind !== 'delta')) {
+    if (steps.some(s => s.kind !== 'delta' || s.opening)) {
       roles.push({ name: plot.totalLabel || 'Total', color: plot.sumColor || T.defaultColor });
     }
     const legendEnabled = (opts.legend && opts.legend.enabled != null)
@@ -10307,7 +10476,7 @@ Charts.histogramCumulative = function (container, opts) {
     const gapRatio = plot.pointPadding != null ? Math.max(0, Math.min(0.6, +plot.pointPadding)) : 0.3;
     const barW = Math.max(2, Math.min(slot * (1 - gapRatio), plot.maxPointWidth || 72));
     const centerX = i => M.l + (i + 0.5) * slot;
-    const colorOf = s => s.color || (s.kind !== 'delta' ? (plot.sumColor || T.defaultColor)
+    const colorOf = s => s.color || (s.kind !== 'delta' || s.opening ? (plot.sumColor || T.defaultColor)
                                    : s.y >= 0 ? (plot.upColor || T.aboveThreshold)
                                               : (plot.downColor || T.belowThreshold));
     const barRects = [];
@@ -10363,8 +10532,8 @@ Charts.histogramCumulative = function (container, opts) {
         lastRight = cx + tw / 2;
         txt(label, { x: cx, y: down ? s._bot + T.valueSize + 4 : s._top - 6,
           'text-anchor': 'middle', 'font-size': T.valueSize,
-          'font-weight': s.kind === 'delta' ? T.valueWeight : T.titleWeight,
-          fill: s.kind === 'delta' ? T.valueColor : T.titleColor, 'font-family': T.font }, gText);
+          'font-weight': s.kind === 'delta' && !s.opening ? T.valueWeight : T.titleWeight,
+          fill: s.kind === 'delta' && !s.opening ? T.valueColor : T.titleColor, 'font-family': T.font }, gText);
       });
     }
 
@@ -10442,12 +10611,7 @@ Charts.histogramCumulative = function (container, opts) {
     })();
 
     // ── Tooltip ─────────────────────────────────────────────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
-      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function clearHover() {
       steps.forEach(s => { if (s._rect) s._rect.style.opacity = '1'; });
@@ -10509,7 +10673,7 @@ Charts.histogramCumulative = function (container, opts) {
       category: s.name,
       change: s.kind === 'delta' ? s.y : null,
       total: +s.total.toPrecision(12),
-      type: s.kind === 'delta' ? (s.y >= 0 ? 'increase' : 'decrease') : 'total'
+      type: s.kind === 'delta' && !s.opening ? (s.y >= 0 ? 'increase' : 'decrease') : 'total'
     }));
 
     return chartAPI(life, {
@@ -10580,7 +10744,7 @@ Charts.histogramCumulative = function (container, opts) {
  *    would draw a band running backwards across the others.
  */
 (function () {
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI,
+  const { refusalChart, createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI,
           createLifecycle, el, txt, esc, wrapHeading, textW, ellipsize, dlEnabled,
           sankeyGraph, NS } = window.ChartsShared;
 
@@ -10603,37 +10767,9 @@ Charts.histogramCumulative = function (container, opts) {
 
     // Refusal / empty panel, same shape as the other engines'.
     function errorChart(container, W, H, opts, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib sankey] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize, 'font-weight': T.titleWeight,
-          fill: T.titleColor, 'font-family': T.font }, svg);
-      });
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => {
-        txt(l, { x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * (SUB_LH || 16),
-          'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg);
-      });
-      return chartAPI(createLifecycle(container), {
-        opts: Object.assign({}, opts, { series: null }), typeName: 'Sankey',
-        getData: function () { return []; },
-        extras: { getNodes: function () { return []; }, getLinks: function () { return []; },
-                  error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'sankey', opts: Object.assign({}, opts, { series: null }), typeName: 'Sankey',
+        extras: { getNodes: function () { return []; }, getLinks: function () { return []; } }
       });
     }
 
@@ -11007,12 +11143,7 @@ Charts.histogramCumulative = function (container, opts) {
     }
 
     // ── Tooltip + hover ─────────────────────────────────────────────────
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
-      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     const line = (label, value, strong) => '<div style="color:' + cssColor(strong ? T.titleColor : T.secondaryColor) +
       ';font-weight:' + cssNumber(strong ? T.valueWeight : 400) + '">' + esc(label) +
@@ -11170,7 +11301,7 @@ Charts.histogramCumulative = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, cssFont, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle,
+  const { refusalChart, createTooltip, makeNumberFormatter, cssNumber, cssColor, resolveTheme, chartAPI, createLifecycle,
           el, txt, esc, wrapHeading, textW, truncate, layoutCategoryAxis, monthNames,
           heatmapGrid, scaleColor, mix, contrast, NS } = window.ChartsShared;
 
@@ -11226,33 +11357,9 @@ Charts.histogramCumulative = function (container, opts) {
 
     // Refusal panel, same shape as the other engines'.
     function errorChart(W, H, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib ' + (calendar ? 'calendarHeatmap' : 'heatmap') + '] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
-        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
-        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
-        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
-      return chartAPI(createLifecycle(container), {
-        opts: Object.assign({}, opts, { series: null }), typeName: typeName,
-        getData: function () { return []; },
-        extras: { error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: calendar ? 'calendarHeatmap' : 'heatmap', typeName: typeName,
+        opts: Object.assign({}, opts, { series: null })
       });
     }
 
@@ -11577,12 +11684,7 @@ Charts.histogramCumulative = function (container, opts) {
     // ── Tooltip + hover ─────────────────────────────────────────────────
     const outline = el('rect', { x: 0, y: 0, width: 0, height: 0, rx: radius + 1, fill: 'none', stroke: T.hoverInk,
       'stroke-width': 1.5, style: 'display:none;pointer-events:none' }, svg);
-    const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position:absolute;pointer-events:none;background:' + cssColor(T.bg) +
-      ';border:1px solid ' + cssColor(T.tooltipBorder) + ';border-radius:4px;padding:6px 8px;font:' +
-      cssNumber(T.tooltipSize) + 'px ' + cssFont(T.font) +
-      ';box-shadow:1px 1px 3px rgba(0,0,0,0.12);display:none;white-space:nowrap;z-index:10;';
-    container.appendChild(tooltip);
+    const tooltip = createTooltip(container, T);
 
     function showTip(ev, html) {
       tooltip.innerHTML = html;
@@ -11707,7 +11809,7 @@ Charts.calendarHeatmap = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
+  const { refusalChart, makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
           wrapHeading, textW, cssColor, tableProblems, tableIsBlank, allocateWidths,
           scaleColor, contrast, NS } = window.ChartsShared;
 
@@ -11737,33 +11839,9 @@ Charts.calendarHeatmap = function (container, opts) {
 
     // Refusal panel, same shape as the other engines'.
     function errorChart(W, H, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib table] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
-        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
-        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
-        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
-      return chartAPI(createLifecycle(container), {
-        opts: opts, typeName: 'Table',
-        getData: function () { return []; },
-        extras: { getRows: function () { return []; }, error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'table', typeName: 'Table',
+        extras: { getRows: function () { return []; } }
       });
     }
 
@@ -12228,7 +12306,7 @@ Charts.calendarHeatmap = function (container, opts) {
  */
 (function () {
   // Helpers shared by every engine — see engines/_shared.js.
-  const { makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
+  const { refusalChart, makeNumberFormatter, resolveTheme, chartAPI, createLifecycle, el, txt,
           wrapHeading, textW, cssColor, reportTableProblems, tableIsBlank, allocateWidths,
           scaleColor, mix, contrast, NS } = window.ChartsShared;
 
@@ -12281,33 +12359,9 @@ Charts.calendarHeatmap = function (container, opts) {
 
     // Refusal panel, same shape as the other engines'.
     function errorChart(W, H, headline, detail) {
-      if (typeof console !== 'undefined' && console.warn) {
-        console.warn('[charts-lib reportTable] ' + headline + ' ' + detail);
-      }
-      const svg = el('svg', { xmlns: NS, width: W, height: H, viewBox: '0 0 ' + W + ' ' + H });
-      svg.style.background = window.ChartsShared.canvasColor(opts, T.bg);
-      svg.style.display = 'block';
-      container.appendChild(svg);
-      let y = 34;
-      if (opts.title) {
-        wrapHeading(opts.title, T.titleSize, W - T.headingGutter * 2, TITLE_LINES, true).forEach(l => {
-          txt(l, { x: T.headingGutter, y: y, 'font-size': T.titleSize, 'font-weight': T.titleWeight,
-            fill: T.titleColor, 'font-family': T.font }, svg);
-          y += TITLE_LH;
-        });
-        y += 10;
-      }
-      const cy = Math.max(y + 20, H / 2 - 10);
-      const headLines = wrapHeading(headline, T.noticeSize, W - 40, 2, true);
-      headLines.forEach((l, i) => txt(l, { x: T.headingGutter, y: cy + i * 18, 'font-size': T.noticeSize,
-        'font-weight': T.titleWeight, fill: T.titleColor, 'font-family': T.font }, svg));
-      wrapHeading(detail, T.subtitleSize, W - 40, 4, false).forEach((l, i) => txt(l, {
-        x: T.headingGutter, y: cy + (headLines.length - 1) * 18 + 26 + i * SUB_LH,
-        'font-size': T.subtitleSize, 'font-weight': T.subtitleWeight, fill: T.subtitleColor, 'font-family': T.font }, svg));
-      return chartAPI(createLifecycle(container), {
-        opts: opts, typeName: 'Report table',
-        getData: function () { return []; },
-        extras: { getRows: function () { return []; }, charts: [], error: headline }
+      return refusalChart(container, T, opts, W, H, headline, detail, {
+        engine: 'reportTable', typeName: 'Report table',
+        extras: { getRows: function () { return []; }, charts: [] }
       });
     }
 
@@ -14238,7 +14292,8 @@ Charts.validate = function (type, config) {
       ". With fewer the polygon collapses to a line or a spoke. Use column, or dumbbell for two states.");
   }
   if ((type === "line" || type.indexOf("histogram") === 0) && cats && cats.length) {
-    var named = cats.filter(function (c) {
+    var seq = type === "line" && window.ChartsShared && window.ChartsShared.isContinuousCats(cats);
+    var named = seq ? [] : cats.filter(function (c) {
       return !(c instanceof Date) && isNaN(Date.parse(c)) && isNaN(Number(c));
     });
     if (named.length) errors.push(type === "line"
@@ -14304,6 +14359,1244 @@ Charts.validate = function (type, config) {
   return { ok: errors.length === 0, errors: errors, warnings: warnings };
 };
 
+// --- auto: suggest / autoFill / auto ---
+
+/*
+ * Automatic charts: rows in, a dressed config out.
+ *
+ *   Charts.suggest(rows, hints)          → { type, intent, config, reasons }   (no drawing)
+ *   Charts.autoFill(type, config, hints) → { config, reasons }                 (fills gaps only)
+ *   Charts.auto(container, rows, hints)  → { chart, type, intent, spec, reasons }
+ *
+ * The rule every decision follows (docs/auto-design.md): make only the claims
+ * the data proves or a hint states, and when unsure use the encoding that
+ * misleads least if it is wrong. Every decision is reported in `reasons` with
+ * its basis — proven, stated, inferred or fallback — so nothing is a black box.
+ *
+ * Nothing here draws. It runs in Node as well as the browser, so the whole
+ * inference is testable without a DOM.
+ */
+(function () {
+  const { isContinuousCats, parseAxisDate, formatNumber } = window.ChartsShared;
+
+  // Above this many points a line drops its per-point labels, and a column chart
+  // becomes a bar chart or drops its labels.
+  const CROWDED = 12;
+  // A time series with this many points or more is a trend; fewer are separate results.
+  const TREND_MIN = 8;
+  // A category label longer than this turns a column chart on its side.
+  const LONG_LABEL = 14;
+  // A donut is a claim that the parts make a whole. Past this many it is a bar chart.
+  const SHARE_MAX = 6;
+  // Fewer raw values than this are too few to bin: each is drawn as its own bar.
+  const HIST_MIN = 20;
+  // Two value columns whose typical sizes differ by more than this cannot share an axis.
+  const MAGNITUDE_GAP = 100;
+  // Decimal places never go past this, however small the values.
+  const MAX_DECIMALS = 6;
+  // Outlier callouts (the `outliers` hint): only with this many values or
+  // more, only past this robust z (Iglewicz & Hoaglin's modified z-score),
+  // and never more than this many notes on one chart.
+  const OUTLIER_MIN_N = 20;
+  const OUTLIER_Z = 3.5;
+  const OUTLIER_MAX = 3;
+
+  // Ordered vocabularies the engines do not already treat as sequences.
+  const ORDINAL_SCALES = [
+    ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl'],
+    ['extra small', 'small', 'medium', 'large', 'extra large'],
+    ['very low', 'low', 'medium', 'high', 'very high'],
+    ['low', 'mid', 'high'],
+    ['none', 'low', 'moderate', 'high', 'critical'],
+    ['strongly disagree', 'disagree', 'neutral', 'agree', 'strongly agree'],
+    ['poor', 'fair', 'good', 'very good', 'excellent'],
+    ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  ];
+  // Letter grades are only a scale when the column says so (grade, rating, tier…)
+  // or a label carries a +/−: "A", "B", "C" on their own are as often names.
+  const GRADE_SCALE = ['a+', 'a', 'a-', 'b+', 'b', 'b-', 'c+', 'c', 'c-', 'd+', 'd', 'd-', 'e', 'f'];
+  const GRADE_WORDS = ['grade', 'grades', 'rating', 'tier', 'class', 'band', 'level', 'mark'];
+  // "18–24", "<1k", "$0–50", "65+", "10 to 20": a binned range, so its order is the scale's.
+  const RANGE_RE = /^\s*[<>≤≥]?\s*[$€£]?\s*\d[\d,.]*\s*[kmb%]?\s*(?:(?:[-–—]|to)\s*[$€£]?\s*\d[\d,.]*\s*[kmb%]?|\+)?\s*$/i;
+
+  // Whole-word name tokens that say what unit a column is in. A word like
+  // "revenue" says money, not which currency, so it is not on this list.
+  // `within` makes a token conditional on the values: "rate" is a percent only
+  // as a 0–1 fraction (heart_rate and exchange_rate are not), "share" only on
+  // a 0–100 scale.
+  const UNIT_TOKENS = {
+    pct: { suffix: '%' }, percent: { suffix: '%' }, percentage: { suffix: '%' },
+    rate: { suffix: '%', within: 1 }, ratio: { suffix: '%', within: 1 }, share: { suffix: '%', within: 100 },
+    usd: { prefix: '$' }, dollars: { prefix: '$' }, eur: { prefix: '€' }, euro: { prefix: '€' },
+    euros: { prefix: '€' }, gbp: { prefix: '£' }
+  };
+  // A donut needs the name to say "part of a whole" as well as the sum to.
+  const SHARE_WORDS = ['share', 'pct', 'percent', 'percentage', 'mix', 'split', 'portion', 'proportion', 'breakdown', 'allocation'];
+  const MONEY_WORDS = ['revenue', 'sales', 'cost', 'costs', 'price', 'spend', 'budget',
+    'profit', 'income', 'amount', 'arr', 'mrr', 'salary', 'expenses'];
+  // Metrics that usually read lower-is-better. These only ever produce a
+  // suggestion in the reasons; colouring by good/bad needs the `better` hint.
+  const LOWER_IS_BETTER = ['churn', 'latency', 'errors', 'error', 'cost', 'costs', 'defects',
+    'returns', 'bounce', 'complaints', 'downtime', 'incidents', 'delay', 'delays', 'wait'];
+  // Words that turn the reading around ("error_budget_remaining", "cost_savings"):
+  // a name holding one of these makes no lower-is-better suggestion.
+  const NEGATORS = ['remaining', 'left', 'saved', 'savings', 'avoided', 'prevented', 'reduction',
+    'reduced', 'free', 'budget', 'headroom', 'resolved'];
+  // Words that make a money word not about money ("error budget", "time cost").
+  const NOT_MONEY = ['error', 'errors', 'time', 'latency', 'cpu', 'memory', 'energy', 'carbon',
+    'calorie', 'calories', 'points', 'risk'];
+  // Column-name pairs that say "the same thing at two moments", which is a dumbbell.
+  const PAIRS = [['before', 'after'], ['plan', 'actual'], ['budget', 'actual'],
+    ['target', 'actual'], ['forecast', 'actual'], ['start', 'end'], ['old', 'new'],
+    ['prior', 'current'], ['previous', 'current'], ['last', 'this']];
+
+  // Words that make a first or last label a total, for waterfall detection.
+  // A label must look like a total AND the steps must add up to it: the words
+  // nominate a bridge, the arithmetic decides.
+  const START_WORDS = ['start', 'starting', 'opening', 'open', 'beginning', 'begin', 'initial', 'bop', 'brought'];
+  const END_WORDS = ['end', 'ending', 'closing', 'close', 'final', 'eop', 'total', 'net', 'carried'];
+  // How far the last value may sit from first + steps and still reconcile:
+  // rounding in exported data, never a missing step.
+  const BRIDGE_TOLERANCE = 0.005;
+
+  // "q1", "h2", "fy24", "2023", "jan": a token naming a period, for pairing value columns.
+  const PERIOD_RE = /^(?:q[1-4]|h[12]|fy\d{2,4}|[a-z]?(?:19|20)\d{2}|w\d{1,2}|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/;
+  // "Q1 2023", "2023 Q1", "2023-Q1", "Q1 '23", "FY24 Q1": a quarter of a year.
+  const QUARTER_RE = /^(?:q([1-4])\s*'?(\d{2}|\d{4})|(\d{4})\s*-?\s*q([1-4])|fy\s*'?(\d{2}|\d{4})\s*-?\s*q([1-4]))$/i;
+
+  // Strings that stand for "no value" in exported data. In a numeric column they
+  // are missing values, not a reason to read the whole column as labels.
+  const PLACEHOLDERS = ['n/a', 'na', '#n/a', '-', '–', '—', 'null', 'nan', 'none', '?', '.', 'missing'];
+  // Name tokens that mark an identifier: never plotted unless a hint asks.
+  const ID_WORDS = ['id', 'uuid', 'guid', 'key', 'pk'];
+
+  // The column name given to rows that arrive as bare numbers.
+  const BARE = 'value';
+
+  const UNIT_STRIP =['usd', 'eur', 'gbp', 'pct', 'percent', 'percentage', 'in'];
+
+  // ── small helpers ───────────────────────────────────────────────────
+
+  function words(name) {
+    return String(name)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .toLowerCase().split(/[^a-z0-9%$€£]+/).filter(Boolean);
+  }
+
+  function humanize(name) {
+    const w = words(name).filter(t => UNIT_STRIP.indexOf(t) < 0 && !/^[%$€£]$/.test(t));
+    // "y2019" is a year with a letter in front so it can be a column name.
+    const s = (w.length ? w : words(name)).map(t => t.replace(/^[a-z]((?:19|20)\d{2})$/, '$1')).join(' ');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  /** A number, a numeric string ("1,204", "12%", "$4.5"), or null. */
+  function readNumber(v) {
+    if (typeof v === 'number') return isFinite(v) ? { n: v } : null;
+    if (typeof v !== 'string') return null;
+    // "-$3", "$-3" and "−12.5%" (a typographic minus) are all negatives.
+    const s = v.trim().replace(/^[−–]/, '-').replace(/^([$€£])\s*[−–]/, '$1-');
+    const m = /^(-?)\s*([$€£]?)\s*(-?[\d,]*\.?\d+(?:e[+-]?\d+)?)\s*(%?)$/i.exec(s);
+    if (!m || (m[1] && m[3][0] === '-')) return null;
+    if (m[3].indexOf(',') >= 0 && !/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(m[3])) return null;
+    return { n: Number(m[1] + m[3].replace(/,/g, '')), prefix: m[2] || '', suffix: m[4] || '' };
+  }
+
+  /** The lower bound of a binned range, for ordering: "<1k" sorts before "1k-5k", "65+" after "45-64". */
+  function rangeLow(label) {
+    const m = /^\s*([<>≤≥])?\s*[$€£]?\s*(\d[\d,]*\.?\d*)\s*([kmb])?/i.exec(label);
+    if (!m) return Infinity;
+    const n = Number(m[2].replace(/,/g, '')) * ({ k: 1e3, m: 1e6, b: 1e9 }[(m[3] || '').toLowerCase()] || 1);
+    return m[1] === '<' || m[1] === '≤' ? n - 0.5 : m[1] === '>' || m[1] === '≥' ? n + 0.5 : n;
+  }
+
+  /**
+   * The labels in their scale's own order, or null when they are not a known
+   * scale. Arriving alphabetically (High, Low, Medium) is not the scale's order.
+   */
+  function scaleOrder(labels, name) {
+    const uniq = Array.from(new Set(labels.map(String)));
+    const low = uniq.map(l => l.trim().toLowerCase());
+    if (low.every(l => RANGE_RE.test(l)) && low.some(l => /[-–—+<>≤≥]|to/.test(l))) {
+      return uniq.slice().sort((a, b) => rangeLow(a) - rangeLow(b));
+    }
+    const scales = ORDINAL_SCALES.slice();
+    if (words(name || '').some(w => GRADE_WORDS.indexOf(w) >= 0) || low.some(l => /^[a-f][+-]$/.test(l))) scales.push(GRADE_SCALE);
+    const scale = scales.find(sc => low.every(l => sc.indexOf(l) >= 0));
+    if (!scale) return null;
+    return uniq.slice().sort((a, b) => scale.indexOf(a.trim().toLowerCase()) - scale.indexOf(b.trim().toLowerCase()));
+  }
+
+  function isOrdinal(labels, name) {
+    return scaleOrder(labels, name) !== null;
+  }
+
+  /** "Q1 2023" → the first millisecond of that quarter (UTC), or null. */
+  function quarterStart(v) {
+    const m = QUARTER_RE.exec(String(v).trim());
+    if (!m) return null;
+    const q = +(m[1] || m[4] || m[6]);
+    let y = +(m[2] || m[3] || m[5]);
+    if (y < 100) y += 2000;
+    return Date.UTC(y, (q - 1) * 3, 1);
+  }
+
+  function asDate(v) {
+    if (v instanceof Date) return isNaN(v) ? null : v.getTime();
+    if (typeof v === 'string' && /^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+Z?)?$/.test(v.trim())) {
+      const t = Date.parse(v.length === 7 ? v + '-01' : v);
+      return isNaN(t) ? null : t;
+    }
+    return null;
+  }
+
+  /**
+   * Decimal places: the fewest that keep every distinct value distinct, and,
+   * for values under 1, enough to show two significant figures of the
+   * smallest, so 0.0012 never rounds to 0.00.
+   */
+  function decimalsFor(values) {
+    const uniq = Array.from(new Set(values.filter(v => v != null)));
+    if (uniq.every(v => Number.isInteger(v))) return 0;
+    const small = uniq.map(Math.abs).filter(v => v > 0 && v < 1);
+    const floor = small.length ? Math.min(MAX_DECIMALS, Math.ceil(-Math.log10(Math.min.apply(null, small))) + 1) : 0;
+    for (let d = floor; d < MAX_DECIMALS; d++) {
+      const f = Math.pow(10, d);
+      if (new Set(uniq.map(v => Math.round(v * f))).size === uniq.length) return d;
+    }
+    return MAX_DECIMALS;
+  }
+
+  function median(values) {
+    const v = values.filter(x => x != null).map(Math.abs).sort((a, b) => a - b);
+    return v.length ? v[Math.floor(v.length / 2)] : 0;
+  }
+
+  function isAlphabetical(names) {
+    for (let i = 1; i < names.length; i++) {
+      if (String(names[i - 1]).localeCompare(String(names[i]), undefined, { sensitivity: 'base' }) > 0) return false;
+    }
+    return true;
+  }
+
+  /** 'desc', 'asc' or null. */
+  function valueOrder(vals) {
+    let up = true, down = true;
+    for (let i = 1; i < vals.length; i++) {
+      if (vals[i] < vals[i - 1]) up = false;
+      if (vals[i] > vals[i - 1]) down = false;
+    }
+    return down ? 'desc' : up ? 'asc' : null;
+  }
+
+  function pairedNames(a, b) {
+    const wa = words(a), wb = words(b);
+    if (PAIRS.some(p => (wa.indexOf(p[0]) >= 0 && wb.indexOf(p[1]) >= 0))) return true;
+    // "q1_sales" / "q2_sales": the same name with only a period token changed.
+    if (wa.length === wb.length && wa.length > 1) {
+      const diff = wa.map((t, i) => i).filter(i => wa[i] !== wb[i]);
+      if (diff.length === 1 && PERIOD_RE.test(wa[diff[0]]) && PERIOD_RE.test(wb[diff[0]])) return true;
+    }
+    // "y2019" / "FY2024" / "2019 total": a year not glued to other digits.
+    const year = n => { const m = /(?:^|\D)((?:19|20)\d{2})(?!\d)/.exec(n); return m ? m[1] : null; };
+    const ya = year(a), yb = year(b);
+    return !!(ya && yb && ya !== yb);
+  }
+
+  function clone(v) {
+    if (Array.isArray(v)) return v.map(clone);
+    if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+      const o = {};
+      for (const k in v) o[k] = clone(v[k]);
+      return o;
+    }
+    return v;
+  }
+
+  function get(obj, path) {
+    return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  }
+
+  function ensure(obj, path) {
+    return path.split('.').reduce((o, k) => (o[k] = o[k] || {}), obj);
+  }
+
+  function theme() {
+    return (window.Charts && window.Charts.theme) || null;
+  }
+
+  // Series colours by name, for the whole page: the first chart to show
+  // "East" fixes its slot in the theme's series ramp, and every later chart
+  // that opts in draws "East" in that slot too, whatever order its series
+  // come in. Slots, not hex values, so a theme change recolours consistently.
+  const seriesSlots = new Map();
+
+  function slotFor(name, n) {
+    if (!seriesSlots.has(name)) seriesSlots.set(name, seriesSlots.size);
+    return seriesSlots.get(name) % n;
+  }
+
+  function why(reasons, decision, basis, text) {
+    reasons.push({ decision, basis, text });
+  }
+
+  // ── 1. profile ──────────────────────────────────────────────────────
+
+  /** null, '', or a placeholder string such as "n/a". */
+  function isBlank(v) {
+    if (v == null) return true;
+    if (typeof v !== 'string') return false;
+    const t = v.trim().toLowerCase();
+    return t === '' || PLACEHOLDERS.indexOf(t) >= 0;
+  }
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function profileColumn(name, values) {
+    const present = values.filter(v => !isBlank(v));
+    const p = { name, values, kind: 'category', idLike: words(name).some(w => ID_WORDS.indexOf(w) >= 0) };
+    if (!present.length) { p.kind = 'empty'; return p; }
+
+    const nums = present.map(readNumber);
+    if (nums.every(Boolean)) {
+      p.kind = 'number';
+      p.nums = values.map(v => { const r = isBlank(v) ? null : readNumber(v); return r ? r.n : null; });
+      // "n/a", "-" and the like: counted, so the reasons can say they were dropped.
+      p.placeholders = values.filter(v => typeof v === 'string' && v.trim() !== '' && isBlank(v));
+      const marked = nums.find(r => r.prefix || r.suffix);
+      if (marked) p.written = { prefix: marked.prefix, suffix: marked.suffix };
+      const ns = p.nums.filter(v => v != null);
+      p.min = Math.min.apply(null, ns); p.max = Math.max.apply(null, ns);
+      p.sum = ns.reduce((a, b) => a + b, 0);
+      p.integers = ns.every(Number.isInteger);
+      // An integer column named like a year is a time axis, not a measure.
+      if (p.integers && p.min >= 1900 && p.max <= 2100 &&
+          words(name).some(w => /^(year|yr|fy|fiscal)$/.test(w))) {
+        p.kind = 'sequence';
+        p.labels = values.map(String);
+      }
+      return p;
+    }
+    if (present.every(v => asDate(v) != null)) {
+      p.kind = 'date';
+      p.times = values.map(asDate);
+      return p;
+    }
+    // Quarters with a year are dates the engines do not parse: read them here,
+    // and keep their own wording for the labels.
+    if (present.every(v => quarterStart(v) != null)) {
+      p.kind = 'date';
+      p.quarters = true;
+      p.times = values.map(quarterStart);
+      return p;
+    }
+    const labels = values.map(v => (v == null ? '' : String(v)));
+    const uniq = Array.from(new Set(labels));
+    p.labels = labels;
+    if (uniq.every(l => parseAxisDate(l) !== null) || isContinuousCats(uniq)) p.kind = 'sequence';
+    else if (isOrdinal(uniq, name)) p.kind = 'ordinal';
+    return p;
+  }
+
+  /** range: { min, max } of the values, for the tokens whose meaning depends on them. */
+  function unitOf(names, hints, written, range) {
+    if (hints.unit) {
+      const u = typeof hints.unit === 'string'
+        ? (hints.unit === '%' ? { suffix: '%' } : { prefix: hints.unit }) : hints.unit;
+      return { prefix: u.prefix || '', suffix: u.suffix || '', basis: 'stated', from: 'the unit hint' };
+    }
+    if (written && (written.prefix || written.suffix)) {
+      return { prefix: written.prefix, suffix: written.suffix, basis: 'proven', from: 'the values as written' };
+    }
+    for (let i = 0; i < names.length; i++) {
+      const ws = words(names[i]);
+      if (/%/.test(names[i])) return { prefix: '', suffix: '%', basis: 'inferred', from: '"%" in "' + names[i] + '"' };
+      for (let j = 0; j < ws.length; j++) {
+        const u = UNIT_TOKENS[ws[j]];
+        if (u && u.within && !(range && Math.max(Math.abs(range.min), Math.abs(range.max)) <= u.within)) continue;
+        if (u) return { prefix: u.prefix || '', suffix: u.suffix || '', basis: 'inferred', from: '"' + ws[j] + '" in "' + names[i] + '"' +
+          (u.within ? ' with every value within ±' + u.within : '') };
+      }
+    }
+    return null;
+  }
+
+  // ── 2–3. roles and intent ───────────────────────────────────────────
+
+  const X_PRIORITY = ['date', 'sequence', 'ordinal', 'category'];
+
+  /**
+   * x, the value columns and the series column. A hint that names a column
+   * which does not exist is reported, never silently dropped: a misspelled y
+   * is an error (there is nothing sensible to plot instead), a misspelled x or
+   * group falls back to choosing one, with a reason.
+   */
+  function assignRoles(profiles, hints, reasons) {
+    const byName = n => profiles.find(p => p.name === n);
+    const names = profiles.map(p => '"' + p.name + '"').join(', ');
+    if (hints.y != null) {
+      const ask = [].concat(hints.y);
+      const unknown = ask.filter(n => !byName(n));
+      if (unknown.length) {
+        throw new TypeError('hints.y names no column: ' + unknown.map(n => '"' + n + '"').join(', ') + '. Columns: ' + names + '.');
+      }
+      const text = ask.filter(n => byName(n).kind !== 'number');
+      if (text.length) {
+        throw new TypeError('hints.y must name numeric columns; ' + text.map(n => '"' + n + '"').join(', ') + ' holds text.');
+      }
+    }
+    const valid = {};
+    ['x', 'group'].forEach(k => {
+      if (hints[k] == null) return;
+      if (byName(hints[k])) { valid[k] = true; return; }
+      why(reasons, 'roles', 'fallback', 'hints.' + k + ' "' + hints[k] + '" names no column, so it was chosen automatically. Columns: ' + names + '.');
+    });
+    // Identifier columns (id, uuid, key…) are labels for rows, not data to plot.
+    const usable = p => !p.idLike;
+    const ids = profiles.filter(p => p.idLike && p.name !== hints.x && p.name !== hints.group &&
+      [].concat(hints.y || []).indexOf(p.name) < 0);
+    if (ids.length) {
+      why(reasons, 'roles', 'inferred', ids.map(p => '"' + p.name + '"').join(', ') + (ids.length === 1 ? ' looks' : ' look') +
+        ' like an identifier, so it is not plotted. Pass x: \'' + ids[0].name + '\' to use it.');
+    }
+    const others = profiles.filter(p => p.kind !== 'number' && p.kind !== 'empty' && usable(p));
+    let x = valid.x ? byName(hints.x) : null;
+    if (!x) {
+      for (let i = 0; i < X_PRIORITY.length && !x; i++) x = others.find(p => p.kind === X_PRIORITY[i]) || null;
+    }
+    let ys = hints.y != null ? [].concat(hints.y).map(byName)
+      : profiles.filter(p => p.kind === 'number' && p !== x && usable(p));
+    let group = valid.group ? byName(hints.group) : null;
+    if (!group && hints.y == null && ys.length === 1 && x && x.kind !== 'number') {
+      group = others.find(p => p !== x && p.kind !== 'date') || null;
+    }
+    ys = ys.filter(p => p !== group);
+    return { x, ys, group, stated: !!(valid.x || valid.group || hints.y != null) };
+  }
+
+  /** Turn rows into categories × series, aggregating repeated (x, series) pairs. */
+  function pivot(rows, x, ys, group, reasons) {
+    const cats = [], catIndex = new Map(), series = [], seriesIndex = new Map();
+    const counts = new Map();
+    let repeats = 0;
+    const key = v => (x.kind === 'date' ? (x.quarters ? quarterStart(v) : asDate(v)) : String(v));
+    const addSeries = (name, unitSrc) => {
+      if (!seriesIndex.has(name)) { seriesIndex.set(name, series.length); series.push({ name, src: unitSrc, data: [] }); }
+      return series[seriesIndex.get(name)];
+    };
+    let blank = 0;
+    rows.forEach((row, r) => {
+      // A row with no label has nowhere to go on a category axis. Only null or
+      // empty counts: "NA" and "None" are real labels (North America, a survey answer).
+      const label = row[x.name];
+      if (label == null || String(label).trim() === '') { blank++; return; }
+      const k = key(row[x.name]);
+      if (!catIndex.has(k)) { catIndex.set(k, cats.length); cats.push(k); }
+      const ci = catIndex.get(k);
+      const targets = group
+        ? [{ s: addSeries(String(row[group.name]), ys[0]), v: ys[0].nums[r] }]
+        : ys.map(y => ({ s: addSeries(y.name, y), v: y.nums[r] }));
+      targets.forEach(t => {
+        const ck = t.s.name + '\u0000' + ci;
+        if (t.v == null) return;
+        if (t.s.data[ci] == null) { t.s.data[ci] = t.v; counts.set(ck, 1); return; }
+        repeats++;
+        counts.set(ck, counts.get(ck) + 1);
+        t.s.data[ci] += t.v;
+      });
+    });
+    series.forEach(s => {
+      const isRate = (s.src.unit && s.src.unit.suffix === '%');
+      for (let i = 0; i < cats.length; i++) {
+        if (s.data[i] === undefined) s.data[i] = null;
+        const n = counts.get(s.name + '\u0000' + i);
+        if (isRate && n > 1) s.data[i] = s.data[i] / n;
+      }
+    });
+    if (blank) {
+      why(reasons, 'roles', 'inferred', plural(blank, 'row') + ' with no ' + x.name + ' ' + (blank === 1 ? 'was' : 'were') +
+        ' left out: a value needs a label to sit against. Fill it in (for example "Unknown") to show ' + (blank === 1 ? 'it' : 'them') + '.');
+    }
+    if (repeats) {
+      const rate = series.some(s => s.src.unit && s.src.unit.suffix === '%');
+      why(reasons, 'aggregate', 'inferred', plural(repeats, 'row') + ' repeated an existing ' + x.name +
+        (group ? ' and ' + group.name : '') + ', so they were ' + (rate ? 'averaged (a rate does not add up)' : 'summed') +
+        '. Aggregate the rows yourself if that is not what they mean.');
+    }
+    return { cats, series };
+  }
+
+  function chooseType(shape, hints, reasons) {
+    const stated = hints.intent;
+    const { xKind, nSeries, nCats, maxLabel, allNonNeg, sumsToWhole, shareWord, paired, unitsDiffer, nValues, increasing, bridge } = shape;
+    const longOrMany = maxLabel > LONG_LABEL || nCats > CROWDED;
+    const compareType = longOrMany ? 'bar' : 'column';
+    const compareWhy = longOrMany
+      ? (maxLabel > LONG_LABEL ? 'a label is ' + maxLabel + ' characters long' : 'there are ' + nCats + ' categories') + ', so the bars run sideways to give each name a row'
+      : 'separate quantities on a shared baseline, the encoding that claims the least';
+
+    if (!xKind) {
+      if (nSeries >= 3) return { type: 'bubble', intent: 'relationship', basis: 'proven', text: 'Three numeric columns and nothing to group them by: each row is a point, the third column its size.' };
+      if (nSeries >= 2) return { type: 'scatter', intent: 'relationship', basis: 'proven', text: 'Two numeric columns and nothing to group them by: each row is a point.' };
+      if (stated === 'distribution') return { type: 'histogram', intent: 'distribution', basis: 'stated', text: 'intent: distribution.' };
+      if (nValues < HIST_MIN) {
+        return { type: 'column', intent: 'compare', basis: 'inferred', alternatives: ['histogram (pass intent: \'distribution\')'],
+          text: 'Only ' + plural(nValues, 'value') + ': too few to bin, so ' + (nValues === 1 ? 'it is' : 'each is') + ' drawn as its own bar.' };
+      }
+      return { type: 'histogram', intent: 'distribution', basis: 'proven', text: 'One column of ' + nValues + ' raw numbers: their distribution is the only thing to show.' };
+    }
+    // A numeric x is a measurement, not a label: a line when it rises row by
+    // row (a numeric axis with an order), a scatter when it does not.
+    if (xKind === 'number') {
+      if ((increasing && stated !== 'relationship') || stated === 'trend') {
+        return { type: 'line', intent: 'trend', basis: stated ? 'stated' : 'inferred', alternatives: ['scatter (pass intent: \'relationship\')'],
+          text: 'x is numeric and rises row by row, so it is a numeric axis the values move along.' };
+      }
+      return { type: 'scatter', intent: 'relationship', basis: stated === 'relationship' ? 'stated' : 'inferred',
+        text: 'x is numeric and not in order, so each row is a point.' };
+    }
+    if (stated === 'relationship' || (xKind === 'category' && nSeries >= 2 && unitsDiffer && !stated)) {
+      return { type: 'scatter', intent: 'relationship', basis: stated ? 'stated' : 'inferred',
+        text: stated ? 'intent: relationship.' : 'The value columns are in different units or of very different sizes, so they cannot share an axis; plotted against each other instead.' };
+    }
+
+    const timeLike = xKind === 'date' || xKind === 'sequence';
+    if (stated) {
+      const map = { trend: 'line', compare: compareType, rank: 'barList', share: 'donut',
+        change: 'dumbbell', distribution: 'histogram' };
+      // A stated intent never overrides what the data rules out: a donut cannot
+      // draw a negative part (it would silently drop it), so share falls through.
+      if (stated === 'share' && (!allNonNeg || nSeries > 1)) {
+        why(reasons, 'type', 'fallback', 'intent: share was not followed: ' + (nSeries > 1 ? 'there are ' + nSeries + ' series, and a donut holds one' :
+          'a value is negative, and a part of a whole cannot be') + '. Drawn as ' + compareType + 's instead.');
+      } else if (map[stated]) {
+        return { type: map[stated], intent: stated, basis: 'stated', text: 'intent: ' + stated + '.' };
+      } else {
+        why(reasons, 'intent', 'fallback', 'Unknown intent "' + stated + '" was ignored.');
+      }
+    }
+    if (timeLike) {
+      if (nCats >= TREND_MIN) {
+        return { type: 'line', intent: 'trend', basis: 'inferred', alternatives: ['column (pass intent: \'compare\')'],
+          text: nCats + ' points in time: enough that the shape between them is the point.' };
+      }
+      return { type: 'column', intent: 'compare', basis: 'inferred', alternatives: ['line (pass intent: \'trend\')'],
+        text: 'Only ' + nCats + ' periods: they read better as separate results than as a line.' };
+    }
+    if (bridge && bridge.ok) {
+      return { type: 'waterfall', intent: 'change', basis: 'inferred', alternatives: [compareType + ' (pass intent: \'compare\')'],
+        text: bridge.text };
+    }
+    if (nSeries === 2 && paired) {
+      return { type: 'dumbbell', intent: 'change', basis: 'inferred', alternatives: ['grouped column (pass intent: \'compare\')'],
+        text: 'The two value columns are the same measure at two moments, so the gap between them is the story.' };
+    }
+    if (nSeries === 1 && allNonNeg && sumsToWhole && nCats <= SHARE_MAX && nCats >= 2) {
+      if (!shareWord) {
+        why(reasons, 'type', 'inferred', 'The values happen to sum to a whole, but nothing in the name says they are parts of one, so no donut. Pass intent: \'share\' if they are.');
+      } else {
+        return { type: 'donut', intent: 'share', basis: 'inferred', alternatives: [compareType + ' (pass intent: \'compare\')'],
+          text: 'The values sum to a whole, the name says share, none is negative and there are only ' + nCats + ': a part-of-whole reading is safe.' };
+      }
+    }
+    return { type: compareType, intent: 'compare', basis: 'fallback', text: compareWhy + '.' };
+  }
+
+  // ── 4–7. dressing (shared by suggest and autoFill) ─────────────────
+
+  const FORMAT_KEYS = ['yAxis.suffix', 'tooltip.valuePrefix', 'tooltip.valueSuffix', 'tooltip.valueDecimals'];
+  const SERIES_FORMAT_KEYS = ['valuePrefix', 'valueSuffix', 'valueDecimals'];
+  const LABEL_KEYS = ['plotOptions.series.dataLabels', 'lineLabels'];
+
+  function plotKey(type) { return type === 'bar' ? 'bar' : type === 'donut' ? 'pie' : type; }
+
+  /** The first key in `paths` (or on any series) the caller set, or null. */
+  function ownedBy(cfg, paths, seriesKeys) {
+    const hit = paths.find(p => get(cfg, p) !== undefined);
+    if (hit) return hit;
+    const s = (cfg.series || []).find(sr => seriesKeys.some(k => sr[k] !== undefined));
+    return s ? 'series.' + seriesKeys.find(k => s[k] !== undefined) : null;
+  }
+
+  function seriesValues(cfg) {
+    return (cfg.series || []).map(s => (s.data || []).map(d =>
+      typeof d === 'number' ? d : Array.isArray(d) ? d[d.length - 1] : d && typeof d === 'object' ? d.y : null));
+  }
+
+  function dressFormat(type, cfg, ctx, hints, reasons) {
+    const pk = 'plotOptions.' + plotKey(type);
+    const owner = ownedBy(cfg, FORMAT_KEYS.concat([pk + '.valueSuffix', pk + '.format']), SERIES_FORMAT_KEYS);
+    if (owner) { why(reasons, 'format', 'stated', 'Number format left as written: ' + owner + ' is set.'); return; }
+
+    const unit = ctx.unit;
+    const vals = seriesValues(cfg);
+    // A percent column written as 0–1 shares reads as 0.42%. Scale it once, here.
+    if (unit && unit.suffix === '%' && vals.every(v => v.every(x => x == null || Math.abs(x) <= 1)) &&
+        vals.some(v => v.some(x => x != null && x !== 0 && x !== 1))) {
+      (cfg.series || []).forEach(s => {
+        s.data = (s.data || []).map(d => {
+          const sc = x => (x == null ? x : +(x * 100).toFixed(4));
+          if (typeof d === 'number') return sc(d);
+          if (Array.isArray(d)) return d.slice(0, -1).concat(sc(d[d.length - 1]));
+          if (d && typeof d === 'object') return Object.assign({}, d, { y: sc(d.y) });
+          return d;
+        });
+      });
+      if (hints.target != null && hints.target <= 1) hints = Object.assign({}, hints, { target: hints.target * 100 });
+      ctx.scaledTarget = hints.target;
+      why(reasons, 'format', 'inferred', 'Values between −1 and 1 in a percent column were multiplied by 100, so 0.42 reads as 42% and −0.05 as −5%.');
+    }
+    const dec = decimalsFor([].concat.apply([], seriesValues(cfg)));
+    const prefix = unit ? unit.prefix : '', suffix = unit ? unit.suffix : '';
+
+    if (type === 'barList') {
+      const po = ensure(cfg, 'plotOptions.barList');
+      if (prefix) po.format = prefix + '{y}' + suffix; else if (suffix) po.valueSuffix = suffix;
+    } else if (type === 'waterfall') {
+      if (suffix) ensure(cfg, 'plotOptions.waterfall').valueSuffix = suffix;
+      if (prefix) ensure(cfg, 'plotOptions.waterfall').valuePrefix = prefix;
+    } else if (type === 'donut') {
+      if (suffix) ensure(cfg, 'plotOptions.pie').valueSuffix = suffix;
+    } else if (type === 'dumbbell') {
+      if (suffix) ensure(cfg, 'plotOptions.dumbbell').valueSuffix = suffix;
+      if (prefix) ensure(cfg, 'plotOptions.dumbbell').valuePrefix = prefix;
+      if (suffix.trim() === '%') {
+        why(reasons, 'format', 'proven', 'The change between two percentages is in percentage points ("+17 pts"), not percent.');
+      }
+    } else if (suffix && type !== 'histogram' && type !== 'scatter') {
+      ensure(cfg, 'yAxis').suffix = suffix;
+    }
+    const tt = ensure(cfg, 'tooltip');
+    if (prefix) tt.valuePrefix = prefix;
+    if (suffix && (type === 'scatter' || type === 'histogram')) tt.valueSuffix = suffix;
+    tt.valueDecimals = dec;
+
+    if (unit) {
+      why(reasons, 'format', unit.basis, 'Unit ' + (prefix || '') + (suffix || '') + ' from ' + unit.from + '.');
+    } else if (ctx.moneyWord) {
+      why(reasons, 'format', 'fallback', '"' + ctx.moneyWord + '" sounds like money, but not which currency, so no symbol was added. Pass unit: \'$\' (or €, £) to add one.');
+    }
+    why(reasons, 'format', 'inferred', dec + ' decimal place' + (dec === 1 ? '' : 's') + ': the fewest that keep every distinct value distinct' +
+      (dec > 2 ? ' and show two significant figures of the smallest.' : '.'));
+  }
+
+  function dressSort(type, cfg, ctx, hints, reasons) {
+    if (['column', 'bar', 'barList'].indexOf(type) < 0) return;
+    if (hints.sort === false) { why(reasons, 'sort', 'stated', 'Order kept: sort: false.'); return; }
+    if (type === 'barList' && get(cfg, 'plotOptions.barList.sort') !== undefined) {
+      why(reasons, 'sort', 'stated', 'Order left as written: plotOptions.barList.sort is set.');
+      return;
+    }
+    if (ctx.intent === 'rank') {
+      if (type === 'barList') ensure(cfg, 'plotOptions.barList').sort = 'desc';
+      else sortByValue(cfg);
+      why(reasons, 'sort', 'stated', 'Sorted by value, largest first: a ranking.');
+      return;
+    }
+    if (ctx.xKind === 'ordinal' && type !== 'barList') {
+      const cats0 = cfg.xAxis.categories.map(String);
+      const want = scaleOrder(cats0, ctx.xName);
+      if (want && want.join('\u0000') !== cats0.join('\u0000')) {
+        reorder(cfg, want.map(c => cats0.indexOf(c)));
+        why(reasons, 'sort', 'proven', 'Put in the scale\'s own order (' + want.join(', ') + '): the rows arrived in another.');
+      } else {
+        why(reasons, 'sort', 'proven', 'Order kept: the categories are an ordered scale.');
+      }
+      return;
+    }
+    if (ctx.xKind !== 'category') {
+      if (ctx.xKind) why(reasons, 'sort', 'proven', ctx.xKind === 'index' ? 'Order kept: the values are shown in the order given.' : 'Order kept: the categories are in time order.');
+      return;
+    }
+    if ((cfg.series || []).length !== 1) return;
+    const cats = type === 'barList' ? cfg.series[0].data.map(d => d.name) : get(cfg, 'xAxis.categories');
+    const vals = seriesValues(cfg)[0];
+    if (!cats || cats.length < 2 || vals.some(v => v == null)) return;
+    // Largest-first is always a choice worth keeping. Alphabetical order beats an
+    // ascending run as evidence: two A→Z rows are ascending by coincidence half the time.
+    const order = valueOrder(vals);
+    if (order === 'desc') { why(reasons, 'sort', 'proven', 'Order kept: the rows are already largest first.'); return; }
+    if (!isAlphabetical(cats)) {
+      why(reasons, 'sort', 'inferred', order === 'asc'
+        ? 'Order kept: the rows are already smallest first.'
+        : 'Order kept: the rows are neither alphabetical nor by value, so the order looks chosen (a funnel, a fiscal year). Pass intent: \'rank\' to sort.');
+      return;
+    }
+    if (type === 'barList') ensure(cfg, 'plotOptions.barList').sort = 'desc';
+    else sortByValue(cfg);
+    why(reasons, 'sort', 'inferred', 'Sorted by value: the rows arrived in alphabetical order, which carries no meaning. Pass sort: false to keep it.');
+  }
+
+  function sortByValue(cfg) {
+    const vals = seriesValues(cfg)[0];
+    reorder(cfg, vals.map((v, i) => i).sort((a, b) => vals[b] - vals[a]));
+  }
+
+  /** Re-order the categories, and every series with them, by a list of old indices. */
+  function reorder(cfg, order) {
+    const cats = cfg.xAxis.categories;
+    cfg.xAxis.categories = order.map(i => cats[i]);
+    cfg.series.forEach(s => { s.data = order.map(i => s.data[i]); });
+  }
+
+  function dressColor(type, cfg, ctx, hints, reasons) {
+    const series = cfg.series || [];
+    const owner = series.some(s => s.color) ? 'series.color'
+      : series.some(s => s.negativeColor !== undefined) ? 'series.negativeColor'
+      : series.some(s => (s.data || []).some(d => d && typeof d === 'object' && !Array.isArray(d) && d.color)) ? 'a point color'
+        : get(cfg, 'plotOptions.' + plotKey(type) + '.colorByPoint') !== undefined ? 'colorByPoint'
+        : get(cfg, 'plotOptions.' + plotKey(type) + '.better') !== undefined ? 'plotOptions.' + plotKey(type) + '.better'
+        : ['upColor', 'downColor'].some(k => get(cfg, 'plotOptions.' + plotKey(type) + '.' + k) !== undefined) ? 'plotOptions.' + plotKey(type) + '.upColor/downColor' : null;
+    if (owner) { why(reasons, 'color', 'stated', 'Colors left as written: ' + owner + ' is set.'); return; }
+
+    ctx.lowerWords.forEach(w => why(reasons, 'color', 'fallback', '"' + w + '" usually reads lower-is-better. Pass better: \'lower\' to color by outcome; until then nothing is colored as good or bad.'));
+
+    const T = theme();
+    dressSeriesColors(type, cfg, ctx, hints, reasons, T);
+    if (hints.better != null && dressValence(type, cfg, ctx, hints, reasons, T)) return;
+    // Values on both sides of zero: the part below gets the theme's
+    // belowThreshold colour. That is the sign regime — direction, not good or
+    // bad — so it needs no hint. Only for one series: with several, colour
+    // already says which series a mark belongs to.
+    const vals = seriesValues(cfg);
+    const crosses = series.length === 1 && vals[0].some(v => v < 0) && vals[0].some(v => v > 0);
+    const signable = crosses && ['column', 'bar', 'line'].indexOf(type) >= 0 && hints.focus == null;
+    if (signable && T && T.belowThreshold && series[0].negativeColor === undefined) {
+      series[0].negativeColor = T.belowThreshold;
+      why(reasons, 'color', 'proven', 'Values fall on both sides of zero, so the part below is drawn in the below-threshold colour. ' +
+        'It marks direction only; pass better: \'higher\' or \'lower\' for good and bad.' +
+        ((ctx.xKind === 'date' || ctx.xKind === 'sequence') && type !== 'line' ? ' The latest-period highlight is skipped so it does not hide the sign.' : ''));
+      return;
+    }
+    if (crosses && hints.focus != null && ['column', 'bar'].indexOf(type) >= 0) {
+      why(reasons, 'color', 'stated', 'Sign colours skipped: focus colours the bars, and a third colour would blur both.');
+    } else if (series.length > 1 && vals.some(v => v.some(x => x < 0)) && vals.some(v => v.some(x => x > 0)) && ['column', 'bar', 'line'].indexOf(type) >= 0) {
+      why(reasons, 'color', 'inferred', 'Values cross zero, but with ' + series.length + ' series colour names the series, so negatives are shown by position only.');
+    }
+
+    if (['column', 'bar'].indexOf(type) < 0 || series.length !== 1) {
+      if (hints.focus != null) {
+        why(reasons, 'color', 'stated', 'focus "' + hints.focus + '" is not drawn on ' +
+          (series.length !== 1 ? 'a chart with ' + series.length + ' series' : 'a ' + type + ' chart') +
+          ' yet: only single-series column and bar charts highlight a category. Use a callout to point at it.');
+      }
+      return;
+    }
+    const cats = get(cfg, 'xAxis.categories') || [];
+    let idx = -1, basis, text;
+    if (hints.focus != null) {
+      idx = cats.map(String).indexOf(String(hints.focus));
+      if (idx < 0) { why(reasons, 'color', 'stated', 'focus "' + hints.focus + '" matches no category, so nothing is highlighted.'); return; }
+      basis = 'stated'; text = '"' + hints.focus + '" highlighted (focus) in the second series color; the rest stay in the first.';
+    } else if ((ctx.xKind === 'date' || ctx.xKind === 'sequence') && cats.length > 1) {
+      idx = cats.length - 1; basis = 'inferred';
+      text = 'The latest period is highlighted, the convention for results over time. Pass focus to pick another.';
+    } else {
+      return;
+    }
+    // The series ramp, not a separate accent: s2 marks the one that matters and
+    // s1 (the colour every single-series chart already uses) carries the rest,
+    // so a highlighted chart is the same chart with one bar re-inked.
+    if (!T || !T.colors || T.colors.length < 2) { why(reasons, 'color', 'fallback', 'No theme loaded, so the highlight was skipped.'); return; }
+    const s = series[0];
+    s.data = s.data.map((d, i) => {
+      const color = i === idx ? T.colors[1] : T.colors[0];
+      return typeof d === 'number' || d == null ? { y: d, color } : Object.assign({}, d, { color });
+    });
+    why(reasons, 'color', basis, text);
+  }
+
+  /**
+   * Stable colours by name: on in Charts.auto (stableColors: false turns it
+   * off), opt-in for suggest and autoFill (stableColors: true). Only where
+   * colour names a series, so only with two or more of them: a single
+   * series keeps s1, which the focus and latest-period highlights rely on.
+   */
+  function dressSeriesColors(type, cfg, ctx, hints, reasons, T) {
+    const on = hints.stableColors != null ? hints.stableColors === true : !!ctx.pageColors;
+    const series = cfg.series || [];
+    if (!on || series.length < 2 || ['column', 'bar', 'line', 'dumbbell'].indexOf(type) < 0) return;
+    if (!T || !T.colors || !T.colors.length) return;
+    const n = T.colors.length;
+    const slots = series.map(s => slotFor(String(s.name), n));
+    series.forEach((s, i) => { s.color = T.colors[slots[i]]; });
+    const shared = slots.length !== new Set(slots).size;
+    why(reasons, 'color', hints.stableColors != null ? 'stated' : 'inferred',
+      'Series colours are kept by name across the page, so ' + series.map(s => '"' + s.name + '"').join(', ') +
+      ' look the same in every automatic chart.' + (shared ? ' More names than the theme has colours, so two series here share one.' : '') +
+      (hints.stableColors != null ? '' : ' Pass stableColors: false to colour by position.'));
+  }
+
+  /**
+   * Good/bad colours, only from the `better` hint (never from a column name).
+   * A change's colour is its sign times the polarity: with better: 'lower', a
+   * fall is favorable. The sign is measured from `target` when there is one,
+   * else from zero; values that are all positive with no target are levels,
+   * not changes, so nothing says which are good and nothing is painted.
+   * Returns true when it coloured the chart.
+   */
+  function dressValence(type, cfg, ctx, hints, reasons, T) {
+    const better = hints.better;
+    if (better !== 'higher' && better !== 'lower') {
+      why(reasons, 'color', 'fallback', 'better: ' + JSON.stringify(better) + ' was ignored: it takes \'higher\' or \'lower\'.');
+      return false;
+    }
+    if (!T || !T.favorable || !T.unfavorable) {
+      why(reasons, 'color', 'fallback', 'better was ignored: the theme has no favorable/unfavorable colours.');
+      return false;
+    }
+    const good = better === 'higher' ? T.favorable : T.unfavorable;
+    const bad = better === 'higher' ? T.unfavorable : T.favorable;
+    const series = cfg.series || [];
+    if (type === 'dumbbell') {
+      ensure(cfg, 'plotOptions.dumbbell').better = better;
+      why(reasons, 'color', 'stated', 'better: \'' + better + '\': each change is drawn favorable when it went ' +
+        (better === 'higher' ? 'up' : 'down') + ', unfavorable when it went ' + (better === 'higher' ? 'down' : 'up') + '.');
+      return true;
+    }
+    if (type === 'waterfall') {
+      const po = ensure(cfg, 'plotOptions.waterfall');
+      po.upColor = good; po.downColor = bad;
+      why(reasons, 'color', 'stated', 'better: \'' + better + '\': steps that ' + (better === 'higher' ? 'add' : 'take away') +
+        ' are drawn favorable, the others unfavorable. Totals stay neutral: a total is not a change.');
+      return true;
+    }
+    if (['column', 'bar', 'line'].indexOf(type) < 0) {
+      why(reasons, 'color', 'stated', 'better is not drawn on a ' + type + ' chart: only column, bar, line, dumbbell and waterfall colour a change.');
+      return false;
+    }
+    if (series.length !== 1) {
+      why(reasons, 'color', 'stated', 'better is not drawn with ' + series.length + ' series: colour already says which series a mark belongs to.');
+      return false;
+    }
+    if (hints.focus != null && type !== 'line') {
+      why(reasons, 'color', 'stated', 'better is not drawn alongside focus: focus colours the bars, and good/bad on top would blur both.');
+      return false;
+    }
+    const target = ctx.scaledTarget != null ? ctx.scaledTarget : hints.target;
+    const vals = seriesValues(cfg)[0].filter(v => v != null);
+    if (target == null && !vals.some(v => v < 0)) {
+      why(reasons, 'color', 'stated', 'better: \'' + better + '\' was given, but every value is positive and there is no target, so they read as levels, not changes: ' +
+        'nothing says which are good. Pass target to colour each against it.');
+      return false;
+    }
+    const s = series[0];
+    s.color = good;
+    s.negativeColor = bad;
+    if (target != null) s.threshold = target;
+    const ref = target != null ? 'the target (' + target + ')' : 'zero';
+    const above = better === 'higher' ? 'favorable' : 'unfavorable', below = better === 'higher' ? 'unfavorable' : 'favorable';
+    why(reasons, 'color', 'stated', 'better: \'' + better + '\': values above ' + ref + ' are drawn ' + above + ', below it ' + below + '.' +
+      ((ctx.xKind === 'date' || ctx.xKind === 'sequence') && type !== 'line' ? ' The latest-period highlight is skipped so it does not hide the outcome.' : ''));
+    return true;
+  }
+
+  function dressLabels(type, cfg, ctx, hints, reasons) {
+    if (['column', 'bar', 'line'].indexOf(type) < 0) return;
+    const owner = ownedBy(cfg, LABEL_KEYS.concat(['plotOptions.' + plotKey(type) + '.dataLabels']), ['dataLabels']);
+    if (owner) { why(reasons, 'labels', 'stated', 'Labels left as written: ' + owner + ' is set.'); return; }
+    const n = Math.max.apply(null, (cfg.series || []).map(s => (s.data || []).length).concat(0));
+    if (type === 'line') {
+      cfg.lineLabels = cfg.series.length > 1 ? 'both' : 'value';
+      why(reasons, 'labels', 'inferred', 'Each line is labelled at its end with its latest value' + (cfg.series.length > 1 ? ' and name' : '') + '.');
+      // Labels from every line share one plot, so they are counted together.
+      const labels = n * cfg.series.length;
+      if (labels > CROWDED) {
+        ensure(cfg, 'plotOptions.series').dataLabels = false;
+        why(reasons, 'labels', 'inferred', labels + ' point labels' + (cfg.series.length > 1 ? ' across ' + cfg.series.length + ' lines' : '') +
+          ': per-point labels off, the end label and tooltip carry the values.');
+      }
+      return;
+    }
+    const total = n * cfg.series.length;
+    if (total > CROWDED * (type === 'bar' ? 2 : 1)) {
+      ensure(cfg, 'plotOptions.series').dataLabels = false;
+      why(reasons, 'labels', 'inferred', total + ' bars: value labels off, read them off the axis and tooltip.');
+    }
+  }
+
+  function dressTarget(type, cfg, ctx, hints, reasons) {
+    if (hints.target == null) return;
+    const target = ctx.scaledTarget != null ? ctx.scaledTarget : hints.target;
+    if (['column', 'bar', 'line', 'waterfall'].indexOf(type) < 0) {
+      why(reasons, 'target', 'stated', 'A target line is not drawn on a ' + type + ' yet.');
+      return;
+    }
+    if (get(cfg, 'yAxis.plotLines') !== undefined) { why(reasons, 'target', 'stated', 'Target skipped: yAxis.plotLines is set.'); return; }
+    ensure(cfg, 'yAxis').plotLines = [{ value: target, dashStyle: 'Dash', label: { text: 'Target' } }];
+    why(reasons, 'target', 'stated', 'Target ' + target + ' drawn as a reference line.');
+  }
+
+  function dress(type, cfg, ctx, hints, reasons) {
+    dressFormat(type, cfg, ctx, hints, reasons);
+    dressSort(type, cfg, ctx, hints, reasons);
+    dressColor(type, cfg, ctx, hints, reasons);
+    dressLabels(type, cfg, ctx, hints, reasons);
+    dressTarget(type, cfg, ctx, hints, reasons);
+    dressOutliers(type, cfg, ctx, hints, reasons);
+    return cfg;
+  }
+
+  /**
+   * Modified z-scores (Iglewicz & Hoaglin): 0.6745 (x − median) / MAD. Robust
+   * because the median and MAD barely move for the outliers they are looking
+   * for, where a mean and standard deviation are dragged toward them. When
+   * more than half the values are equal the MAD is 0, and the mean absolute
+   * deviation stands in. All zeros when the values do not vary at all.
+   */
+  function robustZ(vals) {
+    const sorted = vals.slice().sort((a, b) => a - b);
+    const mid = a => (a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2);
+    const med = mid(sorted);
+    const dev = vals.map(v => Math.abs(v - med));
+    const mad = mid(dev.slice().sort((a, b) => a - b));
+    const meanAD = dev.reduce((a, b) => a + b, 0) / dev.length;
+    const z = mad > 0 ? vals.map(v => 0.6745 * (v - med) / mad)
+      : meanAD > 0 ? vals.map(v => (v - med) / (1.253314 * meanAD)) : vals.map(() => 0);
+    return { z, med, mad };
+  }
+
+  /**
+   * Opt-in (`outliers: true`) callouts on the values far from the rest: at
+   * least 20 values in a series, a robust z past 3.5, the 3 most extreme at
+   * most. A caller's own `callouts` key owns this unit.
+   */
+  function dressOutliers(type, cfg, ctx, hints, reasons) {
+    if (!hints.outliers) return;
+    if (cfg.callouts !== undefined) { why(reasons, 'callouts', 'stated', 'Outlier callouts skipped: callouts is set.'); return; }
+    if (['column', 'bar', 'line'].indexOf(type) < 0) {
+      why(reasons, 'callouts', 'stated', 'Outlier callouts are not drawn on a ' + type + ' chart: only column, bar and line take them.');
+      return;
+    }
+    const cats = get(cfg, 'xAxis.categories');
+    const unit = ctx.unit || {};
+    const dec = get(cfg, 'tooltip.valueDecimals');
+    const fmt = v => formatNumber(v, { prefix: unit.prefix, suffix: unit.suffix, decimals: dec });
+    const found = [];
+    const small = [];
+    (cfg.series || []).forEach(sr => {
+      const pts = (sr.data || []).map((d, i) => {
+        const y = typeof d === 'number' ? d : Array.isArray(d) ? d[d.length - 1] : d && typeof d === 'object' ? d.y : null;
+        const x = Array.isArray(d) && d.length > 1 ? d[0] : d && typeof d === 'object' && d.x != null ? d.x : i;
+        return y == null ? null : { i, x, y };
+      }).filter(Boolean);
+      if (pts.length < OUTLIER_MIN_N) { small.push(sr.name + ' has ' + pts.length); return; }
+      const r = robustZ(pts.map(p => p.y));
+      pts.forEach((p, k) => {
+        if (Math.abs(r.z[k]) > OUTLIER_Z) found.push({ p, z: r.z[k], series: sr.name, med: r.med });
+      });
+    });
+    if (small.length && !found.length && small.length === (cfg.series || []).length) {
+      why(reasons, 'callouts', 'stated', 'outliers: no callouts: it takes ' + OUTLIER_MIN_N + ' values or more to tell an outlier from the spread, and ' +
+        small.join(', ') + '.');
+      return;
+    }
+    if (!found.length) {
+      why(reasons, 'callouts', 'proven', 'outliers: no value is more than ' + OUTLIER_Z + ' robust z-scores from its series\' median, so there is nothing to call out.');
+      return;
+    }
+    found.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+    const shown = found.slice(0, OUTLIER_MAX);
+    const many = (cfg.series || []).length > 1;
+    const labelOf = p => (cats ? String(cats[p.i])
+      : get(cfg, 'xAxis.type') === 'datetime' ? new Date(p.x).toISOString().slice(0, 10) : String(p.x));
+    cfg.callouts = shown.map(o => {
+      // The note sits on the point and the axis names it, so the text is only
+      // the value and what is unusual about it: short enough to land near it.
+      const text = fmt(o.p.y) + ', unusually ' + (o.z > 0 ? 'high' : 'low');
+      const co = type === 'line' ? { x: o.p.x, text } : { category: cats[o.p.i], text };
+      if (many) co.series = o.series;
+      return co;
+    });
+    why(reasons, 'callouts', 'proven', 'outliers: ' + shown.map(o => labelOf(o.p) + ' (' + fmt(o.p.y) + ')').join(', ') +
+      (shown.length === 1 ? ' is' : ' are') + ' more than ' + OUTLIER_Z + ' robust z-scores from the median' +
+      (many ? ' of its series' : ' (' + fmt(found[0].med) + ')') + ', so ' + (shown.length === 1 ? 'it is' : 'each is') + ' called out' +
+      (found.length > shown.length ? '; ' + (found.length - shown.length) + ' more past the line are left uncalled, to keep the chart readable.' : '.'));
+  }
+
+  function nameContext(names, hints, written, range) {
+    const per = names.map(words);
+    const money = per.filter(ws => !ws.some(w => NOT_MONEY.indexOf(w) >= 0))
+      .map(ws => ws.find(w => MONEY_WORDS.indexOf(w) >= 0)).find(Boolean);
+    const lower = hints.better ? [] : per.filter(ws => !ws.some(w => NEGATORS.indexOf(w) >= 0))
+      .map(ws => ws.filter(w => LOWER_IS_BETTER.indexOf(w) >= 0));
+    return {
+      unit: unitOf(names, hints, written, range),
+      moneyWord: money || null,
+      lowerWords: Array.from(new Set([].concat.apply([], lower)))
+    };
+  }
+
+  function rangeOf(values) {
+    const v = values.filter(x => x != null);
+    return v.length ? { min: Math.min.apply(null, v), max: Math.max.apply(null, v) } : null;
+  }
+
+  // ── public: suggest ─────────────────────────────────────────────────
+
+  function suggest(rows, hints) { return suggestFor(rows, hints, false); }
+
+  function suggestFor(rows, hints, pageColors) {
+    hints = Object.assign({}, hints);
+    if (!Array.isArray(rows) || !rows.length) {
+      throw new TypeError('Charts.suggest needs a non-empty array of rows (plain objects, or numbers).');
+    }
+    if (rows.every(r => typeof r === 'number' || typeof r === 'string')) rows = rows.map(v => ({ [BARE]: v }));
+    const reasons = [];
+    const names = [];
+    rows.forEach(r => Object.keys(r || {}).forEach(k => { if (names.indexOf(k) < 0) names.push(k); }));
+    const profiles = names.map(n => profileColumn(n, rows.map(r => (r ? r[n] : null))));
+    profiles.forEach(p => { if (p.kind === 'number') p.unit = unitOf([p.name], hints, p.written, p); });
+
+    const { x, ys, group, stated } = assignRoles(profiles, hints, reasons);
+    if (!ys.length) throw new TypeError('Charts.suggest found no numeric column to plot. Columns: ' + names.join(', ') + '.');
+    ys.concat(x && x.kind === 'number' ? [x] : []).forEach(y => {
+      if (!y.placeholders || !y.placeholders.length) return;
+      const kinds = Array.from(new Set(y.placeholders.map(v => '"' + v.trim() + '"'))).join(', ');
+      why(reasons, 'roles', 'inferred', plural(y.placeholders.length, 'value') + ' in "' + y.name + '" (' + kinds + ') ' +
+        (y.placeholders.length === 1 ? 'is' : 'are') + ' not a number and ' + (y.placeholders.length === 1 ? 'is' : 'are') + ' treated as missing.');
+    });
+    why(reasons, 'roles', stated ? 'stated' : 'inferred',
+      (x ? 'x: ' + x.name + ' (' + x.kind + '), ' : '') + 'values: ' + ys.map(y => y.name).join(', ') +
+      (group ? ', series from: ' + group.name : '') + '.');
+
+    const unitKeys = new Set(ys.map(y => (y.unit ? y.unit.prefix + y.unit.suffix : '')));
+    let pv = null, shape;
+    if (x && x.kind === 'number') {
+      const xs = x.nums.filter(v => v != null);
+      shape = { xKind: 'number', nSeries: ys.length, increasing: xs.every((v, i) => i === 0 || v > xs[i - 1]) };
+    } else if (x) {
+      pv = pivot(rows, x, ys, group, reasons);
+      const one = pv.series[0].data;
+      const ok = one.filter(v => v != null);
+      shape = {
+        xKind: x.kind, nSeries: pv.series.length, nCats: pv.cats.length,
+        maxLabel: Math.max.apply(null, pv.cats.map(c => String(c).length)),
+        allNonNeg: ok.every(v => v >= 0),
+        sumsToWhole: [100, 1].some(t => Math.abs(ok.reduce((a, b) => a + b, 0) - t) <= t * 0.01),
+        shareWord: words(ys[0].name).some(w => SHARE_WORDS.indexOf(w) >= 0) || !!(ys[0].unit && ys[0].unit.suffix === '%'),
+        paired: pv.series.length === 2 && pairedNames(pv.series[0].name, pv.series[1].name),
+        unitsDiffer: !group && (unitKeys.size > 1 || magnitudeGap(ys)),
+        bridge: !group && !hints.intent && x.kind === 'category' && pv.series.length === 1
+          ? bridgeOf(pv.cats.map(String), pv.series[0].data, reasons) : null
+      };
+    } else {
+      shape = { xKind: null, nSeries: ys.length, nValues: ys[0].nums.filter(v => v != null).length };
+    }
+
+    let choice = chooseType(shape, hints, reasons);
+    let cfg = build(choice.type, x, ys, group, pv, hints, rows);
+    const validate = window.Charts && window.Charts.validate;
+    const verdict = validate ? validate(choice.type, cfg) : { ok: true, errors: [] };
+    if (!verdict.ok) {
+      why(reasons, 'type', 'fallback', choice.type + ' was refused (' + verdict.errors[0] + ') so this is a column chart instead.');
+      choice = { type: x ? 'column' : 'histogram', intent: 'compare', basis: 'fallback', text: 'The safe default.' };
+      cfg = build(choice.type, x, ys, group, pv, hints, rows);
+    }
+    why(reasons, 'type', choice.basis, choice.type + ': ' + choice.text +
+      (choice.alternatives ? ' Also fits: ' + choice.alternatives.join('; ') + '.' : ''));
+
+    const ctx = nameContext(ys.map(y => y.name), hints, (ys.find(y => y.written) || {}).written,
+      rangeOf([].concat.apply([], ys.map(y => y.nums))));
+    // On a scatter or bubble each column is its own axis (or size), so only the
+    // y column's unit may reach the y axis and tooltip.
+    if (choice.type === 'scatter' || choice.type === 'bubble') ctx.unit = (x && x.kind === 'number' ? ys[0] : ys[1]).unit || null;
+    ctx.xKind = x ? x.kind : choice.type === 'column' ? 'index' : null;
+    ctx.xName = x ? x.name : '';
+    if (choice.type === 'bubble' && ys.length > 3) {
+      why(reasons, 'roles', 'inferred', 'Only the first three numeric columns are drawn; ' + ys.slice(3).map(y => y.name).join(', ') + ' left out.');
+    }
+    ctx.intent = choice.intent;
+    ctx.pageColors = pageColors;
+    // One value is not a chart (choosing.md §5). Still drawn, so there is
+    // something on screen, but the reasons say what would serve it better.
+    const plotted = (cfg.series || []).reduce((n, s) => n + (s.data || []).filter(d => d != null).length, 0) ||
+      (cfg.data ? cfg.data.length : 0);
+    if (plotted === 1) {
+      why(reasons, 'type', 'fallback', 'Only one value: that is not really a chart. Consider showing it as a large number or in a sentence; it is drawn as a single bar meanwhile.');
+    }
+    if (!cfg.title) cfg.title = titleFor(choice.type, x, ys);
+    if (hints.subtitle) cfg.subtitle = hints.subtitle;
+    dress(choice.type, cfg, ctx, hints, reasons);
+    return { type: choice.type, intent: choice.intent, config: cfg, reasons };
+  }
+
+  /**
+   * A waterfall, checked rather than guessed: the first label must read as an
+   * opening total, the last as a closing one, and first + the steps between
+   * them must equal the last. Labels that look like totals but do not add up
+   * are reported and left as columns. Returns null when the labels do not
+   * nominate a bridge at all.
+   */
+  function bridgeOf(labels, vals, reasons) {
+    const n = labels.length;
+    if (n < 3 || vals.some(v => v == null)) return null;
+    const first = words(labels[0]), last = words(labels[n - 1]);
+    if (!first.some(w => START_WORDS.indexOf(w) >= 0) || !last.some(w => END_WORDS.indexOf(w) >= 0)) return null;
+    const steps = vals.slice(1, -1).reduce((a, b) => a + b, 0);
+    const reached = vals[0] + steps, closing = vals[n - 1];
+    const fmt = v => String(+v.toPrecision(12));
+    const scale = Math.max(Math.abs(vals[0]), Math.abs(closing), 1e-9);
+    if (Math.abs(reached - closing) > scale * BRIDGE_TOLERANCE) {
+      why(reasons, 'type', 'inferred', '"' + labels[0] + '" and "' + labels[n - 1] + '" look like totals, but ' + fmt(vals[0]) +
+        ' plus the steps between them is ' + fmt(reached) + ', not ' + fmt(closing) + ', so this is not drawn as a waterfall. Add the missing step to bridge them.');
+      return { ok: false };
+    }
+    return { ok: true, exact: reached === closing,
+      text: '"' + labels[0] + '" and "' + labels[n - 1] + '" are totals, and ' + fmt(vals[0]) + ' plus the ' + (n - 2) + ' steps between them makes ' +
+        fmt(closing) + (reached === closing ? '' : ' (to within rounding)') + ': a bridge from one to the other.' };
+  }
+
+  /** True when two value columns' typical sizes are too far apart to read off one axis. */
+  function magnitudeGap(ys) {
+    if (ys.length < 2) return false;
+    const m = ys.map(y => median(y.nums)).filter(v => v > 0);
+    return m.length >= 2 && Math.max.apply(null, m) / Math.min.apply(null, m) > MAGNITUDE_GAP;
+  }
+
+  function titleFor(type, x, ys) {
+    if (x && x.kind === 'number') {
+      return type === 'scatter' ? humanize(ys[0].name) + ' vs ' + humanize(x.name)
+        : (ys.length === 1 ? humanize(ys[0].name) : ys.map(y => humanize(y.name)).join(' and ')) + ' by ' + humanize(x.name).toLowerCase();
+    }
+    if (!x) {
+      if (type === 'scatter' || type === 'bubble') {
+        return humanize(ys[1].name) + ' vs ' + humanize(ys[0].name) + (type === 'bubble' ? ', sized by ' + humanize(ys[2].name).toLowerCase() : '');
+      }
+      if (type === 'column') return ys[0].name === BARE ? 'Values' : humanize(ys[0].name);
+      // Bare numbers arrive as a column this file named "value"; it has no name worth printing.
+      return ys[0].name === BARE ? 'Distribution' : 'Distribution of ' + humanize(ys[0].name).toLowerCase();
+    }
+    const what = ys.length === 1 ? humanize(ys[0].name) : ys.map(y => humanize(y.name)).join(' and ');
+    return what + ' by ' + humanize(x.name).toLowerCase();
+  }
+
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /** Category labels for dates: "Q1 2024" for quarters, "Jan 2024" when every date is a month start, else the ISO day. */
+  function dateLabels(times, quarters) {
+    const ds = times.map(t => new Date(t));
+    if (quarters) return ds.map(d => 'Q' + (Math.floor(d.getUTCMonth() / 3) + 1) + ' ' + d.getUTCFullYear());
+    const monthly = ds.every(d => d.getUTCDate() === 1 && d.getUTCHours() === 0);
+    return ds.map(d => (monthly ? MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear() : d.toISOString().slice(0, 10)));
+  }
+
+  function build(type, x, ys, group, pv, hints, rows) {
+    const cfg = {};
+    if (hints.title) cfg.title = hints.title;
+    if (type === 'histogram') { cfg.data = ys[0].nums.filter(v => v != null); return cfg; }
+    if (!x && type === 'column') {
+      // Too few values to bin: one bar each, in the order given.
+      const vals = ys[0].nums.filter(v => v != null);
+      cfg.xAxis = { categories: vals.map((v, i) => '#' + (i + 1)) };
+      cfg.series = [{ name: ys[0].name === BARE ? 'Value' : humanize(ys[0].name), data: vals }];
+      return cfg;
+    }
+    if (x && x.kind === 'number' && type === 'line') {
+      cfg.series = ys.map(y => ({ name: humanize(y.name),
+        data: rows.map((r, i) => (x.nums[i] == null ? null : [x.nums[i], y.nums[i]])).filter(Boolean) }));
+      cfg.xAxis = { title: { text: humanize(x.name) } };
+      return cfg;
+    }
+    if (type === 'scatter' || type === 'bubble') {
+      const label = x && x.kind === 'category' ? x : null;
+      // With a numeric x, it is the horizontal axis and the first value column the vertical.
+      const xc = x && x.kind === 'number' ? x : ys[0], yc = x && x.kind === 'number' ? ys[0] : ys[1];
+      const z = type === 'bubble' ? ys[2] : null;
+      cfg.series = [{ name: humanize(yc.name), data: rows.map((r, i) => {
+        const a = xc.nums[i], b = yc.nums[i], c = z ? z.nums[i] : null;
+        if (a == null || b == null || (z && c == null)) return null;
+        if (label) return z ? { x: a, y: b, z: c, name: String(r[label.name]) } : { x: a, y: b, name: String(r[label.name]) };
+        return z ? [a, b, c] : [a, b];
+      }).filter(Boolean) }];
+      cfg.xAxis = { title: { text: humanize(xc.name) } };
+      cfg.yAxis = { title: { text: humanize(yc.name) } };
+      return cfg;
+    }
+    const series = pv.series.map(s => ({ name: group ? s.name : humanize(s.name), data: s.data.slice() }));
+    const labels = x.kind === 'date' ? dateLabels(pv.cats, x.quarters) : pv.cats.map(String);
+    if (type === 'line' && x.kind === 'date') {
+      cfg.xAxis = { type: 'datetime' };
+      cfg.series = series.map(s => ({ name: s.name, data: s.data.map((v, i) => [pv.cats[i], v]) }));
+      return cfg;
+    }
+    if (type === 'waterfall') {
+      // The closing total is left to the engine, which computes it from the
+      // steps, so the drawn bridge and its total agree by construction.
+      const d = series[0].data;
+      cfg.series = [{ name: series[0].name, data: d.map((v, i) => (i === d.length - 1 ? { name: labels[i], isSum: true }
+        : i === 0 ? { name: labels[i], y: v, isOpening: true } : { name: labels[i], y: v })) }];
+      return cfg;
+    }
+    if (type === 'barList' || type === 'donut') {
+      cfg.series = [{ name: series[0].name, data: series[0].data.map((v, i) => ({ name: labels[i], y: v })) }];
+      return cfg;
+    }
+    cfg.xAxis = { categories: labels };
+    cfg.series = series;
+    return cfg;
+  }
+
+  // ── public: autoFill ────────────────────────────────────────────────
+
+  const FILLABLE = ['column', 'bar', 'line', 'barList', 'donut', 'pie', 'dumbbell', 'waterfall'];
+
+  function autoFill(type, config, hints) {
+    const cfg = clone(config || {});
+    const own = cfg.auto && typeof cfg.auto === 'object' ? cfg.auto : {};
+    delete cfg.auto;
+    const reasons = [];
+    // Hints passed to autoFill win over the config's own auto key: the call is
+    // the more specific instruction. Said, not done silently.
+    Object.keys(hints || {}).forEach(k => {
+      if (k in own && JSON.stringify(own[k]) !== JSON.stringify(hints[k])) {
+        why(reasons, 'hints', 'stated', k + ': ' + JSON.stringify(hints[k]) + ' from the hints argument overrides auto.' + k + ' ' + JSON.stringify(own[k]) + ' in the config.');
+      }
+    });
+    hints = Object.assign({}, own, hints);
+    if (FILLABLE.indexOf(type) < 0) {
+      why(reasons, 'type', 'fallback', 'Automatic filling does not cover ' + type + ' yet; the config is unchanged.');
+      return { config: cfg, reasons };
+    }
+    if (!Array.isArray(cfg.series) || !cfg.series.length) {
+      why(reasons, 'type', 'fallback', 'The config has no series, so there is nothing to fill; it is unchanged.');
+      return { config: cfg, reasons };
+    }
+    const t = type === 'pie' ? 'donut' : type;
+    const cats = get(cfg, 'xAxis.categories');
+    const xName = get(cfg, 'xAxis.title.text') || get(cfg, 'xAxis.title') || '';
+    const ctx = nameContext((cfg.series || []).map(s => s.name || ''), hints, null,
+      rangeOf([].concat.apply([], seriesValues(cfg))));
+    ctx.xName = typeof xName === 'string' ? xName : '';
+    ctx.xKind = t === 'line' ? 'date'
+      : !cats ? null : isContinuousCats(cats.map(String)) ? 'sequence' : isOrdinal(cats, ctx.xName) ? 'ordinal' : 'category';
+    if (t === 'barList') ctx.xKind = 'category';
+    ctx.intent = hints.intent;
+    dress(t, cfg, ctx, hints, reasons);
+    return { config: cfg, reasons };
+  }
+
+  // ── public: auto ────────────────────────────────────────────────────
+
+  function auto(container, rows, hints) {
+    const s = suggestFor(rows, hints, true);
+    const el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (el && !el.style.height && !el.clientHeight && ['barList', 'dumbbell'].indexOf(s.type) < 0) {
+      const n = (get(s.config, 'xAxis.categories') || []).length;
+      el.style.height = (s.type === 'bar' ? Math.max(240, 70 + 34 * n) : 360) + 'px';
+    }
+    const chart = window.Charts[s.type](el || container, s.config);
+    return { chart, type: s.type, intent: s.intent, spec: s.config, reasons: s.reasons };
+  }
+
+  window.Charts.suggest = suggest;
+  window.Charts.autoFill = autoFill;
+  window.Charts.auto = auto;
+  /** Forget which colour each series name has (a new page view in an app that never reloads). */
+  window.Charts.resetSeriesColors = function () { seriesSlots.clear(); };
+})();
+
 
 // --- load order ---------------------------------------------------
 if (!Charts.theme && typeof console !== "undefined" && console.warn) {
@@ -14314,11 +15607,15 @@ if (!Charts.theme && typeof console !== "undefined" && console.warn) {
 
 // --- responsive ---------------------------------------------------
 (function () {
+  // A config with `auto` set is filled on every draw, from the caller’s own config.
+  function autoPrepare(k, opts) {
+    return opts && opts.auto ? function (o) { return Charts.autoFill(k, o).config; } : null;
+  }
   var RAW = {};
   Object.keys(Charts.meta.charts).forEach(function (k) { RAW[k] = Charts[k]; });
   Object.keys(RAW).forEach(function (k) {
     Charts[k] = function (container, opts) {
-      return window.ChartsShared.makeResponsive(RAW[k], container, opts);
+      return window.ChartsShared.makeResponsive(RAW[k], container, opts, autoPrepare(k, opts));
     };
   });
 })();

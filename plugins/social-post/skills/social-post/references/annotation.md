@@ -103,24 +103,21 @@ Notes on the construction:
 - Leading and trailing nulls are safe here — the two segments meet at exactly
   the same coordinate, verified — so this works with the default smoothing.
 
-### Interior gaps need `type:'line'`
+### Interior gaps are `null`, never `0`
 
-**`Charts.line` draws splines by default.** A series with no `type` is smoothed,
-and the smoothing routine *drops null points* rather than breaking the path — so
-a genuine hole in the data is silently drawn as an unbroken trend through it.
-
-This collides directly with the honesty rule in SKILL.md (rule 1): a missing week is
-a gap, not a zero — and a gap the reader cannot see is no better than a zero.
+The honesty rule in SKILL.md (rule 1): a missing week is a gap, not a zero. Write
+`null` (or leave `y` out of the point) and every line type, the default spline
+included, breaks the path there, with no marker, label or tooltip row at it. A
+`0` draws a collapse to the baseline that never happened.
 
 ```js
-// Two missing months. Default (spline): one continuous curve, gap invisible.
-// With type:'line': the path breaks and the hole is visible, which is the truth.
-series: [{ name: 'Signups', type: 'line', data: [10, 14, null, null, 22, 26] }]
+// Two missing months: the path breaks and the hole is visible, which is the truth.
+series: [{ name: 'Signups', data: [10, 14, null, null, 22, 26] }]
 ```
 
-So: **any series containing an interior `null` must set `type: 'line'`** (or the
-whole chart `chart: { smooth: false }`). Smoothing is a presentation choice and
-is fine on complete data; on incomplete data it invents the missing shape.
+Smoothing is still a presentation choice: fine on complete data, but a spline
+through a sparse run draws curvature between readings nobody measured. With few
+points, prefer `type: 'line'`.
 
 ### Saying what the notation means
 
