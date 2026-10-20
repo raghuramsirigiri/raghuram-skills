@@ -59,8 +59,8 @@ The headline names a subject: a region, a series, a moment. That subject takes
 the accent and everything else takes the mute, so the picture says what the
 headline says before anyone reads the axis.
 
-- **Categories:** a per-point `color`, `Charts.theme.highlight` (or
-  `Charts.theme.colors[1]`) on the bars the headline names, `Charts.theme.muted`
+- **Categories:** a per-point `color`, `Charts.theme.colors[1]` (or `T.positive`)
+  on the bars the headline names, `Charts.theme.muted`
   on the rest. `chart-selection.md` § Emphasis has the code.
 - **One line among several:** that series gets the accent and a heavier
   `lineWidth`; the others share one identical mute.

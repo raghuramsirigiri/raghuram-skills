@@ -128,7 +128,7 @@ steps of 0.2).
 
 ### Fewer marks than anywhere else
 
-- One series emphasised in `Charts.theme.highlight` and the rest muted
+- One series emphasised in `Charts.theme.colors[1]` and the rest muted
   (`design-rules.md` § Make the chart show the finding). On a phone, two
   saturated series read as noise.
 - Leave data labels on. A picture has no tooltip, so the values the reader
