@@ -55,7 +55,7 @@ legend interactions — no canvas, no external framework.
 | `Charts.reportTable`  | Table whose columns are `text`, `insight`, `kpi` or `chart` cells (a real chart per row). |
 | `Charts.panels`       | Compositor: up to 4 charts of any type side by side under one shared title. |
 | `Charts.radar`        | One closed polygon per series over the same named axes; the reading is the shape. Three axes minimum. |
-| `Charts.donut`        | Donut (default 60% hole) — variable radius, semi-circle, gradient, sliced. |
+| `Charts.donut`        | Donut (default 60% hole) — variable radius, semi-circle, palette, sliced.  |
 | `Charts.pie`          | Full pie (donut with `innerSize:0`).                                        |
 | `Charts.scatter`      | 2D scatter + optional linear regression + point labels.                     |
 | `Charts.bubble`       | Scatter with third dimension mapped to bubble radius (and color gradient).  |
@@ -67,6 +67,12 @@ legend interactions — no canvas, no external framework.
 | `Charts.calendarHeatmap` | One cell per day, weeks as columns and weekdays as rows — the weekly rhythm of a daily measure. |
 
 Also on the namespace: `Charts.meta` (the manifest — data shape, refusals, sizing, `gridSpan` per chart), `Charts.validate(type, config)` — see [The manifest](#the-manifest-chartsmanifestjson--chartsmeta) — and `Charts.version`, the version of the vendored build.
+
+The build also carries automatic charts: `Charts.suggest`, `Charts.autoFill`,
+`Charts.auto`, and an `auto` key on any config. Don't use them here. They pick
+the type, colours, sort and emphasis by their own rules, and this skill picks
+those from `chart-selection.md` and `card-charts.md`; mixing the two gives a
+post whose cards follow two systems. Write the config.
 
 All functions take `(container, config)` where `container` is a DOM element
 or its id, and `config` is a Highcharts-compatible options object.

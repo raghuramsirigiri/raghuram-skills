@@ -3,7 +3,7 @@
 Part of the charts-lib API — the shared options, sizing and interactions are in
 [`../chart-api.md`](../chart-api.md). Every option below is optional; the library picks sensible defaults.
 
-> **Nesting:** every donut option below except `startColor`/`endColor` is read
+> **Nesting:** every donut option below is read
 > from `plotOptions.pie`, even where the shorthand lines below omit it. Write
 > `plotOptions: { pie: { centerText: {…}, valueSuffix: '%', variableRadius: true,
 > startAngle: -90, endAngle: 90, showPercentages: true } }` — at the top level
@@ -12,7 +12,10 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
 - **Hole**: `plotOptions.pie.innerSize` — fraction of outer radius (`'50%'`, `'80%'`) or px. `0` = full pie.
 - **Semi-circle**: `startAngle: -90, endAngle: 90` (top half; use other angles for other slices)
 - **Variable radius**: `variableRadius: true` + data with `z` values + `minPointSize`
-- **Gradient palette**: `startColor`, `endColor` (defaults black → blue)
+- **Slice colours**: slice *i* takes the theme's `colors[i]` (s1…s7) in order;
+  past seven slices they walk the whole palette as an OKLab ramp.
+  `plotOptions.pie.colors` replaces the palette, `startColor` / `endColor` ask
+  for a two-colour ramp instead, and a point's own `color` beats all three.
 - **Sliced / exploded**: `{ sliced: true }` on any data point; click any wedge to toggle
 - **Center text**: `centerText: { value, label, valueFontSize, color }` — `color`
   tints the center value; set it to the focal wedge's color so the number and

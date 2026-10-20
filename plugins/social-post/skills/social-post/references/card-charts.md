@@ -84,8 +84,8 @@ headline says before anyone reads the axis.
 - **Measured and projected never share a stroke.** A forecast is its own dashed
   series, and the units line says what the dash means (`annotation.md`
   § Intervention and forecast).
-- **A gap is `null`, never `0`,** drawn with `type: 'line'` so the spline
-  doesn't bridge it. A zero draws a collapse that never happened.
+- **A gap is `null`, never `0`.** Every line type breaks its path at a
+  `null`; a zero draws a collapse that never happened.
 
 ## Then write the config
 

@@ -14,7 +14,7 @@ identical to upstream.
 
 | # | Change | Engine file | State | Needed by |
 |---|--------|-------------|-------|-----------|
-| 6 | `Charts.validate` judges a line's categories with the renderer's own test | `_build.js` (the `Charts.validate` it emits) | proposed | `references/charts/line.md`; `assets/chart-convert.js` (editable report-table chart columns); any page that calls `Charts.validate('line', …)` over `'Jan'…` or `'Q1'…` |
+| 6 | `Charts.validate` refuses the line categories the renderer refuses | `_build.js` (the `Charts.validate` it emits) | proposed (half landed in `bce8986`) | `references/charts/line.md`; any page that calls `Charts.validate('line', …)` over yearless dates |
 
 **Nothing about the library gets fixed only in this repo.** A change is either
 written up here as *proposed* and left unapplied, or — when the skill cannot
@@ -24,22 +24,36 @@ comment, and `plugins/chart-dashboard/skills/chart-dashboard/tests/upstream-note
 copy really is in the state the table claims. See *Recording a new change* at
 the bottom.
 
-**Last synced** from `svg-charts` commit `20e11ae` (2026-10-05, `charts-lib`
-1.0.0): a bar or column with no category names gets blank labels rather than
-its index, formerly change 4 here (all four fallbacks in `engines/bar.js`; the
-note had listed three); and a chart that brings in its page's scrollbar is
-redrawn at the narrower width, formerly change 5. Before it, `c196b94`: column
-and bar labels and tooltips keep a negative value's sign (dropped only under
-`tooltip.absoluteX`), formerly change 3. Before that,
-`81a9833`: packed bubbles honour a point's own `color`, formerly change 1.
-Earlier, `c8588bd`: `centerText` takes a bare string, formerly change 2.
-And before that, `185de6f`: heatmap and calendarHeatmap, chart handles with
-`update()`/events/`toSVG()`/`toPNG()`, keyboard access, entry animation.
+**Last synced** from `svg-charts` commit `27adc7b` (2026-10-16, `origin/main`,
+`charts-lib` 1.0.0). Twenty-four commits since `20e11ae`; the ones a page
+author sees: a missing line value (`null`, `NaN`, in any data form) is a gap
+on every line type, the spline included (`fafac06`); `Charts.validate('line')`
+accepts the ordered runs the renderer draws (`'Jan'…`, `'Q1'…`), half of
+change 6 (`bce8986`); donut slices and single-series packed bubbles take the
+palette in order instead of a black-to-blue ramp (`e472726`); value prefix,
+suffix and decimals reach labels and axis ticks through one formatter
+(`2c19182`); dumbbells take `better` and default `%` deltas to points, and
+reference lines break around value labels (`c75fec0`, `00d247f`); waterfalls take
+`isOpening`; column `negativeColor` honours `threshold`; scatter-family
+tooltips name their numbers by axis title (`27adc7b`); the svg's name is an
+`aria-label`, not a `<title>`; live `addPoint` draws once per frame. It also
+adds automatic charts (`Charts.suggest` / `autoFill` / `auto`), which the
+skill's references tell authors not to use. `feat/preset-style-identity`
+(`df8d7c8`, style tokens per preset) was not merged to main and is not in the
+copy. Before this, `20e11ae` (2026-10-05): blank bar labels for missing
+category names, formerly change 4, and a redraw at the narrower width when a
+chart brings in its page's scrollbar, formerly change 5. Before it, `c196b94`:
+column and bar labels keep a negative value's sign, formerly change 3.
+Before that, `81a9833`: packed bubbles honour a point's own `color`,
+formerly change 1. Earlier, `c8588bd`: `centerText` takes a bare string,
+formerly change 2. And before that, `185de6f`: heatmap and calendarHeatmap,
+chart handles with `update()`/events/`toSVG()`/`toPNG()`, keyboard access,
+entry animation.
 See *Syncing the copy* at the bottom for how, and what to check afterwards.
 
 ---
 
-## 6. `Charts.validate` judges a line's categories with the renderer's own test
+## 6. `Charts.validate` refuses the line categories the renderer refuses
 <!-- check: proposed; file: charts.js; needle: !window.ChartsShared.isContinuousCats(cats) -->
 
 ### Problem
@@ -48,60 +62,51 @@ See *Syncing the copy* at the bottom for how, and what to check afterwards.
 category runs a line may cross. The engine refuses unless
 `isContinuousCats(categories)` holds: every label a date with a year, or an
 ordered run such as `'Jan'…'Dec'`, `'Mon'…'Sun'`, `'Q1'…'Q4'` or `'Week 1'…`.
-`validate` instead refuses any label that `Date.parse` and `Number` both
-reject. The two answers differ in both directions:
+
+`bce8986` fixed one direction: `validate` now asks `isContinuousCats` first,
+so the ordered runs pass. But when that test says no, `validate` still falls
+back to its old one, which only refuses labels that `Date.parse` and `Number`
+both reject, so anything `Date.parse` accepts slips through:
 
 ```text
 categories             validate()   renderer
-'Jan' … 'Mar'          refused      draws
-'Q1' … 'Q3'            refused      draws
+'Jan' … 'Mar'          ok           draws       (fixed in bce8986)
+'Q1' … 'Q3'            ok           draws       (fixed in bce8986)
 'Jan 2026', 'Feb 2026' ok           draws
-'Jan 5', 'Mar 3'       ok           refuses (no year, not one numbered stem)
+'Jan 5', 'Mar 3'       ok           refuses     (no year, not one numbered stem)
 'North', 'South'       refused      refuses
 ```
 
 The library's own comments say the refusal panel and `validate()` should be
-one function, so a caller gets the same answer either way. For the line
-category check they are two.
+one function, so a caller gets the same answer either way.
 
 ### Why the skill needs it
 
-`references/charts/line.md` tells authors that a complete rising run like
-`'Jan'…'Jun'` or `'Q1'…'Q4'` is a valid line x-axis, which is what the
-renderer does. A page or agent that calls `Charts.validate` first, as the
-social-post eval runs did over `'Jan'…'Sep'`, is told the opposite and is
-pushed off a line for a trend the renderer would have drawn. The editable
-pages hit it too: `assets/chart-convert.js` asks `validate` before offering a
-chart type for a report table's chart column, so cells over `'Jan'…'Sep'` are
-never offered as a line. The
-other direction is quieter:
-`validate` passes yearless dates the renderer then draws as an error panel.
+`references/charts/line.md` tells authors to give dates a year because
+`validate` passes yearless ones the chart then draws as an error panel. A page
+or agent that trusts `validate` over `'Jan 5'…` ships that panel. The
+skill works without the change: `scripts/check-page.js` judges line axes on
+its own.
 
 ### Change
 
-The `Charts.validate` that `_build.js` emits after `Charts.meta`. Ask the
-renderer's `isContinuousCats` (already exported on `window.ChartsShared`) for
-a line, and keep the `Date.parse` test for histograms, which bin numbers and
-have no ordered-name case. Hunk positions are omitted: this was written
-against the bundled `charts.js` (line 14240 at `20e11ae`), not an upstream
-checkout.
+`_build.js`, the `Charts.validate` it emits after `Charts.meta`. For a line,
+let `isContinuousCats` decide outright; keep the `Date.parse` test for
+histograms, which bin numbers and have no ordered-name case, and for a line
+only when `ChartsShared` is absent.
 
 ```diff
-   if ((type === "line" || type.indexOf("histogram") === 0) && cats && cats.length) {
--    var named = cats.filter(function (c) {
--      return !(c instanceof Date) && isNaN(Date.parse(c)) && isNaN(Number(c));
--    });
--    if (named.length) errors.push(type === "line"
-+    // A line asks the renderer's own test, so validate() and the refusal panel agree.
-+    var refused = type === "line"
-+      ? !window.ChartsShared.isContinuousCats(cats)
-+      : cats.some(function (c) {
-+          return !(c instanceof Date) && isNaN(Date.parse(c)) && isNaN(Number(c));
-+        });
-+    if (refused) errors.push(type === "line"
-       ? "A line chart needs a continuous or temporal x-axis, but xAxis.categories holds named categories. Use column, or give each category its own series over a date/numeric x."
-       : "A histogram bins numbers and cannot use named categories. Counting how often each name occurs is a bar chart: use column.");
-   }
+   '    var seq = type === "line" && window.ChartsShared && window.ChartsShared.isContinuousCats(cats);',
+-  '    var named = seq ? [] : cats.filter(function (c) {',
+-  '      return !(c instanceof Date) && isNaN(Date.parse(c)) && isNaN(Number(c));',
+-  '    });',
+-  '    if (named.length) errors.push(type === "line"',
++  '    var refused = type === "line" && window.ChartsShared',
++  '      ? !window.ChartsShared.isContinuousCats(cats)',
++  '      : !seq && cats.some(function (c) {',
++  '          return !(c instanceof Date) && isNaN(Date.parse(c)) && isNaN(Number(c));',
++  '        });',
++  '    if (refused) errors.push(type === "line"',
 ```
 
 ### Apply and verify
@@ -113,10 +118,8 @@ Histogram validation is unchanged.
 
 ### Current state
 
-Proposed, not applied. The skill does not need it to work: `line.md` says
-`validate` refuses `'Jan'…` and `'Q1'…` runs today and to pass dated labels
-(`'Jan 2026'`…) when calling it, and `scripts/check-page.js` judges line axes
-on its own.
+Proposed, not applied; the first two rows of the table landed upstream in
+`bce8986` and are in the copy.
 
 ---
 

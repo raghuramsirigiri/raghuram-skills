@@ -257,8 +257,9 @@ drawn on top of light fills. Leaving it white is the classic dark-mode bug that
 makes data labels vanish inside bars.
 
 Two roles are not palette-derived and still get assigned directly when the brand
-demands it — `gradientStart` / `gradientEnd`, the donut and bubble gradient
-endpoints, which default to `s1` → `s2`:
+demands it — `gradientStart` / `gradientEnd`, the bubble size-gradient
+endpoints (and a donut's `startColor` / `endColor` defaults), which default to
+`s1` → `s2`. Donut slices and packed bubbles take `colors[]` in order instead:
 
 ```js
 Object.assign(Charts.theme, { gradientStart: '#34E5B4', gradientEnd: '#1B2740' });

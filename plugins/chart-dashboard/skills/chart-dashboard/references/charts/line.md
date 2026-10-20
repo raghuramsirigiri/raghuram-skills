@@ -6,10 +6,11 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
 - **Series type per series**: `type: 'line' | 'spline' | 'step'`. **The
   default is `'spline'`**, not `'line'` — opt out per series with
   `type:'line'`, or for the whole chart with `chart: { smooth: false }`.
-  This matters for more than looks: the smoothing routine **drops `null`
-  points instead of breaking the path**, so a series with an interior gap
-  is drawn as one unbroken curve straight through the missing data. Any
-  series containing a real hole must set `type:'line'`.
+- **A missing value is a gap.** `null`, `undefined` or `NaN` as `y` — in
+  every data form (`[x, null]`, `{ x, y: null }`, a bare `null`, and
+  `addPoint`) — breaks the path on spline, line and step alike, with no
+  marker, label or tooltip row at it. Never write `0` for a missing reading:
+  that draws a collapse to the baseline.
 - **Colour, `lineWidth` and `dashStyle` are per-series**, and there is no
   `zones` option — a line that changes appearance partway along is two
   series sharing an x-axis. See `annotation.md` § Intervention and forecast.
@@ -33,9 +34,9 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
     month names (`'Jan'…'Dec'`), weekday names (`'Mon'…'Sun'`), or one stem
     numbered upwards (`'Q1'…'Q4'`, `'Week 1'…'Week 12'`, `'Band 1'…'Band 5'`).
     A shuffled or partial run fails both, as does an unordered set of names.
-    `Charts.validate('line', …)` refuses runs that pass only test (2), such as
-    `'Jan'…'Sep'` or `'Q1'…'Q3'`, though the chart draws them: when you call
-    validate, use dated labels (`'Jan 2026'…`).
+    `Charts.validate('line', …)` agrees with the renderer on both tests. It
+    still passes yearless dates such as `'Jan 5'`, `'Mar 3'`, which the chart
+    refuses (no year, and not one numbered stem), so give dates a year.
     Date-parsing categories collapse to a coarser calendar period (day → week →
     month → quarter → year) as the axis gets crowded.
   - Logarithmic Y: `yAxis: { type: 'logarithmic' }` — **strictly positive
@@ -55,5 +56,10 @@ Part of the charts-lib API — the shared options, sizing and interactions are i
 - **Negative color**: `series[i].negativeColor` + `threshold`
 - **Zoom**: `chart: { zoomType: 'x' }` — drag to zoom, "Reset zoom" button appears
 - **Legend**: auto-shown at the top below the subtitle whenever there are 2+ series, wraps to multiple rows. Opt in to inline line-end labels instead with `lineLabels: 'inline' | 'name' | 'value' | 'both'`.
-- **Value suffix / prefix / decimals**: `tooltip: { valueSuffix, valuePrefix, valueDecimals }`
-- **Live update**: returned `{ addPoint(seriesIdx, x, y), shift(seriesIdx), redraw() }`
+- **Value suffix / prefix / decimals**: `tooltip: { valueSuffix, valuePrefix, valueDecimals }`,
+  or per series. They reach the data labels and line-end labels as well as the
+  tooltip, and the y-axis ticks take the prefix every series shares plus
+  `yAxis.suffix`.
+- **Live update**: returned `{ addPoint(seriesIdx, x, y), shift(seriesIdx), redraw() }`.
+  The y-axis refits on every call; calls made in one animation frame draw once
+  on the next frame (`redraw()` draws now), and streamed points survive a resize.

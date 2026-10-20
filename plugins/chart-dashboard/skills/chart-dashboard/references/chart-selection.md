@@ -137,7 +137,7 @@ already on the page does not need a table of the same values under it.
 | A value over time, irregular timestamps | datetime line | `Charts.line` + `xAxis:{type:'datetime'}` |
 | A level that holds between changes | step line | `Charts.line` + `type:'step'` |
 | A trend interrupted by an event, or continued as a projection | line + separator, split actual/forecast | `Charts.line` — see `annotation.md` § Intervention and forecast |
-| A series with a real hole in it | line, **unsmoothed** | `Charts.line` + `type:'line'` — the default spline hides interior `null`s |
+| A series with a real hole in it | line | `Charts.line` with `null` at the hole — every line type breaks there; never write `0` |
 | Comparison across ≤12 named categories | columns | `Charts.column` — the answer whenever x is a *name*, whether or not the numbers look like a trend |
 | Comparison across >12 categories, or long labels | horizontal bars | `Charts.bar` |
 | A ranked list, or very long category names | bar list (no axis) | `Charts.barList` + `sort:'desc'` |

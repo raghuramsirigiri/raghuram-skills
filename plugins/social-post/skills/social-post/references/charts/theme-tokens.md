@@ -60,14 +60,15 @@ The full list of theme tokens lives in
 | `callout` | `#B31B38` | Callout leaders, boxes, threshold rules |
 | `aboveThreshold` | `#2323FF` | Value on the upper side of the threshold — see `annotation.md` § Threshold shift |
 | `belowThreshold` | `#9a0060` | Value on the lower side. Named for the threshold, **not** for good/bad. Darkened from `#D1107A`, which collapsed onto `muted` under red-green colour blindness |
+| `favorable` / `unfavorable` | `s2` / `counter` | Good and bad. Used only when a chart is told which way is better (a dumbbell's `better`); otherwise nothing reads them. Derived from the palette, so a brand theme recolours them |
 | `positive` / `negative` | `#2323FF` / `#9a0060` | Aliases of the two above, kept for existing configs |
 | `trend` | `#2323FF` | Regression line color |
 | `connectorLabel` | `#555555` | Donut connector label text |
 | `connectorLine` / `connectorWidth` | `#333333` / `1.4` | Donut callout rule |
 | `colors` | `['#000000',…]` | Series palette (7 colors) |
 | `defaultColor` | `#000000` | Single-series default |
-| `gradientStart` | `#000000` | Donut/bubble gradient start |
-| `gradientEnd` | `#2323FF` | Donut/bubble gradient end |
+| `gradientStart` | `#000000` | Bubble size-gradient start; donut `startColor` default |
+| `gradientEnd` | `#2323FF` | Bubble size-gradient end; donut `endColor` default |
 | `font` | `'Inter',…` | Font stack |
 | `titleSize` / `titleWeight` | `17` / `700` | Title font size (px) and weight |
 | `subtitleSize` / `subtitleWeight` | `12` / `400` | Subtitle font size and weight |
