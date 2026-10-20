@@ -14,7 +14,7 @@ All examples use invented figures.
 
 | One item carries… | On a card use | Not |
 |:--|:--|:--|
-| One number per period | `Charts.line` (ordered x), or `Charts.column` for ≤8 periods where each bar is the point | A donut of months |
+| One number per period | `Charts.line` (ordered x) when the headline is about change across the run (rose, doubled, peaked, fell): months, weeks, quarters. `Charts.column` only for a few periods (~6 or fewer, such as yearly totals) where each bar is compared as its own item | A column of months for a trend; a donut of months |
 | One number per named category | `Charts.column` (≤6–8 categories), `Charts.barList` for a ranking or long names | `Charts.line` over names: the engine refuses it |
 | Two states per category: before/after, plan/actual | `Charts.dumbbell` (exactly two series) | Grouped columns with a legend to decode |
 | How a total moved through signed steps | `Charts.waterfall` (≤6 steps on portrait) | A column of deltas with no start or end |

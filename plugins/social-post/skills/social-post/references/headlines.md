@@ -47,7 +47,18 @@ spend held flat" is one finding about efficiency, and one chart can prove it.
 
 The sentence shape sounds right while the numbers say otherwise, and nobody
 re-adds the column before posting. Work the figure out from the data first,
-then write the sentence that fits it:
+then write the sentence that fits it.
+
+**Pick the comparison before the word.** For a rise over a run of periods
+the start is the first period. The end is the latest period, unless the series
+peaked earlier and fell back: then the end is the peak, named as such ("week 1
+to the week 9 peak"), and the card shows the latest value too, on the units
+line and the chart, so the fall isn't hidden. Every run gets the same two
+ends from the same data. Never move an end to make a word come true:
+starting at the lowest point to reach "doubled" is the comparison a reader
+catches in the comments, and the post loses the figure it was built on. If the
+word doesn't hold on these ends, change the word, not the ends, and don't
+offer other ends as a way to keep the word.
 
 - **"Doubled"** means the later value is 2.0× to about 2.2× the earlier one.
   310 → 640 is 2.06×, so "doubled" holds. "Tripled" works the same way. 310 → 590 is 1.9×: write

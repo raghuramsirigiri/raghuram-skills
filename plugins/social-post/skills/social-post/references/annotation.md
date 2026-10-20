@@ -9,12 +9,26 @@ The through-line: an annotation is a guide for the reader's eye, supplying the
 context the geometry cannot. A chart that shows a spike but not *why* has handed
 the reader the work you were supposed to do.
 
+**On a card, every *why* in this file is a reason the user gave you.** A card
+is painted into a picture that travels without the post's words, so a reason
+on it reads as something the chart proves, with no one's name on it.
+
+- No reason from the user: a callout names the moment (`Week 9 peak`), or there
+  is none. Never a reason of your own, however likely.
+- A reason the user stated, with **when** it happened: mark the event at that
+  time, worded as the event (`New checkout live`), not as the
+  explanation of the change beside it.
+- A reason the user stated with no time: it stays in the post's words,
+  attributed to them (`cards-and-posts.md` § The words), and off the card. Don't
+  pin it on the jump.
+
 ## Reference marks
 
 - Use `plotBands` for context regions (recession, promo window) and `plotLines`
   for targets, thresholds, and single instants.
-- Use `callouts:[{x, series, text}]` to say *why* a spike happened; a chart
-  without a labeled anomaly makes the reader do the work.
+- Use `callouts:[{x, series, text}]` to say *why* a spike happened, when the
+  user told you why (above); a chart without a labeled anomaly makes the reader
+  do the work.
 
 Three mechanical facts that decide how these are written:
 
@@ -244,7 +258,8 @@ signals plus a reader wondering what they missed.
 
 - **An annotation that restates the axis is noise.** If the callout says "peaked
   in March" above a chart whose highest point is visibly March, it has spent
-  attention to tell the reader what they already saw. Say *why* March, or say
+  attention to tell the reader what they already saw. Say *why* March if the
+  user told you; otherwise name the moment the headline points at, or say
   nothing.
 - **One emphasis per chart** still holds (the intervention trio being one cue,
   per above). If the annotation is doing the pointing, leave the marks in the

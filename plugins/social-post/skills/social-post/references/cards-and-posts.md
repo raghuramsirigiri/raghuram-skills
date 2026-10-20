@@ -165,7 +165,14 @@ one:
   "because of the price change" is not, unless the user said so. A cause the
   data doesn't state is the commonest invention in a post, because the words
   want a *why*. Say what happened and leave the why to the user, or quote
-  them.
+  them. This holds in the chat too: a caveat such as "part of this may be
+  seasonal" is still a cause you supplied, and so is a sample reason offered
+  as wording. Name months, not seasons, for when something happened ("since
+  March", not "since the spring").
+- **Keeps a stated cause in the words.** A reason the user gave goes in the
+  post, attributed to them, and stays off the card unless they also said when
+  it happened (`annotation.md`, top). A label on the jump would make the
+  picture look as if it proves the reason.
 - **Sounds like a person reporting**, not a post written to be engaged
   with. The checker warns on endings that only fish for comments ("Agree?",
   "Thoughts?"), on "comment below" and "follow for more", on stock openers

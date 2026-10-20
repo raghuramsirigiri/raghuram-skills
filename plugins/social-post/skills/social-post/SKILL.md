@@ -31,7 +31,8 @@ which file to read and when.
    findings than that are a page, not a post: pick the ones that lead and say
    which you left out.
 4. **Every figure in a post is on a card.** No number in the words that the
-   pictures don't show, and no cause the user didn't state.
+   pictures don't show, and no cause the user didn't state: not in the post,
+   not on the card, and not in the chat as a caveat or a sample reason.
 5. **The headline states the finding with its number, and its arithmetic is
    checked first.** "Doubled", "half", "the biggest" are claims: compute them
    before writing them.
@@ -79,8 +80,9 @@ which file to read and when.
    the emphasis code), then `references/chart-api.md` and only the `references/charts/<type>.md`
    files for the types you use, in one read. Never guess an option name.
    Draw every chart through `SocialSnapshot.draw(Charts.<type>, 'id', config)`,
-   with no title or subtitle in the config, and give it a `data-alt` that
-   states the finding with its numbers. When a card marks a forecast, a target
+   the id in single quotes (`check-page.js` reads only those), with no title
+   or subtitle in the config, and give it a `data-alt` that states the
+   finding with its numbers. When a card marks a forecast, a target
    or an event, read `references/annotation.md`.
 
 6. **If the user pointed at a brand** (site, stylesheet, hex codes), recolour

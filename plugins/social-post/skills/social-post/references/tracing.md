@@ -90,7 +90,8 @@ Use these four headings **exactly as written**, in this order.
 - **Where it appears**: every card and post that carries the figure, so a
   correction reaches all of them.
 - **What would change it**: the input that, changed, changes the figure. Not
-  a cause.
+  a cause, and not an offer: a different start or end listed here is not a
+  way to keep a word (`headlines.md` § Check the arithmetic).
 
 An **illustrative** figure has no *From your data*. Its first heading is
 **Illustrative** and says it was written to show the shape, that it appears
@@ -128,15 +129,15 @@ of each change, and say what was left out. Never a reason the data can't show
 | --- | --- |
 | **"Where does C1.3 come from?"** / *"how did you get 2.1×?"* | The trace block. |
 | **"Why is that C1's headline?"** / *"why not the cost figure?"* | The headline block. |
-| **"Can we say 'doubled'?"** | The trace block's *Working*, and the word's range from `headlines.md`. If it doesn't hold, give the phrase that does, and offer to fix the card and every post. |
+| **"Can we say 'doubled'?"** | The trace block's *Working*, and the word's range from `headlines.md`. If it doesn't hold, give the phrase that does, and offer to fix the card and every post. Never offer a different start or end that makes the word hold, such as counting from the lowest month; change the word, not the comparison. |
 | **"That's not what our dashboard says, it's 25%."** (pushback) | Re-read the data first. If the data says 23%, show the rows and the working and **hold it**: *"From the table you gave me it's 23%. If 25% is right, the table is out of date, and I'd need the newer figures."* Never move a figure because someone is sure. If the user gives new data, rebuild from that, and say what changed. |
 | **"Round it up to 25%, it sounds better."** (pushback) | Don't. A rounded-up figure in public is the one that gets corrected in the comments. Give the honest round (23%, or "nearly a quarter") and say why in one line. |
-| **"Add a line on why it went up."** / *"say it's because of the new onboarding"* | Only a cause the user stated. If they just stated it, write it in their words, attributed as theirs (*"after we changed onboarding"*, not *"because"* unless they said because). If no one stated one: *"Your data shows that it rose, not why."* Never a cause of your own, however plausible. |
+| **"Add a line on why it went up."** / *"say it's because of the new onboarding"* | Only a cause the user stated. If they just stated it, write it in their words, attributed as theirs (*"after we changed onboarding"*, not *"because"* unless they said because). If no one stated one: *"Your data shows that it rose, not why. If you know the reason, tell me in your words and I'll add it as yours."* Never a cause of your own, however plausible, and **no sample reasons**, not even as examples of wording (*"e.g. after the holidays"*, *"a supplier delay"*): the user picks one up and it goes out as fact. |
 | **"Put the 40% growth figure in the X post too."** | Only if 40% is on a card. If it isn't, it goes on a card first or stays out: every figure in a post is one the picture shows (`cards-and-posts.md` § The words). Say which, and offer both. |
 | **"Is this within X's limit?"** | The post's count and the platform's counting rule (`cards-and-posts.md` § Platforms): X counts every link as 23 and CJK or emoji as 2. Give the count. |
 | **"Which of these numbers are real?"** | The handover's *From your data / Illustrative* line, then the illustrative figures' blocks. |
 | **"Is the date right?"** | The source line's date, and where it came from in the user's input. If the user gave no date, say the card's date is the period the data covers and ask them to confirm the snapshot date. |
-| **"Can you make the drop look smaller?"** / *"start the axis higher"* | No change to what the chart shows to soften or sharpen it. Offer the honest alternatives: a different finding, a different period that the headline names, or the change stated in words. |
+| **"Can you make the drop look smaller?"** / *"start the axis higher"* | No change to what the chart shows to soften or sharpen it. Offer the honest alternatives: a different finding, or the change stated in words. Not a different start or end picked to soften or sharpen it (`headlines.md` § Check the arithmetic). |
 | **"Show all of it."** | One trace block per derived figure, in handle order, then a one-line list of the copied ones with their rows. |
 
 ## Rules
