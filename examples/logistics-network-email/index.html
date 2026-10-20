@@ -15557,7 +15557,7 @@ Charts.applyMetrics({ font: getComputedStyle(document.documentElement).getProper
   s.setProperty('--ink',    t.titleColor);
   s.setProperty('--muted',  t.secondaryColor);
   s.setProperty('--hair',   t.grid);
-  s.setProperty('--accent', t.highlight);
+  s.setProperty('--accent', t.colors[1]);
 })();
 </script>
 <script>
@@ -15582,10 +15582,10 @@ EmailSnapshot.draw(Charts.column, 'c-drivers', {
   xAxis: { categories: ['Linehaul', 'Automation', 'Fuel', 'Last-mile wages', 'Returns'] },
   legend: { enabled: false },
   series: [{ name: 'Change, $ per parcel', data: [
-    { y: -0.34, color: Charts.theme.highlight },
+    { y: -0.34, color: Charts.theme.colors[1] },
     { y: -0.12, color: Charts.theme.muted },
     { y: -0.05, color: Charts.theme.muted },
-    { y:  0.19, color: Charts.theme.highlight },
+    { y:  0.19, color: Charts.theme.colors[1] },
     { y:  0.11, color: Charts.theme.muted }
   ] }]
 });

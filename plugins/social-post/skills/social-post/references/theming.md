@@ -281,7 +281,7 @@ template already carries this sync block — leave it in:
   s.setProperty('--ink',    t.titleColor);
   s.setProperty('--muted',  t.secondaryColor);
   s.setProperty('--hair',   t.grid);
-  s.setProperty('--accent', t.highlight);
+  s.setProperty('--accent', t.colors[1]);
 })();
 ```
 
