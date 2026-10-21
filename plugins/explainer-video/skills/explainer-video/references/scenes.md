@@ -185,7 +185,8 @@ reading order, so it is never "typed". The attribution follows.
 **Not for:** any fetched, stock or generated image. Never use one.
 **Slots:** `kicker` · `caption` ≤ 12 (required) · `image` = a `data:image/…`
 URI from the user (required).
-**Motion:** a slow push from 1.03 to 1.07, clipped to the chart area.
+**Motion:** the picture fades in and holds still, filling and clipped to the
+chart area. No push or zoom.
 
 ## source-card
 

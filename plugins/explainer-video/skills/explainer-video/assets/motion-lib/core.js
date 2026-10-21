@@ -18,9 +18,7 @@
  * outgoing text has always left before incoming text arrives. Every scene
  * after the first arrives by the same transition (transitions.js); the
  * spec's old `transitionIn` is ignored. Reading starts when the headline
- * lands, so the hold is what the read still needs after the entrance. The
- * content drifts in slowly the whole time it is on screen (paintScene), so
- * no frame is fully still.
+ * lands, so the hold is what the read still needs after the entrance.
  */
 (function (root) {
   'use strict';
@@ -269,11 +267,11 @@
       const img = C.images[L.src];
       if (img) {
         ctx.globalAlpha *= p;
-        const s = L.scale ? L.scale(lt) : 1;
         ctx.save();
         M.paint.clipRect(ctx, L.x, L.y, L.w, L.h);
+        // Cover the box at the picture's own size: it never zooms.
         const iw = img.width, ih = img.height;
-        const k = Math.max(L.w / iw, L.h / ih) * s;
+        const k = Math.max(L.w / iw, L.h / ih);
         ctx.drawImage(img, L.x + (L.w - iw * k) / 2, L.y + (L.h - ih * k) / 2, iw * k, ih * k);
         ctx.restore();
       }
@@ -363,52 +361,12 @@
     }
   }
 
-  // While a scene is on screen its content drifts in, slowly and steadily,
-  // from 97% of its laid-out size to 100% at its end, about the middle of the
-  // content area: a camera easing in, so no frame is ever fully still. It
-  // never grows past its layout, so nothing leaves the safe area or reaches
-  // the shared chrome, which doesn't drift.
-  //
-  // The content is drawn at its laid-out size into a scratch canvas, and that
-  // picture is scaled: scaling text through the canvas transform makes the
-  // browser re-rasterise glyphs at stepped sizes, and big type twitches. The
-  // scratch canvas is cleared every frame, so frames stay pure functions of
-  // t. Without a canvas to draw into (Node), the transform does the scaling.
-  const DRIFT = 0.03;
-  let scratch = null;
-  function scratchFor(C) {
-    if (scratch && scratch.width === C.W && scratch.height === C.H) return scratch;
-    if (typeof document !== 'undefined' && document.createElement) scratch = document.createElement('canvas');
-    else if (typeof OffscreenCanvas !== 'undefined') scratch = new OffscreenCanvas(C.W, C.H);
-    else return null;
-    scratch.width = C.W; scratch.height = C.H;
-    return scratch;
-  }
+  // A scene's content is drawn at its laid-out size, always: the engine has
+  // no zoom, push or camera move.
   function paintScene(ctx, C, sc, t, frameT) {
-    let lt = t - sc.cStart;
+    const lt = t - sc.cStart;
     const flt = frameT == null ? null : frameT - sc.cStart;
-    const k = M.ease.clamp01((t - sc.cStart) / Math.max(1e-3, sc.cEnd - sc.cStart));
-    const s = (1 - DRIFT + DRIFT * k) * (sc.camera ? sc.camera(t - sc.t0) : 1);
-    const cx = C.safe.x + C.safe.w / 2, cy = (C.zone.top + C.zone.bottom) / 2;
-    const buf = Math.abs(s - 1) > 1e-4 ? scratchFor(C) : null;
-    if (buf) {
-      const b = buf.getContext('2d');
-      b.setTransform(1, 0, 0, 1, 0, 0);
-      b.globalAlpha = 1;
-      b.clearRect(0, 0, C.W, C.H);
-      for (const L of sc.layers) drawLayer(b, C, sc, L, lt, flt);
-      ctx.save();
-      ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
-      ctx.imageSmoothingEnabled = true;
-      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(buf, 0, 0);
-      ctx.restore();
-      return;
-    }
-    ctx.save();
-    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
     for (const L of sc.layers) drawLayer(ctx, C, sc, L, lt, flt);
-    ctx.restore();
   }
 
   function background(ctx, C) {

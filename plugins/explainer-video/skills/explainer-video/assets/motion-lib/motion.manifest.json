@@ -100,7 +100,7 @@
       "job": "a picture the user supplied",
       "slots": { "kicker": { "words": 4 }, "caption": { "words": 12, "required": true }, "image": { "asset": true, "required": true } },
       "data": "copy.image: a data:image/... URI from the user",
-      "signature": "slow push 1.03 to 1.07, clipped to the safe area", "minDur": 4.4,
+      "signature": "fades in and holds still, clipped to the chart area; no zoom", "minDur": 4.4,
       "notFor": "fetched, stock or generated images: never"
     },
     "source-card": {

@@ -218,7 +218,8 @@
     } else if (motif === 'logo') {
       const img = logoImage(C, C.art.logo, col);
       if (img) {
-        const k = Math.min(rx * 1.8 / img.width, ry * 1.8 / img.height) * (1 + 0.02 * Math.sin(t * 0.25));
+        // At one size: the logo never pulses or zooms.
+        const k = Math.min(rx * 1.8 / img.width, ry * 1.8 / img.height);
         ctx.drawImage(img, cx - img.width * k / 2, cy - img.height * k / 2, img.width * k, img.height * k);
       }
     }

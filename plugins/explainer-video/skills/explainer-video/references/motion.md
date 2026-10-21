@@ -1,7 +1,8 @@
 # Motion
 
-The engine carries the motion language: one transition, a slow drift, and
-a frame that stays put. A `custom` scene, rarely, draws its own content. These are the numbers it uses and the
+The engine carries the motion language: one transition, content that
+holds still at its laid-out size, and a frame that stays put. A `custom`
+scene, rarely, draws its own content. These are the numbers it uses and the
 rules a custom scene follows.
 
 ## The numbers
@@ -15,13 +16,11 @@ rules a custom scene follows.
   Non-data shapes may take a tiny overshoot (ζ ≥ 0.8).
 - **Eases**: entrances on `outQuint` (cubic-bezier .16,1,.3,1), morphs on
   `glide` (.45,0,.15,1), exits on expo-in.
-- **Drift**: while a scene is on screen its content eases in from 97% of its
-  laid-out size to 100%, steadily, about the middle of the content area, so
-  no frame is ever fully still. The shared frame doesn't drift. Photo-pan
-  adds its own slow push (1.03–1.07) to the picture. No shake, no random
-  movement.
-- **Never frozen**: no stretch of a second or more without anything moving,
-  holds included. The audit warns on it (`frozen`).
+- **No zoom**: content is drawn at its laid-out size from entrance to exit.
+  Nothing pushes, zooms, drifts or shakes, pictures included.
+- **No dead time**: a still frame lasts only as long as its read needs. The
+  engine sets holds to that; a `dur` that stretches one further, or a
+  custom painter that stops, gets an audit warning (`frozen`).
 
 ## The shared frame
 
@@ -64,8 +63,8 @@ in a custom scene.
 
 ## Banned by default
 
-Particle bursts, shockwave rings, lens flares, glows and bloom, camera
-shake, RGB split, glitches, full-frame crossfades, bouncy or elastic easing,
+Particle bursts, shockwave rings, lens flares, glows and bloom, zooms,
+pushes and camera moves, camera shake, RGB split, glitches, full-frame crossfades, bouncy or elastic easing,
 stock "HUD" décor, fake UI of a real product, emoji decoration, spinning
 logos, gradient panels. They aren't in the engine. Don't build them in a
 custom scene. The one decoration the engine draws is the monochrome

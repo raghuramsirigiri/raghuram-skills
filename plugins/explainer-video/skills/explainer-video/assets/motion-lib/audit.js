@@ -10,9 +10,9 @@
  * Fails: a scene throws; text outside the safe zone; two text layers
  * overlapping; text below the minimum size; contrast below 4.5 (3 for large
  * text); a layer not held still long enough to read; nothing on screen by
- * 0.5 s. Warns: single-frame pops, a second or more with nothing moving
- * (frozen), text near a box edge, a scene whose hold frame leaves too much
- * of the safe area empty (fill).
+ * 0.5 s. Warns: single-frame pops, a frame held still longer than its read
+ * needs (frozen), text near a box edge, a scene whose hold frame leaves too
+ * much of the safe area empty (fill).
  */
 (function (root) {
   'use strict';
@@ -42,8 +42,10 @@
   // a name and a date, and they already grow to the frame.
   const FILL = { target: 0.6, cells: 10, tol: 28, exempt: ['source-card', 'outro'] };
   // Mean luminance change (0-255) between frames a second apart, on the
-  // 64 px thumbnail, below which the picture counts as frozen.
-  const FROZEN = 0.05;
+  // 64 px thumbnail, below which the picture counts as still; and how much
+  // longer than its read a still stretch may run (a reveal's last, slowest
+  // frames read as still too) before it counts as frozen.
+  const FROZEN = 0.05, FROZEN_SLACK = 0.75;
   function fillOf(C, ctx, t) {
     const S = C.safe, R = M.layout.RULE;
     M.seek(ctx, C, t, { frameT: t });
@@ -110,8 +112,7 @@
 
     const diffs = [];
     let prev = null;
-    // Each frame against the one a second earlier: a video that drifts is
-    // never still, one that holds a frozen frame is (the frozen check).
+    // Each frame against the one a second earlier, for the frozen check.
     const lag = [], ring = [];
     // Frames where a text layer's own words changed (a counter's step, a
     // kicker's swap): a jump there is the words, not a pop.
@@ -166,13 +167,11 @@
           const ratio = M.design.contrast(hex(rgbOf(r.color)), d.bg);
           if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + d.bg + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
         }
-        // Read time: how long has this exact text sat fully revealed and
-        // steady? The content's slow drift (well under a pixel a frame) is
-        // steady; a reveal, a roll or an exit is not.
+        // Read time: how long has this exact text sat fully revealed and still?
         const st = still.get(key);
         const solid = r.alpha >= 0.99;
-        const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 1);
-        if (solid && st && same && st.last === n - 1) { st.last = n; st.bbox = r.bbox.slice(); }
+        const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 0.5);
+        if (solid && st && same && st.last === n - 1) { st.last = n; }
         else if (solid) { const best = st ? st.best : 0; still.set(key, { start: n, last: n, bbox: r.bbox.slice(), best, role: r.role, text: r.text, scene: r.scene }); }
         const s2 = still.get(key);
         if (s2) s2.best = Math.max(s2.best, (s2.last - s2.start + 1) / C.fps);
@@ -230,15 +229,21 @@
     }
     if (pops.length) warns.push({ check: 'pops', msg: 'single-frame jumps at frames ' + pops.slice(0, 12).join(', ') + (pops.length > 12 ? '…' : '') + ' — look at them in the player (← →)' });
 
-    // Frozen: a frame no different from the one a second before, holds
-    // included. The engine keeps every scene drifting, so this catches a
-    // custom painter or a spec that stops the picture.
+    // Frozen: a still frame held longer than the reading it is there for.
+    // A hold as long as its read needs is fine (the engine sets auto holds to
+    // exactly that); one stretched past it by a long `dur`, or a custom
+    // painter that stops, reads as the video freezing.
     let run0 = -1;
     for (let n = 0; n <= lag.length; n++) {
       const quiet = n < lag.length && lag[n] < FROZEN;
       if (quiet && run0 < 0) run0 = n;
       if (!quiet && run0 >= 0) {
-        warns.push({ check: 'frozen', t: tc((run0 - C.fps) / C.fps, C.fps), msg: ((n - run0) / C.fps + 1).toFixed(1) + ' s with nothing moving — the frame looks frozen' });
+        const s0 = (run0 - C.fps) / C.fps, s1 = n / C.fps, mid = (s0 + s1) / 2;
+        const sc = C.scenes.find(s => mid >= s.t0 && mid < s.t1) || finalHold;
+        const allow = sc.read + FROZEN_SLACK;
+        if (s1 - s0 > allow) {
+          warns.push({ check: 'frozen', scene: hd(sc.id), t: tc(s0, C.fps), msg: (s1 - s0).toFixed(1) + ' s with nothing moving, ' + (s1 - s0 - sc.read).toFixed(1) + ' s more than its read needs (' + sc.read.toFixed(1) + ' s) — the frame looks frozen; drop its `dur` or add a finding' });
+        }
         run0 = -1;
       }
     }

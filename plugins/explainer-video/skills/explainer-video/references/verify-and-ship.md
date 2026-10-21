@@ -45,8 +45,8 @@ seconds, and **fails** on:
 - nothing readable by 0.5 s;
 - the export probe not round-tripping.
 
-It **warns** on single-frame pops, a second or more with nothing moving
-(`frozen`), and a scene whose hold frame
+It **warns** on single-frame pops, a still frame held longer than its read
+needs (`frozen`), and a scene whose hold frame
 covers less than 60% of the safe area (`formats.md` § Layout per format;
 `stats.fill` lists every scene's figure). Fix the spec, never the
 check: shorten copy, pick a different scene, lengthen `dur`. Rerun until

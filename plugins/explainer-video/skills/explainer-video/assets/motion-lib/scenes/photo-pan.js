@@ -1,8 +1,10 @@
 /*!
  * scenes/photo-pan.js — a picture the user supplied (a data URI in
- * copy.image), with a slow push from 1.03 to 1.07 across the scene. The
- * picture fills the chart area (beside the words in a wide frame) and is
- * clipped to it, so nothing falls outside the safe zone. Never a fetched, stock or generated image.
+ * copy.image). It fades in and holds still at its size: no push, no zoom.
+ * The picture fills the chart area (beside the words in a wide frame) and is
+ * clipped to it, so nothing falls outside the safe zone. Never a fetched,
+ * stock or generated image. (The type keeps its old name so specs still
+ * compile.)
  *
  *   { "type": "photo-pan", "copy": { "kicker", "caption", "image": "data:image/jpeg;base64,..." } }
  */
@@ -18,11 +20,8 @@
       const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('caption'), chart: true, sourceIds: api.used() });
       const box = c.chart;
       const layers = c.layers.slice();
-      let span = 6;
-      layers.push({ kind: 'image', id: 'photo', src: img, x: box.x, y: box.y, w: box.w, h: box.h, at: 0.3, dur: 0.6,
-        scale: lt => 1.03 + 0.04 * M.ease.clamp01(lt / span) });
+      layers.push({ kind: 'image', id: 'photo', src: img, x: box.x, y: box.y, w: box.w, h: box.h, at: 0.3, dur: 0.6 });
       const read = M.readTime(c.primaryWords) + 0.15 * (c.words - c.primaryWords) + 0.8;
-      span = 0.9 + read + 0.35;
       return { layers, rule: c.rule, read };
     }
   });

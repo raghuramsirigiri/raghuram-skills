@@ -126,8 +126,8 @@ card's furniture.
 
 ## Read time
 
-Each text layer is on screen, fully revealed and steady (the scene's slow
-drift aside), for at least **max(1.2 s, 0.5 s + 0.25 s per word)**. A scene's
+Each text layer is on screen, fully revealed and still, for at least
+**max(1.2 s, 0.5 s + 0.25 s per word)**. A scene's
 read is counted from when its headline lands, so it runs alongside a chart
 that is still drawing. Every layer that lands later still gets its own time
 once it has. A big number holds at least 1.5 s after its counter lands. The

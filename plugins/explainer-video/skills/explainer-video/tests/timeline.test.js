@@ -113,21 +113,21 @@ test('the last scene has no exit and holds at least 1 s', () => {
   assert.ok(C.duration - last.enterEnd >= 1);
 });
 
-test('scene content drifts in slowly the whole time it is on screen, never past its layout', () => {
+test('nothing zooms: no frame scales content, and a picture holds its size', () => {
+  const s = FIXTURE_SPEC();
+  const IMG = 'data:image/png;base64,AAAA';
+  s.scenes.splice(2, 0, { id: 'photo', type: 'photo-pan', copy: { caption: 'The new terminal opened in March', image: IMG } });
+  s.cuts.main.scenes.splice(2, 0, 'photo');
   const w = load();
-  const C = w.Motion.compile(FIXTURE_SPEC(), 'main', { measure: mockCtx() });
-  const sc = C.scenes[1];
-  const scaleAt = t => {
+  const C = w.Motion.compile(s, 'main', { measure: mockCtx(), images: { [IMG]: { width: 400, height: 300 } } });
+  for (let n = 0; n < C.frames; n += 3) {
     const log = [];
-    w.Motion.seek(mockCtx(log), C, t);
-    const m = log.map(l => /^scale\(([\d.]+),/.exec(l)).filter(Boolean);
-    return +m[0][1];
-  };
-  const ts = [sc.cStart, sc.enterEnd, (sc.enterEnd + sc.exitStart) / 2, sc.cEnd - 0.01];
-  const ss = ts.map(scaleAt);
-  assert.ok(Math.abs(ss[0] - 0.97) < 1e-3, `starts at ${ss[0]}`);
-  for (let i = 1; i < ss.length; i++) assert.ok(ss[i] > ss[i - 1], `drifts in: ${ss}`);
-  assert.ok(ss[ss.length - 1] <= 1 + 1e-9, `never past its layout: ${ss}`);
+    w.Motion.seek(mockCtx(log), C, n / C.fps);
+    assert.ok(!log.some(l => l.startsWith('scale(')), `frame ${n} scales content`);
+  }
+  const photo = C.scenes.find(x => x.id === 'photo');
+  const drawn = t => { const log = []; w.Motion.seek(mockCtx(log), C, t); return log.find(l => l.startsWith('drawImage(')).split('|')[0]; };
+  assert.strictEqual(drawn(photo.enterEnd + 0.1), drawn(photo.exitStart - 0.05), 'the picture is the same size and place all through its hold');
 });
 
 test('unknown claim, scene, type and cut fail with readable errors', () => {
