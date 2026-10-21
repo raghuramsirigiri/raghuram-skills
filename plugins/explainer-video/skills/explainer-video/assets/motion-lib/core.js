@@ -118,7 +118,11 @@
       return { spec: s, def, built, used: [...used], id, type: s.type };
     });
 
-    // Timing.
+    // Timing. With a soundtrack on and a bpm, every scene's content starts on
+    // a beat: the scene before it holds a little longer to get there.
+    const audio = spec.meta.audio || {};
+    const bpm = audio.score && audio.score !== 'off' ? (audio.bpm || 112) : null;
+    const beat = bpm ? 60 / bpm : 0;
     const scenes = [];
     let t = 0;
     list.forEach((it, i) => {
@@ -144,6 +148,10 @@
       }
       const ovIn = i === 0 ? 0 : trIn.dur;
       const ovOut = trOut ? trOut.dur : 0;
+      if (beat && !last) {
+        const nextStart = t + dur + ovOut;
+        dur += Math.ceil(nextStart / beat - 1e-9) * beat - nextStart;
+      }
       const t0 = i === 0 ? 0 : t - ovIn;
       const cStart = t0 + ovIn;
       const exitStart = cStart + dur - exit;
@@ -161,8 +169,6 @@
     const frames = Math.round(t * fps);
     const duration = frames / fps;
 
-    // Beat snapping (soundtrack on with a bpm): not moving scenes, just reporting the grid.
-    const bpm = spec.meta.audio && spec.meta.audio.score && spec.meta.audio.score !== 'off' ? (spec.meta.audio.bpm || 112) : null;
 
     return {
       cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, safe: fr.safe, fps, frames, duration,

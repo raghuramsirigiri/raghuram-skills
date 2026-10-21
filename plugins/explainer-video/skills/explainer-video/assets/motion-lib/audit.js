@@ -144,8 +144,16 @@
     });
 
     // Pops: a frame-diff spike far above its neighbours, not at a hard cut.
+    // Hard cuts and the sweeping transitions (flood, scan, push) move a lot on
+    // purpose; a jump inside them is the transition, not a pop.
     const cutFrames = new Set();
-    C.scenes.forEach(s => { if (s.trIn.name === 'cut' && s.index > 0) cutFrames.add(Math.round(s.t0 * C.fps)); });
+    C.scenes.forEach(s => {
+      if (s.index === 0) return;
+      if (s.trIn.name === 'cut') cutFrames.add(Math.round(s.t0 * C.fps));
+      if (['flood', 'scan', 'push'].indexOf(s.trIn.name) >= 0) {
+        for (let f = Math.floor(s.t0 * C.fps); f <= Math.ceil((s.t0 + s.trIn.dur) * C.fps) + 1; f++) cutFrames.add(f);
+      }
+    });
     const pops = [];
     for (let n = 2; n < diffs.length - 2; n++) {
       const win = diffs.slice(Math.max(1, n - 8), n).concat(diffs.slice(n + 1, n + 9)).sort((a, b) => a - b);
@@ -192,33 +200,14 @@
       msPerFrame: +(ms / C.frames).toFixed(2), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
       exportPath: probe && probe.path
     };
-    return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C, hd) };
+    return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C) };
   }
 
-  // One frame at each scene's hold midpoint and each transition's midpoint,
-  // labelled with V handles and timecodes outside the frames.
-  function contactSheet(spec, C, hd) {
-    const marks = M.marks(C);
-    const cols = Math.min(6, marks.length);
-    const fw = C.W >= C.H ? 360 : 200, fh = Math.round(fw * C.H / C.W);
-    const lab = 26, pad = 12;
-    const rows = Math.ceil(marks.length / cols);
-    const sheet = document.createElement('canvas');
-    sheet.width = cols * (fw + pad) + pad; sheet.height = rows * (fh + lab + pad) + pad;
-    const sx = sheet.getContext('2d');
-    sx.fillStyle = '#d9d9d6'; sx.fillRect(0, 0, sheet.width, sheet.height);
-    const full = document.createElement('canvas');
-    full.width = C.W; full.height = C.H;
-    const fx = full.getContext('2d');
-    marks.forEach((m, i) => {
-      M.seek(fx, C, m.t, { frameT: m.t });
-      const x = pad + (i % cols) * (fw + pad), y = pad + Math.floor(i / cols) * (fh + lab + pad);
-      sx.drawImage(full, x, y, fw, fh);
-      sx.fillStyle = '#222'; sx.font = '600 13px system-ui, sans-serif'; sx.textBaseline = 'top';
-      const name = m.kind === 'scene' ? hd(m.id) + ' · ' + m.id : '↳ ' + m.id.split('→').map(hd).join(' → ');
-      sx.fillText(name + '  ' + tc(m.t, C.fps), x, y + fh + 5);
-    });
-    return sheet.toDataURL('image/png');
+  // The contact sheet is the player's (player.js), so the page and the audit
+  // produce the same sheet.
+  function contactSheet(spec, C) {
+    if (!M.player) throw new Error('player.js is not loaded');
+    return M.player.contactSheet(C);
   }
 
   root.VideoAudit = { run, contactSheet };
