@@ -80,6 +80,7 @@ if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.au
   if (sc.transitionIn != null) warn('timing', 'scene "' + sc.id + '": transitionIn "' + sc.transitionIn + '" is ignored — every scene arrives by the one transition (motion.md § Transitions); delete it');
 });
 if (meta.art != null && ['off', 'halftone'].indexOf(meta.art) < 0) shape.push('meta.art must be "off" or "halftone" (references/design.md § Artwork)');
+if (meta.style != null && ['continuous', 'slides'].indexOf(meta.style) < 0) shape.push('meta.style must be "continuous" or "slides" (references/continuous.md)');
 const scenes = spec.scenes || [];
 const byId = {};
 scenes.forEach(s => { if (byId[s.id]) shape.push('two scenes share the id "' + s.id + '"'); byId[s.id] = s; });
@@ -132,7 +133,9 @@ try {
       const C = sb.Motion.compile(spec, name, { measure: mockCtx() });
       compiled[name] = C;
       const n = C.scenes.length;
-      const lo = Math.max(2, Math.floor(C.duration / 5)), hi = Math.ceil(C.duration / 3) + 1;
+      // A continuous video's beats run longer: the camera travels between them.
+      const per = C.style === 'continuous' ? [4, 7] : [3, 5];
+      const lo = Math.max(2, Math.floor(C.duration / per[1])), hi = Math.ceil(C.duration / per[0]) + 1;
       const first = C.scenes[0];
       const firstText = first.layers.filter(l => l.kind === 'text' || l.kind === 'counter').reduce((a, l) => Math.min(a, l.at || 0), Infinity);
       if (firstText > 0.5) fail('timing', 'cut "' + name + '": nothing readable by 0.5 s (first text at ' + firstText.toFixed(2) + ' s)');
@@ -199,6 +202,8 @@ function paintedStrings(s) {
   (s.events || []).forEach((e, i) => out.push({ where: 'events[' + i + '].text', text: e.text || '', list: 'events' }));
   (s.steps || []).forEach((t, i) => out.push({ where: 'steps[' + i + ']', text: t, list: 'steps' }));
   (s.points || []).forEach((t, i) => out.push({ where: 'points[' + i + ']', text: t, list: 'points' }));
+  // A picture's own words (its key's "of", a calendar's month) are painted too.
+  ['of', 'due'].forEach(k => { if (s.picture && typeof s.picture[k] === 'string') out.push({ where: 'picture.' + k, text: s.picture[k], list: 'picture' }); });
   return out;
 }
 const stripIds = str => String(str).replace(/\{[A-Za-z][\w.-]*\}/g, ' ');
@@ -350,8 +355,8 @@ function loadEngine() {
   vm.createContext(sb);
   const runF = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sb, { filename: f });
   runF(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
-  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art'].forEach(n => runF(path.join(MLIB, n + '.js')));
-  fs.readdirSync(path.join(MLIB, 'scenes')).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, 'scenes', f)));
+  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world'].forEach(n => runF(path.join(MLIB, n + '.js')));
+  ['pictures', 'scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, d, f))));
   // Custom painters live in the page; stand in for them so timing compiles.
   scenes.filter(s => s.type === 'custom' && s.draw).forEach(s => {
     const mt = new RegExp('Motion\\.custom\\.' + s.draw + '\\s*=\\s*\\{[^}]*?enter\\s*:\\s*([\\d.]+)[^}]*?read\\s*:\\s*([\\d.]+)').exec(html);

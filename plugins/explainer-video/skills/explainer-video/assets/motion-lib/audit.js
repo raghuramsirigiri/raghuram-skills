@@ -134,8 +134,11 @@
         M.debug.record = null;
         continue;
       }
-      const recs = M.debug.record.filter(r => !r.skip);
+      const all = M.debug.record.filter(r => !r.skip);
       M.debug.record = null;
+      // The continuous style's world reports its shapes too; the text checks read the words.
+      const shapes = all.filter(r => r.role === 'shape');
+      const recs = all.filter(r => r.role !== 'shape');
 
       // Thumbnail diff for pops and dead time.
       tctx.drawImage(canvas, 0, 0, tw, th);
@@ -190,6 +193,33 @@
             once('overlap:' + [a.layer, b.layer].sort().join('|'), fails, { check: 'overlap', scene: hd(a.scene), t: tc(t, C.fps), msg: '"' + a.text.slice(0, 30) + '" overlaps "' + b.text.slice(0, 30) + '"' });
           }
         }
+      }
+
+      if (shapes.length) worldChecks(t, recs, shapes);
+    }
+
+    // The world (continuous style). Words never touch a shape (a place's own
+    // labels may sit beside its own lines, a share's mark). While a beat holds, the
+    // place in view sits wholly inside the frame, below its words and above
+    // the footer's hairline.
+    function worldChecks(t, recs, shapes) {
+      const vis = shapes.filter(r => r.alpha > 0.06 && r.kind !== 'shadow');
+      const words = recs.filter(r => r.alpha > 0.3 && !/^world-face:/.test(r.layer || ''));
+      for (const w of words) {
+        const own = /^world-label:([^:]+)/.exec(w.layer || '');
+        const hit = vis.find(sh => !(own && sh.kind === 'line' && String(sh.owner).indexOf(own[1]) === 0) && intersects(w.bbox, sh.bbox));
+        if (hit) once('world:' + w.layer + '|' + hit.owner, fails, { check: 'world-overlap', scene: hd(w.scene), t: tc(t, C.fps), msg: '"' + w.text.slice(0, 30) + '" touches the picture ' + hit.owner });
+      }
+      const sc = C.scenes.find(s => t >= s.enterEnd && t < s.exitStart);
+      if (!sc || !sc.place) return;
+      const mine = vis.filter(r => r.owner === sc.place);
+      if (!mine.length) return;
+      const x0 = Math.min(...mine.map(r => r.bbox[0])), y0 = Math.min(...mine.map(r => r.bbox[1]));
+      const x1 = Math.max(...mine.map(r => r.bbox[0] + r.bbox[2])), y1 = Math.max(...mine.map(r => r.bbox[1] + r.bbox[3]));
+      const band = words.filter(r => !/^(world-|chrome-)/.test(r.layer || '') && r.scene === sc.id);
+      const under = band.length ? Math.max(...band.map(r => r.bbox[1] + r.bbox[3])) : C.zone.top;
+      if (x0 < -1 || x1 > C.W + 1 || y0 < under + 12 || y1 > C.zone.ruleY) {
+        once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the picture spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside the frame, below the words (' + Math.round(under) + ') and above the footer (' + Math.round(C.zone.ruleY) + ')' });
       }
     }
     const ms = performance.now() - t0;

@@ -97,6 +97,11 @@
     const ctx = opts.measure || M.measureContext();
     const byId = {};
     (spec.scenes || []).forEach(s => { byId[s.id] = s; });
+    // The style: slides (scene after scene), or continuous (one 2.5D world
+    // the camera travels across, world.js).
+    const style = spec.meta.style || 'slides';
+    if (style !== 'slides' && style !== 'continuous') throw new Error('meta.style must be "continuous" or "slides"');
+    if (style === 'continuous' && !M.world) throw new Error('meta.style "continuous" needs motion-lib/world.js and pictures/');
 
     // Build every scene. The footer is shared, so its height is the most any
     // scene's source line needs: build once to find it, and again if any
@@ -108,7 +113,7 @@
       if (!def) throw new Error('scene "' + id + '": unknown type "' + s.type + '"');
       const used = new Set();
       const api = {
-        ctx, frame: fr, design, spec, R, index: i, sceneId: id,
+        ctx, frame: fr, design, spec, R, index: i, sceneId: id, style,
         copy: (slot, fallback) => R.fill(s.copy && s.copy[slot] != null ? s.copy[slot] : fallback, 'scene "' + id + '" copy.' + slot, used),
         claim: cid => { used.add(cid); return R.claim(cid, 'scene "' + id + '"'); },
         used: () => [...used],
@@ -119,7 +124,9 @@
         T: M.text, L: M.layout
       };
       let built;
-      try { built = def.build(s, api); } catch (e) { throw new Error('scene "' + id + '" (' + s.type + '): ' + e.message); }
+      // In the continuous style a scene lays out its words as a band; its
+      // picture (world.js) shows what its chart would.
+      try { built = style === 'continuous' ? M.world.band(def, s, api) : def.build(s, api); } catch (e) { throw new Error('scene "' + id + '" (' + s.type + '): ' + e.message); }
       const rv = api.trIn.reveal || 'mask-up';
       built.layers.forEach(l => { if (l.kind === 'text' && !l.reveal) l.reveal = rv; });
       return { spec: s, def, built, used: [...used], id, type: s.type, reserved: api.reserved, chrome: api.chrome, footerUsed: api.footerUsed };
@@ -128,6 +135,22 @@
     const rows = Math.max(0, ...list.map(it => (it.chrome && it.chrome.source ? it.chrome.source.length : 0)));
     if (list.some(it => it.footerUsed != null && it.footerUsed !== rows)) list = build(rows);
     const zone = M.design.frameZone(fr, rows);
+    // The world: its places, the camera on each beat, what each picture does.
+    let world = null;
+    if (style === 'continuous') {
+      world = M.world.plan({ list, fr, zone, design, spec, R, ctx });
+      // The art keeps clear of the world's stage as well as the words.
+      list.forEach((it, i) => { it.reserved.push({ x: 0, y: world.beats[i].band + world.gap / 2, w: fr.W, h: zone.ruleY - world.beats[i].band - world.gap / 2 }); });
+    }
+    // Between two beats of the world: a pan when the camera moves, else the swap.
+    const between = i => {
+      if (i === 0) return M.transitions.get('cut');
+      if (!world) return M.transitions.get('swap');
+      const a = world.beats[i - 1].cam, b = world.beats[i].cam;
+      const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
+      if (dx < 0.5 && dy < 0.5 && a.alpha === b.alpha) return M.transitions.get('swap');
+      return Object.assign({}, M.transitions.get('pan'), { dur: dx < 0.5 ? 0.9 : Math.min(1.8, 1.25 + dx / 4000) });
+    };
     // What a scene's chrome occupies, for the art to keep clear of: the bar,
     // its kicker, the footer's hairline and its source line.
     const chromeBoxes = ch => {
@@ -152,8 +175,8 @@
     list.forEach((it, i) => {
       const b = it.built;
       const nextSpec = list[i + 1] && list[i + 1].spec;
-      const trIn = M.transitions.get(i === 0 ? 'cut' : 'swap');
-      const trOut = nextSpec ? M.transitions.get('swap') : null;
+      const trIn = between(i);
+      const trOut = nextSpec ? between(i + 1) : null;
       const last = i === list.length - 1;
       const landed = l => (l.at || 0) + (l.dur || 0);
       const enter = b.layers.reduce((mx, l) => Math.max(mx, landed(l)), 0);
@@ -210,10 +233,10 @@
     // The last scene has no ovOut, so t is its content end. Whole frames.
     const frames = Math.round(t * fps);
     const duration = frames / fps;
-
+    if (world) M.world.finish(world, scenes);
 
     return {
-      cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, safe: fr.safe, fps, frames, duration,
+      cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, safe: fr.safe, fps, frames, duration, style, world,
       scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design), grid: artGrid }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
       images: opts.images || M.images || {}
     };
@@ -260,6 +283,7 @@
 
     if (L.kind === 'text') drawText(ctx, L, p, raw, lt);
     else if (L.kind === 'counter') drawCounter(ctx, C, L, frameLt == null ? lt : frameLt);
+    else if (L.kind === 'figure') drawFigure(ctx, C, L, frameLt == null ? lt : frameLt);
     else if (L.kind === 'rect') {
       const g = L.grow || 'x';
       const w = g === 'x' ? L.w * p : L.w, h = g === 'y' ? L.h * p : L.h;
@@ -345,16 +369,21 @@
   // or the digits smear. They roll on expo-out to the exact value and settle.
   function drawCounter(ctx, C, L, lt) {
     const raw = M.ease.clamp01((lt - (L.at || 0)) / (L.dur || 1));
-    const p = M.ease.expoOut(raw);
+    // A counter that moves with a picture's units counts at their pace.
+    const p = L.countEase === 'linear' ? raw : M.ease.expoOut(raw);
     if (raw <= 0) return;
     const parsed = L.parsed;
     const str = raw >= 1 || !parsed ? L.display : M.text.formatLike(parsed, parsed.value * p);
+    drawDigits(ctx, L, str, L.display, L.x, Math.min(1, raw * 4));
+  }
+
+  // Digits in tabular cells, right-aligned inside the width of `full` so the
+  // unit stays put while they roll. One record for the whole number.
+  function drawDigits(ctx, L, str, full, x0, alpha) {
     const tab = M.text.tabular(ctx, str, L.font);
-    const full = M.text.tabular(ctx, L.display, L.font);
-    let x = L.align === 'center' ? L.x + (L.boxW - full.w) / 2 : L.x;
-    // Right-align the rolling digits inside the final width so the unit stays put.
-    x += full.w - tab.w;
-    const alpha = Math.min(1, raw * 4);
+    const fw = M.text.tabular(ctx, full, L.font).w;
+    let x = L.align === 'center' ? x0 + (L.boxW - fw) / 2 : x0;
+    x += fw - tab.w;
     const r0 = M.debug.record ? M.debug.record.length : 0;
     tab.parts.forEach(pt => {
       const cx = x + pt.x + (pt.w - M.text.measure(ctx, pt.ch, L.font)) / 2;
@@ -367,6 +396,36 @@
       // In frame pixels, through any transform, like paint.text's records.
       const m = ctx.getTransform ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
       r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
+    }
+    return x + tab.w;
+  }
+
+  // A figure that moves between states of one measure with its picture
+  // (world.js): each key moves it, at the units' pace, to a value and shows
+  // that value's label (its year) beside it. It lands on each key's own
+  // display string exactly.
+  function drawFigure(ctx, C, L, lt) {
+    const keys = L.keys || [];
+    const first = keys[0];
+    if (!first) return;
+    const start = L.start || { value: 0, display: null };
+    const arrive = M.ease.clamp01((lt - Math.min(L.at || 0, first.at)) / 0.3);
+    if (arrive <= 0) return;
+    let value = start.value, display = start.display, label = null, labelA = 0, parsed = M.text.parseDisplay(first.display);
+    for (const k of keys) {
+      if (lt < k.at) break;
+      const q = M.ease.clamp01((lt - k.at) / (k.dur || 1e-6));
+      parsed = M.text.parseDisplay(k.display);
+      display = q >= 1 ? k.display : null;
+      value = value + (k.value - value) * q;     // from where the last key left it
+      label = k.label || null;
+      labelA = M.ease.clamp01((lt - k.at) / 0.3);
+    }
+    const str = display || (parsed ? M.text.formatLike(parsed, value) : first.display);
+    const widest = keys.reduce((w, k) => (k.display.length > w.length ? k.display : w), first.display);
+    const end = drawDigits(ctx, L, str, widest, L.x, arrive);
+    if (label) {
+      M.paint.text(ctx, label, end + L.size * 0.14, L.y + L.h * 0.52, { font: L.labelFont, color: L.labelColor, h: L.labelSize * 1.3, alpha: arrive * labelA, layer: L.id + '-label', role: 'label', size: L.labelSize });
     }
   }
 
@@ -502,6 +561,7 @@
       // screen.
       drawArt(ctx, C, sc.art, next.art, g);
       if (M.debug.record) M.debug.phase = 'transition';
+      if (C.world) M.world.paint(ctx, C, t, next.id);
       // The chrome stays still over the transition; only its words change.
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, next.art, 1); } });
       chromeBetween(ctx, C, sc, next, p, g);
@@ -510,6 +570,11 @@
       // On the first scene the dots grow in; after that they hold.
       if (sc.index === 0) drawArt(ctx, C, null, sc.art, M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)));
       else drawArt(ctx, C, sc.art, sc.art, 1);
+      if (C.world) {
+        if (M.debug.record) M.debug.phase = t < sc.enterEnd ? 'enter' : t >= sc.exitStart ? 'exit' : 'hold';
+        M.world.paint(ctx, C, t, sc.id);
+        if (M.debug.record) M.debug.phase = null;
+      }
       paintScene(ctx, C, sc, t, frameT);
       chromeSteady(ctx, C, sc, t);
     }

@@ -9,7 +9,8 @@
   },
   "transitions": {
     "cut": { "dur": 0, "ownsExit": true, "internal": "the first scene only" },
-    "swap": { "dur": 0.25, "ownsExit": false, "default": true, "note": "the one transition between scenes; transitionIn in a spec is ignored" }
+    "swap": { "dur": 0.25, "ownsExit": false, "default": true, "note": "the one transition between scenes; transitionIn in a spec is ignored" },
+    "pan": { "dur": 1.5, "ownsExit": false, "note": "the continuous style only: the camera pans level from one place to the next; its length is set per change from how far it travels" }
   },
   "scenes": {
     "hook-headline": {
