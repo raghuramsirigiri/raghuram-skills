@@ -16,16 +16,21 @@
       const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K;
       const steps = (s.steps || []).map((t, i) => api.R.fill(t, 'steps[' + i + ']'));
       if (steps.length < 2 || steps.length > 4) throw new Error('steps: use 2 to 4');
-      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), chart: true, split: false, sourceIds: api.used() });
+      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), chart: true, sourceIds: api.used() });
       const box = c.chart;
-      const numF = T.font(d.weights.value, d.size.label * 1.4, d.font);
-      const txtF = T.font(d.weights.title, d.size.label * 1.4, d.font);
-      const lh = d.size.label * 1.4 * 1.25;
-      const rowH = Math.min(box.h / steps.length, 70 * K);
+      // Steps are set like bullet points, a little under the headline, and
+      // spread down the height they have, up to a generous row.
+      const size = c.TY.headline.size * 0.8;
+      const numF = T.font(d.weights.value, size, d.font);
+      const txtF = T.font(d.weights.title, size, d.font);
+      const lh = size * 1.25;
+      const rowH = Math.min(box.h / steps.length, 130 * K);
       const numW = T.measure(ctx, '4', numF) + 14 * K;
       const layers = c.layers.slice();
       const at0 = 0.7, step = 0.55;
-      const ys = steps.map((_, i) => box.y + i * rowH);
+      // The rows sit a little above the middle of the height they leave.
+      const off = Math.max(0, (box.h - rowH * (steps.length - 1) - lh * 2) * 0.35);
+      const ys = steps.map((_, i) => box.y + off + i * rowH);
       // The marker: a short accent bar beside the current step, gliding between steps.
       layers.push({ kind: 'draw', id: 'marker', at: at0, dur: step * (steps.length - 1) + 0.3, ease: 'linear', fn(cx, p, a) {
         const local = (a.lt - at0) / step;
@@ -39,12 +44,12 @@
       steps.forEach((t, i) => {
         const at = at0 + i * step + 0.1;
         const x = box.x + 10 * K;
-        layers.push({ kind: 'text', id: 'num-' + i, role: 'label', font: numF, size: d.size.label * 1.4, color: d.muted, reveal: 'fade',
+        layers.push({ kind: 'text', id: 'num-' + i, role: 'label', font: numF, size, color: d.muted, reveal: 'fade',
           lines: T.place(ctx, [String(i + 1)], numF, x, ys[i], lh, 'left', numW), at, dur: 0.3 });
         const w = box.w - numW - 10 * K;
         const tl = T.balance(ctx, t, txtF, w);
-        layers.push({ kind: 'text', id: 'step-' + i, role: 'body', font: txtF, size: d.size.label * 1.4, color: d.ink, reveal: 'mask-up',
-          lines: T.place(ctx, tl, txtF, x + numW, ys[i], lh, 'left', w), at, dur: 0.5, large: M.design.isLarge(d.size.label * 1.4, d.weights.title) });
+        layers.push({ kind: 'text', id: 'step-' + i, role: 'body', font: txtF, size, color: d.ink, reveal: 'mask-up',
+          lines: T.place(ctx, tl, txtF, x + numW, ys[i], lh, 'left', w), at, dur: 0.5, large: M.design.isLarge(size, d.weights.title) });
       });
       const words = steps.reduce((n, t) => n + T.wordCount(t), 0);
       const read = M.readTime(c.primaryWords) + 0.15 * (c.words - c.primaryWords) + 0.25 * words;

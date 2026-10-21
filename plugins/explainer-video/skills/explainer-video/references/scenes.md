@@ -133,7 +133,8 @@ order. Out of order is a compile error.
 **Not for:** values in different units, or more than two states.
 **Data:** `before`, `after`: `{ label ≤ 3 words, value: claim id }`.
 **Motion:** "before" lands in muted ink, a rule wipes, then "after" lands in
-full ink. Side by side in square and wide frames, stacked in tall ones.
+full ink. Side by side in square frames and in a wide frame's chart column,
+stacked in tall ones.
 
 ## timeline
 
@@ -141,6 +142,9 @@ full ink. Side by side in square and wide frames, stacked in tall ones.
 **Not for:** a measured series over time (`trend-line`).
 **Data:** `events`: 2–5 of `{ date, text ≤ 6 words }`. Dates are labels, not
 claims, but the event text follows the same copy rules as everything else.
+**Motion:** the rail draws down, each date ticks on with its dot and its text
+follows. Vertical in every format (in a wide frame's chart column), spread
+down the height it has.
 
 ## steps
 

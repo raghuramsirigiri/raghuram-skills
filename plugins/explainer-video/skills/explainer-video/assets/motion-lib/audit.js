@@ -10,7 +10,8 @@
  * Fails: a scene throws; text outside the safe zone; two text layers
  * overlapping; text below the minimum size; contrast below 4.5 (3 for large
  * text); a layer not held still long enough to read; nothing on screen by
- * 0.5 s. Warns: single-frame pops, dead time, text near a box edge.
+ * 0.5 s. Warns: single-frame pops, dead time, text near a box edge, a
+ * scene whose hold frame leaves too much of the safe area empty (fill).
  */
 (function (root) {
   'use strict';
@@ -28,6 +29,55 @@
     return m + ':' + String(s).padStart(2, '0') + '.' + String(Math.min(f, fps - 1)).padStart(2, '0');
   };
   const intersects = (a, b) => a[0] + 1 < b[0] + b[2] - 1 && b[0] + 1 < a[0] + a[2] - 1 && a[1] + 2 < b[1] + b[3] - 2 && b[1] + 2 < a[1] + a[3] - 2;
+
+  // Fill: how much of the safe area a scene's composition covers, on its
+  // mid-hold frame. The safe area is cut into square cells a tenth of its
+  // short side; a cell is inked when any pixel in it is clearly off the
+  // background. A blank cell counts as empty space only when its neighbours
+  // are blank too, so the gaps between lines and around a chart belong to the
+  // composition and only real empty bands count against it. The progress
+  // bar's strip is left out: it spans the width in every scene. The closing
+  // cards (source-card, outro) are measured but not warned on: their copy is
+  // a name and a date, and they already grow to the frame.
+  const FILL = { target: 0.6, cells: 10, tol: 28, exempt: ['source-card', 'outro'] };
+  function fillOf(C, ctx, t) {
+    const S = C.safe, R = M.layout.RULE;
+    M.seek(ctx, C, t, { frameT: t });
+    const top = Math.round(S.y + R.accentH * 2 + 4);
+    const x0 = Math.round(S.x), w = Math.round(S.w), h = Math.round(S.y + S.h) - top;
+    const px = ctx.getImageData(x0, top, w, h).data;
+    const bg = rgbOf(C.design.bg);
+    const cell = Math.min(S.w, S.h) / FILL.cells;
+    const nx = Math.max(1, Math.round(w / cell)), ny = Math.max(1, Math.round(h / cell));
+    const ink = new Uint8Array(nx * ny);
+    for (let y = 0; y < h; y += 2) {
+      const cy = Math.min(ny - 1, Math.floor(y / h * ny));
+      for (let x = 0; x < w; x += 2) {
+        const i = (y * w + x) * 4;
+        if (Math.abs(px[i] - bg[0]) > FILL.tol || Math.abs(px[i + 1] - bg[1]) > FILL.tol || Math.abs(px[i + 2] - bg[2]) > FILL.tol) {
+          ink[cy * nx + Math.min(nx - 1, Math.floor(x / w * nx))] = 1;
+        }
+      }
+    }
+    let empty = 0;
+    for (let cy = 0; cy < ny; cy++) {
+      for (let cx = 0; cx < nx; cx++) {
+        let any = 0;
+        for (let dy = -1; dy <= 1 && !any; dy++) {
+          for (let dx = -1; dx <= 1 && !any; dx++) {
+            const a = cx + dx, b = cy + dy;
+            if (a >= 0 && b >= 0 && a < nx && b < ny && ink[b * nx + a]) any = 1;
+          }
+        }
+        if (!any) empty++;
+      }
+    }
+    return 1 - empty / (nx * ny);
+  }
+  // Every scene's fill, measured on its mid-hold frame.
+  function fills(C, ctx) {
+    return C.scenes.map(s => ({ id: s.id, type: s.type, fill: +fillOf(C, ctx, (s.enterEnd + s.exitStart) / 2).toFixed(2) }));
+  }
 
   async function run(opts) {
     opts = opts || {};
@@ -186,6 +236,11 @@
       if (s / (a.length / 16) > 2) fails.push({ check: 'loop', msg: 'first and last frames differ; the loop will jump' });
     }
 
+    const fill = fills(C, ctx);
+    fill.forEach(f => {
+      if (f.fill < FILL.target && FILL.exempt.indexOf(f.type) < 0) warns.push({ check: 'fill', scene: hd(f.id), msg: f.type + ' covers ' + Math.round(f.fill * 100) + '% of the safe area on its hold frame, under ' + Math.round(FILL.target * 100) + '% — lay it out for the ' + C.cls + ' frame (references/formats.md § Layout per format)' });
+    });
+
     let probe = null;
     if (opts.exportProbe) {
       if (!M.exportVideo) warns.push({ check: 'export-probe', msg: 'export.js is not loaded' });
@@ -197,7 +252,7 @@
 
     const stats = {
       cut: cutName, format: C.format, frames: C.frames, duration: +C.duration.toFixed(3), fps: C.fps,
-      msPerFrame: +(ms / C.frames).toFixed(2), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
+      msPerFrame: +(ms / C.frames).toFixed(2), fill: fill.map(f => ({ handle: hd(f.id), type: f.type, fill: f.fill })), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
       exportPath: probe && probe.path
     };
     return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C) };
@@ -210,5 +265,5 @@
     return M.player.contactSheet(C);
   }
 
-  root.VideoAudit = { run, contactSheet };
+  root.VideoAudit = { run, contactSheet, fills, FILL };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -80,22 +80,31 @@
 
   // ── card anatomy ─────────────────────────────────────────────────────
   // An evidence scene is a social card that moves. Top to bottom: room for
-  // the progress bar (the through-line), kicker (muted), headline stating the finding with its
-  // number (700, ink, balanced), units line (muted), the chart in the
-  // remaining height, and a source line under a hairline with the source
-  // name in semibold ink. Scenes drop the parts they don't need; they never
-  // add new kinds of component.
+  // the progress bar (the through-line), kicker (muted), headline stating the
+  // finding with its number (700, ink, balanced), units line (muted), the
+  // chart in the remaining height, and a source line under a hairline with
+  // the source name in semibold ink. Scenes drop the parts they don't need;
+  // they never add new kinds of component.
   //
-  //   card(api, { kicker, headline, units, chart: true, display: false, valign })
-  //   -> { layers, chart: {x,y,w,h} | null, rule, words, primaryWords }
+  // The frame's profile (layout.js) composes it for its shape: in a wide
+  // frame the words sit in a left column, centred on its height, with the
+  // chart beside them at full height; in a tall frame the type is a step
+  // larger. A headline grows into the room it has: `display` (the hook) up to
+  // the display size, `grow` (a title on its own) to about twice the card
+  // size, and a headline beside a chart to one and a half times.
+  //
+  //   card(api, { kicker, headline, units, chart: true, display, grow, valign, split })
+  //   -> { layers, chart: {x,y,w,h} | null, rule, words, primaryWords, textBottom, colW, bottom, TY }
   function card(api, o) {
-    const d = api.design, F = api.frame, T = api.T, TY = M.layout.TYPE, K = M.layout.K;
+    const d = api.design, F = api.frame, T = api.T, TY = M.layout.typeFor(F), K = M.layout.K;
     const ctx = api.ctx;
     const S = F.safe;
+    const P = F.profile;
     const wide = F.cls === 'wide';
-    const split = wide && o.chart && o.split !== false;
-    // Text column: the full safe width, or the left 40% beside a chart in 16:9.
-    const colW = split ? Math.round(S.w * 0.4) : wide ? Math.min(S.w, 1240) : S.w;
+    const split = P.split && o.chart && o.split !== false;
+    // Text column: the left share beside a chart, else the full safe width
+    // (a wide frame keeps a line short enough to read).
+    const colW = split ? Math.round(S.w * P.col) : wide ? Math.round(S.w * 0.8) : S.w;
     const layers = [];
     const R = M.layout.RULE;
     // The progress bar sits along the top of the safe area (core.js); every
@@ -103,6 +112,7 @@
     let y = S.y;
     const rule = true;
     y += R.accentH + 8 * K;
+    const top = y;
 
     const at = o.at || 0;
     const sourceLine = o.source !== false ? sourceText(api, o.sourceIds, o.sources) : null;
@@ -125,19 +135,25 @@
     if (o.kicker) blocks.push({ id: 'kicker', role: 'kicker', str: o.kicker, size: TY.kicker.size, lh: TY.kicker.lh, gap: TY.kicker.gap, w: 400, color: d.muted, at: at, dur: 0.5 });
     if (o.headline) {
       let size = TY.headline.size, lh = TY.headline.lh;
-      if (o.display) {
-        const room = (o.chart ? (bottom - y) * 0.5 : bottom - y);
-        const fit = T.fit(ctx, o.headline, { weight: d.weights.title, family: d.font, maxW: colW, maxH: room, min: TY.display.min, max: TY.display.max, lh: 1.12, maxLines: 4 });
+      const grow = o.display ? { min: TY.display.min, max: TY.display.max, share: o.chart && !split ? 0.5 : 1, lines: 4, lh: 1.12 }
+        : o.grow && !o.chart ? { min: size, max: Math.max(TY.display.min * 1.1, TY.display.max * 0.6), share: 0.75, lines: 4, lh: 1.15 }
+        : split ? { min: size, max: size * 1.5, share: 0.5, lines: 5, lh: 1.2 }
+        : null;
+      if (grow) {
+        // The headline's room is what the kicker and units leave.
+        const others = (o.kicker ? TY.kicker.lh + TY.kicker.gap : 0) +
+          (o.units ? TY.headline.gap + T.balance(ctx, o.units, T.font(400, TY.units.size, d.font), colW).length * TY.units.lh : 0);
+        const fit = T.fit(ctx, o.headline, { weight: d.weights.title, family: d.font, maxW: colW, maxH: (bottom - y - others) * grow.share, min: grow.min, max: grow.max, lh: grow.lh, maxLines: grow.lines });
         size = fit.size; lh = fit.lh;
       }
       blocks.push({ id: 'headline', role: 'headline', str: o.headline, size, lh, gap: TY.headline.gap, w: d.weights.title, color: d.ink, at: at + 0.15, dur: 0.7, reveal: o.headlineReveal, primary: true });
     }
     if (o.units) blocks.push({ id: 'units', role: 'units', str: o.units, size: TY.units.size, lh: TY.units.lh, gap: TY.units.gap, w: 400, color: d.muted, at: at + 0.45, dur: 0.5 });
 
-    // Measure the stack to centre it when there's no chart.
+    // Measure the stack to centre it when there's no chart, or in its column beside one.
     const heights = blocks.map(b => T.balance(ctx, b.str, T.font(b.w, b.size, d.font), colW).length * b.lh);
     const stackH = heights.reduce((s, h, i) => s + h + (i < blocks.length - 1 ? blocks[i].gap : 0), 0);
-    if (!o.chart && o.valign !== 'top') {
+    if ((!o.chart || split) && o.valign !== 'top') {
       const free = bottom - y - stackH - (o.reserve || 0);
       if (free > 0) {
         const shift = free * (o.valign === 'lower' ? 0.62 : 0.42);
@@ -155,7 +171,7 @@
     let chart = null;
     if (o.chart) {
       if (split) {
-        chart = { x: S.x + colW + 30 * K, y: S.y, w: S.w - colW - 30 * K, h: bottom - S.y - 6 * K };
+        chart = { x: S.x + colW + 30 * K, y: top, w: S.w - colW - 30 * K, h: bottom - top - 6 * K };
       } else {
         chart = { x: S.x, y, w: S.w, h: Math.max(0, bottom - y - 6 * K) };
       }
@@ -175,7 +191,7 @@
         });
       });
     }
-    return { layers, chart, rule, words, primaryWords, textBottom, colW, bottom };
+    return { layers, chart, rule, words, primaryWords, textBottom, colW, bottom, TY, split };
   }
 
   // Lay source runs into rows no wider than maxW, splitting a run at spaces
@@ -279,14 +295,19 @@
     const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K;
     if (rows.some(r => !(r.value >= 0))) throw new Error('bars need values of zero or more');
     const n = rows.length;
-    const labF = T.font(d.weights.category, d.size.label, d.font);
-    const valF = T.font(d.weights.value, d.size.value, d.font);
-    const rankF = T.font(d.weights.value, d.size.label, d.font);
+    // Chart text takes the frame's type step, like the card's words.
+    const tf = api.frame.profile ? api.frame.profile.type : 1;
+    const labSize = d.size.label * tf, valSize = d.size.value * tf;
+    const labF = T.font(d.weights.category, labSize, d.font);
+    const valF = T.font(d.weights.value, valSize, d.font);
+    const rankF = T.font(d.weights.value, labSize, d.font);
     // charts-lib's barList geometry at 2.5x: label above its bar, barHeight 26,
-    // rowGap 22, the label->bar gap tighter than the row->row gap.
-    const labLh = d.size.label * 1.3;
+    // rowGap 22, the label->bar gap tighter than the row->row gap. With room
+    // to spare (a tall frame, or the chart column of a wide one) bars and gaps
+    // grow up to 1.8x, so the list holds its box instead of sitting at the top.
+    const labLh = labSize * 1.3;
     const want = labLh + 2 * K + 26 * K + 22 * K;
-    const k = Math.min(1, box.h / (n * want));
+    const k = Math.min(1.8, box.h / (n * want));
     const barH = Math.max(10 * K, 26 * K * k);
     const rowH = labLh + 2 * K + barH + 22 * K * k;
     const valW = Math.max(...rows.map(r => T.measure(ctx, r.display, valF))) + 6 * K;
@@ -305,14 +326,14 @@
       const at = at0 + i * stag;
       const color = r.emph ? d.subject : anyEmph ? d.context : d.series[0];
       if (o.rank) {
-        layers.push({ kind: 'text', id: 'rank-' + i, role: 'label', font: rankF, size: d.size.label, color: d.muted, reveal: 'fade',
+        layers.push({ kind: 'text', id: 'rank-' + i, role: 'label', font: rankF, size: labSize, color: d.muted, reveal: 'fade',
           lines: T.place(ctx, [String(i + 1)], rankF, box.x, top + labLh, barH, 'left', rankW), at, dur: 0.4 });
       }
-      layers.push({ kind: 'text', id: 'label-' + i, role: 'label', font: labF, size: d.size.label, color: d.label, reveal: 'fade',
+      layers.push({ kind: 'text', id: 'label-' + i, role: 'label', font: labF, size: labSize, color: d.label, reveal: 'fade',
         lines: T.place(ctx, [r.label], labF, x, top, labLh, 'left', maxW), at, dur: 0.4 });
       const w = Math.max(1.5 * K, r.value / max * maxW);
       layers.push({ kind: 'rect', id: 'bar-' + i, x, y: top + labLh + 2 * K, w, h: barH, color, grow: 'x', at: at + 0.05, dur: 0.9, ease: 'expoOut', hatch: !!r.forecast });
-      layers.push({ kind: 'text', id: 'value-' + i, role: 'value', font: valF, size: d.size.value, color: d.value, reveal: 'fade',
+      layers.push({ kind: 'text', id: 'value-' + i, role: 'value', font: valF, size: valSize, color: d.value, reveal: 'fade',
         lines: T.place(ctx, [r.display], valF, x + w + 3 * K, top + labLh + 2 * K, barH, 'left', valW), at: at + 0.55, dur: 0.4 });
     });
     return layers;

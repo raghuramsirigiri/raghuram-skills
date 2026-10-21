@@ -18,6 +18,35 @@ The type scale is the social card's at 2.5× in every format (a 1080-wide
 frame is a 432 px card), so a frame reads the same at phone size as a
 social-post card.
 
+## Layout per format
+
+Each aspect class gets its own composition, not one square card placed in a
+bigger frame (`layout.js` `PROFILE`, applied by `design.js` `card()`):
+
+| Class | Formats | Type step | Composition |
+| --- | --- | --- | --- |
+| `square` | 1:1 | 1× | the card: words on top, chart below |
+| `tall` | 9:16, 4:5 | 1.2× | the card, words a step larger; lists, steps and timelines spread down the height; bars thicken; a big number runs as wide as fits |
+| `wide` | 16:9 | 1.15× | words in a left column (40%), centred on its height; the chart, list, steps, timeline or photo beside them at full height; a big number in the left half with its words beside it |
+
+The type step applies to the kicker, headline and units and to chart and
+list text; the source line stays card size. A title on its own
+(`kicker-title`) grows to about twice the card headline, a hook to its
+display size, a headline beside a chart to 1.5×. The source card and the
+outro grow until they hold about two thirds of the frame.
+
+**Fill.** The audit measures how much of the safe area each scene's
+mid-hold frame covers, and warns under 60%. The safe area is cut into
+cells a tenth of its short side; a blank cell counts as empty only when its
+neighbours are blank too, so the gaps between lines belong to the
+composition and only real empty bands count. The source card and outro are
+measured but not warned on. A warning on an evidence scene usually means
+copy too short for the frame (one short line in a 9:16 kicker-title): give
+it a `units`/`sub` line, merge it into the next scene, or use a format that
+suits it. The engine lays out the frame; don't pad it with decoration.
+`tests/layout-gallery.html` shows every scene type in all four formats with
+its fill.
+
 ## Frame rate
 
 `fps` 30 by default. 60 is allowed for very fast motion (bigger files,

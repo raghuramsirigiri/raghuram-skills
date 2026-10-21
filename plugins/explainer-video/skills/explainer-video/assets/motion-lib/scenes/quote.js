@@ -15,7 +15,7 @@
     type: 'quote',
     slots: { quote: { claim: true, required: true }, name: { words: 5, required: true }, role: { words: 8 } },
     build(s, api) {
-      const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K, S = api.frame.safe, TY = M.layout.TYPE;
+      const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K, S = api.frame.safe;
       const qid = String((s.copy && s.copy.quote) || '').replace(/[{}]/g, '');
       const q = api.claim(qid);
       const body = q.display != null ? String(q.display) : String(q.verbatim || '');
@@ -23,8 +23,12 @@
       const text = '“' + body + '”';
       const name = api.copy('name'), role = api.copy('role');
       const c = M.card(api, { chart: false, valign: 'top', sourceIds: api.used() });
-      const W = api.frame.cls === 'wide' ? Math.min(S.w, 1400) : S.w;
-      const fit = T.fit(ctx, text, { weight: 400, family: d.font, maxW: W, maxH: (c.bottom - c.textBottom) * 0.62, min: TY.headline.size, max: TY.headline.size * 1.6, lh: 1.25, maxLines: 7 });
+      const TY = c.TY;
+      // The quote grows into the frame: further in a tall or wide one, which
+      // has the room a square card doesn't.
+      const square = api.frame.cls === 'square';
+      const W = api.frame.cls === 'wide' ? Math.round(S.w * 0.85) : S.w;
+      const fit = T.fit(ctx, text, { weight: 400, family: d.font, maxW: W, maxH: (c.bottom - c.textBottom) * (square ? 0.62 : 0.75), min: TY.headline.size, max: TY.headline.size * (square ? 1.6 : 2.2), lh: 1.25, maxLines: 7 });
       const nameF = T.font(600, TY.units.size, d.font), roleF = T.font(400, TY.units.size, d.font);
       const attH = TY.units.lh * (role ? 2 : 1);
       const blockH = fit.lines.length * fit.lh + 12 * K + attH;

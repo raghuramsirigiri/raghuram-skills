@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Layout gallery</title>
+<!-- Dev page, not a deliverable. Serve the repo root over HTTP and open
+     /plugins/explainer-video/skills/explainer-video/tests/layout-gallery.html.
+     Every scene type, with copy of a realistic length, on its mid-hold frame in
+     all four formats, each with its fill (audit.js): the share of the safe area
+     its composition covers. The dashed box is the safe area. Results are also
+     on window.gallery for scripted checks. -->
+<style>
+  body { margin: 16px; background: #d9d9d6; font: 13px system-ui, sans-serif; color: #222; }
+  h2 { font-size: 15px; margin: 18px 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  figure { margin: 0; }
+  canvas { display: block; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+  figcaption { margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .low { color: #b00020; font-weight: 600; }
+</style>
+</head><body>
+<h1 style="font-size:18px;margin:0">Layout gallery</h1>
+<p id="summary"></p>
+<div id="out"></div>
+<script src="../assets/charts-lib/theme.js"></script>
+<script src="../assets/motion-lib/core.js"></script>
+<script src="../assets/motion-lib/ease.js"></script>
+<script src="../assets/motion-lib/text.js"></script>
+<script src="../assets/motion-lib/paint.js"></script>
+<script src="../assets/motion-lib/layout.js"></script>
+<script src="../assets/motion-lib/design.js"></script>
+<script src="../assets/motion-lib/transitions.js"></script>
+<script src="../assets/motion-lib/scenes/hook-headline.js"></script>
+<script src="../assets/motion-lib/scenes/big-number.js"></script>
+<script src="../assets/motion-lib/scenes/kicker-title.js"></script>
+<script src="../assets/motion-lib/scenes/compare-bars.js"></script>
+<script src="../assets/motion-lib/scenes/trend-line.js"></script>
+<script src="../assets/motion-lib/scenes/share-split.js"></script>
+<script src="../assets/motion-lib/scenes/ranked-list.js"></script>
+<script src="../assets/motion-lib/scenes/before-after.js"></script>
+<script src="../assets/motion-lib/scenes/timeline.js"></script>
+<script src="../assets/motion-lib/scenes/steps.js"></script>
+<script src="../assets/motion-lib/scenes/quote.js"></script>
+<script src="../assets/motion-lib/scenes/bullet-stack.js"></script>
+<script src="../assets/motion-lib/scenes/photo-pan.js"></script>
+<script src="../assets/motion-lib/scenes/source-card.js"></script>
+<script src="../assets/motion-lib/scenes/outro.js"></script>
+<script src="../assets/motion-lib/scenes/custom.js"></script>
+<script src="../assets/motion-lib/audit.js"></script>
+<script>
+(async function () {
+  const M = window.Motion;
+  // A photo stand-in: a flat tint, so the frame shows where the picture sits.
+  const pc = document.createElement('canvas'); pc.width = 160; pc.height = 120;
+  const g = pc.getContext('2d'); g.fillStyle = '#9aa7b5'; g.fillRect(0, 0, 160, 120); g.fillStyle = '#6f7d8c'; g.fillRect(0, 70, 160, 50);
+  const PHOTO = pc.toDataURL('image/png');
+  const claim = (id, value, display, extra) => Object.assign({ id, value, display, source: 'A', locator: 'p. 4', verbatim: display, kind: 'copied' }, extra);
+  const ids = ['hook', 'ctx', 'big', 'bars', 'trend', 'share', 'share-bar', 'rank', 'ba', 'tl', 'steps', 'quote', 'bullets', 'photo', 'src', 'outro'];
+  const spec = {
+    meta: { title: 'Gallery', locale: 'en-GB', preset: 'default', fps: 30, seed: 1, audio: { score: 'off' }, brand: { name: 'Port Halden Transit' } },
+    cuts: { tall: { format: '9:16', scenes: ids }, feed: { format: '4:5', scenes: ids }, square: { format: '1:1', scenes: ids }, wide: { format: '16:9', scenes: ids } },
+    sources: [{ id: 'A', name: 'Port Halden Transit annual report', date: '2026-03-02' }],
+    claims: [claim('F1', 41, '41%'), claim('F2', 1.4, '1.4m'), claim('F3', 1.9, '1.9m'), claim('F4', 68, '68%'), claim('F5', 21, '21%'),
+      claim('F6', 0.9, '0.9m'), claim('F7', 0.6, '0.6m'), claim('F8', 11, '11%'),
+      claim('Q1', null, 'the ferry is simply the quickest way across the bay', { quote: true, verbatim: 'For most of us the ferry is simply the quickest way across the bay.' })],
+    data: [{ id: 'D1', source: 'A', locator: 'table 2', unit: 'm', x: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'], y: [1.2, 0.5, 0.8, 1.1, 1.3, 1.4, 1.9] }],
+    scenes: [
+      { id: 'hook', type: 'hook-headline', copy: { kicker: 'Port Halden ferries', headline: 'Ferry trips rose {F1} in one year' } },
+      { id: 'ctx', type: 'kicker-title', copy: { kicker: 'The year in brief', title: 'Commuters came back to the harbour line', sub: 'Annual figures, April to March' } },
+      { id: 'big', type: 'big-number', copy: { kicker: 'Record year', value: 'F3', line: 'trips, the highest total since 2009', units: 'Passenger journeys, all routes' } },
+      { id: 'bars', type: 'compare-bars', copy: { kicker: 'Year on year', title: 'Trips rose from {F2} to {F3}', units: 'Passenger journeys, millions' },
+        bars: [{ label: '2024', value: 'F2' }, { label: '2025', value: 'F3', emph: true }] },
+      { id: 'trend', type: 'trend-line', copy: { kicker: 'Since 2019', title: 'Trips are back above their 2019 level', units: 'Passenger journeys, millions' }, series: 'D1', end: 'F3', highlight: [4, 6] },
+      { id: 'share', type: 'share-split', copy: { kicker: 'Who rides', title: 'Commuters made {F4} of all trips', units: 'Share of journeys' },
+        parts: [{ label: 'Weekday commuters', value: 'F4', emph: true }, { label: 'Visitors', value: 'F5' }] },
+      { id: 'share-bar', type: 'share-split', copy: { kicker: 'Who rides', title: 'Three groups make up the riders', units: 'Share of journeys' }, style: 'bar',
+        parts: [{ label: 'Commuters', value: 'F4' }, { label: 'Visitors', value: 'F5' }, { label: 'Students', value: 'F8' }] },
+      { id: 'rank', type: 'ranked-list', copy: { kicker: 'By route', title: 'The harbour line carried the most riders', units: 'Passenger journeys, millions' },
+        rows: [{ label: 'Harbour line', value: 'F3', emph: true }, { label: 'North shore', value: 'F2' }, { label: 'Island loop', value: 'F6' }, { label: 'Night boat', value: 'F7' }] },
+      { id: 'ba', type: 'before-after', copy: { kicker: 'Year on year', title: 'A year of growth on the water', units: 'Passenger journeys' },
+        before: { label: '2024', value: 'F2' }, after: { label: '2025', value: 'F3' } },
+      { id: 'tl', type: 'timeline', copy: { kicker: 'What changed', title: 'Three changes drove the rise' },
+        events: [{ date: 'March 2025', text: 'Harbour route opens' }, { date: 'June 2025', text: 'Fares frozen for a year' }, { date: 'October 2025', text: 'Night boat added' }] },
+      { id: 'steps', type: 'steps', copy: { kicker: 'How it works', title: 'Riding takes three steps' }, steps: ['Buy a card online', 'Tap on at the gate', 'Ride across the bay'] },
+      { id: 'quote', type: 'quote', copy: { quote: 'Q1', name: 'Ana Ruiz', role: 'Daily commuter, North shore' } },
+      { id: 'bullets', type: 'bullet-stack', copy: { kicker: 'Next year', title: 'What the operator plans next' }, points: ['Two new boats in spring', 'Later sailings on Fridays', 'Contactless on every route'] },
+      { id: 'photo', type: 'photo-pan', copy: { kicker: 'The terminal', caption: 'The new terminal opened in March', image: PHOTO } },
+      { id: 'src', type: 'source-card' },
+      { id: 'outro', type: 'outro', copy: { cta: 'Timetables at the terminal' } }
+    ]
+  };
+  await M.loadImages(spec);
+  const out = document.getElementById('out');
+  const res = {};
+  let low = 0, all = 0;
+  for (const cut of Object.keys(spec.cuts)) {
+    const C = M.compile(spec, cut);
+    const big = document.createElement('canvas'); big.width = C.W; big.height = C.H;
+    const ctx = big.getContext('2d', { willReadFrequently: true });
+    const fills = VideoAudit.fills(C, ctx);
+    res[cut] = fills;
+    const h2 = document.createElement('h2'); h2.textContent = cut + ' — ' + C.format; out.appendChild(h2);
+    const row = document.createElement('div'); row.className = 'row'; out.appendChild(row);
+    const th = C.cls === 'wide' ? 150 : 260, k = th / C.H;
+    C.scenes.forEach((s, i) => {
+      M.seek(ctx, C, (s.enterEnd + s.exitStart) / 2);
+      const fig = document.createElement('figure');
+      const cv = document.createElement('canvas'); cv.width = Math.round(C.W * k); cv.height = th;
+      const c2 = cv.getContext('2d'); c2.drawImage(big, 0, 0, cv.width, cv.height);
+      c2.setLineDash([3, 3]); c2.strokeStyle = 'rgba(200,0,60,.5)'; c2.strokeRect(C.safe.x * k, C.safe.y * k, C.safe.w * k, C.safe.h * k);
+      const f = fills[i].fill;
+      const counts = VideoAudit.FILL.exempt.indexOf(s.type) < 0;
+      if (counts) { all++; if (f < VideoAudit.FILL.target) low++; }
+      const cap = document.createElement('figcaption');
+      cap.innerHTML = s.type + ' <span class="' + (f < VideoAudit.FILL.target ? 'low' : '') + '">' + Math.round(f * 100) + '%</span>';
+      fig.appendChild(cv); fig.appendChild(cap); row.appendChild(fig);
+    });
+  }
+  document.getElementById('summary').textContent = low + ' of ' + all + ' frames under the ' + Math.round(VideoAudit.FILL.target * 100) + '% fill target (' + VideoAudit.FILL.exempt.join(' and ') + ' are measured, not counted).';
+  window.gallery = res;
+  window.gallerySpec = spec;
+})().catch(e => { document.body.insertAdjacentHTML('beforeend', '<pre style="color:#b00020">' + e.stack + '</pre>'); window.gallery = { error: e.message }; });
+</script>
+</body></html>

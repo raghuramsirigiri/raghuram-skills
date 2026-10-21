@@ -1,7 +1,8 @@
 /*!
  * scenes/before-after.js — two states of one measure. The "before" value
  * lands first, in muted ink; a rule wipes across and the "after" value lands
- * in full ink. Side by side in square and wide frames, stacked in tall ones.
+ * in full ink. Side by side in square frames and in a wide frame's chart
+ * column, stacked in tall ones.
  *
  *   { "type": "before-after", "copy": { "kicker", "title", "units" },
  *     "before": { "label": "2025", "value": "F2" }, "after": { "label": "2026", "value": "F3" } }
@@ -17,23 +18,24 @@
       const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K;
       if (!s.before || !s.after) throw new Error('needs "before" and "after"');
       const [b, a] = M.chart.rows(api, [s.before, s.after], 'before/after');
-      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), units: api.copy('units'), chart: true, split: false, sourceIds: api.used() });
+      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), units: api.copy('units'), chart: true, sourceIds: api.used() });
       const box = c.chart;
       const tall = api.frame.cls === 'tall';
       const cellW = tall ? box.w : (box.w - 20 * K) / 2;
       const cellH = tall ? (box.h - 20 * K) / 2 : box.h;
-      const maxSize = Math.min(M.layout.TYPE.display.max, cellH * 0.45);
-      const fitV = str => T.fit(ctx, str, { weight: d.weights.value, family: d.font, maxW: cellW, maxH: maxSize * 1.1, min: Math.min(M.layout.TYPE.display.min, maxSize), max: maxSize, lh: 1.05, maxLines: 1 });
+      const maxSize = Math.min(c.TY.display.max, cellH * 0.45);
+      const fitV = str => T.fit(ctx, str, { weight: d.weights.value, family: d.font, maxW: cellW, maxH: maxSize * 1.1, min: Math.min(c.TY.display.min, maxSize), max: maxSize, lh: 1.05, maxLines: 1 });
       const size = Math.min(fitV(b.display).size, fitV(a.display).size);
       const vF = T.font(d.weights.value, size, d.font);
-      const labF = T.font(d.weights.category, d.size.label, d.font);
-      const labLh = d.size.label * 1.4;
+      const labSize = d.size.label * api.frame.profile.type;
+      const labF = T.font(d.weights.category, labSize, d.font);
+      const labLh = labSize * 1.4;
       const blockH = labLh + size * 1.1;
       const layers = c.layers.slice();
       const cell = (i, r, color, at) => {
         const x = tall ? box.x : box.x + i * (cellW + 20 * K);
         const y = (tall ? box.y + i * (cellH + 20 * K) : box.y) + Math.max(0, (cellH - blockH) * 0.4);
-        layers.push({ kind: 'text', id: 'label-' + i, role: 'label', font: labF, size: d.size.label, color: d.label, reveal: 'fade',
+        layers.push({ kind: 'text', id: 'label-' + i, role: 'label', font: labF, size: labSize, color: d.label, reveal: 'fade',
           lines: T.place(ctx, [r.label], labF, x, y, labLh, 'left', cellW), at, dur: 0.4 });
         layers.push({ kind: 'counter', id: 'value-' + i, role: 'value', display: r.display, parsed: T.parseDisplay(r.display),
           font: vF, size, color, x, y: y + labLh, h: size * 1.1, align: 'left', boxW: cellW, at: at + 0.1, dur: 0.9 });

@@ -28,15 +28,19 @@
       const rest = Math.max(0, 100 - total);
       const restColor = d.hair;
 
-      const labF = T.font(d.weights.category, d.size.label, d.font);
-      const valF = T.font(d.weights.value, d.size.value, d.font);
-      const rowLh = d.size.label * 1.5;
+      // Chart text takes the frame's type step, like the card's words.
+      const tf = api.frame.profile.type;
+      const labSize = d.size.label * tf, valSize = d.size.value * tf;
+      const labF = T.font(d.weights.category, labSize, d.font);
+      const valF = T.font(d.weights.value, valSize, d.font);
+      const rowLh = labSize * (tf > 1 ? 1.8 : 1.5);
       const legendH = parts.length * rowLh;
       const shapeH = Math.max(80, box.h - legendH - 14 * K);
       const layers = c.layers.slice();
 
       if (style === 'waffle') {
-        const side = Math.min(shapeH, box.w * (api.frame.cls === 'wide' ? 0.6 : 1), 260 * K);
+        // As large as the box allows: the waffle is the chart.
+        const side = Math.min(shapeH, box.w);
         const gap = Math.max(2, side * 0.02);
         const cell = (side - gap * 9) / 10;
         // Cells fill row by row from the top left; each part takes its share of 100.
@@ -56,7 +60,11 @@
         } });
         layers.push(...legend(box.y + side + 14 * K));
       } else {
-        const barH = Math.min(shapeH, 40 * K);
+        // The bar thickens with the room it has, and the bar and its list sit
+        // a little above the box's middle rather than at its top.
+        const barH = Math.max(Math.min(shapeH, 40 * K), Math.min(shapeH * 0.3, 80 * K));
+        const free = Math.max(0, box.h - barH - 14 * K - legendH);
+        box.y += free * 0.3;
         let x = box.x;
         parts.forEach((p, i) => {
           const w = box.w * p.value / 100;
@@ -69,15 +77,15 @@
 
       function legend(y0) {
         const out = [];
-        const sw = d.size.label * 0.8;
+        const sw = labSize * 0.8;
         parts.forEach((p, i) => {
           const y = y0 + i * rowLh;
           const at = 1.0 + i * 0.12;
           out.push({ kind: 'rect', id: 'key-' + i, x: box.x, y: y + (rowLh - sw) / 2, w: sw, h: sw, color: colors[i], grow: 'x', at, dur: 0.3 });
           const vw = T.measure(ctx, p.display, valF);
-          out.push({ kind: 'text', id: 'pval-' + i, role: 'value', font: valF, size: d.size.value, color: d.value, reveal: 'fade',
+          out.push({ kind: 'text', id: 'pval-' + i, role: 'value', font: valF, size: valSize, color: d.value, reveal: 'fade',
             lines: T.place(ctx, [p.display], valF, box.x + sw + 4 * K, y, rowLh, 'left', vw), at, dur: 0.4 });
-          out.push({ kind: 'text', id: 'plabel-' + i, role: 'label', font: labF, size: d.size.label, color: d.label, reveal: 'fade',
+          out.push({ kind: 'text', id: 'plabel-' + i, role: 'label', font: labF, size: labSize, color: d.label, reveal: 'fade',
             lines: T.place(ctx, [p.label], labF, box.x + sw + 8 * K + vw, y, rowLh, 'left', box.w), at, dur: 0.4 });
         });
         return out;

@@ -1,8 +1,8 @@
 /*!
  * scenes/photo-pan.js — a picture the user supplied (a data URI in
  * copy.image), with a slow push from 1.03 to 1.07 across the scene. The
- * picture fills the chart area and is clipped to it, so nothing falls outside
- * the safe zone. Never a fetched, stock or generated image.
+ * picture fills the chart area (beside the words in a wide frame) and is
+ * clipped to it, so nothing falls outside the safe zone. Never a fetched, stock or generated image.
  *
  *   { "type": "photo-pan", "copy": { "kicker", "caption", "image": "data:image/jpeg;base64,..." } }
  */
@@ -15,7 +15,7 @@
     build(s, api) {
       const img = s.copy && s.copy.image;
       if (!img || !/^data:image\//.test(img)) throw new Error('copy.image must be a data:image/... URI the user supplied');
-      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('caption'), chart: true, split: false, sourceIds: api.used() });
+      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('caption'), chart: true, sourceIds: api.used() });
       const box = c.chart;
       const layers = c.layers.slice();
       let span = 6;

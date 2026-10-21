@@ -15,16 +15,19 @@
       const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K;
       const pts = (s.points || []).map((t, i) => api.R.fill(t, 'points[' + i + ']'));
       if (pts.length < 1 || pts.length > 3) throw new Error('points: use 1 to 3');
-      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), chart: true, split: false, sourceIds: api.used() });
+      const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), chart: true, sourceIds: api.used() });
       const box = c.chart;
-      const size = M.layout.TYPE.headline.size * 0.9;
+      const size = c.TY.headline.size * 0.9;
       const f = T.font(d.weights.title, size, d.font);
       const lh = size * 1.25;
       const mark = size * 0.32;
       const indent = mark + 10 * K;
       const lines = pts.map(t => T.balance(ctx, t, f, box.w - indent));
-      const gap = 14 * K;
-      const total = lines.reduce((n, l) => n + l.length * lh, 0) + gap * (pts.length - 1);
+      // The points spread down the height they have (a generous gap at most),
+      // then the block sits a little above the middle of what is left.
+      const textH = lines.reduce((n, l) => n + l.length * lh, 0);
+      const gap = pts.length > 1 ? Math.max(14 * K, Math.min(48 * K, (box.h - textH) * 0.6 / (pts.length - 1))) : 0;
+      const total = textH + gap * (pts.length - 1);
       let y = box.y + Math.max(0, (box.h - total) * 0.3);
       const layers = c.layers.slice();
       const words = [];

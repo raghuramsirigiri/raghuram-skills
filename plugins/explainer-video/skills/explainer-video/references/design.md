@@ -71,14 +71,17 @@ An evidence scene **is a social card that moves**. Top to bottom:
 3. **headline**, stating the finding with its number: weight 700, ink,
    55 px, balanced lines;
 4. **units line**, muted, 30 px;
-5. **the chart**, in the remaining height (beside the text in 16:9);
+5. **the chart**, in the remaining height (in 16:9, in a column beside the
+   words: `formats.md` § Layout per format);
 6. **source line** under a hairline, 25 px: *Source:* in muted, the source
    name in semibold ink, the date muted. Built automatically from the
    claims the scene shows.
 
-These are the card's sizes × 2.5. Hook and big-number may set the headline
-or value 2–3× larger (110–165 px) in the same face and weight: scale, never
-a second type system. Context, quote and source-card scenes drop the parts
+These are the card's sizes × 2.5, as a square frame sets them; a tall frame
+sets the kicker, headline and units 1.2× and a wide one 1.15×
+(`formats.md` § Layout per format). Hook and big-number may set the headline
+or value 2–3× larger in a square frame (110–165 px), more in a tall or wide
+one, in the same face and weight: scale, never a second type system. Context, quote and source-card scenes drop the parts
 they don't need. No scene adds a new kind of component.
 
 ## Emphasis
