@@ -4,12 +4,16 @@
  * One tone, taken from the theme: the background moved a short way toward
  * the ink, so it reads as part of the ground, never as content. The engine
  * places one shape per scene in the largest empty rectangle the scene's layout
- * leaves inside the safe area (never behind text, a chart, the progress bar
+ * leaves inside the safe area (never behind text, a chart, the accent bar
  * or the source line; never in the platform margins), keeps it where it was
  * while that spot stays free, and lets it drift slowly so the frame is never
  * fully still.
  *
- *   meta.art: "auto" (default) | "off" | { "motif": "contour" | "rings" | "dots" | "lines" | "logo" }
+ *   meta.art: "off" (default) | "auto" | { "motif": "contour" | "rings" | "dots" | "lines" | "logo" }
+ *
+ * Off by default: in review these motifs and their per-scene placement read
+ * as random rather than designed. They stay available on request until
+ * curated art in one fixed corner replaces them.
  *
  * "auto" is the user's own logo when meta.brand.logo holds one, otherwise
  * contour lines. "logo" uses only meta.brand.logo, recoloured to the tone;
@@ -30,7 +34,7 @@
   const MIN = 0.16;          // shortest side of a shape, as a share of the safe area's short side
 
   function resolve(meta) {
-    const a = meta && meta.art != null ? meta.art : 'auto';
+    const a = meta && meta.art != null ? meta.art : 'off';
     if (a === 'off' || a === false) return null;
     const logo = meta && meta.brand && /^data:image\//.test(meta.brand.logo || '') ? meta.brand.logo : null;
     const motif = a === 'auto' ? (logo ? 'logo' : 'contour') : (a && a.motif) || a;

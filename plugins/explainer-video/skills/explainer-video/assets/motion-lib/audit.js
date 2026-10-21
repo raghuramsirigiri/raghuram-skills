@@ -35,8 +35,8 @@
   // short side; a cell is inked when any pixel in it is clearly off the
   // background. A blank cell counts as empty space only when its neighbours
   // are blank too, so the gaps between lines and around a chart belong to the
-  // composition and only real empty bands count against it. The progress
-  // bar's strip is left out: it spans the width in every scene. The closing
+  // composition and only real empty bands count against it. The accent
+  // bar's strip is left out: it is the same on every scene. The closing
   // cards (source-card, outro) are measured but not warned on: their copy is
   // a name and a date, and they already grow to the frame.
   const FILL = { target: 0.6, cells: 10, tol: 28, exempt: ['source-card', 'outro'] };

@@ -314,13 +314,15 @@
     }
   }
 
-  // The through-line: a progress bar along the top edge of the safe area. It
-  // never moves; its fill tracks the video's time, so something is always
-  // moving, and a scene that says rule: null (the outro) lets it fade away.
+  // The through-line: the card's short accent bar, fixed at the top-left of
+  // the safe area. It sits in the same place on every scene and through every
+  // transition. It draws in from zero width on its first scene, morph-bar
+  // stretches it along the top and lets it settle back, and a scene that says
+  // rule: null (the outro) lets it shrink away. barShown is its width, 0..1.
   function barShown(C, sc, lt) {
     if (!sc.rule) return 0;
     const prev = C.scenes[sc.index - 1];
-    // A first appearance fades in.
+    // A first appearance draws in from zero width.
     if (!prev || !prev.rule) return M.ease.outQuint(M.ease.clamp01((lt - sc.ovIn) / 0.5));
     return 1;
   }
@@ -345,15 +347,11 @@
     ctx.restore();
   }
 
-  function drawBar(ctx, C, t, shown, swell) {
-    if (shown <= 0.001) return;
+  // stretch (0..1) widens it toward the full safe width, in place.
+  function drawBar(ctx, C, shown, stretch) {
     const S = C.safe, R = M.layout.RULE;
-    const h = R.accentH * (swell || 1);
-    ctx.save();
-    ctx.globalAlpha = shown;
-    M.paint.rect(ctx, S.x, S.y, S.w, h, C.design.hair);
-    M.paint.rect(ctx, S.x, S.y, S.w * M.ease.clamp01(t / C.duration), h, C.design.subject);
-    ctx.restore();
+    const w = R.accentW * shown + (S.w - R.accentW) * (stretch || 0);
+    if (w > 0.5) M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
   }
 
   function drawArt(ctx, C, at, t, alpha) {
@@ -380,7 +378,7 @@
       if (sc.art === next.art) drawArt(ctx, C, sc.art, t, 1);
       else { drawArt(ctx, C, sc.art, t, 1 - g); drawArt(ctx, C, next.art, t, g); }
       if (M.debug.record) M.debug.phase = 'transition';
-      const bar = () => drawBar(ctx, C, t, shown, tr.swell ? tr.swell(p) : 1);
+      const bar = () => drawBar(ctx, C, shown, tr.stretch && sc.rule && next.rule ? tr.stretch(p) : 0);
       if (tr.coversBar) bar();
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, t, 1); } });
       if (!tr.coversBar) bar();
@@ -388,7 +386,7 @@
     } else {
       drawArt(ctx, C, sc.art, t, sc.index === 0 ? M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)) : 1);
       paintScene(ctx, C, sc, t, frameT);
-      drawBar(ctx, C, t, barShown(C, sc, t - sc.t0));
+      drawBar(ctx, C, barShown(C, sc, t - sc.t0), 0);
     }
     if (C.grain) M.paint.grain(ctx, C.W, C.H, Math.round(frameT * C.fps), C.seed, C.grain);
   }

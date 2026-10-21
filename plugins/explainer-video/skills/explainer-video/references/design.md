@@ -65,8 +65,8 @@ the user's own. Offer a neutral preset instead.
 
 An evidence scene **is a social card that moves**. Top to bottom:
 
-1. **the through-line**, a thin progress bar fixed along the top of the safe
-   area (`motion.md`); the card leaves room for it;
+1. **the through-line**, the short accent bar, fixed at the top-left of the
+   safe area on every scene (`motion.md`); the card leaves room for it;
 2. **kicker**, muted, 27.5 px;
 3. **headline**, stating the finding with its number: weight 700, ink,
    55 px, balanced lines;
@@ -86,13 +86,18 @@ they don't need. No scene adds a new kind of component.
 
 ## Artwork in the space left
 
-Once the layout fills its frame (`formats.md` § Layout per format), the
-engine puts one piece of monochrome artwork in the largest empty area each
-scene leaves (`art.js`, `meta.art`). It is ground, not content:
+**Off by default, and leave it off.** In review these motifs and their
+per-scene placement read as random rather than designed, and a plain frame
+is better than that. Curated art in one fixed corner is due to replace them;
+until then use `meta.art` only when the user asks for artwork by name.
+
+When it is on, the engine puts one piece of monochrome artwork in the
+largest empty area each scene leaves (`art.js`, `meta.art`). It is ground,
+not content:
 
 - **One tone**: the background moved a short way toward the ink, below the
   step the audit reads as ink, so it never counts as text or toward fill.
-- **Only in empty space**: inside the safe area, below the progress bar,
+- **Only in empty space**: inside the safe area, below the accent bar,
   clear of every text line, bar, image and plot by a margin. A chart's plot
   is data area even where no mark is drawn yet. A scene too full for it gets
   none, and the outro (which shows the logo itself) never has any.
@@ -102,19 +107,18 @@ scene leaves (`art.js`, `meta.art`). It is ground, not content:
 
 | `meta.art` | Draws |
 | --- | --- |
-| `"auto"` (default) | the user's logo if `meta.brand.logo` holds one, else `contour` |
+| `"off"` (default) | nothing |
+| `"auto"` | the user's logo if `meta.brand.logo` holds one, else `contour` |
 | `"contour"` | topographic line loops |
 | `"rings"` | concentric dashed rings |
 | `"dots"` | a halftone field, dots shrinking toward its rim |
 | `"lines"` | a hatched field |
 | `"logo"` | `meta.brand.logo` recoloured to the tone, its inner shapes kept |
-| `"off"` | nothing |
 
 The logo is only ever the one the user supplied, as a data URI: never
-fetched, traced or invented, and never another organisation's. Leave the
-default unless the user asks for something else; turn it `"off"` when they
-want a plain frame. The art fills what a good layout leaves. It is not a
-fix for a scene the audit's fill check warns about.
+fetched, traced or invented, and never another organisation's. The art
+fills what a good layout leaves. It is not a fix for a scene the audit's
+fill check warns about.
 
 ## Emphasis
 

@@ -21,13 +21,12 @@ rules a custom scene follows.
 
 ## The through-line
 
-A thin progress bar runs along the top edge of the safe area, full safe
-width: a muted track (`hair`) with the subject colour filling it as the video
-plays. It never moves up, down or sideways, whatever height a scene's text
-sits at; only its fill grows, so something is moving on every frame. It fades
-in on the first scene, stays through every transition, and fades away into a
-scene that has none (the outro). `morph-bar` swells it to twice its
-thickness for a moment, in place; no transition moves it.
+The card's short accent bar, in the subject colour, sits fixed at the
+top-left of the safe area: the same place and size on every scene, whatever
+height that scene's text sits at, and through every transition. It draws in
+from zero width on the first scene and shrinks away into a scene that has
+none (the outro). `morph-bar` stretches it along the top for a moment and
+lets it settle back, in place; no transition moves it.
 
 ## Transitions
 
@@ -40,7 +39,7 @@ left. The ones that own the exit move the outgoing frame themselves.
 | --- | --- | --- | --- |
 | `mask-up` (default) | 0.4 s | incoming lines rise through a mask | most scene changes |
 | `mask-left` | 0.4 s | lines slide in from their left edge | a list or a sequence |
-| `morph-bar` | 0.55 s | the progress bar swells, in place, as the lines rise | a turn in the story (context → evidence) |
+| `morph-bar` | 0.55 s | the accent bar stretches along the top, in place, as the lines rise | a turn in the story (context → evidence) |
 | `scan` | 0.5 s | one horizontal line wipes down, new scene above it | a change of chart |
 | `flood` | 0.6 s | an accent field sweeps across with a hard edge | into the source card, or a section break |
 | `push` | 0.5 s | the camera pushes into the outgoing frame as it fades | after a photo, or a dramatic figure |

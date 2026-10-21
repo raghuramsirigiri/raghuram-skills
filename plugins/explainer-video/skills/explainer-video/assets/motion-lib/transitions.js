@@ -2,10 +2,10 @@
  * motion-lib/transitions.js — what happens between two scenes.
  *
  * A transition runs over the overlap between the outgoing scene's tail and
- * the incoming scene's head. The through-line, a progress bar along the top
- * of the safe area, never moves: core.js draws it over every transition, and
- * a transition may only swell its thickness (morph-bar) or paint over it
- * (flood, whose accent field covers the whole frame). Transitions that own the
+ * the incoming scene's head. The through-line, a short accent bar fixed at
+ * the top-left of the safe area, never moves: core.js draws it over every
+ * transition, and a transition may only stretch it along the top (morph-bar)
+ * or paint over it (flood, whose accent field covers the whole frame). Transitions that own the
  * exit (cut, flood, scan, push) move the outgoing hold frame themselves; the
  * rest run after the outgoing text has already left.
  *
@@ -26,9 +26,10 @@
     'mask-left': { dur: 0.4, ownsExit: false, reveal: 'mask-left', draw: incoming },
     'morph-bar': {
       dur: 0.55, ownsExit: false,
-      // The progress bar swells to twice its thickness at mid-transition, in
-      // place, then settles: a beat that marks a turn in the story.
-      swell: p => 1 + Math.sin(Math.PI * p),
+      // The accent bar stretches along the top of the safe area at
+      // mid-transition, in place, then settles back: a beat that marks a turn
+      // in the story.
+      stretch: p => Math.sin(Math.PI * p) * 0.6,
       draw: incoming
     },
     flood: {

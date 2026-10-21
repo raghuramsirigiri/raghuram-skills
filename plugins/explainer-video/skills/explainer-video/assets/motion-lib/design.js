@@ -80,7 +80,7 @@
 
   // ── card anatomy ─────────────────────────────────────────────────────
   // An evidence scene is a social card that moves. Top to bottom: room for
-  // the progress bar (the through-line), kicker (muted), headline stating the
+  // the accent bar (the through-line), kicker (muted), headline stating the
   // finding with its number (700, ink, balanced), units line (muted), the
   // chart in the remaining height, and a source line under a hairline with
   // the source name in semibold ink. Scenes drop the parts they don't need;
@@ -107,8 +107,8 @@
     const colW = split ? Math.round(S.w * P.col) : wide ? Math.round(S.w * 0.8) : S.w;
     const layers = [];
     const R = M.layout.RULE;
-    // The progress bar sits along the top of the safe area (core.js); every
-    // card leaves room for it, whatever its own vertical alignment.
+    // The accent bar sits fixed at the top-left of the safe area (core.js);
+    // every card leaves room for it, whatever its own vertical alignment.
     let y = S.y;
     const rule = true;
     y += R.accentH + 8 * K;

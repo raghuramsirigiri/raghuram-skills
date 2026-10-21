@@ -1,7 +1,7 @@
 // node --test plugins/explainer-video/skills/explainer-video/tests/art.test.js
 //
 // Monochrome artwork (art.js) goes only where a scene's layout leaves room:
-// inside the safe area, below the progress bar, clear of every text line,
+// inside the safe area, below the accent bar, clear of every text line,
 // bar, image and data area; in one tone the audit reads as ground, not ink.
 'use strict';
 const test = require('node:test');
@@ -34,7 +34,8 @@ function spec(art) {
   };
 }
 const FORMATS = ['9:16', '4:5', '1:1', '16:9'];
-function compile(format, art) {
+// Art is off by default; these tests turn it on with "auto" unless they say otherwise.
+function compile(format, art = 'auto') {
   const w = load();
   const s = spec(art);
   s.cuts.c = { format, scenes: s.scenes.map(x => x.id) };
@@ -75,8 +76,13 @@ test('art keeps clear of a data area, not just of what is drawn in it', () => {
   }
 });
 
-test('the outro and "off" get no art; "auto" uses the user logo when there is one', () => {
-  const { C } = compile('9:16');
+test('art is off by default; "auto" uses the user logo when there is one; the outro never has art', () => {
+  const w = load();
+  const d = spec(); delete d.meta.art; d.cuts.c = { format: '9:16', scenes: d.scenes.map(x => x.id) };
+  const def = w.Motion.compile(d, 'c', { measure: mockCtx() });
+  assert.strictEqual(def.art, null, 'no art unless asked for');
+  assert.ok(def.scenes.every(s => !s.art));
+  const { C } = compile('9:16', 'auto');
   assert.strictEqual(C.scenes.find(s => s.id === 'outro').art, null);
   assert.strictEqual(C.art.motif, 'logo');
   const off = compile('9:16', 'off').C;
