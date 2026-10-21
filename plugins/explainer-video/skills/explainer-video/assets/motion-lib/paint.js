@@ -97,21 +97,29 @@
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillText(str, x, y + o.h / 2);
-    ctx.restore();
     const rec = M.debug.record;
     if (rec) {
       const w = o.w != null ? o.w : ctx.measureText(str).width;
       const m = ctx.getTransform ? ctx.getTransform() : null;
-      // Report the box in frame pixels, through any camera transform.
+      // Report the box in frame pixels, through any camera transform, cut to
+      // the reveal mask when there is one (masked text outside it isn't seen).
       let bx = x, by = y, bw = w, bh = o.h;
-      if (m && (m.a !== 1 || m.d !== 1 || m.e || m.f)) {
-        bx = m.a * x + m.e; by = m.d * y + m.f; bw = w * m.a; bh = o.h * m.d;
+      if (o.clip) {
+        const [cx, cy, cw, ch] = o.clip;
+        const x2 = Math.min(bx + bw, cx + cw), y2 = Math.min(by + bh, cy + ch);
+        bx = Math.max(bx, cx); by = Math.max(by, cy); bw = Math.max(0, x2 - bx); bh = Math.max(0, y2 - by);
       }
-      rec.push({
-        scene: M.debug.scene, layer: o.layer || null, role: o.role || null, text: str,
-        bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha * a, size: o.size || 0, color: o.color, large: !!o.large
-      });
+      if (m && (m.a !== 1 || m.d !== 1 || m.e || m.f)) {
+        bx = m.a * bx + m.e; by = m.d * by + m.f; bw = bw * m.a; bh = bh * m.d;
+      }
+      if (bw > 0 && bh > 0) {
+        rec.push({
+          scene: M.debug.scene, phase: M.debug.phase, layer: o.layer || null, role: o.role || null, text: str,
+          bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha, size: o.size || 0, color: o.color, large: !!o.large
+        });
+      }
     }
+    ctx.restore();
   }
 
   // Seeded film grain (off unless meta.grain): a fixed noise tile, offset per frame by the hash.

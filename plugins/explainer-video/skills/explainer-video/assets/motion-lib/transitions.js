@@ -52,7 +52,7 @@
       dur: 0.5, ownsExit: true,
       draw(ctx, p, x) {
         // One horizontal line wipes down: above it the incoming scene, below it the outgoing hold.
-        const C = x.C, y = C.H * M.ease.expoInOut(p);
+        const C = x.C, y = C.H * M.ease.glide(p);
         ctx.save(); M.paint.clipRect(ctx, 0, y, C.W, C.H - y); x.holdA(); x.drawRule(x.A.rule); ctx.restore();
         ctx.save(); M.paint.clipRect(ctx, 0, 0, C.W, y); x.background(); x.drawB(); x.drawRule(x.B.rule); ctx.restore();
         M.paint.line(ctx, 0, y, C.W, y, C.design.ink, M.layout.RULE.hair * 2);

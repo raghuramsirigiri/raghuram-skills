@@ -1,0 +1,225 @@
+/*!
+ * motion-lib/audit.js — renders every frame of a cut with instrumentation on
+ * and reports what a viewer would trip over. Staged for verification only;
+ * finalize.js never inlines it.
+ *
+ *   const r = await VideoAudit.run({ cut: 'main' });     // { ok, fails, warns, stats }
+ *   r.contactSheet()                                     // PNG data URL
+ *   await VideoAudit.run({ cut: 'main', exportProbe: true })
+ *
+ * Fails: a scene throws; text outside the safe zone; two text layers
+ * overlapping; text below the minimum size; contrast below 4.5 (3 for large
+ * text); a layer not held still long enough to read; nothing on screen by
+ * 0.5 s. Warns: single-frame pops, dead time, text near a box edge.
+ */
+(function (root) {
+  'use strict';
+  const M = root.Motion;
+
+  function rgbOf(str) {
+    const m = /^#([0-9a-f]{6})/i.exec(str);
+    if (m) { const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+    const r = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(str);
+    return r ? [+r[1], +r[2], +r[3]] : [0, 0, 0];
+  }
+  const hex = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  const tc = (t, fps) => {
+    const m = Math.floor(t / 60), s = Math.floor(t % 60), f = Math.round((t - Math.floor(t)) * fps);
+    return m + ':' + String(s).padStart(2, '0') + '.' + String(Math.min(f, fps - 1)).padStart(2, '0');
+  };
+  const intersects = (a, b) => a[0] + 1 < b[0] + b[2] - 1 && b[0] + 1 < a[0] + a[2] - 1 && a[1] + 2 < b[1] + b[3] - 2 && b[1] + 2 < a[1] + a[3] - 2;
+
+  async function run(opts) {
+    opts = opts || {};
+    const spec = opts.spec || M.readSpec();
+    await M.fonts.ready(spec);
+    if (!M.images || !Object.keys(M.images).length) await M.loadImages(spec);
+    const cutName = opts.cut || Object.keys(spec.cuts)[0];
+    const fails = [], warns = [];
+    let C;
+    try { C = M.compile(spec, cutName); } catch (e) { return { ok: false, fails: [{ check: 'compile', msg: e.message }], warns, stats: {} }; }
+    const canvas = document.createElement('canvas');
+    canvas.width = C.W; canvas.height = C.H;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const tw = 64, th = Math.round(64 * C.H / C.W);
+    const thumb = document.createElement('canvas');
+    thumb.width = tw; thumb.height = th;
+    const tctx = thumb.getContext('2d', { willReadFrequently: true });
+    const S = C.safe, d = C.design;
+    const handle = {};
+    C.scenes.forEach((s, i) => { handle[s.id] = 'V' + (i + 1); });
+    const hd = id => (handle[id] || id);
+
+    const diffs = [];
+    let prev = null;
+    const still = new Map();     // layer key -> { start, last, bbox, text, best, role, words }
+    const reported = new Set();
+    const once = (key, arr, row) => { if (!reported.has(key)) { reported.add(key); arr.push(row); } };
+    const t0 = performance.now();
+
+    for (let n = 0; n < C.frames; n++) {
+      const t = n / C.fps;
+      M.debug.record = [];
+      try { M.seek(ctx, C, t, { frameT: t }); } catch (e) {
+        const sc = C.scenes.find(s => t >= s.t0 && t < s.t1);
+        once('throw:' + (sc && sc.id), fails, { check: 'throws', scene: sc && hd(sc.id), t: tc(t, C.fps), msg: e.message });
+        M.debug.record = null;
+        continue;
+      }
+      const recs = M.debug.record.filter(r => !r.skip);
+      M.debug.record = null;
+
+      // Thumbnail diff for pops and dead time.
+      tctx.drawImage(canvas, 0, 0, tw, th);
+      const px = tctx.getImageData(0, 0, tw, th).data;
+      const lum = new Float32Array(tw * th);
+      for (let i = 0; i < lum.length; i++) lum[i] = 0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2];
+      if (prev) { let s = 0; for (let i = 0; i < lum.length; i++) s += Math.abs(lum[i] - prev[i]); diffs.push(s / lum.length); } else diffs.push(0);
+      prev = lum;
+
+      if (n === Math.round(0.5 * C.fps) && !recs.some(r => r.alpha > 0.5)) {
+        fails.push({ check: 'hook', t: tc(t, C.fps), msg: 'nothing readable on screen by 0.5 s' });
+      }
+
+      const seen = new Set();
+      recs.forEach(r => {
+        const [x, y, w, h] = r.bbox;
+        const key = r.scene + '/' + r.layer + '/' + r.text;
+        seen.add(key);
+        const moving = r.phase === 'transition' || r.phase === 'exit';
+        if (r.alpha > 0.5) {
+          if (!moving && (x < S.x - 2 || y < S.y - 2 || x + w > S.x + S.w + 2 || y + h > S.y + S.h + 2)) {
+            once('safe:' + key, fails, { check: 'safe-zone', scene: hd(r.scene), t: tc(t, C.fps), msg: '"' + r.text.slice(0, 40) + '" leaves the safe zone (' + [x, y, w, h].map(Math.round).join(',') + ')' });
+          }
+          if (r.size && r.size < M.layout.MIN_TEXT) once('size:' + key, fails, { check: 'size', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" is ' + r.size.toFixed(1) + 'px, below ' + M.layout.MIN_TEXT });
+          const need = r.large ? 3 : 4.5;
+          const ratio = M.design.contrast(hex(rgbOf(r.color)), d.bg);
+          if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + d.bg + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
+        }
+        // Read time: how long has this exact text sat fully revealed and still?
+        const st = still.get(key);
+        const solid = r.alpha >= 0.99;
+        const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 0.5);
+        if (solid && st && same && st.last === n - 1) { st.last = n; }
+        else if (solid) { const best = st ? st.best : 0; still.set(key, { start: n, last: n, bbox: r.bbox.slice(), best, role: r.role, text: r.text, scene: r.scene }); }
+        const s2 = still.get(key);
+        if (s2) s2.best = Math.max(s2.best, (s2.last - s2.start + 1) / C.fps);
+      });
+
+      // Overlap between different layers, both visible.
+      const vis = recs.filter(r => r.alpha > 0.3 && r.phase !== 'transition');
+      for (let i = 0; i < vis.length; i++) {
+        for (let j = i + 1; j < vis.length; j++) {
+          const a = vis[i], b = vis[j];
+          if (a.scene === b.scene && a.layer === b.layer) continue;
+          if (intersects(a.bbox, b.bbox)) {
+            once('overlap:' + [a.layer, b.layer].sort().join('|'), fails, { check: 'overlap', scene: hd(a.scene), t: tc(t, C.fps), msg: '"' + a.text.slice(0, 30) + '" overlaps "' + b.text.slice(0, 30) + '"' });
+          }
+        }
+      }
+    }
+    const ms = performance.now() - t0;
+
+    // Read-time verdicts.
+    const finalHold = C.scenes[C.scenes.length - 1];
+    // Judge each layer by its longest-held text: a counter's rolling values and
+    // a line's per-word records are steps on the way to that text.
+    const byLayer = new Map();
+    still.forEach((st, key) => {
+      const lk = key.slice(0, key.lastIndexOf('/'));
+      const cur = byLayer.get(lk);
+      if (!cur || st.best > cur[1].best) byLayer.set(lk, [key, st]);
+    });
+    byLayer.forEach(([key, st]) => {
+      if (st.role === 'value-glyph' || st.role === 'tick') return;
+      const sc = C.scenes.find(s => s.id === st.scene);
+      const layerId = key.split('/')[1];
+      const L = sc && sc.layers.find(l => l.id === layerId);
+      const words = L && L.lines ? L.lines.reduce((n, ln) => n + M.text.wordCount(ln.text), 0) : M.text.wordCount(st.text);
+      let need = st.role === 'value' ? M.READ.number : st.role === 'label' || st.role === 'source' ? M.READ.min : M.readTime(words);
+      if (sc === finalHold) need = Math.min(need, Math.max(M.READ.final, sc.read));
+      if (st.best + 1 / C.fps < need) {
+        fails.push({ check: 'read-time', scene: hd(st.scene), msg: '"' + st.text.slice(0, 40) + '" holds still ' + st.best.toFixed(2) + ' s, needs ' + need.toFixed(2) + ' s' });
+      }
+    });
+
+    // Pops: a frame-diff spike far above its neighbours, not at a hard cut.
+    const cutFrames = new Set();
+    C.scenes.forEach(s => { if (s.trIn.name === 'cut' && s.index > 0) cutFrames.add(Math.round(s.t0 * C.fps)); });
+    const pops = [];
+    for (let n = 2; n < diffs.length - 2; n++) {
+      const win = diffs.slice(Math.max(1, n - 8), n).concat(diffs.slice(n + 1, n + 9)).sort((a, b) => a - b);
+      const med = win[Math.floor(win.length / 2)] || 0;
+      // A pop is one frame that jumps while its neighbours barely move.
+      const around = Math.max(diffs[n - 1], diffs[n + 1], 0.1);
+      if (diffs[n] > 1.5 && diffs[n] > 5 * around && diffs[n] > 6 * Math.max(med, 0.15) && !cutFrames.has(n)) pops.push(n);
+    }
+    if (pops.length) warns.push({ check: 'pops', msg: 'single-frame jumps at frames ' + pops.slice(0, 12).join(', ') + (pops.length > 12 ? '…' : '') + ' — look at them in the player (← →)' });
+
+    // Dead time: more than 1.5 s without change outside declared holds.
+    const inHold = n => {
+      const t = n / C.fps;
+      return C.scenes.some(s => t >= s.enterEnd - 0.05 && t <= s.exitStart + 0.05) || t >= finalHold.enterEnd;
+    };
+    let run0 = -1;
+    for (let n = 1; n <= diffs.length; n++) {
+      const quiet = n < diffs.length && diffs[n] < 0.02 && !inHold(n);
+      if (quiet && run0 < 0) run0 = n;
+      if (!quiet && run0 >= 0) {
+        if ((n - run0) / C.fps > 1.5) warns.push({ check: 'dead-time', t: tc(run0 / C.fps, C.fps), msg: ((n - run0) / C.fps).toFixed(1) + ' s with nothing moving outside a read hold' });
+        run0 = -1;
+      }
+    }
+
+    if (opts.loop) {
+      M.seek(ctx, C, 0); const a = ctx.getImageData(0, 0, C.W, C.H).data;
+      M.seek(ctx, C, C.duration - 1 / C.fps); const b = ctx.getImageData(0, 0, C.W, C.H).data;
+      let s = 0; for (let i = 0; i < a.length; i += 16) s += Math.abs(a[i] - b[i]);
+      if (s / (a.length / 16) > 2) fails.push({ check: 'loop', msg: 'first and last frames differ; the loop will jump' });
+    }
+
+    let probe = null;
+    if (opts.exportProbe) {
+      if (!M.exportVideo) warns.push({ check: 'export-probe', msg: 'export.js is not loaded' });
+      else {
+        try { probe = await M.exportVideo({ spec, cut: cutName, seconds: Math.min(2, C.duration), probe: true }); if (!probe.ok) fails.push({ check: 'export-probe', msg: probe.message }); }
+        catch (e) { fails.push({ check: 'export-probe', msg: e.message }); }
+      }
+    }
+
+    const stats = {
+      cut: cutName, format: C.format, frames: C.frames, duration: +C.duration.toFixed(3), fps: C.fps,
+      msPerFrame: +(ms / C.frames).toFixed(2), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
+      exportPath: probe && probe.path
+    };
+    return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C, hd) };
+  }
+
+  // One frame at each scene's hold midpoint and each transition's midpoint,
+  // labelled with V handles and timecodes outside the frames.
+  function contactSheet(spec, C, hd) {
+    const marks = M.marks(C);
+    const cols = Math.min(6, marks.length);
+    const fw = C.W >= C.H ? 360 : 200, fh = Math.round(fw * C.H / C.W);
+    const lab = 26, pad = 12;
+    const rows = Math.ceil(marks.length / cols);
+    const sheet = document.createElement('canvas');
+    sheet.width = cols * (fw + pad) + pad; sheet.height = rows * (fh + lab + pad) + pad;
+    const sx = sheet.getContext('2d');
+    sx.fillStyle = '#d9d9d6'; sx.fillRect(0, 0, sheet.width, sheet.height);
+    const full = document.createElement('canvas');
+    full.width = C.W; full.height = C.H;
+    const fx = full.getContext('2d');
+    marks.forEach((m, i) => {
+      M.seek(fx, C, m.t, { frameT: m.t });
+      const x = pad + (i % cols) * (fw + pad), y = pad + Math.floor(i / cols) * (fh + lab + pad);
+      sx.drawImage(full, x, y, fw, fh);
+      sx.fillStyle = '#222'; sx.font = '600 13px system-ui, sans-serif'; sx.textBaseline = 'top';
+      const name = m.kind === 'scene' ? hd(m.id) + ' · ' + m.id : '↳ ' + m.id.split('→').map(hd).join(' → ');
+      sx.fillText(name + '  ' + tc(m.t, C.fps), x, y + fh + 5);
+    });
+    return sheet.toDataURL('image/png');
+  }
+
+  root.VideoAudit = { run, contactSheet };
+})(typeof window !== 'undefined' ? window : globalThis);

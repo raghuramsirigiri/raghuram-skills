@@ -185,6 +185,7 @@
     if (e >= 1) return;
     ctx.save();
     M.debug.scene = sc.id;
+    if (M.debug.record && M.debug.phase !== 'transition') M.debug.phase = e > 0 ? 'exit' : raw < 1 ? 'enter' : 'hold';
     if (e > 0) { ctx.globalAlpha *= 1 - e; ctx.translate(0, -24 * e); }
 
     if (L.kind === 'text') drawText(ctx, L, p, raw, lt);
@@ -229,10 +230,11 @@
       if (style === 'brighten') {
         // Words go from muted to ink in reading order; the text is all there from the start.
         const words = ln.words, total = L.wordTotal || 1;
+        const shown = M.ease.outQuint(M.ease.clamp01((lt - (L.at || 0)) / 0.35));   // the muted text fades in first
         words.forEach((w, j) => {
           const idx = (L.wordIndex ? L.wordIndex[i] : 0) + j;
           const q = M.ease.clamp01(raw * total - idx);
-          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: 1 - q, layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: (1 - q) * shown, layer: L.id, role: L.role, size: L.size, large: L.large });
           M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: q, layer: L.id, role: L.role, size: L.size, large: L.large });
         });
         return;
@@ -248,7 +250,7 @@
           if (q <= 0) return;
           ctx.save();
           M.paint.clipRect(ctx, w.x - 4, ln.y - 2, w.w + 8, ln.h + 4);
-          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { clip: [w.x - 4, ln.y - 2, w.w + 8, ln.h + 4], font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large });
           ctx.restore();
         });
         return;
@@ -259,10 +261,12 @@
       const q = M.ease.outQuint(M.ease.clamp01((lt - (L.at || 0) - i * stag) / own));
       if (q <= 0) return;
       ctx.save();
-      M.paint.clipRect(ctx, ln.x - 6, ln.y - 4, ln.w + 12, ln.h + 8);
+      // mask-left reveals from the line's own left edge: nothing shows outside it.
+      const cl = style === 'mask-left' ? [ln.x, ln.y - 4, ln.w + 6, ln.h + 8] : [ln.x - 6, ln.y - 4, ln.w + 12, ln.h + 8];
+      M.paint.clipRect(ctx, cl[0], cl[1], cl[2], cl[3]);
       const dx = style === 'mask-left' ? -(1 - q) * Math.min(ln.w, 200) : 0;
       const dy = style === 'mask-left' ? 0 : (1 - q) * ln.h;
-      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large });
+      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { clip: cl, font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large });
       ctx.restore();
     });
   }
@@ -281,6 +285,7 @@
     // Right-align the rolling digits inside the final width so the unit stays put.
     x += full.w - tab.w;
     const alpha = Math.min(1, raw * 4);
+    const r0 = M.debug.record ? M.debug.record.length : 0;
     tab.parts.forEach(pt => {
       const cx = x + pt.x + (pt.w - M.text.measure(ctx, pt.ch, L.font)) / 2;
       M.paint.text(ctx, pt.ch, cx, L.y, { font: L.font, color: L.color, h: L.h, w: pt.w, alpha, layer: L.id + '#' + pt.x, role: 'value-glyph', size: L.size, large: true });
@@ -288,8 +293,8 @@
     if (M.debug.record) {
       // One record for the whole number, for overlap/read checks.
       const r = M.debug.record;
-      for (let i = r.length - tab.parts.length; i < r.length; i++) r[i].skip = true;
-      r.push({ scene: M.debug.scene, layer: L.id, role: L.role || 'value', text: str, bbox: [x, L.y, tab.w, L.h], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
+      for (let i = r0; i < r.length; i++) r[i].skip = true;
+      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [x, L.y, tab.w, L.h], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
     }
   }
 
@@ -351,7 +356,9 @@
       else if (rb) rule = { x: rb.x, y: rb.y, w: rb.w * g, h: rb.h };
       const holdA = () => paintScene(ctx, C, sc, Math.min(t, sc.exitStart - 1e-6), Math.min(frameT, sc.exitStart - 1e-6));
       const drawB = () => paintScene(ctx, C, next, t, frameT);
+      if (M.debug.record) M.debug.phase = 'transition';
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, rule, drawRule: r => drawRule(ctx, C, r), background: () => background(ctx, C) });
+      M.debug.phase = null;
     } else {
       paintScene(ctx, C, sc, t, frameT);
       drawRule(ctx, C, ruleAt(C, sc, t - sc.t0));

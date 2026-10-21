@@ -99,8 +99,9 @@
     y += R.accentH + 8 * K;
 
     const at = o.at || 0;
-    const sourceLine = o.source !== false ? sourceText(api, o.sourceIds) : null;
-    const srcH = sourceLine ? TY.source.lh + TY.source.pad + TY.source.gap : 0;
+    const sourceLine = o.source !== false ? sourceText(api, o.sourceIds, o.sources) : null;
+    const srcRows = sourceLine ? flowRuns(api, sourceLine, S.w) : [];
+    const srcH = srcRows.length ? srcRows.length * TY.source.lh + TY.source.pad + TY.source.gap : 0;
     const bottom = S.y + S.h - srcH;
     let words = 0, primaryWords = 0;
 
@@ -154,22 +155,51 @@
       }
     }
     const textBottom = y;
-    if (sourceLine) {
-      const sy = S.y + S.h - TY.source.lh;
-      layers.push({ kind: 'hair', id: 'source-rule', x: S.x, y: sy - TY.source.pad, w: S.w, color: d.hair, at: at + 0.7, dur: 0.6, ease: 'glide' });
-      let x = S.x;
-      sourceLine.forEach((run, i) => {
-        const f = T.font(run.strong ? 600 : 400, TY.source.size, d.font);
-        const w = T.measure(ctx, run.text, f);
-        layers.push({
-          kind: 'text', id: 'source-' + i, role: 'source', font: f, size: TY.source.size,
-          color: run.strong ? d.ink : d.muted, reveal: 'fade', at: at + 0.8, dur: 0.5,
-          lines: [{ text: run.text, x, y: sy, w, h: TY.source.lh, words: [{ text: run.text, x, w }] }]
+    if (srcRows.length) {
+      const sy0 = S.y + S.h - srcRows.length * TY.source.lh;
+      layers.push({ kind: 'hair', id: 'source-rule', x: S.x, y: sy0 - TY.source.pad, w: S.w, color: d.hair, at: at + 0.7, dur: 0.6, ease: 'glide' });
+      let k = 0;
+      srcRows.forEach((row, ri) => {
+        row.forEach(run => {
+          layers.push({
+            kind: 'text', id: 'source-' + (k++), role: 'source', font: run.f, size: TY.source.size,
+            color: run.strong ? d.ink : d.muted, reveal: 'fade', at: at + 0.8, dur: 0.5,
+            lines: [{ text: run.text, x: S.x + run.x, y: sy0 + ri * TY.source.lh, w: run.w, h: TY.source.lh, words: [{ text: run.text, x: S.x + run.x, w: run.w }] }]
+          });
         });
-        x += w;
       });
     }
     return { layers, chart, rule, words, primaryWords, textBottom, colW, bottom };
+  }
+
+  // Lay source runs into rows no wider than maxW, splitting a run at spaces
+  // when it doesn't fit. Returns [[{ text, strong, f, x, w }]].
+  function flowRuns(api, runs, maxW) {
+    const T = api.T, d = api.design, TY = M.layout.TYPE;
+    const rows = [[]];
+    let x = 0;
+    const put = (text, strong) => {
+      const f = T.font(strong ? 600 : 400, TY.source.size, d.font);
+      const w = T.measure(api.ctx, text, f);
+      if (x + w > maxW && x > 0) {
+        // Try to break this run at its last space that fits.
+        const words = text.split(' ');
+        let head = '';
+        for (let i = 0; i < words.length; i++) {
+          const next = head ? head + ' ' + words[i] : words[i];
+          if (x + T.measure(api.ctx, next, f) > maxW) break;
+          head = next;
+        }
+        if (head && head.trim()) { put(head, strong); text = text.slice(head.length).replace(/^ /, ''); }
+        rows.push([]); x = 0;
+        if (!text) return;
+        return put(text.replace(/^[ ·;]+/, ''), strong);
+      }
+      rows[rows.length - 1].push({ text, strong, f, x, w });
+      x += w;
+    };
+    runs.forEach(r => put(r.text, r.strong));
+    return rows.filter(r => r.length);
   }
 
   // WCAG "large text", judged at the size a phone shows the frame (frame px / 2.5):
@@ -180,11 +210,12 @@
   }
 
   // "Source: NAME · 14 Oct 2026" as runs, from the claims the scene shows.
-  function sourceText(api, ids) {
-    const used = ids || api.sourceIds || [];
+  function sourceText(api, ids, extra) {
+    const used = ids || [];
     const R = api.R;
     const srcs = [];
     let illustrative = false;
+    (extra || []).forEach(sid => { if (R.sources[sid] && srcs.indexOf(R.sources[sid]) < 0) srcs.push(R.sources[sid]); });
     used.forEach(cid => {
       const c = R.claims[cid];
       if (!c) return;
@@ -214,6 +245,88 @@
     } catch (e) { return String(iso); }
   }
 
+  // ── chart kit: shared by the chart scenes ────────────────────────────
+  function niceStep(span, n) {
+    const raw = span / Math.max(1, n);
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+  function niceTicks(min, max, n) {
+    if (min === max) { max = min + 1; }
+    const step = niceStep(max - min, n || 4);
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const out = [];
+    for (let v = lo; v <= hi + step * 1e-6; v += step) out.push(Math.round(v / step) * step);
+    return out;
+  }
+  function tickLabel(v, locale, unit) {
+    const big = Math.abs(v) >= 10000;
+    const s = M.text.formatNumber(v, locale, big ? { notation: 'compact', maximumFractionDigits: 1 } : { maximumFractionDigits: 2 });
+    return unit === '%' ? s + '%' : s;
+  }
+
+  // Horizontal bars from a zero baseline (charts-lib's barList): a category
+  // label above each bar and its value at the bar's end. rows: [{ label, display, value, emph, forecast }]
+  function hbars(api, box, rows, o) {
+    o = o || {};
+    const d = api.design, T = api.T, ctx = api.ctx, K = M.layout.K;
+    if (rows.some(r => !(r.value >= 0))) throw new Error('bars need values of zero or more');
+    const n = rows.length;
+    const labF = T.font(d.weights.category, d.size.label, d.font);
+    const valF = T.font(d.weights.value, d.size.value, d.font);
+    const rankF = T.font(d.weights.value, d.size.label, d.font);
+    // charts-lib's barList geometry at 2.5x: label above its bar, barHeight 26,
+    // rowGap 22, the label->bar gap tighter than the row->row gap.
+    const labLh = d.size.label * 1.3;
+    const want = labLh + 2 * K + 26 * K + 22 * K;
+    const k = Math.min(1, box.h / (n * want));
+    const barH = Math.max(10 * K, 26 * K * k);
+    const rowH = labLh + 2 * K + barH + 22 * K * k;
+    const valW = Math.max(...rows.map(r => T.measure(ctx, r.display, valF))) + 6 * K;
+    const rankW = o.rank ? T.measure(ctx, String(n), rankF) + 8 * K : 0;
+    const maxW = box.w - valW - rankW;
+    const max = Math.max(...rows.map(r => r.value)) || 1;
+    const anyEmph = rows.some(r => r.emph);
+    const used = n * rowH;
+    const y0 = box.y + Math.max(0, (box.h - used) * (o.valign === 'top' ? 0 : 0.3));
+    const layers = [];
+    const at0 = o.at || 0.6;
+    const stag = o.stagger || 0.1;
+    rows.forEach((r, i) => {
+      const top = y0 + i * rowH;
+      const x = box.x + rankW;
+      const at = at0 + i * stag;
+      const color = r.emph ? d.subject : anyEmph ? d.context : d.series[0];
+      if (o.rank) {
+        layers.push({ kind: 'text', id: 'rank-' + i, role: 'label', font: rankF, size: d.size.label, color: d.muted, reveal: 'fade',
+          lines: T.place(ctx, [String(i + 1)], rankF, box.x, top + labLh, barH, 'left', rankW), at, dur: 0.4 });
+      }
+      layers.push({ kind: 'text', id: 'label-' + i, role: 'label', font: labF, size: d.size.label, color: d.label, reveal: 'fade',
+        lines: T.place(ctx, [r.label], labF, x, top, labLh, 'left', maxW), at, dur: 0.4 });
+      const w = Math.max(1.5 * K, r.value / max * maxW);
+      layers.push({ kind: 'rect', id: 'bar-' + i, x, y: top + labLh + 2 * K, w, h: barH, color, grow: 'x', at: at + 0.05, dur: 0.9, ease: 'expoOut', hatch: !!r.forecast });
+      layers.push({ kind: 'text', id: 'value-' + i, role: 'value', font: valF, size: d.size.value, color: d.value, reveal: 'fade',
+        lines: T.place(ctx, [r.display], valF, x + w + 3 * K, top + labLh + 2 * K, barH, 'left', valW), at: at + 0.55, dur: 0.4 });
+    });
+    return layers;
+  }
+
+  // Rows from spec entries [{ label, value: "F2", emph, forecast }]: each value is a claim.
+  function rows(api, list, where) {
+    if (!Array.isArray(list) || !list.length) throw new Error(where + ' needs a non-empty list');
+    return list.map((r, i) => {
+      const id = String(r.value || '').replace(/[{}]/g, '');
+      const c = api.claim(id);
+      return {
+        label: api.R.fill(r.label, where + '[' + i + '].label'),
+        display: c.display != null ? c.display : String(c.value),
+        value: +c.value, emph: !!r.emph, forecast: !!(r.forecast || c.forecast), claim: c
+      };
+    });
+  }
+
+  M.chart = { niceTicks, tickLabel, hbars, rows };
   M.design = { resolve, contrast, luminance, mix };
   M.card = card;
   M.design.isLarge = isLarge;

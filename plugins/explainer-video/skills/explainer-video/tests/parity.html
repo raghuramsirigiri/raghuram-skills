@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Design parity</title>
+<!-- Dev page, not a deliverable. Serve the repo root over HTTP and open
+     /plugins/explainer-video/skills/explainer-video/tests/parity.html.
+     Left: a social-post portrait card drawn by charts-lib (Charts.barList).
+     Right: explainer-video's hold frame for the same data at 4:5, which is the
+     portrait card's own 1080x1350 picture size. They should read as one family. -->
+<link rel="stylesheet" href="../../../../chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.css">
+<style>
+  :root { --card:#fbfaf8; --ink:#2a2723; --muted:#77716a; --hair:#e4e1dc; }
+  body { margin: 16px; background: #d9d9d6; font: 13px system-ui, sans-serif; }
+  .row { display: flex; gap: 24px; margin-bottom: 28px; align-items: flex-start; }
+  .card { box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; width: 432px; height: 540px;
+    background: var(--card); color: var(--ink); font-family: var(--font); padding: 22px 24px 16px; }
+  .card .kicker { margin: 0 0 6px; font-size: 11px; line-height: 14px; color: var(--muted); }
+  .card h2 { margin: 0 0 6px; font-size: 22px; line-height: 27px; font-weight: 700; text-wrap: balance; }
+  .card .units { margin: 0 0 10px; font-size: 12px; line-height: 16px; color: var(--muted); }
+  .card .chart { flex: 1 1 auto; min-height: 0; width: 100%; }
+  .card .source { margin: 8px 0 0; padding-top: 7px; border-top: 1px solid var(--hair); font-size: 10px; line-height: 13px; color: var(--muted); }
+  .card .source b { font-weight: 600; color: var(--ink); }
+  canvas { width: 432px; height: 540px; }
+  h3 { font: 600 13px system-ui; margin: 0 0 6px; }
+</style></head><body>
+<div id="rows"></div>
+<script src="../assets/charts-lib/theme.js"></script>
+<script src="../../../../chart-dashboard/skills/chart-dashboard/assets/charts-lib/charts.js"></script>
+<script src="../assets/motion-lib/core.js"></script>
+<script src="../assets/motion-lib/ease.js"></script>
+<script src="../assets/motion-lib/text.js"></script>
+<script src="../assets/motion-lib/paint.js"></script>
+<script src="../assets/motion-lib/layout.js"></script>
+<script src="../assets/motion-lib/design.js"></script>
+<script src="../assets/motion-lib/transitions.js"></script>
+<script src="../assets/motion-lib/scenes/compare-bars.js"></script>
+<script>
+const spec = {
+  meta: { title: 'Parity', locale: 'en-GB', preset: 'default', fps: 30 },
+  cuts: { main: { format: '4:5', scenes: ['bars'] } },
+  sources: [{ id: 'A', name: 'Port Halden Transit Authority', date: '2026-10-14' }],
+  claims: [
+    { id: 'F1', value: 0.9, display: '0.9m', source: 'A', locator: 't2', kind: 'copied' },
+    { id: 'F2', value: 0.8, display: '0.8m', source: 'A', locator: 't2', kind: 'copied' },
+    { id: 'F3', value: 0.7, display: '0.7m', source: 'A', locator: 't2', kind: 'copied' }
+  ],
+  scenes: [{ id: 'bars', type: 'compare-bars',
+    copy: { kicker: 'Busiest routes', title: 'The harbour line carried most trips', units: 'Million trips, 2026' },
+    bars: [{ label: 'Harbour line', value: 'F1', emph: true }, { label: 'North shore', value: 'F2' }, { label: 'Island loop', value: 'F3' }] }]
+};
+async function row(preset) {
+  const el = document.createElement('div'); el.className = 'row';
+  document.getElementById('rows').appendChild(el);
+  Charts.applyPreset(preset);
+  const t = Charts.theme, s = document.documentElement.style;
+  s.setProperty('--card', t.bg); s.setProperty('--ink', t.titleColor); s.setProperty('--muted', t.secondaryColor);
+  s.setProperty('--hair', t.grid); s.setProperty('--font', Charts.metrics.font);
+  const id = 'c-' + preset;
+  el.innerHTML = '<div><h3>social card · ' + preset + '</h3><div class="card"><p class="kicker">Busiest routes</p>' +
+    '<h2>The harbour line carried most trips</h2><p class="units">Million trips, 2026</p><div class="chart" id="' + id + '"></div>' +
+    '<p class="source">Source: <b>Port Halden Transit Authority</b> · 14 Oct 2026</p></div></div>' +
+    '<div><h3>video hold frame · ' + preset + '</h3><canvas width="1080" height="1350"></canvas></div>';
+  Charts.barList(id, { legend: { enabled: false }, plotOptions: { barList: { valueSuffix: 'm' } },
+    series: [{ name: 'Trips', data: [{ name: 'Harbour line', y: 0.9, color: t.colors[1] }, { name: 'North shore', y: 0.8, color: t.muted }, { name: 'Island loop', y: 0.7, color: t.muted }] }] });
+  const sp = JSON.parse(JSON.stringify(spec)); sp.meta.preset = preset;
+  await Motion.fonts.ready(sp);
+  const C = Motion.compile(sp, 'main');
+  const sc = C.scenes[0];
+  Motion.seek(el.querySelector('canvas').getContext('2d'), C, (sc.enterEnd + sc.exitStart) / 2);
+}
+addEventListener('load', async () => { for (const p of ['default', 'cyanotype', 'editorial']) await row(p); });
+</script>
+</body></html>
