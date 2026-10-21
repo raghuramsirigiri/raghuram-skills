@@ -83,6 +83,8 @@ test('quotes: a paraphrase in quote marks fails', () => failsWith(s => {
   s.claims[3].display = 'People got used to short showers';
 }, 'quotes', /not in the verbatim/));
 test('timing: a dur below the minimum fails', () => failsWith(s => { s.scenes[0].dur = 1; }, 'timing', /below its minimum/));
+test('shape: an unknown art motif fails', () => failsWith(s => { s.meta.art = { motif: 'stars' }; }, 'shape', /meta\.art/));
+test('shape: logo art without a supplied logo fails', () => failsWith(s => { s.meta.art = { motif: 'logo' }; }, 'shape', /meta\.brand\.logo/));
 test('copy: over the word limit fails', () => failsWith(s => { s.scenes[0].copy.line = 'much less water was used across the whole valley this winter'; }, 'copy', /limit 8/));
 test('copy: a V handle in the caption fails', () => failsWith(s => { s.caption += ' (see V2.1)'; }, 'copy', /handle/));
 test('determinism: Math.random in the page fails', () => failsWith(() => {}, 'determinism', /Math\.random/,

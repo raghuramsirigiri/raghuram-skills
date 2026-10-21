@@ -29,6 +29,7 @@
       if (!painter || typeof painter.draw !== 'function') throw new Error('no painter Motion.custom.' + s.draw + ' with a draw(ctx, lt, api) function');
       const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), units: api.copy('units'), chart: true, sourceIds: api.used() });
       const box = c.chart;
+      api.reserved.push(box);   // the painter may draw anywhere in it
       const enter = +painter.enter || 1;
       const seed = api.spec.meta.seed || 0;
       const layers = c.layers.slice();

@@ -38,7 +38,7 @@
         const used = rowH * (ev.length - 1) + r * 2 + lab * 0.8 + txtLh * 2;
         const y0 = box.y + r + Math.max(0, (box.h - used) * 0.35);
         const y1 = y0 + rowH * (ev.length - 1);
-        layers.push({ kind: 'draw', id: 'rail', at: at0, dur: step * ev.length, ease: 'linear', fn(cx, p) {
+        layers.push({ kind: 'draw', id: 'rail', box: { x: x - r, y: y0 - r, w: r * 2, h: y1 - y0 + r * 2 }, at: at0, dur: step * ev.length, ease: 'linear', fn(cx, p) {
           M.paint.line(cx, x, y0, x, y0 + (y1 - y0) * p, d.hair, d.stroke.axis);
         } });
         ev.forEach((e, i) => {
@@ -54,7 +54,7 @@
       } else {
         const colW = box.w / ev.length;
         const y = box.y + box.h * 0.3;
-        layers.push({ kind: 'draw', id: 'rail', at: at0, dur: step * ev.length, ease: 'linear', fn(cx, p) {
+        layers.push({ kind: 'draw', id: 'rail', box: { x: box.x, y: y - r, w: box.w, h: r * 2 }, at: at0, dur: step * ev.length, ease: 'linear', fn(cx, p) {
           M.paint.line(cx, box.x, y, box.x + (box.w - colW + r) * p, y, d.hair, d.stroke.axis);
         } });
         ev.forEach((e, i) => {

@@ -32,7 +32,7 @@
       const off = Math.max(0, (box.h - rowH * (steps.length - 1) - lh * 2) * 0.35);
       const ys = steps.map((_, i) => box.y + off + i * rowH);
       // The marker: a short accent bar beside the current step, gliding between steps.
-      layers.push({ kind: 'draw', id: 'marker', at: at0, dur: step * (steps.length - 1) + 0.3, ease: 'linear', fn(cx, p, a) {
+      layers.push({ kind: 'draw', id: 'marker', box: { x: box.x, y: ys[0], w: M.layout.RULE.accentH * 1.5, h: ys[ys.length - 1] + lh - ys[0] }, at: at0, dur: step * (steps.length - 1) + 0.3, ease: 'linear', fn(cx, p, a) {
         const local = (a.lt - at0) / step;
         const i = Math.min(steps.length - 1, Math.floor(local));
         const f = M.ease.glide(M.ease.clamp01((local - i) / 0.6));

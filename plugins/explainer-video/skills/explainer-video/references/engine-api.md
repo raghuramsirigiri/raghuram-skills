@@ -14,6 +14,7 @@ validates exactly this shape.
     "preset": "default",
     "palette": null,
     "brand": null,
+    "art": "auto",
     "fonts": [],
     "fps": 30,
     "seed": 7,
@@ -65,6 +66,7 @@ validates exactly this shape.
 | `preset` | a charts-lib preset (`design.md`), default `default` |
 | `palette` | brand palette overrides from `generate-theme.js` / `extract-theme.js`, or `null` |
 | `brand` | `{ "name", "logo": "data:image/…" }`, only what the user supplied |
+| `art` | `"auto"` (default: the user's logo if `brand.logo` holds one, else contour lines), `"off"`, or `{ "motif": "contour" \| "rings" \| "dots" \| "lines" \| "logo" }` (`design.md` § Artwork in the space left) |
 | `fonts` | `[{ "family", "src": "data:font/…", "weight" }]`, only fonts the user supplied |
 | `fps` | 30 (default), 60, 24 or 25 |
 | `seed` | seeds noise and any `api.rng`; changing it changes nothing semantic |
@@ -96,7 +98,7 @@ copy fail the lint, except years and day-month dates.
 ## The JS API
 
 The page loads, in this order (theme first, always): `charts-lib/theme.js`
-→ `core → ease → text → paint → layout → design → transitions → scenes/* →
+→ `core → ease → text → paint → layout → design → transitions → art → scenes/* →
 audio → mux-mp4 → mux-webm → export → player`. The template already has
 the tags; `finalize.js` inlines them in that order.
 

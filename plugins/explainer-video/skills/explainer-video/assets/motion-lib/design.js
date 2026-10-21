@@ -317,6 +317,8 @@
     const anyEmph = rows.some(r => r.emph);
     const used = n * rowH;
     const y0 = box.y + Math.max(0, (box.h - used) * (o.valign === 'top' ? 0 : 0.3));
+    // The plot is data area across its full width: art keeps clear of it.
+    if (api.reserved) api.reserved.push({ x: box.x, y: y0, w: box.w, h: used });
     const layers = [];
     const at0 = o.at || 0.6;
     const stag = o.stagger || 0.1;

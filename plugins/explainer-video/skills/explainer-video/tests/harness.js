@@ -7,7 +7,7 @@ const vm = require('vm');
 
 const SKILL = path.join(__dirname, '..');
 const LIB = path.join(SKILL, 'assets', 'motion-lib');
-const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions'];
+const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art'];
 
 function sceneFiles() {
   return fs.readdirSync(path.join(LIB, 'scenes')).filter(f => f.endsWith('.js')).sort();
@@ -48,6 +48,7 @@ function mockCtx(log) {
     getTransform() { return Object.assign({}, T); },
     translate(x, y) { T.e += x * T.a; T.f += y * T.d; rec('translate', [x, y]); },
     scale(x, y) { T.a *= x; T.d *= y; rec('scale', [x, y]); },
+    rotate(a) { rec('rotate', [a]); },
     setTransform() { T = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
     setLineDash(d) { rec('dash', d); },
     roundRect(...a) { rec('roundRect', a); }

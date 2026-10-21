@@ -84,6 +84,38 @@ or value 2–3× larger in a square frame (110–165 px), more in a tall or wide
 one, in the same face and weight: scale, never a second type system. Context, quote and source-card scenes drop the parts
 they don't need. No scene adds a new kind of component.
 
+## Artwork in the space left
+
+Once the layout fills its frame (`formats.md` § Layout per format), the
+engine puts one piece of monochrome artwork in the largest empty area each
+scene leaves (`art.js`, `meta.art`). It is ground, not content:
+
+- **One tone**: the background moved a short way toward the ink, below the
+  step the audit reads as ink, so it never counts as text or toward fill.
+- **Only in empty space**: inside the safe area, below the progress bar,
+  clear of every text line, bar, image and plot by a margin. A chart's plot
+  is data area even where no mark is drawn yet. A scene too full for it gets
+  none, and the outro (which shows the logo itself) never has any.
+- **Steady**: it keeps its place from scene to scene while that spot stays
+  free, crossfades in place when it must move, and drifts slowly (loops
+  wobble, dashes and hatching turn) so no frame is fully still.
+
+| `meta.art` | Draws |
+| --- | --- |
+| `"auto"` (default) | the user's logo if `meta.brand.logo` holds one, else `contour` |
+| `"contour"` | topographic line loops |
+| `"rings"` | concentric dashed rings |
+| `"dots"` | a halftone field, dots shrinking toward its rim |
+| `"lines"` | a hatched field |
+| `"logo"` | `meta.brand.logo` recoloured to the tone, its inner shapes kept |
+| `"off"` | nothing |
+
+The logo is only ever the one the user supplied, as a data URI: never
+fetched, traced or invented, and never another organisation's. Leave the
+default unless the user asks for something else; turn it `"off"` when they
+want a plain frame. The art fills what a good layout leaves. It is not a
+fix for a scene the audit's fill check warns about.
+
 ## Emphasis
 
 Two colours, not a rainbow. The subject (the bar, the stretch of line, the

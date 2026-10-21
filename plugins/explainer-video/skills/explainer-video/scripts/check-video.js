@@ -76,6 +76,11 @@ if (meta.fps && [24, 25, 30, 60].indexOf(meta.fps) < 0) shape.push('meta.fps mus
 if (meta.preset && PRESETS.indexOf(meta.preset) < 0) shape.push('meta.preset "' + meta.preset + '" is not one of ' + PRESETS.join(', '));
 const score = meta.audio && meta.audio.score;
 if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.audio.score must be off, pulse or ambient');
+if (meta.art != null) {
+  const motif = typeof meta.art === 'object' ? meta.art.motif : meta.art;
+  if (['auto', 'off', 'contour', 'rings', 'dots', 'lines', 'logo'].indexOf(motif) < 0) shape.push('meta.art must be "auto", "off" or { "motif": contour | rings | dots | lines | logo }');
+  else if (motif === 'logo' && !(meta.brand && /^data:image\//.test(meta.brand.logo || ''))) shape.push('meta.art "logo" needs meta.brand.logo: a data URI of the logo the user supplied');
+}
 const scenes = spec.scenes || [];
 const byId = {};
 scenes.forEach(s => { if (byId[s.id]) shape.push('two scenes share the id "' + s.id + '"'); byId[s.id] = s; });
@@ -346,7 +351,7 @@ function loadEngine() {
   vm.createContext(sb);
   const runF = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sb, { filename: f });
   runF(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
-  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions'].forEach(n => runF(path.join(MLIB, n + '.js')));
+  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art'].forEach(n => runF(path.join(MLIB, n + '.js')));
   fs.readdirSync(path.join(MLIB, 'scenes')).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, 'scenes', f)));
   // Custom painters live in the page; stand in for them so timing compiles.
   scenes.filter(s => s.type === 'custom' && s.draw).forEach(s => {

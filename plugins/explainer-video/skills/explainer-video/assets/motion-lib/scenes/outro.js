@@ -59,7 +59,8 @@
           lines: T.place(ctx, ctaLines, ctaF, x, y, Lo.ul, 'center', W), at: 0.5, dur: 0.5 });
       }
       const read = M.readTime(T.wordCount(name) + T.wordCount(cta));
-      return { layers, rule: null, read };
+      // No corner art: the outro shows the logo itself.
+      return { layers, rule: null, art: false, read };
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -44,7 +44,8 @@
       cell(0, b, d.muted, 0.6);
       const p1 = cell(1, a, d.ink, 1.9);
       // The wipe: a rule sweeping into the "after" cell just before its value lands.
-      layers.push({ kind: 'draw', id: 'wipe', at: 1.5, dur: 0.5, ease: 'expoInOut', fn(cx, p) {
+      const wipeBox = tall ? { x: box.x, y: p1.y - 12 * K, w: box.w, h: 4 * K } : { x: p1.x - 12 * K, y: box.y, w: 4 * K, h: box.h };
+      layers.push({ kind: 'draw', id: 'wipe', box: wipeBox, at: 1.5, dur: 0.5, ease: 'expoInOut', fn(cx, p) {
         if (tall) M.paint.line(cx, box.x, p1.y - 10 * K, box.x + box.w * p, p1.y - 10 * K, d.subject, M.layout.RULE.accentH);
         else M.paint.line(cx, p1.x - 10 * K, box.y + box.h * (1 - p), p1.x - 10 * K, box.y + box.h, d.subject, M.layout.RULE.accentH);
       } });

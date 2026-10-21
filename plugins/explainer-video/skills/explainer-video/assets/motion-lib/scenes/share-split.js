@@ -46,7 +46,7 @@
         // Cells fill row by row from the top left; each part takes its share of 100.
         const owner = [];
         parts.forEach((p, i) => { for (let k = 0; k < Math.round(p.value); k++) owner.push(i); });
-        layers.push({ kind: 'draw', id: 'waffle', at: 0.6, dur: 1.2, ease: 'linear', fn(cx, p) {
+        layers.push({ kind: 'draw', id: 'waffle', box: { x: box.x, y: box.y, w: side, h: side }, at: 0.6, dur: 1.2, ease: 'linear', fn(cx, p) {
           for (let k = 0; k < 100; k++) {
             const r = Math.floor(k / 10), col = k % 10;
             const x = box.x + col * (cell + gap), y = box.y + r * (cell + gap);

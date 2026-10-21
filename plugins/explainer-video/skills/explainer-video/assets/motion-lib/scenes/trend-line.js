@@ -29,6 +29,7 @@
         sourceIds: api.used(), sources: D.source ? [D.source] : []
       });
       const box = c.chart;
+      api.reserved.push(box);   // the plot is data area: no art in it
       const vals = D.y.filter(v => v != null);
       const min = Math.min(...vals), max = Math.max(...vals);
       const lo0 = min >= 0 && min < 0.4 * max ? 0 : min;
