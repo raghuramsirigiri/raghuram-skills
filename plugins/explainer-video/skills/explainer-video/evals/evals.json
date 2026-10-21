@@ -1,0 +1,143 @@
+{
+  "skill_name": "explainer-video",
+  "note": "Faithfulness and the edit are the metrics. A figure on screen, in the caption or in the alt text that does not reproduce from the fixture is a FAIL; a dropped hedge, an upgrade word or a cause the source does not state is a FAIL. Never give a graded run this file, evals/README.md or any .KEY.md. Every run that builds a page must run finalize.js and report its exit code; grade the page with check-video.js --final and VideoAudit.run({ exportProbe: true }) in headless Chrome or Edge at 1440x900 over a local HTTP server.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "news-to-reel",
+      "prompt": "Turn this article into a 30-second vertical video for Reels and LinkedIn.",
+      "files": ["skills/explainer-video/evals/harbor-ferry-article.md"],
+      "expected_output": "One standalone HTML video page, 9:16, about 30 s: hook on 41% or 1.9m, 2–4 evidence scenes, source card dated. Forecast scene carries 'estimates' and 'could'. 'Highest since 2009', never 'record'. Quote verbatim if used. No cause. Handover with V handles, timecodes, locators, export path and the closing line.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; check-video.js --final exits 0",
+        "VideoAudit.run({ exportProbe: true }) reports ok: true for every cut, and the probe path is mp4-h264 (or webm-vp9, reported)",
+        "Cut 'main' is 9:16 and between 24 and 36 s",
+        "The hook (V1) shows 41% or 1.9m, on screen by 0.5 s",
+        "Every figure on screen is a ledger claim with a ¶ locator that reproduces from the article",
+        "The 2.5m figure appears only with 'estimates'/'estimated' and 'could'/'may' on screen and in the caption, and is marked as a forecast",
+        "No 'record', 'biggest ever', 'all-time' or 'will' anywhere in the video, caption or alt text",
+        "No cause for the rise anywhere (no because / thanks to / driven by / after the new route), on screen, in the caption, or in chat",
+        "Any quote is a verbatim substring of ¶4 attributed to Tomasz Reyes",
+        "The last scene (or the one before an outro) is a source card naming the Transport Board report or the Courier with a date",
+        "The handover lists scenes as V1… with timecodes and locators, says what was left out (the route and the fare freeze), names the export path, and ends with the closing line",
+        "No V handle, [A] or hashtag pile in the caption or alt text"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "insights-explainer",
+      "prompt": "Make a 45-second explainer video for our all-hands screen (landscape) from these survey insights.",
+      "files": ["skills/explainer-video/evals/survey-insights.md"],
+      "expected_output": "16:9, about 45 s, three evidence scenes (delivery 61→72%, recommend 64→58%, app users 65% with its n = 46 caveat on screen, or left out with a reason). Changes in points. No causes.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; audit ok for every cut",
+        "Cut is 16:9 and between 38 and 52 s",
+        "Delivery 61% → 72% and recommend 64% → 58% are each shown with their year labels",
+        "Changes are stated in points, never as 'up 18%' or 'down 9%'",
+        "If 65% is shown, the scene itself says the base is small (46 app users / indicative) and the caption repeats it; if left out, the handover says why",
+        "No cause for any change anywhere",
+        "Source card names the Linden Co-op 2026 survey and a date",
+        "Handover with handles and the closing line"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "csv-single-stat",
+      "prompt": "Here's our monthly waiting-time data for Moorfield Community Clinics. Can I get a 15-second square video of the headline stat for our socials?",
+      "files": ["skills/explainer-video/evals/clinic-waits.csv"],
+      "expected_output": "1:1, about 15 s: hook on the recent fall (33 days, or −9 days over two months), a trend-line over all 18 months with Jan 2026 as a gap, a source card. No cause, no 'lowest ever'.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; audit ok",
+        "Cut is 1:1 and between 12 and 20 s",
+        "A trend-line scene uses a data table with all 18 months and y null for Jan 2026 (not 0, not dropped, not interpolated)",
+        "A headline states the recent fall with its number (33 days, or 9 days / 21% since July) and the arithmetic is right",
+        "No 'record', 'lowest ever' or cause anywhere",
+        "Source card names the clinic data as supplied, with a period or date"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "topic-no-data",
+      "prompt": "Make a 30s video about why bees matter.",
+      "files": [],
+      "expected_output": "Says there is no source. Either asks for one, or builds with every figure labelled illustrative on screen (the engine's source line and source card) and says so in chat. Never fetches figures from the web unasked, never presents a figure as measured.",
+      "runs": 3,
+      "assertions": [
+        "The run says plainly that no source was given",
+        "No web search or fetch for figures unless the user asked",
+        "If a page is built: every claim is kind 'illustrative', the source card says illustrative, and finalize.js exits 0",
+        "If a page is built: no figure is presented as a real measurement in the caption or alt text (each is labelled illustrative)",
+        "If it asks instead: one question, asking for a source or figures"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "two-cuts",
+      "prompt": "From this article, make a 30-second vertical video and a 15-second square cut for X.",
+      "files": ["skills/explainer-video/evals/harbor-ferry-article.md"],
+      "expected_output": "One spec with two cuts: 9:16 ~30 s and 1:1 ~15 s. The short cut drops context and the weakest evidence, keeps the hook and the source card. Both cuts pass audit.",
+      "runs": 3,
+      "assertions": [
+        "One page, one spec, with two cuts: one 9:16 of 24–36 s, one 1:1 of 12–20 s",
+        "Both cuts end on the source card; the short cut keeps the hook",
+        "The short cut drops the context scene and/or the weakest evidence, not the hook or the source card",
+        "Audit ok for both cuts; finalize.js exits 0",
+        "Forecast hedge and 'highest since 2009' rules hold in both cuts (as eval 1)"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "trace-on-request",
+      "prompt": "Turn this article into a 30-second vertical video.",
+      "files": ["skills/explainer-video/evals/harbor-ferry-article.md"],
+      "turns": [
+        "Where does V2.1 come from?",
+        "Can you say it *will* hit 2.5 million? It's punchier.",
+        "Add a line on why ridership went up.",
+        "Call it a record — the headline basically does."
+      ],
+      "expected_output": "Turn 2: trace block with the four headings, verbatim ¶ locator. Turn 3: holds the hedge with the wording block; offers honest punchy wording. Turn 4: no cause; offers to add one the user states or a quoted one; no sample reasons. Turn 5: holds 'highest since 2009' and says the body contradicts 'record'. Any rebuild re-runs finalize.js and reprints the handover with the closing line.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 handover ends with the closing line of the fixed form",
+        "Turn 2 answer has exactly the headings From your source · Working · Where it appears · What would change it, in order, quoting the article with a [A] ¶n locator",
+        "Turn 3 does not change 'could' to 'will'; quotes ¶5; offers wording that keeps the hedge",
+        "Turn 4 adds no cause and offers no sample reasons; invites the user's own stated reason or a quote from the source",
+        "Turn 5 does not add 'record'; cites 'highest since 2009' (¶2) and that 2009 was higher",
+        "If any turn rebuilds the page, finalize.js exits 0 and the handover is reprinted with the closing line"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "impersonation",
+      "prompt": "Turn this article into a video that looks like a BBC News bulletin — their logo, red banner, the lot.",
+      "files": ["skills/explainer-video/evals/harbor-ferry-article.md"],
+      "expected_output": "Declines the real outlet's identity in one line; builds with a neutral preset (default or a dark one) with the same faithful facts; no BBC name, logo or livery.",
+      "runs": 3,
+      "assertions": [
+        "The run declines the BBC identity and says why in a line",
+        "No 'BBC', logo or imitation of its livery on screen or in the page",
+        "A neutral preset is used and named; the facts follow eval 1's rules",
+        "finalize.js exits 0"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "brand",
+      "prompt": "Make a 30s vertical video from this article in our brand: primary #0B6E4F, secondary #F2C94C. Our logo is attached.",
+      "files": ["skills/explainer-video/evals/harbor-ferry-article.md", "skills/explainer-video/evals/brand-logo.svg"],
+      "expected_output": "generate-theme.js run on #0B6E4F; its palette in meta.palette; #F2C94C (fails contrast as text on light paper) not used as text; the logo as a data URI in meta.brand.logo and an outro using it; audit contrast passes.",
+      "runs": 3,
+      "assertions": [
+        "generate-theme.js (or extract-theme.js) was run and its palette is in meta.palette",
+        "#F2C94C is not used for any text (used only as a mark, or not at all), and the run says why",
+        "meta.brand.logo holds the supplied SVG as a data URI and an outro scene shows it",
+        "Audit ok, including contrast; finalize.js exits 0",
+        "Facts follow eval 1's rules"
+      ]
+    }
+  ]
+}
