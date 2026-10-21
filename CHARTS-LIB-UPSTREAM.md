@@ -137,7 +137,11 @@ S=claude-chart-dashboard/plugins/chart-dashboard/skills/chart-dashboard/assets/c
 cp $U/charts.js $U/theme.js $U/charts.css $U/charts.manifest.json $S/
 cp $U/charts.js $U/theme.js $U/charts.css $U/charts.manifest.json \
   claude-chart-dashboard/plugins/social-post/skills/social-post/assets/charts-lib/
+cp $U/theme.js claude-chart-dashboard/plugins/explainer-video/skills/explainer-video/assets/charts-lib/
 ```
+
+explainer-video takes `theme.js` only: it draws its own canvas charts in the
+library's design system and never loads `charts.js`.
 
 Then, in this repo:
 
@@ -146,7 +150,10 @@ Then, in this repo:
    `upstream-notes.test.js` fails if an applied change went missing, or if a
    proposed one has landed upstream (then delete its section). Then
    `node --test plugins/social-post/skills/social-post/tests/*.test.js`:
-   `shared-files.test.js` fails if the two copies differ.
+   `shared-files.test.js` fails if the two copies differ. Then
+   `node --test plugins/explainer-video/skills/explainer-video/tests/*.test.js`,
+   whose own `shared-files.test.js` checks its `theme.js`. A palette, metric
+   or preset change also needs a look at `tests/parity.html` there.
 2. Read upstream's `git log` and the diff of its agent docs
    (`.agents/skills/charts-lib/`) and `README.md` since the last sync, and
    carry anything a page author needs into `references/chart-api.md` (shared

@@ -1,0 +1,128 @@
+{
+  "version": "1.0.0",
+  "note": "Per-scene facts for the agent and for check-video.js. Slot names and word limits must match each scene's registered `slots` (tests/scenes.test.js holds them in step). `minDur` is typical content time at the default copy length; the compiler computes the real minimum from the words.",
+  "formats": {
+    "9:16": { "size": [1080, 1920], "safe": { "top": 250, "right": 150, "bottom": 380, "left": 60 } },
+    "4:5": { "size": [1080, 1350], "safe": { "top": 60, "right": 60, "bottom": 120, "left": 60 } },
+    "1:1": { "size": [1080, 1080], "safe": { "top": 60, "right": 60, "bottom": 60, "left": 60 } },
+    "16:9": { "size": [1920, 1080], "safe": { "top": 54, "right": 96, "bottom": 54, "left": 96 } }
+  },
+  "transitions": {
+    "cut": { "dur": 0, "ownsExit": true, "internal": "the first scene only" },
+    "swap": { "dur": 0.25, "ownsExit": false, "default": true, "note": "the one transition between scenes; transitionIn in a spec is ignored" }
+  },
+  "scenes": {
+    "hook-headline": {
+      "job": "open on the one claim",
+      "slots": { "kicker": { "words": 4 }, "headline": { "words": 7, "required": true }, "units": { "words": 8 } },
+      "data": null, "claims": "optional, inline as {F1} in the headline",
+      "signature": "words rise through a mask line, staggered", "minDur": 3.4,
+      "notFor": "a hook that is one figure on its own: use big-number"
+    },
+    "big-number": {
+      "job": "one figure, huge",
+      "slots": { "kicker": { "words": 4 }, "value": { "claim": true, "required": true }, "line": { "words": 8, "required": true }, "units": { "words": 8 } },
+      "data": null, "claims": "exactly one, in value",
+      "signature": "counter rolls on expo-out to the exact value, holds >= 1.5 s", "minDur": 4.2,
+      "notFor": "comparing two figures: use before-after or compare-bars"
+    },
+    "kicker-title": {
+      "job": "context or a section title: what, who, when",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 8, "required": true }, "sub": { "words": 10 } },
+      "data": null, "claims": "optional, inline",
+      "signature": "masked line reveal, bar draws above", "minDur": 3.6,
+      "notFor": "a finding with a number: give it an evidence scene"
+    },
+    "compare-bars": {
+      "job": "2-6 values in the same unit",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true }, "units": { "words": 8 } },
+      "data": "bars: 2-6 of { label (<= 3 words), value: claim id, emph?, forecast? }",
+      "signature": "bars grow from zero, value labels land at their ends", "minDur": 4.8,
+      "notFor": "change over time (trend-line), parts of a whole (share-split), negative values"
+    },
+    "trend-line": {
+      "job": "change over ordered time",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true }, "units": { "words": 8 } },
+      "data": "series: data table id { x[], y[] (null = gap), unit, source, locator, forecastFrom? }; end?: claim id; highlight?: [from, to]",
+      "signature": "line draws left to right, end dot and value", "minDur": 5.6,
+      "notFor": "unordered categories, fewer than 3 points, more than one line"
+    },
+    "share-split": {
+      "job": "part of a whole (never a pie)",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true }, "units": { "words": 8 } },
+      "data": "parts: 1-5 of { label, value: claim id in %, emph? }; style?: waffle | bar",
+      "signature": "waffle cells or stacked segments fill in order", "minDur": 5.2,
+      "notFor": "shares that don't come from one whole, or add past 100%"
+    },
+    "ranked-list": {
+      "job": "top-N, largest first",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true }, "units": { "words": 8 } },
+      "data": "rows: 2-5 of { label (<= 4 words), value: claim id, emph? }, in rank order",
+      "signature": "rows arrive by rank, bars grow", "minDur": 5.0,
+      "notFor": "unranked categories (compare-bars)"
+    },
+    "before-after": {
+      "job": "two states of one measure",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true }, "units": { "words": 8 } },
+      "data": "before, after: { label (<= 3 words), value: claim id }",
+      "signature": "before lands muted, a rule wipes, after lands in ink", "minDur": 5.4,
+      "notFor": "values in different units, or more than two states"
+    },
+    "timeline": {
+      "job": "dated events",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true } },
+      "data": "events: 2-5 of { date, text (<= 6 words) }",
+      "signature": "rail draws, dates tick on", "minDur": 5.8,
+      "notFor": "a measured series over time (trend-line)"
+    },
+    "steps": {
+      "job": "a 1-2-3 process",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10, "required": true } },
+      "data": "steps: 2-4 strings, <= 6 words each",
+      "signature": "one marker travels step to step", "minDur": 5.6,
+      "notFor": "events with dates (timeline)"
+    },
+    "quote": {
+      "job": "an attributed quote, verbatim",
+      "slots": { "quote": { "claim": true, "required": true }, "name": { "words": 5, "required": true }, "role": { "words": 8 } },
+      "data": "a claim with quote: true, verbatim (source sentence) and display (on-screen excerpt, a substring of verbatim)",
+      "signature": "words brighten in reading order, attribution after", "minDur": 5.5,
+      "notFor": "paraphrase, or a person the source doesn't quote"
+    },
+    "bullet-stack": {
+      "job": "up to 3 short points",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10 } },
+      "data": "points: 1-3 strings, <= 7 words each",
+      "signature": "each point enters as the previous settles", "minDur": 4.6,
+      "notFor": "points that each carry a figure: give the strongest its own scene"
+    },
+    "photo-pan": {
+      "job": "a picture the user supplied",
+      "slots": { "kicker": { "words": 4 }, "caption": { "words": 12, "required": true }, "image": { "asset": true, "required": true } },
+      "data": "copy.image: a data:image/... URI from the user",
+      "signature": "fades in and holds still, clipped to the chart area; no zoom", "minDur": 4.4,
+      "notFor": "fetched, stock or generated images: never"
+    },
+    "source-card": {
+      "job": "sources and dates; always in every cut",
+      "slots": { "note": { "words": 12 } },
+      "data": "built from sources[] and claims[]",
+      "signature": "quiet fade-up, holds >= 2 s", "minDur": 2.9,
+      "notFor": "anything else: it is last, or just before the outro"
+    },
+    "outro": {
+      "job": "the user's own name, logo and call to action",
+      "slots": { "name": { "words": 6, "required": true }, "cta": { "words": 8 } },
+      "data": "meta.brand.logo, only if the user gave one",
+      "signature": "lockup settles, holds", "minDur": 2.6,
+      "notFor": "invented handles, links or slogans: never"
+    },
+    "custom": {
+      "job": "the escape hatch",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10 }, "units": { "words": 8 } },
+      "data": "draw: name of a painter on Motion.custom { enter, read, draw(ctx, lt, api) }",
+      "signature": "free, under the determinism contract", "minDur": null,
+      "notFor": "anything the catalog already draws"
+    }
+  }
+}

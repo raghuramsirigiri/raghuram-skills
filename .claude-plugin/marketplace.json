@@ -255,6 +255,42 @@
         "offline",
         "zero-dependency"
       ]
+    },
+    {
+      "name": "explainer-video",
+      "source": "./plugins/explainer-video",
+      "description": "Turn an article, news story, report findings or a table into a short explainer video: motion graphics rendered in JavaScript, exported as MP4 in your browser. 15–60 s in 9:16 (Reels, Shorts, TikTok), 1:1, 4:5 or 16:9, in the same design system as chart-dashboard and social-post. Every figure comes from your source with its hedges kept, and the video ends on a dated source card. One standalone HTML file: no other apps, no CDN, works offline; never posts.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "explainer-video",
+        "video",
+        "motion-graphics",
+        "article-to-video",
+        "news-to-video",
+        "text-to-video",
+        "data-video",
+        "animated-infographic",
+        "kinetic-typography",
+        "reels",
+        "shorts",
+        "tiktok",
+        "linkedin-video",
+        "mp4",
+        "webm",
+        "webcodecs",
+        "canvas",
+        "javascript",
+        "zero-dependency",
+        "offline",
+        "explainer",
+        "news",
+        "insights",
+        "data-storytelling"
+      ]
     }
   ]
 }

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — explainer video</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  /* The player page. Its colours follow the video's preset (set below from
+     Charts.theme), so the chrome sits in the same family as the frames. None
+     of this page is ever in the exported video. */
+  :root { --card:#f4f4f0; --ground:#eae8e4; --ink:#111111; --muted:#666666; --hair:#dcdbd7; --accent:#2323FF;
+    --font: system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+  html, body { margin: 0; background: var(--ground); color: var(--ink); }
+  body { font: 14px/1.45 var(--font); }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 18px; line-height: 24px; margin: 0 0 4px; }
+  .lede { margin: 0 0 16px; color: var(--muted); max-width: 70ch; }
+  #player { outline: none; }
+  #player:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+  .mv-stage { position: relative; margin: 0 auto 10px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .mv-canvas, .mv-overlay { display: block; }
+  .mv-overlay { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .mv-controls { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
+  .mv-track { position: relative; flex: 1 1 auto; padding-bottom: 16px; }
+  .mv-scrub { width: 100%; margin: 0; accent-color: var(--accent); }
+  .mv-ticks { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; }
+  .mv-tick { position: absolute; font-size: 10px; line-height: 14px; color: var(--muted); border-left: 1px solid var(--hair); padding-left: 2px; }
+  .mv-time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 120px; text-align: right; }
+  .mv-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button, select { font: 13px var(--font); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--hair); background: var(--card); color: var(--ink); }
+  button.mv-primary, button.mv-play { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  button[aria-pressed="true"] { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, select:focus-visible, .mv-scrub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mv-progress { width: 100%; margin: 10px 0 0; accent-color: var(--accent); }
+  .mv-status { min-height: 20px; margin: 8px 0 0; color: var(--muted); }
+  details { margin-top: 22px; max-width: 70ch; }
+  summary { cursor: pointer; color: var(--muted); }
+  details p { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TITLE</h1>
+  <p class="lede">ONE LINE: what the video shows and where its figures come from.</p>
+  <div id="player"></div>
+  <details><summary>Caption and alt text</summary><p id="caption-out"></p><p id="alt-out"></p></details>
+</main>
+
+<!-- The spec: the contract between you and the engine (references/engine-api.md).
+     Scenes, copy, timings, the claims ledger and sources. Every figure in copy
+     is a claim id ("F1", or "{F1}" inside a string), never a typed number.
+     Write it whole; there are no starter scenes on purpose. -->
+<script type="application/json" id="video-spec">
+{
+  "meta": { "title": "TITLE", "locale": "en-GB", "preset": "default", "fps": 30, "seed": 1,
+            "audio": { "score": "off" }, "motionBlur": { "subframes": 4, "shutter": 0.5 } },
+  "cuts": { "main": { "format": "9:16", "scenes": [] } },
+  "sources": [],
+  "claims": [],
+  "data": [],
+  "scenes": [],
+  "caption": "",
+  "alt": ""
+}
+</script>
+
+<!-- These tags are placeholders: scripts/finalize.js inlines each file so the
+     page works standalone. theme.js MUST load before motion-lib; keep this
+     order. audit.js is staged for verification only and never listed here. -->
+<script src="charts-lib/theme.js"></script>
+<script src="motion-lib/core.js"></script>
+<script src="motion-lib/ease.js"></script>
+<script src="motion-lib/text.js"></script>
+<script src="motion-lib/paint.js"></script>
+<script src="motion-lib/layout.js"></script>
+<script src="motion-lib/design.js"></script>
+<script src="motion-lib/transitions.js"></script>
+<script src="motion-lib/art.js"></script>
+<script src="motion-lib/scenes/hook-headline.js"></script>
+<script src="motion-lib/scenes/big-number.js"></script>
+<script src="motion-lib/scenes/kicker-title.js"></script>
+<script src="motion-lib/scenes/compare-bars.js"></script>
+<script src="motion-lib/scenes/trend-line.js"></script>
+<script src="motion-lib/scenes/share-split.js"></script>
+<script src="motion-lib/scenes/ranked-list.js"></script>
+<script src="motion-lib/scenes/before-after.js"></script>
+<script src="motion-lib/scenes/timeline.js"></script>
+<script src="motion-lib/scenes/steps.js"></script>
+<script src="motion-lib/scenes/quote.js"></script>
+<script src="motion-lib/scenes/bullet-stack.js"></script>
+<script src="motion-lib/scenes/photo-pan.js"></script>
+<script src="motion-lib/scenes/source-card.js"></script>
+<script src="motion-lib/scenes/outro.js"></script>
+<script src="motion-lib/scenes/custom.js"></script>
+<script src="motion-lib/audio.js"></script>
+<script src="motion-lib/mux-mp4.js"></script>
+<script src="motion-lib/mux-webm.js"></script>
+<script src="motion-lib/export.js"></script>
+<script src="motion-lib/player.js"></script>
+<script>
+/* A custom scene's painter goes HERE, only when no catalog scene fits
+   (references/motion.md § Custom scenes). Pure function of lt: no
+   Math.random, Date.now, timers or state kept between calls.
+
+Motion.custom.name = { enter: 1, read: 2, draw(ctx, lt, api) { … } };
+*/
+
+(async function () {
+  const el = document.getElementById('player');
+  try {
+    const spec = Motion.readSpec();
+    // The chrome follows the video's preset (and brand palette, if any).
+    Motion.design.resolve(spec.meta);
+    const t = Charts.theme, s = document.documentElement.style;
+    s.setProperty('--card', t.bg); s.setProperty('--ground', t.tileSurface); s.setProperty('--ink', t.titleColor);
+    s.setProperty('--muted', t.secondaryColor); s.setProperty('--hair', t.grid); s.setProperty('--accent', t.colors[1]);
+    document.getElementById('caption-out').textContent = spec.caption ? 'Caption: ' + spec.caption : '';
+    document.getElementById('alt-out').textContent = spec.alt ? 'Alt text: ' + spec.alt : '';
+    window.videoPlayer = await Motion.player.start(el, { spec });
+  } catch (e) {
+    el.textContent = 'The video spec has a problem: ' + e.message;
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
