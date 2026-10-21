@@ -44,7 +44,7 @@ has it.
    scene. The story works **muted**: there is no voiceover, so the on-screen
    text is the script.
 6. **Everything is readable before it moves on.** The engine holds each text
-   layer for max(1.2 s, 0.6 s + 0.3 s/word), and a big number 1.5 s after it
+   layer for max(1.2 s, 0.5 s + 0.25 s/word), and a big number 1.5 s after it
    lands. Never set a `dur` below a scene's minimum.
 7. **Every cut ends on a source card**: each source with its date, and
    "illustrative" when any figure is. Then, optionally, the user's outro.

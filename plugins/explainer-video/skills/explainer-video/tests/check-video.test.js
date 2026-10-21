@@ -30,7 +30,7 @@ function good() {
       { id: 'hook', type: 'big-number', copy: { kicker: 'Northvale', value: 'F1', line: 'less water used this winter' } },
       { id: 'e1', type: 'kicker-title', copy: { kicker: 'Per person', title: 'Use is now about {F2} a day' } },
       { id: 'e2', type: 'big-number', copy: { kicker: 'The board expects', value: 'F3', line: 'a day could follow by 2028' } },
-      { id: 'src', type: 'source-card', transitionIn: 'flood' }
+      { id: 'src', type: 'source-card' }
     ],
     caption: 'Northvale household water use fell 12% this winter, to about 140 litres a day. The board expects it could settle near 125 litres by 2028.',
     alt: 'Animated video: use fell 12%; about 140 litres a day now; could be 125 litres by 2028. Source: Northvale Water Board bulletin.'
@@ -85,6 +85,12 @@ test('quotes: a paraphrase in quote marks fails', () => failsWith(s => {
 test('timing: a dur below the minimum fails', () => failsWith(s => { s.scenes[0].dur = 1; }, 'timing', /below its minimum/));
 test('shape: an unknown art motif fails', () => failsWith(s => { s.meta.art = { motif: 'stars' }; }, 'shape', /meta\.art/));
 test('shape: logo art without a supplied logo fails', () => failsWith(s => { s.meta.art = { motif: 'logo' }; }, 'shape', /meta\.brand\.logo/));
+test('timing: a transitionIn in the spec warns that it is ignored', () => {
+  const s = good(); s.scenes[3].transitionIn = 'flood';
+  const r = check(page(s));
+  assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
+  assert.ok(r.rows.some(x => x.level === 'WARN' && /transitionIn/.test(x.detail)), JSON.stringify(r.rows.filter(x => x.level === 'WARN')));
+});
 test('copy: over the word limit fails', () => failsWith(s => { s.scenes[0].copy.line = 'much less water was used across the whole valley this winter'; }, 'copy', /limit 8/));
 test('copy: a V handle in the caption fails', () => failsWith(s => { s.caption += ' (see V2.1)'; }, 'copy', /handle/));
 test('determinism: Math.random in the page fails', () => failsWith(() => {}, 'determinism', /Math\.random/,

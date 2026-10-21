@@ -43,14 +43,14 @@ validates exactly this shape.
   "scenes": [
     { "id": "hook", "type": "big-number",
       "copy": { "kicker": "Port Halden ferries", "value": "F1", "line": "more ferry trips than last year" } },
-    { "id": "ctx", "type": "kicker-title", "transitionIn": "mask-up",
+    { "id": "ctx", "type": "kicker-title",
       "copy": { "kicker": "Annual report", "title": "The busiest year on the water since 2011", "sub": "Year to September 2026" } },
-    { "id": "e1", "type": "compare-bars", "transitionIn": "morph-bar",
+    { "id": "e1", "type": "compare-bars",
       "copy": { "kicker": "Trips per year", "title": "Trips rose from {F3} to {F2}", "units": "Million trips, year to September" },
       "bars": [ { "label": "2025", "value": "F3" }, { "label": "2026", "value": "F2", "emph": true } ] },
-    { "id": "e3", "type": "big-number", "transitionIn": "scan",
+    { "id": "e3", "type": "big-number",
       "copy": { "kicker": "The authority estimates", "value": "F4", "line": "trips a year could follow by 2028", "units": "A forecast, not a measurement" } },
-    { "id": "src", "type": "source-card", "transitionIn": "flood" }
+    { "id": "src", "type": "source-card" }
   ],
   "caption": "…",
   "alt": "…"
@@ -76,7 +76,7 @@ validates exactly this shape.
 
 ### Scenes
 
-`{ "id", "type", "copy": { … }, "dur": "auto" | seconds, "transitionIn" }`,
+`{ "id", "type", "copy": { … }, "dur": "auto" | seconds }`,
 plus the type's data keys (`bars`, `rows`, `parts`, `series`, `events`,
 `steps`, `points`, `before`/`after`, `draw`). The slots and data per type
 are in `scenes.md` and `assets/motion-lib/motion.manifest.json`.
@@ -84,8 +84,9 @@ are in `scenes.md` and `assets/motion-lib/motion.manifest.json`.
 - `dur` is **content time** (reveal + read + exit), excluding transitions.
   `"auto"` (default) takes the minimum the words need. A number below the
   minimum fails to compile, naming the scene and the minimum.
-- `transitionIn` (`motion.md` § Transitions) defaults to `mask-up`. The
-  first scene always starts on frame 0.
+- Every scene after the first arrives by the one transition (`motion.md`
+  § Transitions); there is no `transitionIn`. The first scene starts on
+  frame 0.
 - Total length = the sum of scene content plus transitions, rounded to whole
   frames. Frame `n` is drawn at `t = n / fps` for `n` in `[0, N)`.
 

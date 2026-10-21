@@ -10,14 +10,17 @@
  *
  * A scene's local timeline:
  *
- *   t0 ── ovIn ──┬── enter ──┬── read (hold) ──┬── exit ──┬── ovOut ── t1
- *   (transition  │ layers    │ every layer     │ layers   │ (transition
- *    from prev)  │ reveal    │ revealed, still │ leave    │  to next)
+ *   t0 ── ovIn ──┬── enter ──┬── hold ──┬── exit ──┬── ovOut ── t1
+ *   (transition  │ layers    │ every    │ layers   │ (transition
+ *    from prev)  │ reveal    │ layer in │ leave    │  to next)
  *
  * ovIn of a scene is the same stretch of time as ovOut of the one before, so
- * outgoing text has always left before incoming text arrives. A transition
- * that "owns the exit" (cut, flood, scan, push) skips the outgoing exit and
- * moves the outgoing hold frame itself.
+ * outgoing text has always left before incoming text arrives. Every scene
+ * after the first arrives by the same transition (transitions.js); the
+ * spec's old `transitionIn` is ignored. Reading starts when the headline
+ * lands, so the hold is what the read still needs after the entrance. The
+ * content drifts in slowly the whole time it is on screen (paintScene), so
+ * no frame is fully still.
  */
 (function (root) {
   'use strict';
@@ -48,9 +51,9 @@
   }
 
   // ── read-time rule ───────────────────────────────────────────────────
-  // Each reading layer holds, fully revealed and still, for
-  // max(1.2 s, 0.6 s + 0.3 s per word). A big number holds 1.5 s after it lands.
-  const READ = { min: 1.2, base: 0.6, perWord: 0.3, number: 1.5, source: 2.0, final: 1.0 };
+  // Each reading layer is on screen, fully revealed, for
+  // max(1.2 s, 0.5 s + 0.25 s per word). A big number holds 1.5 s after it lands.
+  const READ = { min: 1.2, base: 0.5, perWord: 0.25, number: 1.5, source: 2.0, final: 1.0 };
   const readTime = words => Math.max(READ.min, READ.base + READ.perWord * words);
   const EXIT = 0.35;
 
@@ -114,7 +117,7 @@
         reserved: [],   // data areas the art keeps clear of, beyond the layers' own boxes
         footerRows,     // the video's footer height in source rows (null on the first pass)
         footerUsed: null, chrome: null,   // set by card(): the rows it laid out for, and its kicker and source line
-        trIn: i === 0 ? M.transitions.get('cut') : M.transitions.get(s.transitionIn || 'mask-up'),
+        trIn: M.transitions.get(i === 0 ? 'cut' : 'swap'),
         T: M.text, L: M.layout
       };
       let built;
@@ -142,13 +145,23 @@
     list.forEach((it, i) => {
       const b = it.built;
       const nextSpec = list[i + 1] && list[i + 1].spec;
-      const trIn = i === 0 ? M.transitions.get('cut') : M.transitions.get(it.spec.transitionIn || 'mask-up');
-      const trOut = nextSpec ? M.transitions.get(nextSpec.transitionIn || 'mask-up') : null;
+      const trIn = M.transitions.get(i === 0 ? 'cut' : 'swap');
+      const trOut = nextSpec ? M.transitions.get('swap') : null;
       const last = i === list.length - 1;
-      const enter = b.layers.reduce((mx, l) => Math.max(mx, (l.at || 0) + (l.dur || 0)), 0);
+      const landed = l => (l.at || 0) + (l.dur || 0);
+      const enter = b.layers.reduce((mx, l) => Math.max(mx, landed(l)), 0);
       const read = b.read != null ? b.read : 1.2;
       const exit = last || (trOut && trOut.ownsExit) ? 0 : EXIT;
-      const holdFloor = last ? Math.max(read, READ.final) : read;
+      // The scene's read starts when its headline lands, alongside the rest of
+      // the entrance; every layer that lands later still gets its own time
+      // on screen once it has.
+      const heads = b.layers.filter(l => l.role === 'headline');
+      const readFrom = heads.length ? Math.max(...heads.map(landed)) : enter;
+      const words = l => (l.lines ? l.lines.reduce((n, ln) => n + M.text.wordCount(ln.text), 0) : 0);
+      const need = l => (l.role === 'value' ? READ.number : l.role === 'label' || l.role === 'tick' ? READ.min : l.kind === 'text' ? readTime(words(l)) : 0);
+      const own = b.layers.reduce((mx, l) => Math.max(mx, landed(l) + need(l) - enter), 0);
+      const hold = Math.max(read - (enter - readFrom), own, 0.5);
+      const holdFloor = last ? Math.max(hold, READ.final) : hold;
       const minDur = enter + holdFloor + exit;
       let dur = minDur;
       if (it.spec.dur != null && it.spec.dur !== 'auto') {
@@ -156,7 +169,7 @@
         if (!(d > 0)) throw new Error('scene "' + it.id + '": dur must be "auto" or seconds');
         if (d + 1e-6 < minDur) {
           throw new Error('scene "' + it.id + '": dur ' + d + ' s is below its minimum ' + minDur.toFixed(2) +
-            ' s (enter ' + enter.toFixed(2) + ' + read ' + holdFloor.toFixed(2) + ' + exit ' + exit.toFixed(2) + ')');
+            ' s (enter ' + enter.toFixed(2) + ' + hold ' + holdFloor.toFixed(2) + ' + exit ' + exit.toFixed(2) + ')');
         }
         dur = d;
       }
@@ -344,20 +357,58 @@
       // One record for the whole number, for overlap/read checks.
       const r = M.debug.record;
       for (let i = r0; i < r.length; i++) r[i].skip = true;
-      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [x, L.y, tab.w, L.h], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
+      // In frame pixels, through any transform, like paint.text's records.
+      const m = ctx.getTransform ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
+      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
     }
   }
 
+  // While a scene is on screen its content drifts in, slowly and steadily,
+  // from 97% of its laid-out size to 100% at its end, about the middle of the
+  // content area: a camera easing in, so no frame is ever fully still. It
+  // never grows past its layout, so nothing leaves the safe area or reaches
+  // the shared chrome, which doesn't drift.
+  //
+  // The content is drawn at its laid-out size into a scratch canvas, and that
+  // picture is scaled: scaling text through the canvas transform makes the
+  // browser re-rasterise glyphs at stepped sizes, and big type twitches. The
+  // scratch canvas is cleared every frame, so frames stay pure functions of
+  // t. Without a canvas to draw into (Node), the transform does the scaling.
+  const DRIFT = 0.03;
+  let scratch = null;
+  function scratchFor(C) {
+    if (scratch && scratch.width === C.W && scratch.height === C.H) return scratch;
+    if (typeof document !== 'undefined' && document.createElement) scratch = document.createElement('canvas');
+    else if (typeof OffscreenCanvas !== 'undefined') scratch = new OffscreenCanvas(C.W, C.H);
+    else return null;
+    scratch.width = C.W; scratch.height = C.H;
+    return scratch;
+  }
   function paintScene(ctx, C, sc, t, frameT) {
     let lt = t - sc.cStart;
     const flt = frameT == null ? null : frameT - sc.cStart;
-    if (sc.camera) {
-      const s = sc.camera(t - sc.t0);
+    const k = M.ease.clamp01((t - sc.cStart) / Math.max(1e-3, sc.cEnd - sc.cStart));
+    const s = (1 - DRIFT + DRIFT * k) * (sc.camera ? sc.camera(t - sc.t0) : 1);
+    const cx = C.safe.x + C.safe.w / 2, cy = (C.zone.top + C.zone.bottom) / 2;
+    const buf = Math.abs(s - 1) > 1e-4 ? scratchFor(C) : null;
+    if (buf) {
+      const b = buf.getContext('2d');
+      b.setTransform(1, 0, 0, 1, 0, 0);
+      b.globalAlpha = 1;
+      b.clearRect(0, 0, C.W, C.H);
+      for (const L of sc.layers) drawLayer(b, C, sc, L, lt, flt);
       ctx.save();
-      ctx.translate(C.W / 2, C.H / 2); ctx.scale(s, s); ctx.translate(-C.W / 2, -C.H / 2);
+      ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+      ctx.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(buf, 0, 0);
+      ctx.restore();
+      return;
     }
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
     for (const L of sc.layers) drawLayer(ctx, C, sc, L, lt, flt);
-    if (sc.camera) ctx.restore();
+    ctx.restore();
   }
 
   function background(ctx, C) {
@@ -376,9 +427,8 @@
   // words differ: a new kicker rolls up through its line's own mask as the
   // old one rolls out, and a new source line fades in where the old one
   // faded out. On the first scene the bar and the hairline draw in and the
-  // words rise in; into a scene without chrome (the outro) the bar and the
-  // hairline shrink away and the words leave. morph-bar stretches the bar
-  // along the top, in place.
+  // words rise in; into a scene without chrome (the outro) it all fades out.
+  // The bar never changes size between scenes.
 
   // How far the chrome has arrived at content time lt of sc: null when it
   // was already there in the scene before.
@@ -389,19 +439,23 @@
     return { bar: q(0, 0.5), kicker: q(0, 0.5), hair: q(0.7, 0.6, 'glide'), source: q(0.8, 0.5) };
   }
 
-  // The bar at width `shown` (0..1); stretch (0..1) widens it toward the
-  // full safe width, in place.
-  function drawBar(ctx, C, shown, stretch) {
+  // The bar, drawn in to `shown` (0..1) of its width, at `alpha`.
+  function drawBar(ctx, C, shown, alpha) {
     const S = C.safe, R = M.layout.RULE;
-    const w = R.accentW * shown + (S.w - R.accentW) * (stretch || 0);
-    if (w > 0.5) M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
+    const w = R.accentW * shown;
+    if (w <= 0.5 || alpha <= 0.001) return;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
+    ctx.restore();
   }
 
-  // The footer's hairline, drawn to `shown` of the safe width.
-  function drawHair(ctx, C, shown) {
+  // The footer's hairline, drawn in to `shown` of the safe width, at `alpha`.
+  function drawHair(ctx, C, shown, alpha) {
     const Z = C.zone, S = C.safe;
-    if (!Z.rows || shown <= 0.001) return;
+    if (!Z.rows || shown <= 0.001 || alpha <= 0.001) return;
+    ctx.save(); ctx.globalAlpha *= alpha;
     M.paint.line(ctx, S.x, Z.ruleY, S.x + S.w * shown, Z.ruleY, C.design.hair, M.layout.RULE.hair);
+    ctx.restore();
   }
 
   // A kicker, shifted dy inside its own line's mask.
@@ -428,8 +482,8 @@
     const a = arrival(C, sc, t - sc.cStart);
     const phase = M.debug.phase;
     if (M.debug.record) M.debug.phase = a && a.source < 1 ? 'enter' : 'hold';
-    drawBar(ctx, C, a ? a.bar : 1, 0);
-    drawHair(ctx, C, a ? a.hair : 1);
+    drawBar(ctx, C, a ? a.bar : 1, 1);
+    drawHair(ctx, C, a ? a.hair : 1, 1);
     if (ch.kicker) { const q = a ? a.kicker : 1; drawKicker(ctx, C, sc, ch.kicker, Math.min(1, q * 1.4), (1 - q) * ch.kicker.h); }
     drawSource(ctx, C, sc, ch.source, a ? a.source : 1);
     M.debug.phase = phase;
@@ -437,11 +491,11 @@
 
   // The chrome through the transition from A to B, at progress p (g eased).
   // B's chrome, when A had none, arrives in B's own scene.
-  function chromeBetween(ctx, C, A, B, tr, p, g) {
+  function chromeBetween(ctx, C, A, B, p, g) {
     const a = A.chrome, b = B.chrome;
     if (!a) return;
-    drawBar(ctx, C, b ? 1 : 1 - g, b && tr.stretch ? tr.stretch(p) : 0);
-    drawHair(ctx, C, b ? 1 : 1 - g);
+    drawBar(ctx, C, 1, b ? 1 : 1 - g);
+    drawHair(ctx, C, 1, b ? 1 : 1 - g);
     const ka = a.kicker, kb = b && b.kicker;
     if (ka && kb && ka.key === kb.key) drawKicker(ctx, C, A, ka, 1, 0);
     else {
@@ -479,12 +533,9 @@
       if (sc.art === next.art) drawArt(ctx, C, sc.art, t, 1);
       else { drawArt(ctx, C, sc.art, t, 1 - g); drawArt(ctx, C, next.art, t, g); }
       if (M.debug.record) M.debug.phase = 'transition';
-      // The chrome stays still over the transition; one that floods the
-      // frame paints over it.
-      const chrome = () => chromeBetween(ctx, C, sc, next, tr, p, g);
-      if (tr.coversChrome) chrome();
+      // The chrome stays still over the transition; only its words change.
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, t, 1); } });
-      if (!tr.coversChrome) chrome();
+      chromeBetween(ctx, C, sc, next, p, g);
       M.debug.phase = null;
     } else {
       drawArt(ctx, C, sc.art, t, sc.index === 0 ? M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)) : 1);

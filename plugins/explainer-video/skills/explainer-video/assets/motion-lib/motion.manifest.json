@@ -8,14 +8,8 @@
     "16:9": { "size": [1920, 1080], "safe": { "top": 54, "right": 96, "bottom": 54, "left": 96 } }
   },
   "transitions": {
-    "cut": { "dur": 0, "ownsExit": true },
-    "mask-up": { "dur": 0.4, "ownsExit": false, "default": true },
-    "mask-left": { "dur": 0.4, "ownsExit": false },
-    "morph-bar": { "dur": 0.55, "ownsExit": false },
-    "flood": { "dur": 0.6, "ownsExit": true },
-    "scan": { "dur": 0.5, "ownsExit": true },
-    "push": { "dur": 0.5, "ownsExit": true },
-    "fade": { "dur": 0.4, "ownsExit": true, "onlyWhenAsked": true }
+    "cut": { "dur": 0, "ownsExit": true, "internal": "the first scene only" },
+    "swap": { "dur": 0.25, "ownsExit": false, "default": true, "note": "the one transition between scenes; transitionIn in a spec is ignored" }
   },
   "scenes": {
     "hook-headline": {

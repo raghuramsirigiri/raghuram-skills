@@ -11,8 +11,8 @@ the code.
 
 Every scene takes `"dur": "auto"` (the default) or a number of seconds of
 content time, *excluding* transitions. A number below the scene's minimum is a
-compile error that names the scene, never a silent stretch. `transitionIn`
-picks how the scene arrives (`motion.md` § Transitions).
+compile error that names the scene, never a silent stretch. Every scene
+arrives by the same transition (`motion.md` § Transitions).
 
 Evidence scenes are laid out as a social card: the accent bar and the kicker
 line at the top, headline, units and chart, then a source line under a

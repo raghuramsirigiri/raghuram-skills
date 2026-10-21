@@ -126,10 +126,13 @@ card's furniture.
 
 ## Read time
 
-Each text layer holds, fully revealed and still, for at least
-**max(1.2 s, 0.6 s + 0.3 s per word)**. A big number holds at least 1.5 s after
-its counter lands. The source card holds at least 2 s, and the final frame at
-least 1 s. The compiler builds these in when `dur` is `"auto"`. A number `dur`
+Each text layer is on screen, fully revealed and steady (the scene's slow
+drift aside), for at least **max(1.2 s, 0.5 s + 0.25 s per word)**. A scene's
+read is counted from when its headline lands, so it runs alongside a chart
+that is still drawing. Every layer that lands later still gets its own time
+once it has. A big number holds at least 1.5 s after its counter lands. The
+source card holds at least 2 s, and the final frame at least 1 s. The
+compiler builds these in when `dur` is `"auto"`. A number `dur`
 below a scene's minimum fails to compile. The audit measures what was actually
 painted.
 

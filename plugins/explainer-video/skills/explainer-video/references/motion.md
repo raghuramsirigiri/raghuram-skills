@@ -1,23 +1,27 @@
 # Motion
 
-The engine carries the motion language. Scenes pick a transition, and a
-`custom` scene, rarely, draws its own. These are the numbers it uses and the
+The engine carries the motion language: one transition, a slow drift, and
+a frame that stays put. A `custom` scene, rarely, draws its own content. These are the numbers it uses and the
 rules a custom scene follows.
 
 ## The numbers
 
-- **Read time** (`copy.md` § Read time): max(1.2 s, 0.6 + 0.3 s/word);
-  numbers 1.5 s after landing; source card 2 s; final frame 1 s.
+- **Read time** (`copy.md` § Read time): max(1.2 s, 0.5 + 0.25 s/word),
+  counted from when the headline lands; numbers 1.5 s after landing; source
+  card 2 s; final frame 1 s.
 - **Hook by 0.5 s**: something readable is on screen by frame 15 at 30 fps.
 - **Stagger**: words 60–90 ms, lines up to 100 ms, rows 80–120 ms.
 - **Springs**: ω 12–40. Data is critically damped (never passes its value).
   Non-data shapes may take a tiny overshoot (ζ ≥ 0.8).
-- **Eases**: entrances on `outQuint` (cubic-bezier .16,1,.3,1), morphs and
-  wipes on `glide` (.45,0,.15,1), exits on expo-in.
-- **Camera**: one language per video; a slow push of 1.03–1.07 at most
-  (photo-pan, the push transition). No shake, no random drift.
-- **No dead time**: nothing sits static for more than 1.5 s outside a read
-  hold. The audit warns on it.
+- **Eases**: entrances on `outQuint` (cubic-bezier .16,1,.3,1), morphs on
+  `glide` (.45,0,.15,1), exits on expo-in.
+- **Drift**: while a scene is on screen its content eases in from 97% of its
+  laid-out size to 100%, steadily, about the middle of the content area, so
+  no frame is ever fully still. The shared frame doesn't drift. Photo-pan
+  adds its own slow push (1.03–1.07) to the picture. No shake, no random
+  movement.
+- **Never frozen**: no stretch of a second or more without anything moving,
+  holds included. The audit warns on it (`frozen`).
 
 ## The shared frame
 
@@ -29,8 +33,7 @@ stay still through every transition. Only the scene's own content (headline,
 figure, chart) enters and leaves.
 
 - **The bar**, short, in the subject colour, at the top-left of the safe
-  area. `morph-bar` stretches it along the top for a moment and lets it
-  settle back, in place.
+  area. It never changes size between scenes.
 - **The kicker** sits on its own line under the bar. When the next scene's
   kicker is the same, it doesn't move at all; when it differs, the new one
   rolls up through the line's own mask as the old one rolls out, in place.
@@ -42,30 +45,22 @@ figure, chart) enters and leaves.
   hairline with no source line under it.
 
 On the first scene the bar and the hairline draw in and the words rise in.
-Into a scene without them (the outro) the bar and the hairline shrink away
-and the words leave. A transition that floods the frame (`flood`) paints over
-them; no transition moves them.
+Into a scene without them (the outro) they all fade out, the bar at its full
+size. The transition never moves them.
 
 ## Transitions
 
-Set on the incoming scene as `transitionIn`. A transition moves the scene's
-own content, never the shared frame. Outgoing text always clears
-before incoming text arrives: the transitions that keep the exit
-(`mask-up`, `mask-left`, `morph-bar`) run after the outgoing scene's text has
-left. The ones that own the exit move the outgoing frame themselves.
+**One transition, the same between every pair of scenes.** Real explainers
+use one grammar; a different move at each change reads as random. The
+outgoing content rises a little and fades out (0.35 s, expo-in); for the
+next 0.25 s the shared frame stays still and only swaps its words; then the
+incoming content rises in through its line masks. Nothing sweeps, floods or
+wipes the frame, and nothing resizes the bar. The first scene starts on
+frame 0 with nothing before it.
 
-| Name | Length | What happens | Use for |
-| --- | --- | --- | --- |
-| `mask-up` (default) | 0.4 s | incoming lines rise through a mask | most scene changes |
-| `mask-left` | 0.4 s | lines slide in from their left edge | a list or a sequence |
-| `morph-bar` | 0.55 s | the accent bar stretches along the top, in place, as the lines rise | a turn in the story (context → evidence) |
-| `scan` | 0.5 s | one horizontal line wipes down, new scene above it | a change of chart |
-| `flood` | 0.6 s | an accent field sweeps across with a hard edge | into the source card, or a section break |
-| `push` | 0.5 s | the camera pushes into the outgoing frame as it fades | after a photo, or a dramatic figure |
-| `cut` | 0 | hard cut on the boundary | a fast edit, sparingly |
-| `fade` | 0.4 s | the outgoing frame fades out | only when the user asks for a fade |
-
-Vary them a little; three or four kinds in a 30 s video is plenty.
+There is no per-scene choice. A `transitionIn` left in a spec is ignored,
+and `check-video.js` warns so you delete it. Don't build another transition
+in a custom scene.
 
 ## Banned by default
 

@@ -72,8 +72,8 @@ const FIXTURE_SPEC = () => ({
   ],
   scenes: [
     { id: 'ctx', type: 'kicker-title', copy: { kicker: 'Northvale', title: 'Water use fell this winter' } },
-    { id: 'hook', type: 'big-number', copy: { value: 'F1', line: 'less water used than last winter' }, transitionIn: 'mask-up' },
-    { id: 'src', type: 'source-card', transitionIn: 'flood' }
+    { id: 'hook', type: 'big-number', copy: { value: 'F1', line: 'less water used than last winter' } },
+    { id: 'src', type: 'source-card' }
   ]
 });
 

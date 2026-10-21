@@ -10,8 +10,9 @@
  * Fails: a scene throws; text outside the safe zone; two text layers
  * overlapping; text below the minimum size; contrast below 4.5 (3 for large
  * text); a layer not held still long enough to read; nothing on screen by
- * 0.5 s. Warns: single-frame pops, dead time, text near a box edge, a
- * scene whose hold frame leaves too much of the safe area empty (fill).
+ * 0.5 s. Warns: single-frame pops, a second or more with nothing moving
+ * (frozen), text near a box edge, a scene whose hold frame leaves too much
+ * of the safe area empty (fill).
  */
 (function (root) {
   'use strict';
@@ -40,6 +41,9 @@
   // cards (source-card, outro) are measured but not warned on: their copy is
   // a name and a date, and they already grow to the frame.
   const FILL = { target: 0.6, cells: 10, tol: 28, exempt: ['source-card', 'outro'] };
+  // Mean luminance change (0-255) between frames a second apart, on the
+  // 64 px thumbnail, below which the picture counts as frozen.
+  const FROZEN = 0.05;
   function fillOf(C, ctx, t) {
     const S = C.safe, R = M.layout.RULE;
     M.seek(ctx, C, t, { frameT: t });
@@ -95,6 +99,10 @@
     const thumb = document.createElement('canvas');
     thumb.width = tw; thumb.height = th;
     const tctx = thumb.getContext('2d', { willReadFrequently: true });
+    // Average the frame down properly: a plain resample drops thin text in
+    // and out of the 64 px grid and reads as a pop that isn't there.
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
     const S = C.safe, d = C.design;
     const handle = {};
     C.scenes.forEach((s, i) => { handle[s.id] = 'V' + (i + 1); });
@@ -102,6 +110,12 @@
 
     const diffs = [];
     let prev = null;
+    // Each frame against the one a second earlier: a video that drifts is
+    // never still, one that holds a frozen frame is (the frozen check).
+    const lag = [], ring = [];
+    // Frames where a text layer's own words changed (a counter's step, a
+    // kicker's swap): a jump there is the words, not a pop.
+    const lastText = new Map(), textSteps = new Set();
     const still = new Map();     // layer key -> { start, last, bbox, text, best, role, words }
     const reported = new Set();
     const once = (key, arr, row) => { if (!reported.has(key)) { reported.add(key); arr.push(row); } };
@@ -126,6 +140,9 @@
       for (let i = 0; i < lum.length; i++) lum[i] = 0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2];
       if (prev) { let s = 0; for (let i = 0; i < lum.length; i++) s += Math.abs(lum[i] - prev[i]); diffs.push(s / lum.length); } else diffs.push(0);
       prev = lum;
+      const back = ring[n % C.fps];
+      if (back) { let s = 0; for (let i = 0; i < lum.length; i++) s += Math.abs(lum[i] - back[i]); lag.push(s / lum.length); } else lag.push(Infinity);
+      ring[n % C.fps] = lum;
 
       if (n === Math.round(0.5 * C.fps) && !recs.some(r => r.alpha > 0.5)) {
         fails.push({ check: 'hook', t: tc(t, C.fps), msg: 'nothing readable on screen by 0.5 s' });
@@ -133,6 +150,9 @@
 
       const seen = new Set();
       recs.forEach(r => {
+        const lk = r.scene + '/' + r.layer;
+        if (lastText.has(lk) && lastText.get(lk) !== r.text) textSteps.add(n);
+        lastText.set(lk, r.text);
         const [x, y, w, h] = r.bbox;
         const key = r.scene + '/' + r.layer + '/' + r.text;
         seen.add(key);
@@ -146,11 +166,13 @@
           const ratio = M.design.contrast(hex(rgbOf(r.color)), d.bg);
           if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + d.bg + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
         }
-        // Read time: how long has this exact text sat fully revealed and still?
+        // Read time: how long has this exact text sat fully revealed and
+        // steady? The content's slow drift (well under a pixel a frame) is
+        // steady; a reveal, a roll or an exit is not.
         const st = still.get(key);
         const solid = r.alpha >= 0.99;
-        const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 0.5);
-        if (solid && st && same && st.last === n - 1) { st.last = n; }
+        const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 1);
+        if (solid && st && same && st.last === n - 1) { st.last = n; st.bbox = r.bbox.slice(); }
         else if (solid) { const best = st ? st.best : 0; still.set(key, { start: n, last: n, bbox: r.bbox.slice(), best, role: r.role, text: r.text, scene: r.scene }); }
         const s2 = still.get(key);
         if (s2) s2.best = Math.max(s2.best, (s2.last - s2.start + 1) / C.fps);
@@ -194,15 +216,9 @@
     });
 
     // Pops: a frame-diff spike far above its neighbours, not at a hard cut.
-    // Hard cuts and the sweeping transitions (flood, scan, push) move a lot on
-    // purpose; a jump inside them is the transition, not a pop.
     const cutFrames = new Set();
     C.scenes.forEach(s => {
-      if (s.index === 0) return;
-      if (s.trIn.name === 'cut') cutFrames.add(Math.round(s.t0 * C.fps));
-      if (['flood', 'scan', 'push'].indexOf(s.trIn.name) >= 0) {
-        for (let f = Math.floor(s.t0 * C.fps); f <= Math.ceil((s.t0 + s.trIn.dur) * C.fps) + 1; f++) cutFrames.add(f);
-      }
+      if (s.index > 0 && s.trIn.name === 'cut') cutFrames.add(Math.round(s.t0 * C.fps));
     });
     const pops = [];
     for (let n = 2; n < diffs.length - 2; n++) {
@@ -210,21 +226,19 @@
       const med = win[Math.floor(win.length / 2)] || 0;
       // A pop is one frame that jumps while its neighbours barely move.
       const around = Math.max(diffs[n - 1], diffs[n + 1], 0.1);
-      if (diffs[n] > 1.5 && diffs[n] > 5 * around && diffs[n] > 6 * Math.max(med, 0.15) && !cutFrames.has(n)) pops.push(n);
+      if (diffs[n] > 1.5 && diffs[n] > 5 * around && diffs[n] > 6 * Math.max(med, 0.15) && !cutFrames.has(n) && !textSteps.has(n)) pops.push(n);
     }
     if (pops.length) warns.push({ check: 'pops', msg: 'single-frame jumps at frames ' + pops.slice(0, 12).join(', ') + (pops.length > 12 ? '…' : '') + ' — look at them in the player (← →)' });
 
-    // Dead time: more than 1.5 s without change outside declared holds.
-    const inHold = n => {
-      const t = n / C.fps;
-      return C.scenes.some(s => t >= s.enterEnd - 0.05 && t <= s.exitStart + 0.05) || t >= finalHold.enterEnd;
-    };
+    // Frozen: a frame no different from the one a second before, holds
+    // included. The engine keeps every scene drifting, so this catches a
+    // custom painter or a spec that stops the picture.
     let run0 = -1;
-    for (let n = 1; n <= diffs.length; n++) {
-      const quiet = n < diffs.length && diffs[n] < 0.02 && !inHold(n);
+    for (let n = 0; n <= lag.length; n++) {
+      const quiet = n < lag.length && lag[n] < FROZEN;
       if (quiet && run0 < 0) run0 = n;
       if (!quiet && run0 >= 0) {
-        if ((n - run0) / C.fps > 1.5) warns.push({ check: 'dead-time', t: tc(run0 / C.fps, C.fps), msg: ((n - run0) / C.fps).toFixed(1) + ' s with nothing moving outside a read hold' });
+        warns.push({ check: 'frozen', t: tc((run0 - C.fps) / C.fps, C.fps), msg: ((n - run0) / C.fps + 1).toFixed(1) + ' s with nothing moving — the frame looks frozen' });
         run0 = -1;
       }
     }
@@ -255,6 +269,7 @@
       msPerFrame: +(ms / C.frames).toFixed(2), fill: fill.map(f => ({ handle: hd(f.id), type: f.type, fill: f.fill })), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
       exportPath: probe && probe.path
     };
+    stats.lag = { min: +Math.min(...lag).toFixed(3), median: +lag.filter(isFinite).sort((a, b) => a - b)[Math.floor(lag.filter(isFinite).length / 2)].toFixed(3) };
     return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C) };
   }
 

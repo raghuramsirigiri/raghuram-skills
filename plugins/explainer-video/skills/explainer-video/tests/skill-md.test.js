@@ -68,11 +68,11 @@ test('the closing line in SKILL.md and tracing.md\'s worked handover has the sha
   const template = 'Ask "where does <figure> come from?" or "why does the video open on <hook scene>?" to see the working behind any figure or choice.';
   assert.ok(tracing.includes(template), 'tracing.md states the closing line template');
   const shape = /^Ask "where does (V\d+\.\d+) come from\?" or "why does the video open on (V1)\?" to see the working behind any figure or choice\.$/;
-  const skillLine = skill.split('\n').find(l => l.startsWith('Ask "where does V'));
+  const skillLine = skill.split(/\r?\n/).find(l => l.startsWith('Ask "where does V'));
   assert.match(skillLine || '', shape);
   const block = tracing.match(/Handles live in the chat handover:\s*```([\s\S]*?)```/);
   assert.ok(block, 'tracing.md has a worked handover');
-  assert.match(block[1].trim().split('\n').pop(), shape);
+  assert.match(block[1].trim().split(/\r?\n/).pop(), shape);
 });
 
 test('tracing.md carries the four trace headings, in order, and the choice and wording blocks', () => {

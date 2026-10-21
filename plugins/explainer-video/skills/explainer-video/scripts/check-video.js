@@ -76,6 +76,9 @@ if (meta.fps && [24, 25, 30, 60].indexOf(meta.fps) < 0) shape.push('meta.fps mus
 if (meta.preset && PRESETS.indexOf(meta.preset) < 0) shape.push('meta.preset "' + meta.preset + '" is not one of ' + PRESETS.join(', '));
 const score = meta.audio && meta.audio.score;
 if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.audio.score must be off, pulse or ambient');
+(spec.scenes || []).forEach(sc => {
+  if (sc.transitionIn != null) warn('timing', 'scene "' + sc.id + '": transitionIn "' + sc.transitionIn + '" is ignored — every scene arrives by the one transition (motion.md § Transitions); delete it');
+});
 if (meta.art != null) {
   const motif = typeof meta.art === 'object' ? meta.art.motif : meta.art;
   if (['auto', 'off', 'contour', 'rings', 'dots', 'lines', 'logo'].indexOf(motif) < 0) shape.push('meta.art must be "auto", "off" or { "motif": contour | rings | dots | lines | logo }');
