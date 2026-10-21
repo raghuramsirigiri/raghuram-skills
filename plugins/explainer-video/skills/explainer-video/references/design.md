@@ -65,7 +65,8 @@ the user's own. Offer a neutral preset instead.
 
 An evidence scene **is a social card that moves**. Top to bottom:
 
-1. **the through-line bar**, a short accent rule (`motion.md`);
+1. **the through-line**, a thin progress bar fixed along the top of the safe
+   area (`motion.md`); the card leaves room for it;
 2. **kicker**, muted, 27.5 px;
 3. **headline**, stating the finding with its number: weight 700, ink,
    55 px, balanced lines;

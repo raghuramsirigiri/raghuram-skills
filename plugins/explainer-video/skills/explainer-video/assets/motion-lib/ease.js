@@ -66,7 +66,7 @@
   }
 
   const outQuint = cubicBezier(0.16, 1, 0.3, 1);   // entrances
-  const glide = cubicBezier(0.45, 0, 0.15, 1);     // morphs, the through-line
+  const glide = cubicBezier(0.45, 0, 0.15, 1);     // morphs, wipes, the bar's hand-off
   // Ease an iris by area, not radius, or its first frames jump.
   const areaEase = (t, base) => Math.sqrt((base || expoInOut)(clamp01(t)));
 

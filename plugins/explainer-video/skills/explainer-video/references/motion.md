@@ -13,7 +13,7 @@ rules a custom scene follows.
 - **Springs**: ω 12–40. Data is critically damped (never passes its value).
   Non-data shapes may take a tiny overshoot (ζ ≥ 0.8).
 - **Eases**: entrances on `outQuint` (cubic-bezier .16,1,.3,1), morphs and
-  the through-line on `glide` (.45,0,.15,1), exits on expo-in.
+  wipes on `glide` (.45,0,.15,1), exits on expo-in.
 - **Camera**: one language per video; a slow push of 1.03–1.07 at most
   (photo-pan, the push transition). No shake, no random drift.
 - **No dead time**: nothing sits static for more than 1.5 s outside a read
@@ -21,11 +21,13 @@ rules a custom scene follows.
 
 ## The through-line
 
-Every evidence scene carries a short accent bar above its kicker: the card's
-own rule set in motion. It persists from scene to scene and glides to its
-next position during each transition, so scenes are made out of each other
-rather than cut together. A scene without one (the outro) lets it shrink
-away.
+A thin progress bar runs along the top edge of the safe area, full safe
+width: a muted track (`hair`) with the subject colour filling it as the video
+plays. It never moves up, down or sideways, whatever height a scene's text
+sits at; only its fill grows, so something is moving on every frame. It fades
+in on the first scene, stays through every transition, and fades away into a
+scene that has none (the outro). `morph-bar` swells it to twice its
+thickness for a moment, in place; no transition moves it.
 
 ## Transitions
 
@@ -36,9 +38,9 @@ left. The ones that own the exit move the outgoing frame themselves.
 
 | Name | Length | What happens | Use for |
 | --- | --- | --- | --- |
-| `mask-up` (default) | 0.4 s | bar glides; incoming lines rise through a mask | most scene changes |
-| `mask-left` | 0.4 s | bar glides; lines slide in from their left edge | a list or a sequence |
-| `morph-bar` | 0.55 s | the bar stretches across the frame, then settles in its new place | a turn in the story (context → evidence) |
+| `mask-up` (default) | 0.4 s | incoming lines rise through a mask | most scene changes |
+| `mask-left` | 0.4 s | lines slide in from their left edge | a list or a sequence |
+| `morph-bar` | 0.55 s | the progress bar swells, in place, as the lines rise | a turn in the story (context → evidence) |
 | `scan` | 0.5 s | one horizontal line wipes down, new scene above it | a change of chart |
 | `flood` | 0.6 s | an accent field sweeps across with a hard edge | into the source card, or a section break |
 | `push` | 0.5 s | the camera pushes into the outgoing frame as it fades | after a photo, or a dramatic figure |

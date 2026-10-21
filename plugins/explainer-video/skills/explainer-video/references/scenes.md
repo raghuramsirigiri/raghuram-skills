@@ -14,7 +14,7 @@ content time, *excluding* transitions. A number below the scene's minimum is a
 compile error that names the scene, never a silent stretch. `transitionIn`
 picks how the scene arrives (`motion.md` § Transitions).
 
-Evidence scenes are laid out as a social card: accent bar, kicker, headline,
+Evidence scenes are laid out as a social card: room for the progress bar, kicker, headline,
 units, chart, then a source line under a hairline. The source line is built
 automatically from the sources of the claims the scene shows. You never write
 it.

@@ -304,18 +304,15 @@
     }
   }
 
-  // The through-line: an accent bar that persists across scenes and carries
-  // the transitions. Each scene says where its bar sits (or null).
-  function ruleAt(C, sc, lt) {
-    const r = sc.rule;
-    if (!r) return null;
+  // The through-line: a progress bar along the top edge of the safe area. It
+  // never moves; its fill tracks the video's time, so something is always
+  // moving, and a scene that says rule: null (the outro) lets it fade away.
+  function barShown(C, sc, lt) {
+    if (!sc.rule) return 0;
     const prev = C.scenes[sc.index - 1];
-    // A first appearance draws in from zero width.
-    if (!prev || !prev.rule || sc.trIn.name === 'cut') {
-      const p = M.ease.outQuint(M.ease.clamp01((lt - sc.ovIn) / 0.5));
-      return { x: r.x, y: r.y, w: r.w * p, h: r.h };
-    }
-    return r;
+    // A first appearance fades in.
+    if (!prev || !prev.rule) return M.ease.outQuint(M.ease.clamp01((lt - sc.ovIn) / 0.5));
+    return 1;
   }
 
   function paintScene(ctx, C, sc, t, frameT) {
@@ -338,8 +335,15 @@
     ctx.restore();
   }
 
-  function drawRule(ctx, C, r) {
-    if (r && r.w > 0.5) M.paint.rect(ctx, r.x, r.y, r.w, r.h, C.design.subject);
+  function drawBar(ctx, C, t, shown, swell) {
+    if (shown <= 0.001) return;
+    const S = C.safe, R = M.layout.RULE;
+    const h = R.accentH * (swell || 1);
+    ctx.save();
+    ctx.globalAlpha = shown;
+    M.paint.rect(ctx, S.x, S.y, S.w, h, C.design.hair);
+    M.paint.rect(ctx, S.x, S.y, S.w * M.ease.clamp01(t / C.duration), h, C.design.subject);
+    ctx.restore();
   }
 
   // ── seek ─────────────────────────────────────────────────────────────
@@ -354,20 +358,19 @@
       // In the overlap between sc and next.
       const tr = next.trIn;
       const p = M.ease.clamp01((t - sc.cEnd) / (tr.dur || 1e-6));
-      const ra = sc.rule, rb = next.rule;
       const g = M.ease.glide(p);
-      let rule = null;
-      if (ra && rb) rule = { x: ra.x + (rb.x - ra.x) * g, y: ra.y + (rb.y - ra.y) * g, w: ra.w + (rb.w - ra.w) * g, h: ra.h + (rb.h - ra.h) * g };
-      else if (ra) rule = { x: ra.x, y: ra.y, w: ra.w * (1 - g), h: ra.h };
-      else if (rb) rule = { x: rb.x, y: rb.y, w: rb.w * g, h: rb.h };
+      const shown = next.trIn.name === 'cut' ? (next.rule ? 1 : 0) : (sc.rule ? 1 - g : 0) + (next.rule ? g : 0);
       const holdA = () => paintScene(ctx, C, sc, Math.min(t, sc.exitStart - 1e-6), Math.min(frameT, sc.exitStart - 1e-6));
       const drawB = () => paintScene(ctx, C, next, t, frameT);
       if (M.debug.record) M.debug.phase = 'transition';
-      tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, rule, drawRule: r => drawRule(ctx, C, r), background: () => background(ctx, C) });
+      const bar = () => drawBar(ctx, C, t, shown, tr.swell ? tr.swell(p) : 1);
+      if (tr.coversBar) bar();
+      tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => background(ctx, C) });
+      if (!tr.coversBar) bar();
       M.debug.phase = null;
     } else {
       paintScene(ctx, C, sc, t, frameT);
-      drawRule(ctx, C, ruleAt(C, sc, t - sc.t0));
+      drawBar(ctx, C, t, barShown(C, sc, t - sc.t0));
     }
     if (C.grain) M.paint.grain(ctx, C.W, C.H, Math.round(frameT * C.fps), C.seed, C.grain);
   }

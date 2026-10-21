@@ -34,7 +34,6 @@
       const head = M.layout.RULE.accentH + 8 * K + TY.kicker.lh + TY.kicker.gap * 2;
       const h = head + blocks.reduce((n, b) => n + b.lines.length * b.lh + b.gap, 0);
       let y = S.y + Math.max(0, (S.h - h) * 0.42);
-      const rule = { x: S.x, y, w: M.layout.RULE.accentW, h: M.layout.RULE.accentH };
       y += M.layout.RULE.accentH + 8 * K;
       const layers = [{
         kind: 'text', id: 'kicker', role: 'kicker', font: kF, size: TY.kicker.size, color: d.muted, reveal: 'fade',
@@ -52,7 +51,7 @@
         words += T.wordCount(b.str);
       });
       const read = Math.max(M.READ.source, M.readTime(words) * 0.75);
-      return { layers, rule, read };
+      return { layers, rule: true, read };
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
