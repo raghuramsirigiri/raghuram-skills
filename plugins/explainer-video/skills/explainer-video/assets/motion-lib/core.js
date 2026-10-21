@@ -97,7 +97,10 @@
     const byId = {};
     (spec.scenes || []).forEach(s => { byId[s.id] = s; });
 
-    const list = cut.scenes.map((id, i) => {
+    // Build every scene. The footer is shared, so its height is the most any
+    // scene's source line needs: build once to find it, and again if any
+    // scene laid itself out for a different footer.
+    const build = footerRows => cut.scenes.map((id, i) => {
       const s = byId[id];
       if (!s) throw new Error('cut "' + name + '": no scene with id "' + id + '"');
       const def = M.scenes[s.type];
@@ -109,6 +112,8 @@
         claim: cid => { used.add(cid); return R.claim(cid, 'scene "' + id + '"'); },
         used: () => [...used],
         reserved: [],   // data areas the art keeps clear of, beyond the layers' own boxes
+        footerRows,     // the video's footer height in source rows (null on the first pass)
+        footerUsed: null, chrome: null,   // set by card(): the rows it laid out for, and its kicker and source line
         trIn: i === 0 ? M.transitions.get('cut') : M.transitions.get(s.transitionIn || 'mask-up'),
         T: M.text, L: M.layout
       };
@@ -116,8 +121,14 @@
       try { built = def.build(s, api); } catch (e) { throw new Error('scene "' + id + '" (' + s.type + '): ' + e.message); }
       const rv = api.trIn.reveal || 'mask-up';
       built.layers.forEach(l => { if (l.kind === 'text' && !l.reveal) l.reveal = rv; });
-      return { spec: s, def, built, used: [...used], id, type: s.type, reserved: api.reserved };
+      return { spec: s, def, built, used: [...used], id, type: s.type, reserved: api.reserved, chrome: api.chrome, footerUsed: api.footerUsed };
     });
+    let list = build(null);
+    const rows = Math.max(0, ...list.map(it => (it.chrome && it.chrome.source ? it.chrome.source.length : 0)));
+    if (list.some(it => it.footerUsed != null && it.footerUsed !== rows)) list = build(rows);
+    const zone = M.design.frameZone(fr, rows);
+    const chromeBoxes = [{ x: fr.safe.x, y: fr.safe.y, w: fr.safe.w, h: zone.top - fr.safe.y }]
+      .concat(rows ? [{ x: fr.safe.x, y: zone.ruleY - 4, w: fr.safe.w, h: fr.safe.y + fr.safe.h - zone.ruleY + 4 }] : []);
 
     // Timing. With a soundtrack on and a bpm, every scene's content starts on
     // a beat: the scene before it holds a little longer to get there.
@@ -153,7 +164,7 @@
       // refuse it (art: false), as the outro does with its own logo.
       let artAt = null;
       if (art && b.art !== false) {
-        artAt = M.art.place(fr, M.art.boxes(b.layers, it.reserved, ctx), artPrev);
+        artAt = M.art.place(fr, M.art.boxes(b.layers, it.reserved.concat(chromeBoxes), ctx), artPrev);
         artPrev = artAt;
       }
       const ovIn = i === 0 ? 0 : trIn.dur;
@@ -170,6 +181,7 @@
       scenes.push({
         id: it.id, type: it.type, index: i, def: it.def, spec: it.spec, built: b,
         layers: b.layers, rule: b.rule || null, used: it.used, art: artAt,
+        chrome: b.rule ? placeChrome(it.chrome, fr, zone, design, ctx) : null,
         t0, t1, cStart, enterEnd: cStart + enter, exitStart, cEnd, ovIn, ovOut,
         enter, read: holdFloor, exit, minDur, dur, trIn, trOut, last
       });
@@ -182,9 +194,31 @@
 
     return {
       cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, safe: fr.safe, fps, frames, duration,
-      scenes, design, art: art ? Object.assign({ tone: M.art.tone(design) }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
+      scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design) }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
       images: opts.images || M.images || {}
     };
+  }
+
+  // A scene's kicker and source line, placed in the shared frame. `key` says
+  // whether two scenes' words are the same, in which case nothing changes
+  // between them.
+  function placeChrome(ch, fr, zone, design, ctx) {
+    const S = fr.safe, TY = M.layout.typeFor(fr), d = design;
+    const out = { kicker: null, source: null };
+    if (ch && ch.kicker) {
+      const f = M.text.font(400, TY.kicker.size, d.font);
+      const ln = M.text.place(ctx, [ch.kicker], f, S.x, zone.kickerY, TY.kicker.lh, 'left', S.w)[0];
+      out.kicker = { key: ch.kicker, font: f, size: TY.kicker.size, color: d.muted, x: ln.x, y: ln.y, w: ln.w, h: ln.h, text: ln.text };
+    }
+    if (ch && ch.source) {
+      const runs = [];
+      ch.source.forEach((row, ri) => row.forEach(run => runs.push({
+        text: run.text, font: run.f, color: run.strong ? d.ink : d.muted,
+        x: S.x + run.x, y: zone.rowsY + ri * TY.source.lh, w: run.w, h: TY.source.lh
+      })));
+      out.source = { key: ch.source.map(row => row.map(r => r.text).join('')).join('\n'), runs, size: TY.source.size };
+    }
+    return out;
   }
 
   // ── layer rendering ──────────────────────────────────────────────────
@@ -314,19 +348,6 @@
     }
   }
 
-  // The through-line: the card's short accent bar, fixed at the top-left of
-  // the safe area. It sits in the same place on every scene and through every
-  // transition. It draws in from zero width on its first scene, morph-bar
-  // stretches it along the top and lets it settle back, and a scene that says
-  // rule: null (the outro) lets it shrink away. barShown is its width, 0..1.
-  function barShown(C, sc, lt) {
-    if (!sc.rule) return 0;
-    const prev = C.scenes[sc.index - 1];
-    // A first appearance draws in from zero width.
-    if (!prev || !prev.rule) return M.ease.outQuint(M.ease.clamp01((lt - sc.ovIn) / 0.5));
-    return 1;
-  }
-
   function paintScene(ctx, C, sc, t, frameT) {
     let lt = t - sc.cStart;
     const flt = frameT == null ? null : frameT - sc.cStart;
@@ -347,11 +368,92 @@
     ctx.restore();
   }
 
-  // stretch (0..1) widens it toward the full safe width, in place.
+  // ── chrome: the parts every scene shares ─────────────────────────────
+  // The accent bar (the through-line), the kicker line under it and the
+  // footer (a hairline over the source line) sit in one place for the whole
+  // video (C.zone), outside the scenes, and stay still through every
+  // transition. Only their words change, and only when the next scene's
+  // words differ: a new kicker rolls up through its line's own mask as the
+  // old one rolls out, and a new source line fades in where the old one
+  // faded out. On the first scene the bar and the hairline draw in and the
+  // words rise in; into a scene without chrome (the outro) the bar and the
+  // hairline shrink away and the words leave. morph-bar stretches the bar
+  // along the top, in place.
+
+  // How far the chrome has arrived at content time lt of sc: null when it
+  // was already there in the scene before.
+  function arrival(C, sc, lt) {
+    const prev = C.scenes[sc.index - 1];
+    if (prev && prev.chrome) return null;
+    const q = (at, dur, e) => M.ease[e || 'outQuint'](M.ease.clamp01((lt - at) / dur));
+    return { bar: q(0, 0.5), kicker: q(0, 0.5), hair: q(0.7, 0.6, 'glide'), source: q(0.8, 0.5) };
+  }
+
+  // The bar at width `shown` (0..1); stretch (0..1) widens it toward the
+  // full safe width, in place.
   function drawBar(ctx, C, shown, stretch) {
     const S = C.safe, R = M.layout.RULE;
     const w = R.accentW * shown + (S.w - R.accentW) * (stretch || 0);
     if (w > 0.5) M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
+  }
+
+  // The footer's hairline, drawn to `shown` of the safe width.
+  function drawHair(ctx, C, shown) {
+    const Z = C.zone, S = C.safe;
+    if (!Z.rows || shown <= 0.001) return;
+    M.paint.line(ctx, S.x, Z.ruleY, S.x + S.w * shown, Z.ruleY, C.design.hair, M.layout.RULE.hair);
+  }
+
+  // A kicker, shifted dy inside its own line's mask.
+  function drawKicker(ctx, C, sc, k, alpha, dy) {
+    if (!k || alpha <= 0.001) return;
+    M.debug.scene = sc.id;
+    const clip = [k.x - 6, k.y - 4, C.safe.w + 12, k.h + 8];
+    ctx.save();
+    M.paint.clipRect(ctx, clip[0], clip[1], clip[2], clip[3]);
+    M.paint.text(ctx, k.text, k.x, k.y + dy, { clip, font: k.font, color: k.color, h: k.h, w: k.w, alpha, layer: 'chrome-kicker', role: 'kicker', size: k.size });
+    ctx.restore();
+  }
+
+  function drawSource(ctx, C, sc, src, alpha) {
+    if (!src || alpha <= 0.001) return;
+    M.debug.scene = sc.id;
+    src.runs.forEach((r, i) => M.paint.text(ctx, r.text, r.x, r.y, { font: r.font, color: r.color, h: r.h, w: r.w, alpha, layer: 'chrome-source-' + i, role: 'source', size: src.size }));
+  }
+
+  // The chrome on a frame inside scene sc.
+  function chromeSteady(ctx, C, sc, t) {
+    const ch = sc.chrome;
+    if (!ch) return;
+    const a = arrival(C, sc, t - sc.cStart);
+    const phase = M.debug.phase;
+    if (M.debug.record) M.debug.phase = a && a.source < 1 ? 'enter' : 'hold';
+    drawBar(ctx, C, a ? a.bar : 1, 0);
+    drawHair(ctx, C, a ? a.hair : 1);
+    if (ch.kicker) { const q = a ? a.kicker : 1; drawKicker(ctx, C, sc, ch.kicker, Math.min(1, q * 1.4), (1 - q) * ch.kicker.h); }
+    drawSource(ctx, C, sc, ch.source, a ? a.source : 1);
+    M.debug.phase = phase;
+  }
+
+  // The chrome through the transition from A to B, at progress p (g eased).
+  // B's chrome, when A had none, arrives in B's own scene.
+  function chromeBetween(ctx, C, A, B, tr, p, g) {
+    const a = A.chrome, b = B.chrome;
+    if (!a) return;
+    drawBar(ctx, C, b ? 1 : 1 - g, b && tr.stretch ? tr.stretch(p) : 0);
+    drawHair(ctx, C, b ? 1 : 1 - g);
+    const ka = a.kicker, kb = b && b.kicker;
+    if (ka && kb && ka.key === kb.key) drawKicker(ctx, C, A, ka, 1, 0);
+    else {
+      if (ka) drawKicker(ctx, C, A, ka, 1 - g, -g * ka.h);
+      if (kb) drawKicker(ctx, C, B, kb, g, (1 - g) * kb.h);
+    }
+    const sa = a.source, sb = b && b.source;
+    if (sa && sb && sa.key === sb.key) drawSource(ctx, C, A, sa, 1);
+    else {
+      drawSource(ctx, C, A, sa, 1 - M.ease.clamp01(p * 2));
+      drawSource(ctx, C, B, sb, M.ease.clamp01(p * 2 - 1));
+    }
   }
 
   function drawArt(ctx, C, at, t, alpha) {
@@ -371,22 +473,23 @@
       const tr = next.trIn;
       const p = M.ease.clamp01((t - sc.cEnd) / (tr.dur || 1e-6));
       const g = M.ease.glide(p);
-      const shown = next.trIn.name === 'cut' ? (next.rule ? 1 : 0) : (sc.rule ? 1 - g : 0) + (next.rule ? g : 0);
       const holdA = () => paintScene(ctx, C, sc, Math.min(t, sc.exitStart - 1e-6), Math.min(frameT, sc.exitStart - 1e-6));
       const drawB = () => paintScene(ctx, C, next, t, frameT);
       // Art that stays put draws once; art that moves crossfades in place.
       if (sc.art === next.art) drawArt(ctx, C, sc.art, t, 1);
       else { drawArt(ctx, C, sc.art, t, 1 - g); drawArt(ctx, C, next.art, t, g); }
       if (M.debug.record) M.debug.phase = 'transition';
-      const bar = () => drawBar(ctx, C, shown, tr.stretch && sc.rule && next.rule ? tr.stretch(p) : 0);
-      if (tr.coversBar) bar();
+      // The chrome stays still over the transition; one that floods the
+      // frame paints over it.
+      const chrome = () => chromeBetween(ctx, C, sc, next, tr, p, g);
+      if (tr.coversChrome) chrome();
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, t, 1); } });
-      if (!tr.coversBar) bar();
+      if (!tr.coversChrome) chrome();
       M.debug.phase = null;
     } else {
       drawArt(ctx, C, sc.art, t, sc.index === 0 ? M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)) : 1);
       paintScene(ctx, C, sc, t, frameT);
-      drawBar(ctx, C, barShown(C, sc, t - sc.t0), 0);
+      chromeSteady(ctx, C, sc, t);
     }
     if (C.grain) M.paint.grain(ctx, C.W, C.H, Math.round(frameT * C.fps), C.seed, C.grain);
   }

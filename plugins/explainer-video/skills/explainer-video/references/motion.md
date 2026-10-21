@@ -19,18 +19,37 @@ rules a custom scene follows.
 - **No dead time**: nothing sits static for more than 1.5 s outside a read
   hold. The audit warns on it.
 
-## The through-line
+## The shared frame
 
-The card's short accent bar, in the subject colour, sits fixed at the
-top-left of the safe area: the same place and size on every scene, whatever
-height that scene's text sits at, and through every transition. It draws in
-from zero width on the first scene and shrinks away into a scene that has
-none (the outro). `morph-bar` stretches it along the top for a moment and
-lets it settle back, in place; no transition moves it.
+Three things are the same on every slide, so they are never rebuilt between
+slides: **the accent bar** (the through-line), **the kicker line** under it,
+and **the footer**, a hairline over the source line. The engine draws them
+outside the scenes, in one place for the whole video (per format), and they
+stay still through every transition. Only the scene's own content (headline,
+figure, chart) enters and leaves.
+
+- **The bar**, short, in the subject colour, at the top-left of the safe
+  area. `morph-bar` stretches it along the top for a moment and lets it
+  settle back, in place.
+- **The kicker** sits on its own line under the bar. When the next scene's
+  kicker is the same, it doesn't move at all; when it differs, the new one
+  rolls up through the line's own mask as the old one rolls out, in place.
+  A scene without a kicker leaves the line empty.
+- **The footer**: the hairline sits where the video's longest source line
+  needs it and never moves. When the next scene's source line is the same,
+  nothing changes; when it differs, the old one fades out and the new one
+  fades in on the same rows. A scene that shows no figures keeps the
+  hairline with no source line under it.
+
+On the first scene the bar and the hairline draw in and the words rise in.
+Into a scene without them (the outro) the bar and the hairline shrink away
+and the words leave. A transition that floods the frame (`flood`) paints over
+them; no transition moves them.
 
 ## Transitions
 
-Set on the incoming scene as `transitionIn`. Outgoing text always clears
+Set on the incoming scene as `transitionIn`. A transition moves the scene's
+own content, never the shared frame. Outgoing text always clears
 before incoming text arrives: the transitions that keep the exit
 (`mask-up`, `mask-left`, `morph-bar`) run after the outgoing scene's text has
 left. The ones that own the exit move the outgoing frame themselves.

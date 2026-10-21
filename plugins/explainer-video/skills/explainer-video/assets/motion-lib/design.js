@@ -78,13 +78,34 @@
     };
   }
 
+  // ── the frame every scene shares ─────────────────────────────────────
+  // The accent bar, the kicker line under it and the footer (a hairline over
+  // the source line) sit in one place for the whole video, per format, and
+  // stay still through every transition: core.js draws them outside the
+  // scenes and changes only their words. `rows` is the video's footer height
+  // in source rows, the most any scene needs, so the hairline never moves.
+  // Scene content lives between `top` and `bottom`.
+  //
+  //   frameZone(frame, rows) -> { kickerY, kickerH, top, bottom, ruleY, rowsY, rows }
+  function frameZone(F, rows) {
+    const S = F.safe, K = M.layout.K, R = M.layout.RULE, TY = M.layout.typeFor(F);
+    const kickerY = S.y + R.accentH + 8 * K;
+    const ruleY = S.y + S.h - rows * TY.source.lh - TY.source.pad;
+    return {
+      kickerY, kickerH: TY.kicker.lh, top: kickerY + TY.kicker.lh + TY.kicker.gap,
+      bottom: rows ? ruleY - TY.source.gap : S.y + S.h, ruleY, rowsY: ruleY + TY.source.pad, rows
+    };
+  }
+
   // ── card anatomy ─────────────────────────────────────────────────────
-  // An evidence scene is a social card that moves. Top to bottom: room for
-  // the accent bar (the through-line), kicker (muted), headline stating the
-  // finding with its number (700, ink, balanced), units line (muted), the
-  // chart in the remaining height, and a source line under a hairline with
-  // the source name in semibold ink. Scenes drop the parts they don't need;
-  // they never add new kinds of component.
+  // An evidence scene is a social card that moves. Top to bottom: the accent
+  // bar (the through-line) and the kicker (muted), both in the shared frame
+  // above; the headline stating the finding with its number (700, ink,
+  // balanced), units line (muted), the chart in the remaining height; and the
+  // source line under its hairline in the shared footer, the source name in
+  // semibold ink. card() hands the kicker and the source line to the frame
+  // (api.chrome) and lays out only the scene's own content. Scenes drop the
+  // parts they don't need; they never add new kinds of component.
   //
   // The frame's profile (layout.js) composes it for its shape: in a wide
   // frame the words sit in a left column, centred on its height, with the
@@ -94,7 +115,7 @@
   // size, and a headline beside a chart to one and a half times.
   //
   //   card(api, { kicker, headline, units, chart: true, display, grow, valign, split })
-  //   -> { layers, chart: {x,y,w,h} | null, rule, words, primaryWords, textBottom, colW, bottom, TY }
+  //   -> { layers, chart: {x,y,w,h} | null, rule, words, primaryWords, textBottom, colW, bottom, TY, split, zone }
   function card(api, o) {
     const d = api.design, F = api.frame, T = api.T, TY = M.layout.typeFor(F), K = M.layout.K;
     const ctx = api.ctx;
@@ -106,20 +127,18 @@
     // (a wide frame keeps a line short enough to read).
     const colW = split ? Math.round(S.w * P.col) : wide ? Math.round(S.w * 0.8) : S.w;
     const layers = [];
-    const R = M.layout.RULE;
-    // The accent bar sits fixed at the top-left of the safe area (core.js);
-    // every card leaves room for it, whatever its own vertical alignment.
-    let y = S.y;
     const rule = true;
-    y += R.accentH + 8 * K;
-    const top = y;
-
     const at = o.at || 0;
     const sourceLine = o.source !== false ? sourceText(api, o.sourceIds, o.sources) : null;
     const srcRows = sourceLine ? flowRuns(api, sourceLine, S.w) : [];
-    const srcH = srcRows.length ? srcRows.length * TY.source.lh + TY.source.pad + TY.source.gap : 0;
-    const bottom = S.y + S.h - srcH;
-    let words = 0, primaryWords = 0;
+    // The kicker and the source line belong to the shared frame, which keeps
+    // them still from scene to scene; the card lays out what's between them.
+    const Z = frameZone(F, api.footerRows != null ? api.footerRows : srcRows.length);
+    api.footerUsed = Z.rows;
+    api.chrome = { kicker: o.kicker || null, source: srcRows.length ? srcRows : null };
+    let y = Z.top;
+    const top = y, bottom = Z.bottom;
+    let words = T.wordCount(o.kicker), primaryWords = 0;
 
     function textLayer(id, role, str, size, lh, weight, color, top, extra) {
       const f = T.font(weight, size, d.font);
@@ -132,17 +151,15 @@
     }
 
     const blocks = [];
-    if (o.kicker) blocks.push({ id: 'kicker', role: 'kicker', str: o.kicker, size: TY.kicker.size, lh: TY.kicker.lh, gap: TY.kicker.gap, w: 400, color: d.muted, at: at, dur: 0.5 });
     if (o.headline) {
       let size = TY.headline.size, lh = TY.headline.lh;
       const grow = o.display ? { min: TY.display.min, max: TY.display.max, share: o.chart && !split ? 0.5 : 1, lines: 4, lh: 1.12 }
-        : o.grow && !o.chart ? { min: size, max: Math.max(TY.display.min * 1.1, TY.display.max * 0.6), share: 0.75, lines: 4, lh: 1.15 }
+        : o.grow && !o.chart ? { min: size, max: Math.max(TY.display.min * 1.1, TY.display.max * 0.7), share: 0.85, lines: 4, lh: 1.15 }
         : split ? { min: size, max: size * 1.5, share: 0.5, lines: 5, lh: 1.2 }
         : null;
       if (grow) {
-        // The headline's room is what the kicker and units leave.
-        const others = (o.kicker ? TY.kicker.lh + TY.kicker.gap : 0) +
-          (o.units ? TY.headline.gap + T.balance(ctx, o.units, T.font(400, TY.units.size, d.font), colW).length * TY.units.lh : 0);
+        // The headline's room is what the units line leaves.
+        const others = o.units ? TY.headline.gap + T.balance(ctx, o.units, T.font(400, TY.units.size, d.font), colW).length * TY.units.lh : 0;
         const fit = T.fit(ctx, o.headline, { weight: d.weights.title, family: d.font, maxW: colW, maxH: (bottom - y - others) * grow.share, min: grow.min, max: grow.max, lh: grow.lh, maxLines: grow.lines });
         size = fit.size; lh = fit.lh;
       }
@@ -177,21 +194,7 @@
       }
     }
     const textBottom = y;
-    if (srcRows.length) {
-      const sy0 = S.y + S.h - srcRows.length * TY.source.lh;
-      layers.push({ kind: 'hair', id: 'source-rule', x: S.x, y: sy0 - TY.source.pad, w: S.w, color: d.hair, at: at + 0.7, dur: 0.6, ease: 'glide' });
-      let k = 0;
-      srcRows.forEach((row, ri) => {
-        row.forEach(run => {
-          layers.push({
-            kind: 'text', id: 'source-' + (k++), role: 'source', font: run.f, size: TY.source.size,
-            color: run.strong ? d.ink : d.muted, reveal: 'fade', at: at + 0.8, dur: 0.5,
-            lines: [{ text: run.text, x: S.x + run.x, y: sy0 + ri * TY.source.lh, w: run.w, h: TY.source.lh, words: [{ text: run.text, x: S.x + run.x, w: run.w }] }]
-          });
-        });
-      });
-    }
-    return { layers, chart, rule, words, primaryWords, textBottom, colW, bottom, TY, split };
+    return { layers, chart, rule, words, primaryWords, textBottom, colW, bottom, TY, split, zone: Z };
   }
 
   // Lay source runs into rows no wider than maxW, splitting a run at spaces
@@ -356,7 +359,7 @@
   }
 
   M.chart = { niceTicks, tickLabel, hbars, rows };
-  M.design = { resolve, contrast, luminance, mix };
+  M.design = { resolve, contrast, luminance, mix, frameZone, flowRuns };
   M.card = card;
   M.design.isLarge = isLarge;
   M.formatDate = formatDate;

@@ -14,8 +14,8 @@
  *
  * The contract: a pure function of lt. No Math.random (use api.rng), no
  * Date.now, no timers, no state kept between calls. Draw text through
- * api.text so the audit can see it. The card's kicker, headline, units and
- * source line come for free around api.box.
+ * api.text so the audit can see it. The headline and units come for free
+ * around api.box, and the kicker and source line in the shared frame.
  */
 (function (root) {
   'use strict';

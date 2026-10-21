@@ -14,10 +14,13 @@ content time, *excluding* transitions. A number below the scene's minimum is a
 compile error that names the scene, never a silent stretch. `transitionIn`
 picks how the scene arrives (`motion.md` § Transitions).
 
-Evidence scenes are laid out as a social card: room for the accent bar, kicker, headline,
-units, chart, then a source line under a hairline. The source line is built
-automatically from the sources of the claims the scene shows. You never write
-it.
+Evidence scenes are laid out as a social card: the accent bar and the kicker
+line at the top, headline, units and chart, then a source line under a
+hairline. The bar, the kicker line and the footer are the shared frame, the
+same place on every scene and still through transitions (`motion.md` § The
+shared frame); a scene's `kicker` copy fills the kicker line. The source line
+is built automatically from the sources of the claims the scene shows. You
+never write it.
 
 Evidence headlines may run to 10 words because they state the finding with its
 number. Kinetic layers (the hook headline, a big number's line, bullets, steps)

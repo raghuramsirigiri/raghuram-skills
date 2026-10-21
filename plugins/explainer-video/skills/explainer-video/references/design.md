@@ -65,9 +65,9 @@ the user's own. Offer a neutral preset instead.
 
 An evidence scene **is a social card that moves**. Top to bottom:
 
-1. **the through-line**, the short accent bar, fixed at the top-left of the
-   safe area on every scene (`motion.md`); the card leaves room for it;
-2. **kicker**, muted, 27.5 px;
+1. **the through-line**, the short accent bar, at the top-left of the safe
+   area;
+2. **kicker**, muted, 27.5 px, on its own line under the bar;
 3. **headline**, stating the finding with its number: weight 700, ink,
    55 px, balanced lines;
 4. **units line**, muted, 30 px;
@@ -76,6 +76,11 @@ An evidence scene **is a social card that moves**. Top to bottom:
 6. **source line** under a hairline, 25 px: *Source:* in muted, the source
    name in semibold ink, the date muted. Built automatically from the
    claims the scene shows.
+
+The bar, the kicker line and the footer (1, 2 and 6) are the **shared
+frame**: one place for the whole video, still through every transition, only
+their words changing (`motion.md` § The shared frame). The scene lays out
+3–5 between them.
 
 These are the card's sizes × 2.5, as a square frame sets them; a tall frame
 sets the kicker, headline and units 1.2× and a wide one 1.15×

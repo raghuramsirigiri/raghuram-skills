@@ -18,11 +18,18 @@
       const note = api.copy('note');
       const W = api.frame.cls === 'wide' ? Math.round(S.w * 0.8) : S.w;
       const TY0 = M.layout.typeFor(api.frame);
+      // "Source" goes in the shared kicker line, where every scene's kicker
+      // sits; the card's own block centres between it and the footer.
+      const label = srcs.length > 1 ? 'Sources' : 'Source';
+      const Z = M.design.frameZone(api.frame, api.footerRows != null ? api.footerRows : 0);
+      api.footerUsed = Z.rows;
+      api.chrome = { kicker: label, source: null };
+      const room = Z.bottom - Z.top;
 
       // The card at scale f of the frame's type.
       function layout(f) {
         const sz = t => ({ size: t.size * f, lh: t.lh * f, gap: t.gap * f });
-        const TY = { kicker: sz(TY0.kicker), headline: sz(TY0.headline), units: sz(TY0.units) };
+        const TY = { headline: sz(TY0.headline), units: sz(TY0.units) };
         const nameSize = TY.headline.size * 0.8, nameLh = TY.headline.lh * 0.8;
         const blocks = [];
         srcs.forEach(src => {
@@ -34,30 +41,23 @@
         if (ill) blocks.push({ str: 'Illustrative figures, not measurements', size: TY.units.size, lh: TY.units.lh, weight: 600, color: d.ink, gap: 6 * K * f });
         if (note) blocks.push({ str: note, size: TY.units.size, lh: TY.units.lh, weight: 400, color: d.muted, gap: 0 });
         blocks.forEach(b => { b.f = T.font(b.weight, b.size, d.font); b.lines = T.balance(api.ctx, b.str, b.f, W); });
-        const head = M.layout.RULE.accentH + 8 * K + TY.kicker.lh + TY.kicker.gap * 2;
-        const h = head + blocks.reduce((n, b) => n + b.lines.length * b.lh + b.gap, 0);
+        const h = blocks.reduce((n, b) => n + b.lines.length * b.lh + b.gap, 0);
         return { TY, blocks, h };
       }
-      // The card grows until it holds about two thirds of the frame's height,
-      // up to three times the frame's type: a closing card, not a footnote in
-      // a big frame.
+      // The card grows until it holds about three quarters of its room, up to
+      // three times the frame's type: a closing card, not a footnote in a big
+      // frame.
       let Lc = layout(1);
-      for (let f = 3; f > 1.001; f -= 0.1) { const t = layout(f); if (t.h <= S.h * 0.7) { Lc = t; break; } }
-      const TY = Lc.TY, blocks = Lc.blocks, h = Lc.h;
+      for (let f = 3; f > 1.001; f -= 0.1) { const t = layout(f); if (t.h <= room * 0.75) { Lc = t; break; } }
+      const blocks = Lc.blocks, h = Lc.h;
 
-      const kF = T.font(400, TY.kicker.size, d.font);
       // A wide frame centres the block across its width, as the outro does;
       // the lines stay left-aligned inside it.
-      const blockW = Math.max(T.measure(api.ctx, srcs.length > 1 ? 'Sources' : 'Source', kF), ...blocks.map(b => Math.max(...b.lines.map(l => T.measure(api.ctx, l, b.f)))));
+      const blockW = Math.max(...blocks.map(b => Math.max(...b.lines.map(l => T.measure(api.ctx, l, b.f)))));
       const x0 = api.frame.cls === 'wide' ? S.x + Math.max(0, (S.w - blockW) / 2) : S.x;
-      let y = S.y + Math.max(0, (S.h - h) * 0.42);
-      y += M.layout.RULE.accentH + 8 * K;
-      const layers = [{
-        kind: 'text', id: 'kicker', role: 'kicker', font: kF, size: TY.kicker.size, color: d.muted, reveal: 'fade',
-        lines: T.place(api.ctx, [srcs.length > 1 ? 'Sources' : 'Source'], kF, x0, y, TY.kicker.lh, 'left', W), at: 0, dur: 0.5
-      }];
-      y += TY.kicker.lh + TY.kicker.gap * 2;
-      let words = 0;
+      let y = Z.top + Math.max(0, (room - h) * 0.42);
+      const layers = [];
+      let words = 1;
       blocks.forEach((b, i) => {
         layers.push({
           kind: 'text', id: 'row-' + i, role: i === 0 ? 'headline' : 'body', font: b.f, size: b.size, color: b.color,

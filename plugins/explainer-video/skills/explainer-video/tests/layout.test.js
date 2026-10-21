@@ -58,7 +58,7 @@ test('16:9 puts the words in a left column and the chart beside them', () => {
     const head = layer(sc, 'headline');
     assert.ok(right(head) <= col + 1, `${id}: headline runs to ${right(head)}, past the column at ${col}`);
     // Everything that isn't the card's own text starts right of the column.
-    const own = new Set(['kicker', 'headline', 'units', 'source-rule']);
+    const own = new Set(['headline', 'units']);
     const rest = sc.layers.filter(l => !own.has(l.id) && !/^source-/.test(l.id) && l.kind !== 'draw');
     for (const l of rest) {
       const x = l.lines ? Math.min(...l.lines.map(ln => ln.x)) : l.x;
@@ -103,15 +103,15 @@ test('a tall frame spreads steps and timeline rows down its height', () => {
   }
 });
 
-test('the headline never grows into the source line', () => {
+test('the headline never grows into the footer', () => {
   for (const f of ['9:16', '4:5', '1:1', '16:9']) {
     const { C } = compile(f);
+    assert.ok(C.zone.rows > 0, `${f}: the video has a footer`);
     for (const sc of C.scenes) {
       const head = layer(sc, 'headline');
-      const rule = layer(sc, 'source-rule');
-      if (!head || !rule) continue;
+      if (!head) continue;
       const bottom = Math.max(...head.lines.map(l => l.y + l.h));
-      assert.ok(bottom <= rule.y, `${f} ${sc.id}: headline ends at ${bottom}, the source rule is at ${rule.y}`);
+      assert.ok(bottom <= C.zone.ruleY, `${f} ${sc.id}: headline ends at ${bottom}, the footer's hairline is at ${C.zone.ruleY}`);
     }
   }
 });

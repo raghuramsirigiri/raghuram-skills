@@ -2,10 +2,11 @@
  * motion-lib/transitions.js — what happens between two scenes.
  *
  * A transition runs over the overlap between the outgoing scene's tail and
- * the incoming scene's head. The through-line, a short accent bar fixed at
- * the top-left of the safe area, never moves: core.js draws it over every
- * transition, and a transition may only stretch it along the top (morph-bar)
- * or paint over it (flood, whose accent field covers the whole frame). Transitions that own the
+ * the incoming scene's head. The chrome every scene shares (the accent bar,
+ * the kicker line, the footer) never moves: core.js draws it over every
+ * transition and changes only its words. A transition may stretch the bar
+ * along the top (morph-bar) or paint over the chrome (flood, whose accent
+ * field covers the whole frame); it never moves it. Transitions that own the
  * exit (cut, flood, scan, push) move the outgoing hold frame themselves; the
  * rest run after the outgoing text has already left.
  *
@@ -33,7 +34,7 @@
       draw: incoming
     },
     flood: {
-      dur: 0.6, ownsExit: true, coversBar: true,
+      dur: 0.6, ownsExit: true, coversChrome: true,
       draw(ctx, p, x) {
         // An accent shape floods the frame with a hard edge, then recedes the
         // same way, leaving the incoming scene.

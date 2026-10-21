@@ -53,7 +53,10 @@ test('art sits inside the safe area, below the bar, clear of everything the scen
       if (!a) continue;
       placed++;
       assert.ok(a.x >= S.x - 0.5 && a.y >= S.y + R.accentH && a.x + a.w <= S.x + S.w + 0.5 && a.y + a.h <= S.y + S.h + 0.5, `${f} ${sc.id}: art leaves the safe area`);
-      const boxes = w.Motion.art.boxes(sc.layers, [], mockCtx());
+      // The scene's own layers, plus the shared kicker line and footer.
+      const Z = C.zone;
+      const chrome = [{ x: S.x, y: S.y, w: S.w, h: Z.top - S.y }].concat(Z.rows ? [{ x: S.x, y: Z.ruleY, w: S.w, h: S.y + S.h - Z.ruleY }] : []);
+      const boxes = w.Motion.art.boxes(sc.layers, chrome, mockCtx());
       for (const b of boxes) assert.ok(!hit(a, b), `${f} ${sc.id}: art overlaps ${JSON.stringify(b)}`);
     }
     assert.ok(placed >= 4, `${f}: art placed in only ${placed} scenes`);
