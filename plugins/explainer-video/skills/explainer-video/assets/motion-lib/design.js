@@ -50,11 +50,15 @@
     // A brand accent that fails as text against the card is kept for marks only.
     const accent = t.colors[1];
     const accentText = contrast(accent, bg) >= 4.5 ? accent : ink;
+    // Small muted text (kicker, units, source) must clear 4.5:1. A brand
+    // palette can leave n4 short of it, so step down the ink ramp until it does.
+    const p = C.palette;
+    const muted = [t.secondaryColor, p.n5, p.n6, p.n7, ink].find(c => c && contrast(c, bg) >= 4.5) || ink;
 
     return {
       preset,
       dark: luminance(bg) < 0.2,
-      bg, ink, hair: t.grid, muted: t.secondaryColor, context: t.muted,
+      bg, ink, hair: t.grid, muted, context: t.muted,
       contextScale: t.mutedScale.slice(),
       subject: accent, accentText, callout: t.callout,
       axis: t.axis, grid: t.grid, tick: t.tickColor, label: t.categoryColor, value: t.valueColor,

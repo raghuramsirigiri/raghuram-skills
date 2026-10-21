@@ -136,6 +136,18 @@ topic with figures in it.
   plugins/social-post/skills/social-post/tests/shared-files.test.js` fails
   on any drift. A library sync copies into both (`CHARTS-LIB-UPSTREAM.md`
   § Syncing the copy). Its `references/` are its own.
+- `plugins/explainer-video/` draws its own animated charts on a canvas (no
+  `charts.js`), but in charts-lib's design system, so it carries its **own
+  copy** of `assets/charts-lib/theme.js` and the three brand-recolour scripts
+  (`generate-theme.js`, `extract-theme.js`, `fetch-design.js`). Those four
+  files stay identical to chart-dashboard's, so the copies rule now covers
+  three plugins: a change goes into every plugin that carries the file, in one
+  commit, and `node --test
+  plugins/explainer-video/skills/explainer-video/tests/shared-files.test.js`
+  fails on drift. Everything else in it (`assets/motion-lib/`, `references/`)
+  is its own. Its output is JavaScript only: Canvas 2D plus the browser's
+  WebCodecs and Web Audio. Never add ffmpeg, Remotion, a render pipeline, TTS
+  or a CDN animation library.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
@@ -188,6 +200,10 @@ plugins/social-post/
   .claude-plugin/plugin.json
   skills/social-post/       SKILL.md, references/, templates/, assets/, scripts/, tests/, evals/
                             (assets/, scripts/ and the templates are copies of chart-dashboard's)
+plugins/explainer-video/
+  .claude-plugin/plugin.json
+  skills/explainer-video/   SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
+                            (assets/charts-lib/theme.js and the theme scripts are copies of chart-dashboard's)
 examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
