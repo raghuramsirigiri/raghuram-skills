@@ -95,6 +95,38 @@ test('the footer is as tall as the longest source line needs, on every scene', (
   assert.strictEqual(C.zone.rows, most);
 });
 
+// The footer's source line as rows of text, top to bottom.
+function footerRows(C) {
+  const sc = C.scenes.find(s => s.chrome && s.chrome.source);
+  const rows = new Map();
+  for (const r of sc.chrome.source.runs) rows.set(r.y, (rows.get(r.y) || '') + r.text);
+  return [...rows.keys()].sort((a, b) => a - b).map(y => rows.get(y).replace(/ /g, ' '));
+}
+
+test('a wrapped source line keeps every character, and never splits its date', () => {
+  // Lengthen the source's name a word at a time, so the row break walks across the date.
+  const w = load();
+  const squash = s => s.replace(/[·\s]+/g, ' ').trim();
+  let wrapped = 0;
+  for (let n = 0; n < 30; n++) {
+    const name = 'Linden Co-op customer survey 2026: key insights' + ' team'.repeat(n);
+    const s = {
+      meta: { title: 'S', locale: 'en-GB', preset: 'default', fps: 30, seed: 1, audio: { score: 'off' } },
+      cuts: { c: { format: '9:16', scenes: ['hook'] } },
+      sources: [{ id: 'A', name, date: '2026-08-12' }],
+      claims: [claim('F1', 72, '72%')],
+      scenes: [{ id: 'hook', type: 'big-number', copy: { value: 'F1', line: 'rated home delivery good' } }]
+    };
+    const rows = footerRows(w.Motion.compile(s, 'c', { measure: mockCtx() }));
+    if (rows.length > 1) wrapped++;
+    const seen = JSON.stringify(rows);
+    assert.strictEqual(squash(rows.join(' ')), squash(`Source: ${name} · 12 Aug 2026`), `n=${n}: characters lost or added: ${seen}`);
+    assert.ok(rows.some(r => r.includes('12 Aug 2026')), `n=${n}: the date is split across rows: ${seen}`);
+    assert.ok(!rows.some(r => /·\s*$/.test(r)), `n=${n}: a row ends on its separator: ${seen}`);
+  }
+  assert.ok(wrapped >= 20, `only ${wrapped} of 30 source lines wrapped`);
+});
+
 test('scene content stays between the kicker line and the footer', () => {
   for (const f of FORMATS) {
     const { C } = compile(f);

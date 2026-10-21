@@ -198,7 +198,9 @@
   }
 
   // Lay source runs into rows no wider than maxW, splitting a run at spaces
-  // when it doesn't fit. Returns [[{ text, strong, f, x, w }]].
+  // when it doesn't fit. Every character lands in a row except the separator
+  // a new row would start with. Non-breaking spaces never split.
+  // Returns [[{ text, strong, f, x, w }]].
   function flowRuns(api, runs, maxW) {
     const T = api.T, d = api.design, TY = M.layout.TYPE;
     const rows = [[]];
@@ -207,18 +209,18 @@
       const f = T.font(strong ? 600 : 400, TY.source.size, d.font);
       const w = T.measure(api.ctx, text, f);
       if (x + w > maxW && x > 0) {
-        // Try to break this run at its last space that fits.
-        const words = text.split(' ');
-        let head = '';
-        for (let i = 0; i < words.length; i++) {
-          const next = head ? head + ' ' + words[i] : words[i];
-          if (x + T.measure(api.ctx, next, f) > maxW) break;
-          head = next;
+        // Break this run at its last space that fits, if what comes before it has words.
+        let cut = -1;
+        for (let i = text.indexOf(' ', 1); i > 0; i = text.indexOf(' ', i + 1)) {
+          if (x + T.measure(api.ctx, text.slice(0, i), f) > maxW) break;
+          cut = i;
         }
-        if (head && head.trim()) { put(head, strong); text = text.slice(head.length).replace(/^ /, ''); }
+        const head = cut > 0 && /[^\s·;]/.test(text.slice(0, cut)) ? text.slice(0, cut) : '';
+        if (head) put(head, strong);
         rows.push([]); x = 0;
-        if (!text) return;
-        return put(text.replace(/^[ ·;]+/, ''), strong);
+        const rest = text.slice(head.length).replace(/^[\s·;]+/, '');
+        if (!rest) return;
+        return put(rest, strong);
       }
       rows[rows.length - 1].push({ text, strong, f, x, w });
       x += w;
@@ -248,13 +250,15 @@
       if (c.source && R.sources[c.source] && srcs.indexOf(R.sources[c.source]) < 0) srcs.push(R.sources[c.source]);
     });
     if (!srcs.length && !illustrative) return null;
+    // A date never breaks across rows, and its separator stays with it.
+    const keep = s => s.replace(/ /g, ' ');
     const runs = [{ text: srcs.length ? 'Source: ' : '' }];
     srcs.forEach((s, i) => {
       runs.push({ text: s.name, strong: true });
       const date = formatDate(s.date, api.spec.meta.locale);
-      runs.push({ text: (date ? ' · ' + date : '') + (i < srcs.length - 1 ? '; ' : '') });
+      runs.push({ text: (date ? ' ' + keep('· ' + date) : '') + (i < srcs.length - 1 ? '; ' : '') });
     });
-    if (illustrative) runs.push({ text: (srcs.length ? ' · ' : '') + 'Illustrative figures' });
+    if (illustrative) runs.push({ text: (srcs.length ? ' ' + keep('· ') : '') + 'Illustrative figures' });
     return runs.filter(r => r.text);
   }
 
