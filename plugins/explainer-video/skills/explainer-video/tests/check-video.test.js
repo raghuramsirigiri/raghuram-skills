@@ -62,6 +62,12 @@ test('a good page passes', () => {
   assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
 });
 
+test('numbers: a year followed by a comma is a date, not a figure', () => {
+  const s = good(); s.scenes[2].copy.line = 'a day could follow by 2028, the board says';
+  s.caption = 'Northvale household water use fell 12% this winter, to about 140 litres a day. By 2028, the board expects it could settle near 125 litres.';
+  const r = check(page(s));
+  assert.ok(!r.fails.some(x => x.name === 'numbers'), JSON.stringify(r.fails));
+});
 test('numbers: a typed number in copy fails', () => failsWith(s => { s.scenes[1].copy.title = 'Use is now 140 litres a day'; }, 'numbers', /typed into copy/));
 test('numbers: a caption figure not in the ledger fails', () => failsWith(s => { s.caption += ' Bills rose 9%.'; }, 'numbers', /matches no claim/));
 test('numbers: a caption figure not on screen fails', () => failsWith(s => { s.cuts.main.scenes = ['hook', 'src']; s.caption = 'Use could reach 125 litres by 2028.'; s.alt = ''; }, 'numbers', /not on screen/));

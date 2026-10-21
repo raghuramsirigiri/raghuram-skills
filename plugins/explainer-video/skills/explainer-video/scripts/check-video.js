@@ -145,7 +145,7 @@ const MULT = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, mn: 1e6, bn: 1e9, bi
 const MONTHS = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
 function numberTokens(str) {
   const out = [];
-  const re = /(^|[^\w.])(-?\d[\d,]*(?:\.\d+)?)\s*(%|per ?cent|thousand|million|billion|trillion|bn|mn|tn|[kmb](?![a-z]))?/gi;
+  const re = /(^|[^\w.])(-?\d+(?:,\d{3})*(?:\.\d+)?)\s*(%|per ?cent|thousand|million|billion|trillion|bn|mn|tn|[kmb](?![a-z]))?/gi;
   let r;
   while ((r = re.exec(str))) {
     const raw = r[2], unit = (r[3] || '').toLowerCase();
