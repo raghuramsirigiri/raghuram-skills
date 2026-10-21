@@ -79,11 +79,7 @@ if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.au
 (spec.scenes || []).forEach(sc => {
   if (sc.transitionIn != null) warn('timing', 'scene "' + sc.id + '": transitionIn "' + sc.transitionIn + '" is ignored — every scene arrives by the one transition (motion.md § Transitions); delete it');
 });
-if (meta.art != null) {
-  const motif = typeof meta.art === 'object' ? meta.art.motif : meta.art;
-  if (['auto', 'off', 'contour', 'rings', 'dots', 'lines', 'logo'].indexOf(motif) < 0) shape.push('meta.art must be "auto", "off" or { "motif": contour | rings | dots | lines | logo }');
-  else if (motif === 'logo' && !(meta.brand && /^data:image\//.test(meta.brand.logo || ''))) shape.push('meta.art "logo" needs meta.brand.logo: a data URI of the logo the user supplied');
-}
+if (meta.art != null && ['off', 'halftone'].indexOf(meta.art) < 0) shape.push('meta.art must be "off" or "halftone" (references/design.md § Artwork)');
 const scenes = spec.scenes || [];
 const byId = {};
 scenes.forEach(s => { if (byId[s.id]) shape.push('two scenes share the id "' + s.id + '"'); byId[s.id] = s; });

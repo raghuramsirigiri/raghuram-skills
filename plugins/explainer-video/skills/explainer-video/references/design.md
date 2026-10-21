@@ -89,41 +89,29 @@ or value 2–3× larger in a square frame (110–165 px), more in a tall or wide
 one, in the same face and weight: scale, never a second type system. Context, quote and source-card scenes drop the parts
 they don't need. No scene adds a new kind of component.
 
-## Artwork in the space left
+## Artwork
 
-**Off by default, and leave it off.** In review these motifs and their
-per-scene placement read as random rather than designed, and a plain frame
-is better than that. Curated art in one fixed corner is due to replace them;
-until then use `meta.art` only when the user asks for artwork by name.
+One texture, `meta.art: "halftone"`, on by default. Set `"off"` when the
+user wants a plain frame. It is ground, not content:
 
-When it is on, the engine puts one piece of monochrome artwork in the
-largest empty area each scene leaves (`art.js`, `meta.art`). It is ground,
-not content:
-
-- **One tone**: the background moved a short way toward the ink, below the
-  step the audit reads as ink, so it never counts as text or toward fill.
-- **Only in empty space**: inside the safe area, below the accent bar,
-  clear of every text line, bar, image and plot by a margin. A chart's plot
-  is data area even where no mark is drawn yet. A scene too full for it gets
-  none, and the outro (which shows the logo itself) never has any.
-- **Steady**: it keeps its place from scene to scene while that spot stays
-  free, crossfades in place when it must move, and drifts slowly (loops
-  wobble, dashes and hatching turn) so no frame is fully still.
-
-| `meta.art` | Draws |
-| --- | --- |
-| `"off"` (default) | nothing |
-| `"auto"` | the user's logo if `meta.brand.logo` holds one, else `contour` |
-| `"contour"` | topographic line loops |
-| `"rings"` | concentric dashed rings |
-| `"dots"` | a halftone field, dots shrinking toward its rim |
-| `"lines"` | a hatched field |
-| `"logo"` | `meta.brand.logo` recoloured to the tone, its inner shapes kept |
-
-The logo is only ever the one the user supplied, as a data URI: never
-fetched, traced or invented, and never another organisation's. The art
-fills what a good layout leaves. It is not a fix for a scene the audit's
-fill check warns about.
+- **A halftone field from two corners**: a dot grid fixed to the frame, its
+  dot sizes following soft flowing bands, coming in from the top-right and
+  bottom-left corners of the frame and running off its edges. The frame edge
+  is its only hard edge; it may fill the margins outside the content area
+  (the space below the footer in 9:16, for one).
+- **Around the content, never on it**: it thins out toward the middle of the
+  frame, and its dots shrink away gradually near anything a scene shows (text,
+  a chart's whole plot even where no mark is drawn, the bar, the kicker, the
+  footer), stopping 44 px short. It flows around each scene's layout; the
+  outro has none.
+- **Still, or changing all at once**: the texture never moves. Between two
+  scenes that leave every dot the same size it doesn't change at all; when
+  any dot changes, every dot in both corners eases to its new size together,
+  in the swap's quiet stretch when neither scene's content is on screen. On
+  the first scene the dots grow in.
+- **One tone**: the background mixed a third of the way toward the ink. The
+  audit's fill check measures each scene without it: the art fills what a
+  good layout leaves, it doesn't stand in for one.
 
 ## Emphasis
 

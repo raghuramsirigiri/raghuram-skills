@@ -67,9 +67,9 @@ Particle bursts, shockwave rings, lens flares, glows and bloom, zooms,
 pushes and camera moves, camera shake, RGB split, glitches, full-frame crossfades, bouncy or elastic easing,
 stock "HUD" décor, fake UI of a real product, emoji decoration, spinning
 logos, gradient panels. They aren't in the engine. Don't build them in a
-custom scene. The one decoration the engine draws is the monochrome
-artwork in a scene's empty space (`design.md` § Artwork in the space left):
-one tone, never behind content, drifting slowly.
+custom scene. The one decoration the engine draws is the halftone
+artwork (`design.md` § Artwork; `meta.art: "off"` turns it off): one tone,
+from two corners of the frame, around the content and never on it.
 
 ## Custom scenes
 

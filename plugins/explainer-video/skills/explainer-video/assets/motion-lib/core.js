@@ -128,8 +128,16 @@
     const rows = Math.max(0, ...list.map(it => (it.chrome && it.chrome.source ? it.chrome.source.length : 0)));
     if (list.some(it => it.footerUsed != null && it.footerUsed !== rows)) list = build(rows);
     const zone = M.design.frameZone(fr, rows);
-    const chromeBoxes = [{ x: fr.safe.x, y: fr.safe.y, w: fr.safe.w, h: zone.top - fr.safe.y }]
-      .concat(rows ? [{ x: fr.safe.x, y: zone.ruleY - 4, w: fr.safe.w, h: fr.safe.y + fr.safe.h - zone.ruleY + 4 }] : []);
+    // What a scene's chrome occupies, for the art to keep clear of: the bar,
+    // its kicker, the footer's hairline and its source line.
+    const chromeBoxes = ch => {
+      if (!ch) return [];
+      const S = fr.safe, out = [{ x: S.x, y: S.y, w: M.layout.RULE.accentW, h: M.layout.RULE.accentH }];
+      if (ch.kicker) out.push({ x: ch.kicker.x, y: ch.kicker.y, w: ch.kicker.w, h: ch.kicker.h });
+      if (rows) out.push({ x: S.x, y: zone.ruleY - 2, w: S.w, h: 4 });
+      if (ch.source) ch.source.runs.forEach(run => out.push({ x: run.x, y: run.y, w: run.w, h: run.h }));
+      return out;
+    };
 
     // Timing. With a soundtrack on and a bpm, every scene's content starts on
     // a beat: the scene before it holds a little longer to get there.
@@ -138,6 +146,7 @@
     const beat = bpm ? 60 / bpm : 0;
     const scenes = [];
     const art = M.art ? M.art.resolve(spec.meta) : null;
+    const artGrid = art ? M.art.grid(fr, spec.meta.seed || 0) : null;
     let artPrev = null;
     let t = 0;
     list.forEach((it, i) => {
@@ -171,13 +180,14 @@
         }
         dur = d;
       }
-      // Art goes in the largest empty square this scene leaves; a scene can
-      // refuse it (art: false), as the outro does with its own logo.
+      const chrome = b.rule ? placeChrome(it.chrome, fr, zone, design, ctx) : null;
+      // The art's dot sizes for this scene: they shrink away near everything
+      // it shows. The same sizes as the scene before come back as the very
+      // same array, so the art doesn't move between them. A scene can refuse
+      // art (art: false), as the outro does with its own logo.
       let artAt = null;
-      if (art && b.art !== false) {
-        artAt = M.art.place(fr, M.art.boxes(b.layers, it.reserved.concat(chromeBoxes), ctx), artPrev);
-        artPrev = artAt;
-      }
+      if (art && b.art !== false) artAt = M.art.sizes(artGrid, M.art.boxes(b.layers, it.reserved.concat(chromeBoxes(chrome)), ctx), artPrev);
+      artPrev = artAt;
       const ovIn = i === 0 ? 0 : trIn.dur;
       const ovOut = trOut ? trOut.dur : 0;
       if (beat && !last) {
@@ -191,8 +201,7 @@
       const t1 = cEnd + ovOut;
       scenes.push({
         id: it.id, type: it.type, index: i, def: it.def, spec: it.spec, built: b,
-        layers: b.layers, rule: b.rule || null, used: it.used, art: artAt,
-        chrome: b.rule ? placeChrome(it.chrome, fr, zone, design, ctx) : null,
+        layers: b.layers, rule: b.rule || null, used: it.used, art: artAt, chrome, reserved: it.reserved,
         t0, t1, cStart, enterEnd: cStart + enter, exitStart, cEnd, ovIn, ovOut,
         enter, read: holdFloor, exit, minDur, dur, trIn, trOut, last
       });
@@ -205,7 +214,7 @@
 
     return {
       cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, safe: fr.safe, fps, frames, duration,
-      scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design) }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
+      scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design), grid: artGrid }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
       images: opts.images || M.images || {}
     };
   }
@@ -468,8 +477,9 @@
     }
   }
 
-  function drawArt(ctx, C, at, t, alpha) {
-    if (M.art && at) M.art.draw(ctx, C, at, t, alpha);
+  // The art at sizes eased from a toward b by k (a === b: it holds still).
+  function drawArt(ctx, C, a, b, k) {
+    if (M.art && C.art) M.art.draw(ctx, C, a, b, k);
   }
 
   // ── seek ─────────────────────────────────────────────────────────────
@@ -487,16 +497,19 @@
       const g = M.ease.glide(p);
       const holdA = () => paintScene(ctx, C, sc, Math.min(t, sc.exitStart - 1e-6), Math.min(frameT, sc.exitStart - 1e-6));
       const drawB = () => paintScene(ctx, C, next, t, frameT);
-      // Art that stays put draws once; art that moves crossfades in place.
-      if (sc.art === next.art) drawArt(ctx, C, sc.art, t, 1);
-      else { drawArt(ctx, C, sc.art, t, 1 - g); drawArt(ctx, C, next.art, t, g); }
+      // The art holds still when the next scene leaves it the same; otherwise
+      // every dot eases to its new size together, while no content is on
+      // screen.
+      drawArt(ctx, C, sc.art, next.art, g);
       if (M.debug.record) M.debug.phase = 'transition';
       // The chrome stays still over the transition; only its words change.
-      tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, t, 1); } });
+      tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, next.art, 1); } });
       chromeBetween(ctx, C, sc, next, p, g);
       M.debug.phase = null;
     } else {
-      drawArt(ctx, C, sc.art, t, sc.index === 0 ? M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)) : 1);
+      // On the first scene the dots grow in; after that they hold.
+      if (sc.index === 0) drawArt(ctx, C, null, sc.art, M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)));
+      else drawArt(ctx, C, sc.art, sc.art, 1);
       paintScene(ctx, C, sc, t, frameT);
       chromeSteady(ctx, C, sc, t);
     }

@@ -83,8 +83,12 @@ test('quotes: a paraphrase in quote marks fails', () => failsWith(s => {
   s.claims[3].display = 'People got used to short showers';
 }, 'quotes', /not in the verbatim/));
 test('timing: a dur below the minimum fails', () => failsWith(s => { s.scenes[0].dur = 1; }, 'timing', /below its minimum/));
-test('shape: an unknown art motif fails', () => failsWith(s => { s.meta.art = { motif: 'stars' }; }, 'shape', /meta\.art/));
-test('shape: logo art without a supplied logo fails', () => failsWith(s => { s.meta.art = { motif: 'logo' }; }, 'shape', /meta\.brand\.logo/));
+test('shape: an art setting other than off or halftone fails', () => failsWith(s => { s.meta.art = 'contour'; }, 'shape', /meta\.art must be "off" or "halftone"/));
+test('shape: halftone art passes', () => {
+  const s = good(); s.meta.art = 'halftone';
+  const r = check(page(s));
+  assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
+});
 test('timing: a transitionIn in the spec warns that it is ignored', () => {
   const s = good(); s.scenes[3].transitionIn = 'flood';
   const r = check(page(s));

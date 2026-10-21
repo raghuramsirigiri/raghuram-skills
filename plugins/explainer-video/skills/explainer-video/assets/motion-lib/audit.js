@@ -48,7 +48,10 @@
   const FROZEN = 0.05, FROZEN_SLACK = 0.75;
   function fillOf(C, ctx, t) {
     const S = C.safe, R = M.layout.RULE;
-    M.seek(ctx, C, t, { frameT: t });
+    // Measured without the art: decoration doesn't stand in for layout.
+    const art = C.art;
+    C.art = null;
+    try { M.seek(ctx, C, t, { frameT: t }); } finally { C.art = art; }
     const top = Math.round(S.y + R.accentH * 2 + 4);
     const x0 = Math.round(S.x), w = Math.round(S.w), h = Math.round(S.y + S.h) - top;
     const px = ctx.getImageData(x0, top, w, h).data;

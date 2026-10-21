@@ -14,7 +14,7 @@ validates exactly this shape.
     "preset": "default",
     "palette": null,
     "brand": null,
-    "art": "off",
+    "art": "halftone",
     "fonts": [],
     "fps": 30,
     "seed": 7,
@@ -66,7 +66,7 @@ validates exactly this shape.
 | `preset` | a charts-lib preset (`design.md`), default `default` |
 | `palette` | brand palette overrides from `generate-theme.js` / `extract-theme.js`, or `null` |
 | `brand` | `{ "name", "logo": "data:image/…" }`, only what the user supplied |
-| `art` | `"off"` (default; leave it off unless the user asks for artwork), `"auto"` (the user's logo if `brand.logo` holds one, else contour lines), or `{ "motif": "contour" \| "rings" \| "dots" \| "lines" \| "logo" }` (`design.md` § Artwork in the space left) |
+| `art` | `"halftone"` (default): a halftone texture from two corners of the frame, around the content (`design.md` § Artwork); `"off"` for a plain frame |
 | `fonts` | `[{ "family", "src": "data:font/…", "weight" }]`, only fonts the user supplied |
 | `fps` | 30 (default), 60, 24 or 25 |
 | `seed` | seeds noise and any `api.rng`; changing it changes nothing semantic |
