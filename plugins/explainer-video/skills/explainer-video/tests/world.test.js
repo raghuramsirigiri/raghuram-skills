@@ -87,10 +87,10 @@ test('nothing zooms: the world is drawn at one scale, the camera only pans', () 
     w.Motion.seek(mockCtx(log), C, n / C.fps);
     assert.ok(!log.some(l => l.startsWith('scale(')), `frame ${n} scales`);
   }
-  assert.ok(C.world.s > 0 && C.world.s <= 1);
+  assert.ok(C.world.s > 0 && C.world.s <= 1.3);
 });
 
-for (const [story, format] of [['survey', '9:16'], ['survey', '4:5'], ['survey', '1:1'], ['banking', '9:16'], ['banking', '4:5'], ['banking', '1:1']]) {
+for (const [story, format] of [['survey', '9:16'], ['survey', '4:5'], ['survey', '1:1'], ['survey', '16:9'], ['banking', '9:16'], ['banking', '4:5'], ['banking', '1:1'], ['banking', '16:9']]) {
   test(`the words never meet the world, and the world stays above the footer (${story}, ${format})`, () => {
     const { w, C } = compile(withFormat(format, story));
     for (let n = 0; n < C.frames; n += 2) {
@@ -109,19 +109,20 @@ for (const [story, format] of [['survey', '9:16'], ['survey', '4:5'], ['survey',
   });
 }
 
-test('while a beat holds, its place sits wholly in the frame, below its words', () => {
-  for (const [story, format] of [['survey', '9:16'], ['survey', '4:5'], ['survey', '1:1'], ['banking', '9:16'], ['banking', '4:5'], ['banking', '1:1']]) {
+test('while a beat holds, its place sits wholly in the frame, clear of its words', () => {
+  for (const [story, format] of [['survey', '9:16'], ['survey', '4:5'], ['survey', '1:1'], ['survey', '16:9'], ['banking', '9:16'], ['banking', '4:5'], ['banking', '1:1'], ['banking', '16:9']]) {
     const { w, C } = compile(withFormat(format, story));
     for (const sc of C.scenes) {
       const recs = records(w, C, hold(sc));
       const mine = recs.filter(r => r.role === 'shape' && r.owner === sc.place && r.alpha > 0.06);
       if (!mine.length) continue;
+      // The words' room: above the world, or a wide frame's column beside it.
       const band = recs.filter(r => r.role !== 'shape' && r.scene === sc.id && !/^(world-|chrome-)/.test(r.layer || ''));
-      const under = Math.max(...band.map(r => r.bbox[1] + r.bbox[3]));
       const x0 = Math.min(...mine.map(r => r.bbox[0])), x1 = Math.max(...mine.map(r => r.bbox[0] + r.bbox[2]));
-      const y0 = Math.min(...mine.map(r => r.bbox[1]));
-      assert.ok(x0 >= 0 && x1 <= C.W, `${format} ${sc.id}: the place runs off the frame (${Math.round(x0)}..${Math.round(x1)})`);
-      assert.ok(y0 >= under + 12, `${format} ${sc.id}: the place (top ${Math.round(y0)}) is under the words (${Math.round(under)})`);
+      const y0 = Math.min(...mine.map(r => r.bbox[1])), y1 = Math.max(...mine.map(r => r.bbox[1] + r.bbox[3]));
+      assert.ok(x0 >= 0 && x1 <= C.W, `${story} ${format} ${sc.id}: the place runs off the frame (${Math.round(x0)}..${Math.round(x1)})`);
+      const hit = band.find(r => meets(r.bbox, [x0, y0 - 12, x1 - x0, y1 - y0 + 12]));
+      assert.ok(!hit, `${story} ${format} ${sc.id}: the place (${[x0, y0, x1, y1].map(Math.round)}) reaches the words "${hit && hit.text}"`);
     }
   }
 });
@@ -194,9 +195,14 @@ test('pictures refuse what they cannot show honestly, with a readable error', ()
   bad(s => { s.meta.style = 'cinematic'; }, /meta.style must be/);
   bad(s => {
     s.data = [{ id: 'D1', source: 'A', locator: 't1', unit: '%', x: ['2023', '2024', '2025'], y: [50, 60, 64] }];
-    s.scenes.push({ id: 'tr', type: 'trend-line', copy: { title: 'Up three years running' }, series: 'D1' });
+    s.scenes.push({ id: 'tr', type: 'trend-line', copy: { title: 'Up three years running' }, series: 'D1', picture: { kind: 'blocks', of: 'members' } });
     s.cuts.main.scenes.splice(5, 0, 'tr');
-  }, /not in the continuous style yet/);
+  }, /cannot show trend-line/);
+  bad(s => {
+    s.data = [{ id: 'D1', source: 'A', locator: 't1', unit: '%', x: ['2023', '2024', '2025'], y: [null, 60, null] }];
+    s.scenes.push({ id: 'tr', type: 'trend-line', copy: { title: 'One value is not a line' }, series: 'D1' });
+    s.cuts.main.scenes.splice(5, 0, 'tr');
+  }, /at least two values that are not gaps/);
 });
 
 test('a people field over 2,000 dots takes a stated scale, and its key says so', () => {
@@ -263,14 +269,79 @@ test('columns stand from zero, heights in proportion; a funnel only narrows; a r
 });
 
 test('the world settles on a scale and keeps it: every place fits the stage in every format', () => {
-  for (const format of ['9:16', '4:5', '1:1']) {
+  for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const { C } = compile(withFormat(format, 'banking'));
     const W = C.world;
-    assert.ok(W.s > 0.4 && W.s <= 1, `${format}: scale ${W.s}`);
+    assert.ok(W.s > 0.4 && W.s <= 1.3, `${format}: scale ${W.s}`);
     for (const p of W.places) {
       assert.ok(W.rowY + p.box.y1 <= W.bottom + 0.5, `${format} ${p.id}: below the footer`);
       assert.ok(p.box.x1 - p.box.x0 <= C.W, `${format} ${p.id}: wider than the frame`);
     }
   }
+});
+
+// ── every scene type, in every format ──
+
+// A spec that uses the rest of the catalog: a hook headline, a trend line,
+// a timeline, steps, a quote, a photo, a custom painter and an outro.
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+function CATALOG(format) {
+  const s = SURVEY();
+  s.meta.brand = { name: 'Northvale Co-op' };
+  s.claims.push({ id: 'Q1', kind: 'copied', quote: true, source: 'A', locator: 'p. 3', verbatim: 'Members told us delivery is now the thing they would tell a friend about.', display: 'delivery is now the thing they would tell a friend about' });
+  s.data = [{ id: 'D1', source: 'A', locator: 'Table 2', unit: '%', x: ['2021', '2022', '2023', '2024', '2025', '2026'], y: [55, 58, null, 63, 61, 72] }];
+  s.scenes = [
+    { id: 'hk', type: 'hook-headline', copy: { kicker: 'Members survey', headline: 'Delivery is rated higher than ever asked' } },
+    s.scenes.find(x => x.id === 'hook'),
+    { id: 'tr', type: 'trend-line', copy: { kicker: 'Six years', title: 'Delivery ratings, survey by survey', units: '% rating it good or very good' }, series: 'D1', end: 'F1', highlight: [4, 6] },
+    { id: 'tl', type: 'timeline', copy: { kicker: 'What happened', title: 'The year in delivery' }, events: [{ date: 'March', text: 'New delivery partner' }, { date: 'July', text: 'Survey in the field' }, { date: 'August', text: 'Findings published' }] },
+    { id: 'st', type: 'steps', copy: { kicker: 'Next', title: 'What happens now' }, steps: ['Code the open answers', 'Share the themes', 'Plan the changes'] },
+    { id: 'q', type: 'quote', copy: { quote: 'Q1', name: 'Research team', role: 'Northvale Co-op' } },
+    { id: 'ph', type: 'photo-pan', copy: { kicker: 'On the road', caption: 'One of the new delivery vans', image: PNG } },
+    { id: 'cu', type: 'custom', draw: 'crates', copy: { kicker: 'Drawn by hand', title: 'A custom picture in the same world' } },
+    s.scenes.find(x => x.id === 'src'),
+    { id: 'out', type: 'outro', copy: { cta: 'Read the findings' } }
+  ];
+  s.cuts.main = { format, scenes: s.scenes.map(x => x.id) };
+  return s;
+}
+function compileCatalog(format) {
+  const w = load();
+  w.Motion.custom.crates = { enter: 1, read: 1.5, draw(ctx, lt, api) { const V = api.iso(0.8); V.box(-40, -40, 0, 80, 80, 60 * api.at(0, 1), api.mat.N2); } };
+  return { w, C: w.Motion.compile(CATALOG(format), 'main', { measure: mockCtx(), images: { [PNG]: { width: 4, height: 3 } } }) };
+}
+
+for (const format of ['9:16', '4:5', '1:1', '16:9']) {
+  test(`every scene type has a continuous form, and its words never meet the world (${format})`, () => {
+    const { w, C } = compileCatalog(format);
+    const B = id => C.world.beats.find(b => b.scene === id);
+    assert.strictEqual(C.world.byScene.tr.kind, 'ribbon', 'a trend line gets a ribbon');
+    ['ph', 'cu', 'out'].forEach(id => assert.strictEqual(B(id).cam.alpha, 0, id + ' takes the stage: the world steps aside'));
+    ['tl', 'st', 'q'].forEach(id => assert.ok(B(id).restOnly, id + ' rests on the place in view'));
+    for (let n = 0; n < C.frames; n += 3) {
+      const t = n / C.fps;
+      const recs = records(w, C, t);
+      const shapes = recs.filter(r => r.role === 'shape' && r.alpha > 0.06 && r.kind !== 'shadow' && !/^custom:/.test(r.owner || ''));
+      const words = recs.filter(r => r.role !== 'shape' && r.alpha > 0.3 && !/^world-face:/.test(r.layer || ''));
+      for (const wd of words) {
+        const own = /^world-label:([^:]+)/.exec(wd.layer || '');
+        const hit = shapes.find(sh => !(own && sh.kind === 'line' && String(sh.owner).indexOf(own[1]) === 0) && meets(wd.bbox, sh.bbox));
+        assert.ok(!hit, `${format} ${t.toFixed(2)} s: "${wd.text}" meets ${hit && hit.owner}`);
+      }
+    }
+  });
+}
+
+test('a ribbon keeps its gaps, ghosts its forecast and says a baseline that is not zero', () => {
+  const { w, C } = compileCatalog('9:16');
+  const p = C.world.byScene.tr;
+  assert.strictEqual(p.line.y[2], null, 'the gap stays a gap');
+  assert.ok(p.lo > 0, 'values far above zero start the ribbon above it');
+  const sc = C.scenes.find(x => x.id === 'tr');
+  const recs = records(w, C, (sc.enterEnd + sc.exitStart) / 2);
+  const texts = recs.filter(r => /^world-label:/.test(r.layer || '')).map(r => r.text);
+  assert.ok(texts.indexOf('72%') >= 0, 'the end value, with its claim\'s display');
+  assert.ok(texts.some(x => /%$/.test(x) && x !== '72%'), 'the scale post states the baseline');
+  assert.ok(texts.indexOf('2021') >= 0 && texts.indexOf('2026') >= 0, 'first and last x labels');
 });
 

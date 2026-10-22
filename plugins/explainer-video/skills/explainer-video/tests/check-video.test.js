@@ -95,6 +95,23 @@ test('timing: a transitionIn in the spec warns that it is ignored', () => {
   assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
   assert.ok(r.rows.some(x => x.level === 'WARN' && /transitionIn/.test(x.detail)), JSON.stringify(r.rows.filter(x => x.level === 'WARN')));
 });
+// The continuous style: the good page as one world.
+function continuous(s) {
+  s.meta.style = 'continuous';
+  s.scenes[0].picture = { kind: 'blocks', skin: 'plain', of: 'households' };
+  return s;
+}
+test('shape: a style other than continuous or slides fails', () => failsWith(s => { s.meta.style = 'cinematic'; }, 'shape', /meta\.style must be "continuous" or "slides"/));
+test('pictures: a continuous page passes, and a finding with no picture of its own warns', () => {
+  const s = continuous(good());
+  const r = check(page(s));
+  assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
+  // e2 shows a figure (125 litres) but has no picture: it rests on the pallet before it.
+  assert.ok(r.rows.some(x => x.level === 'WARN' && x.name === 'pictures' && /"e2"/.test(x.detail)), JSON.stringify(r.rows.filter(x => x.level === 'WARN')));
+});
+test('pictures: a picture that cannot show its scene fails, naming the scene', () => failsWith(s => { continuous(s); s.scenes[2].picture = { kind: 'blocks', of: 'households' }; }, 'timing', /scene "e2" picture: "blocks" shows a share in %/));
+test('numbers: a typed figure in the words of a picture fails', () => failsWith(s => { continuous(s); s.scenes[0].picture.of = '300 households'; }, 'numbers', /picture\.of/));
+
 test('copy: over the word limit fails', () => failsWith(s => { s.scenes[0].copy.line = 'much less water was used across the whole valley this winter'; }, 'copy', /limit 8/));
 test('copy: a V handle in the caption fails', () => failsWith(s => { s.caption += ' (see V2.1)'; }, 'copy', /handle/));
 test('determinism: Math.random in the page fails', () => failsWith(() => {}, 'determinism', /Math\.random/,

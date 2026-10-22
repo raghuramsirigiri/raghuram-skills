@@ -87,6 +87,19 @@ test('the manifest lists every transition the engine knows', () => {
   }
 });
 
+test('the manifest lists every picture the continuous style knows, with its skins and needs', () => {
+  const w = load();
+  const reg = w.Motion.pictures.list;
+  assert.deepStrictEqual(Object.keys(reg).sort(), Object.keys(manifest.pictures).sort());
+  for (const [k, v] of Object.entries(manifest.pictures)) {
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(reg[k].skins || null)), v.skins || null, `skins of ${k}`);
+    if (v.needs) assert.deepStrictEqual(JSON.parse(JSON.stringify(reg[k].needs || [])), v.needs, `needs of ${k}`);
+    // A place of its own with no data (the desk) has no skins; a prop has skins.
+    const d = reg[k], role = d.emphasis ? 'emphasis' : d.data ? 'data' : d.prop && !d.skins ? 'place' : 'prop';
+    assert.strictEqual(role, v.role, `role of ${k}`);
+  }
+});
+
 test('the manifest formats match the layout module', () => {
   const w = load();
   for (const [k, v] of Object.entries(manifest.formats)) {

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "note": "Per-scene facts for the agent and for check-video.js. Slot names and word limits must match each scene's registered `slots` (tests/scenes.test.js holds them in step). `minDur` is typical content time at the default copy length; the compiler computes the real minimum from the words.",
+  "note": "Per-scene facts for the agent and for check-video.js. Slot names and word limits must match each scene's registered `slots` (tests/scenes.test.js holds them in step). `minDur` is typical content time at the default copy length; the compiler computes the real minimum from the words. `pictures` lists the continuous style's pictures (pictures/*.js); the tests hold it in step with the registered ones.",
   "formats": {
     "9:16": { "size": [1080, 1920], "safe": { "top": 250, "right": 150, "bottom": 380, "left": 60 } },
     "4:5": { "size": [1080, 1350], "safe": { "top": 60, "right": 60, "bottom": 120, "left": 60 } },
@@ -125,5 +125,19 @@
       "signature": "free, under the determinism contract", "minDur": null,
       "notFor": "anything the catalog already draws"
     }
+  },
+  "pictures": {
+    "people": {"role": "data", "job": "a count of people, one dot each (or one per `per`), and shares of them", "scenes": ["big-number", "before-after", "compare-bars"], "needs": [], "options": {"whole": "claim id of the count, when the scene shows a share", "per": "people per dot, required above 2,000"}, "key": "1 dot = 1 person (or per people)", "notFor": "anything that is not people: visits, accounts, money"},
+    "dots": {"role": "data", "job": "a small share of anything: 1,000 dots, one per 0.1%, lit along the front", "scenes": ["big-number", "before-after", "compare-bars"], "needs": ["of"], "key": "1 dot = 0.1% of <of>", "notFor": "a count; a share above about 20% (use blocks)"},
+    "blocks": {"role": "data", "job": "a share as a 10 x 10 stack, one unit per 1%", "scenes": ["big-number", "before-after", "compare-bars"], "needs": ["of"], "skins": ["parcel", "card", "plain"], "liftable": true, "key": "= 1% of <of>", "notFor": "a count; a share below 2% (use dots)"},
+    "split": {"role": "data", "job": "parts of one whole, each lit in turn, the first (or emph) in the accent", "scenes": ["share-split"], "needs": ["of"], "skins": ["plain", "card", "parcel"], "key": "the unit, then each part with its swatch", "notFor": "shares of different wholes, or more than 100%"},
+    "columns": {"role": "data", "job": "2 to 6 values in one unit, standing in a row from zero", "scenes": ["compare-bars"], "needs": [], "key": "each value and label in the world", "notFor": "a long series (use a trend line); parts of a whole"},
+    "funnel": {"role": "data", "job": "stages that only narrow, each stage's loss a ghost above it", "scenes": ["compare-bars"], "needs": [], "key": "each value and label under the plate", "notFor": "stages that grow, or different units"},
+    "podium": {"role": "data", "job": "a ranking, largest first in the accent, long names wrapped", "scenes": ["ranked-list"], "needs": [], "key": "each value and label in the world", "notFor": "unranked categories"},
+    "ribbon": {"role": "data", "job": "a series over ordered time, drawn left to right; gaps stay gaps, a forecast is ghosted", "scenes": ["trend-line"], "needs": [], "key": "the end value, first and last x, the baseline when not zero", "notFor": "unordered categories"},
+    "building": {"role": "prop", "job": "where a finding happens: a home, a bank branch", "skins": ["home", "branch"], "notFor": "a cause the source does not state"},
+    "device": {"role": "prop", "job": "a website or app: a laptop or phone with a plain wireframe page", "skins": ["laptop", "phone"], "standalone": true, "notFor": "a real product's screen"},
+    "desk": {"role": "place", "job": "work waiting: an unsorted pile, empty trays, a calendar showing when it is due", "options": {"due": "words from the scene's copy", "from": "an earlier scene whose place the sheets lift off"}, "notFor": "a finding with a figure"},
+    "plinth": {"role": "emphasis", "job": "lifts the place in view (or `at`) for a verdict about it", "notFor": "a place that is not blocks"}
   }
 }

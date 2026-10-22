@@ -97,9 +97,10 @@
     const ctx = opts.measure || M.measureContext();
     const byId = {};
     (spec.scenes || []).forEach(s => { byId[s.id] = s; });
-    // The style: slides (scene after scene), or continuous (one 2.5D world
-    // the camera travels across, world.js).
-    const style = spec.meta.style || 'slides';
+    // The style: continuous (one 2.5D world the camera travels across,
+    // world.js) or slides (scene after scene). A spec that doesn't say gets
+    // the world when it gives its scenes pictures, slides when it gives none.
+    const style = spec.meta.style || ((spec.scenes || []).some(s => s.picture) ? 'continuous' : 'slides');
     if (style !== 'slides' && style !== 'continuous') throw new Error('meta.style must be "continuous" or "slides"');
     if (style === 'continuous' && !M.world) throw new Error('meta.style "continuous" needs motion-lib/world.js and pictures/');
 
@@ -425,7 +426,9 @@
     const widest = keys.reduce((w, k) => (k.display.length > w.length ? k.display : w), first.display);
     const end = drawDigits(ctx, L, str, widest, L.x, arrive);
     if (label) {
-      M.paint.text(ctx, label, end + L.size * 0.14, L.y + L.h * 0.52, { font: L.labelFont, color: L.labelColor, h: L.labelSize * 1.3, alpha: arrive * labelA, layer: L.id + '-label', role: 'label', size: L.labelSize });
+      // Beside the figure, or under it where words sit beside it.
+      const lx = L.labelBelow ? L.x : end + L.size * 0.14, ly = L.labelBelow ? L.y + L.h + 2 : L.y + L.h * 0.52;
+      M.paint.text(ctx, label, lx, ly, { font: L.labelFont, color: L.labelColor, h: L.labelSize * 1.3, alpha: arrive * labelA, layer: L.id + '-label', role: 'label', size: L.labelSize });
     }
   }
 

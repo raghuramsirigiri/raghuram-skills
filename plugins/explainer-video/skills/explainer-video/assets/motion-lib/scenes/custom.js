@@ -39,6 +39,10 @@
           box, design: a.design, paint: M.paint, ease: M.ease,
           at: (start, dur, ease) => M.ease.get(ease || 'outQuint')(M.ease.clamp01((lt - start) / (dur || 1e-6))),
           rng: (...keys) => M.rng(seed, s.id, ...keys),
+          // The 2.5D kit, as the continuous style's painters get it: a view
+          // centred in the box (world 0,0,0 a little below its middle) and the tints.
+          mat: M.iso ? M.iso.materials(a.design) : null,
+          iso: k => M.iso.view(cx, { ax: box.x + box.w / 2, ay: box.y + box.h * 0.62, cx: 0, cy: 0, s: k || 1, font: a.design.font }, 'custom:' + s.id),
           text: (str, x, y, o) => {
             const f = M.text.font(o && o.weight || 400, o && o.size || a.design.size.label, a.design.font);
             M.paint.text(cx, str, x, y, { font: f, color: (o && o.color) || a.design.ink, h: (o && o.size || a.design.size.label) * 1.3, alpha: o && o.alpha, layer: 'custom-' + str.slice(0, 12), role: 'body', size: o && o.size || a.design.size.label });

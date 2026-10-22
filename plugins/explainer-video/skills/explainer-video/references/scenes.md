@@ -22,6 +22,10 @@ shared frame); a scene's `kicker` copy fills the kicker line. The source line
 is built automatically from the sources of the claims the scene shows. You
 never write it.
 
+In the continuous style (`continuous.md`) every type below keeps its slots
+and data, sets its words in the band, and takes a `picture` that draws what
+its chart would (`pictures.md` § Choosing).
+
 Evidence headlines may run to 10 words because they state the finding with its
 number. Kinetic layers (the hook headline, a big number's line, bullets, steps)
 stay at 7–8 words (`copy.md` § Word limits).

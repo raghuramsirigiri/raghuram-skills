@@ -28,6 +28,7 @@
   const GHOST = 0.32;            // what's left of a unit's accent after a fall: the share that was lost
   const STAGE_GAP = 36;          // between the words' band and the world, frame px
   const LABEL = 30;              // world labels (keys, marks), frame px
+  const MAX_SCALE = 1.3;         // the world's largest scale; it is set once per video
 
   // ── the picture registry ─────────────────────────────────────────────
   const PICS = {};
@@ -43,19 +44,27 @@
   M.pictures = { register, get: getPic, list: PICS };
 
   // ── the words: each scene's band ─────────────────────────────────────
+  //
+  // The band's shape follows the frame: stacked at the top of a tall frame;
+  // a row in a squarer one (the figure on the left, its words beside it), so
+  // the world keeps its height; a left column in a wide one, with the world
+  // in the room to its right.
   const BANDS = {};
+  const bandMode = fr => (fr.cls === 'wide' ? 'column' : fr.H / fr.W >= 1.5 ? 'stack' : 'row');
+  const COLUMN = 0.4;              // a wide frame's word column, as a share of the safe width
 
   // The card gives the kicker and the source line to the shared frame; the
   // band's words stack from the top of the zone.
-  function head(api, kicker) {
-    const c = M.card(api, { kicker, chart: false, valign: 'top', sourceIds: api.used() });
-    return { c, TY: c.TY, y: c.zone.top, layers: c.layers.slice() };
+  function head(api, kicker, sources) {
+    const c = M.card(api, { kicker, chart: false, valign: 'top', sourceIds: api.used(), sources });
+    const S = api.frame.safe, mode = bandMode(api.frame);
+    return { c, TY: c.TY, y: c.zone.top, x: S.x, w: mode === 'column' ? Math.round(S.w * COLUMN) : S.w, mode, zone: c.zone, layers: c.layers.slice() };
   }
   function words(api, B, id, role, str, size, lh, weight, color, at, dur, w, x) {
     if (!str) return 0;
-    const T = api.T, f = T.font(weight, size, api.design.font), S = api.frame.safe;
-    const lines = T.balance(api.ctx, str, f, w || S.w);
-    const placed = T.place(api.ctx, lines, f, x == null ? S.x : x, B.y, lh, 'left', w || S.w);
+    const T = api.T, f = T.font(weight, size, api.design.font);
+    const lines = T.balance(api.ctx, str, f, w || B.w);
+    const placed = T.place(api.ctx, lines, f, x == null ? B.x : x, B.y, lh, 'left', w || B.w);
     let wi = 0;
     const wordIndex = placed.map(l => { const s0 = wi; wi += l.words.length; return s0; });
     B.layers.push({ kind: 'text', id, role, font: f, size, color, lines: placed, wordIndex, wordTotal: wi, at, dur, large: M.design.isLarge(size, weight) });
@@ -63,49 +72,94 @@
     B.y += h;
     return h;
   }
-  // The band's figure: as large as the display size allows within the width.
-  function valueFont(api, B, displays) {
-    const d = api.design, S = api.frame.safe;
+  // Move layers down by dy (a column's words settling, a row's words centring on their figure).
+  function shift(layers, dy) {
+    layers.forEach(l => {
+      if (l.lines) l.lines.forEach(ln => { ln.y += dy; });
+      if (l.kind === 'counter' || l.kind === 'figure' || l.kind === 'rect' || l.kind === 'image') l.y += dy;
+      if (l.box) l.box.y += dy;
+      if (l.pos) l.pos.y += dy;
+    });
+  }
+  // In a wide frame the words sit a little above the middle of their column.
+  function settle(B) {
+    if (B.mode === 'column') {
+      const free = B.zone.bottom - B.zone.top - (B.y - B.zone.top);
+      if (free > 0) { shift(B.layers, free * 0.42); B.y += free * 0.42; }
+    }
+    return B.layers;
+  }
+  // The figure's box: on top in a stack or a column, on the left in a row.
+  function figureBox(api, B) {
+    const S = api.frame.safe;
+    if (B.mode === 'row') { const w = Math.round(S.w * 0.42); return { x: S.x, w, maxW: w - 12 }; }
+    return { x: B.x, w: B.w, maxW: B.mode === 'stack' ? S.w * 0.62 : B.w };
+  }
+  // The words that go with a figure of height figH: under it, or beside it in a row.
+  function withFigure(api, B, F, figH, fn) {
+    const K = M.layout.K, S = api.frame.safe;
+    if (B.mode !== 'row') { B.y += figH + 4 * K; fn(); return; }
+    const x = B.x, w = B.w, y0 = B.y, n0 = B.layers.length, gap = 24 * K;
+    B.x = F.x + F.w + gap; B.w = S.x + S.w - B.x;
+    fn();
+    const h = B.y - y0;
+    if (h < figH) shift(B.layers.slice(n0), (figH - h) / 2);
+    B.y = y0 + Math.max(h, figH);
+    B.x = x; B.w = w;
+  }
+  // The band's figure: as large as the display size allows within its box.
+  function valueFont(api, B, displays, maxW) {
+    const d = api.design;
     const longest = displays.reduce((a, b) => (String(b).length > String(a).length ? b : a), '');
-    // Room beside the figure for its year label.
-    return api.T.fit(api.ctx, longest, { weight: d.weights.value, family: d.font, maxW: S.w * 0.62, maxH: B.TY.display.max * 0.84, min: B.TY.display.min, max: B.TY.display.max * 0.8, lh: 1.05, maxLines: 1 });
+    return api.T.fit(api.ctx, longest, { weight: d.weights.value, family: d.font, maxW, maxH: B.TY.display.max * 0.84, min: Math.min(B.TY.display.min, B.TY.display.max * 0.5), max: B.TY.display.max * 0.8, lh: 1.05, maxLines: 1 });
   }
   const claimOf = (api, v) => { const c = api.claim(String(v || '').replace(/[{}]/g, '')); return { claim: c, display: c.display != null ? c.display : String(c.value), value: +c.value }; };
+  // The stage a scene without a picture paints in (a photo, a custom
+  // painter): below a stacked or row band, beside a column.
+  function stageBox(api, B) {
+    const S = api.frame.safe, K = M.layout.K;
+    if (B.mode === 'column') { const x = S.x + B.w + 30 * K; return { x, y: B.zone.top, w: S.x + S.w - x, h: B.zone.bottom - B.zone.top }; }
+    const y = B.y + 14 * K;
+    return { x: S.x, y, w: S.w, h: Math.max(40, B.zone.bottom - y) };
+  }
 
   BANDS['big-number'] = (s, api) => {
-    const T = api.T, d = api.design, K = M.layout.K, S = api.frame.safe;
+    const T = api.T, d = api.design;
     if (!(s.copy && s.copy.value)) throw new Error('copy.value must name a claim, e.g. "F1"');
     const v = claimOf(api, s.copy.value);
     const kicker = api.copy('kicker'), line = api.copy('line'), units = api.copy('units');
-    const B = head(api, kicker);
-    const vf = valueFont(api, B, [v.display]);
-    const fig = { kind: 'counter', id: 'value', role: 'value', display: v.display, parsed: T.parseDisplay(v.display), font: vf.font, size: vf.size, color: d.ink, x: S.x, y: B.y, h: vf.size * 1.1, align: 'left', boxW: S.w, at: 0.1, dur: 1.1 };
+    const B = head(api, kicker), F = figureBox(api, B);
+    const vf = valueFont(api, B, [v.display], F.maxW);
+    const fig = { kind: 'counter', id: 'value', role: 'value', display: v.display, parsed: T.parseDisplay(v.display), font: vf.font, size: vf.size, color: d.ink, x: F.x, y: B.y, h: vf.size * 1.1, align: 'left', boxW: F.w, at: 0.1, dur: 1.1 };
     B.layers.push(fig);
-    B.y += vf.size * 1.1 + 4 * K;
-    words(api, B, 'line', 'headline', line, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.5, 0.7);
-    if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.8, 0.5); }
+    withFigure(api, B, F, fig.h, () => {
+      words(api, B, 'line', 'headline', line, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.5, 0.7);
+      if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.8, 0.5); }
+    });
     const read = Math.max(M.READ.number, M.readTime(T.wordCount(line) + 1)) + 0.15 * (T.wordCount(kicker) + T.wordCount(units));
-    return { layers: B.layers, rule: B.c.rule, read, fig, values: [v] };
+    return { layers: settle(B), rule: B.c.rule, read, fig, values: [v], mode: B.mode };
   };
 
   // Two states of one measure, as a figure that moves from one to the other
-  // with the picture, its year label beside it.
+  // with the picture, its year label beside it (under it, where the words
+  // sit beside the figure).
   function twoStates(s, api, rows, title, units, kicker) {
-    const T = api.T, d = api.design, K = M.layout.K, S = api.frame.safe;
-    const B = head(api, kicker);
-    const vf = valueFont(api, B, rows.map(r => r.display));
-    const labSize = B.TY.units.size * 1.15;
+    const T = api.T, d = api.design;
+    const B = head(api, kicker), F = figureBox(api, B);
+    const vf = valueFont(api, B, rows.map(r => r.display), F.maxW);
+    const labSize = B.TY.units.size * 1.15, below = B.mode !== 'stack';
     const fig = {
-      kind: 'figure', id: 'value', role: 'value', font: vf.font, size: vf.size, color: d.ink, x: S.x, y: B.y, h: vf.size * 1.1, boxW: S.w,
-      labelFont: T.font(400, labSize, d.font), labelSize: labSize, labelColor: d.muted,
+      kind: 'figure', id: 'value', role: 'value', font: vf.font, size: vf.size, color: d.ink, x: F.x, y: B.y, h: vf.size * 1.1, boxW: F.w,
+      labelFont: T.font(400, labSize, d.font), labelSize: labSize, labelColor: d.muted, labelBelow: below,
       start: null, keys: rows.map((r, i) => ({ at: 0.2 + i * 1.6, dur: 0.6, value: r.value, display: r.display, label: r.label })), at: 0.1, dur: 3.4
     };
     B.layers.push(fig);
-    B.y += vf.size * 1.1 + 4 * K;
-    words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.5, 0.7);
-    if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.8, 0.5); }
+    withFigure(api, B, F, fig.h + (below ? labSize * 1.45 : 0), () => {
+      words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.5, 0.7);
+      if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.8, 0.5); }
+    });
     const read = Math.max(M.READ.number, M.readTime(T.wordCount(title)) + 0.15 * (T.wordCount(kicker) + T.wordCount(units)) + 0.6);
-    return { layers: B.layers, rule: B.c.rule, read, fig, values: rows };
+    return { layers: settle(B), rule: B.c.rule, read, fig, values: rows, mode: B.mode };
   }
   BANDS['before-after'] = (s, api) => {
     if (!s.before || !s.after) throw new Error('needs "before" and "after"');
@@ -137,15 +191,37 @@
     return titled(s, api, rows, 0.4 * rows.length);
   };
   // A title and units in the band; the picture carries the values.
-  function titled(s, api, rows, extra) {
+  function titled(s, api, rows, extra, sources) {
     const T = api.T, d = api.design;
     const kicker = api.copy('kicker'), title = api.copy('title'), units = api.copy('units');
-    const B = head(api, kicker);
+    const B = head(api, kicker, sources);
     words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.15, 0.7);
     if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.45, 0.5); }
     const read = M.readTime(T.wordCount(title)) + 0.15 * (T.wordCount(kicker) + T.wordCount(units)) + extra;
-    return { layers: B.layers, rule: B.c.rule, read, values: rows, series: true };
+    return { layers: settle(B), rule: B.c.rule, read, values: rows, series: true, mode: B.mode, B };
   }
+  // A series over ordered time: the band says it, the picture (a ribbon) draws it.
+  BANDS['trend-line'] = (s, api) => {
+    const D = api.R.data[s.series];
+    if (!D) throw new Error('series: no data table "' + s.series + '"');
+    if (!Array.isArray(D.x) || !Array.isArray(D.y) || D.x.length !== D.y.length || D.x.length < 3) throw new Error('data "' + D.id + '": x and y must be arrays of the same length, at least 3');
+    const end = s.end ? claimOf(api, s.end) : null;
+    const b = titled(s, api, end ? [end] : [], 0.6, D.source ? [D.source] : []);
+    b.line = { id: D.id, x: D.x.slice(), y: D.y.slice(), unit: D.unit, forecastFrom: D.forecastFrom != null ? D.forecastFrom : null, highlight: Array.isArray(s.highlight) ? s.highlight : null, end };
+    return b;
+  };
+
+  BANDS['hook-headline'] = (s, api) => {
+    const T = api.T, d = api.design;
+    const kicker = api.copy('kicker'), headline = api.copy('headline'), units = api.copy('units');
+    const B = head(api, kicker);
+    const fit = T.fit(api.ctx, headline, { weight: d.weights.title, family: d.font, maxW: B.w, maxH: B.TY.display.max * 1.6, min: B.TY.headline.size, max: B.TY.display.max * 0.5, lh: 1.12, maxLines: 3 });
+    words(api, B, 'headline', 'headline', headline, fit.size, fit.lh, d.weights.title, d.ink, 0.05, 0.9);
+    Object.assign(B.layers[B.layers.length - 1], { reveal: 'words', stagger: 0.075 });
+    if (units) { B.y += B.TY.headline.gap; words(api, B, 'units', 'units', units, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.6, 0.5); }
+    const read = M.readTime(T.wordCount(headline)) + 0.15 * (T.wordCount(kicker) + T.wordCount(units));
+    return { layers: settle(B), rule: B.c.rule, read, values: [], mode: B.mode };
+  };
 
   BANDS['kicker-title'] = (s, api) => {
     const T = api.T, d = api.design;
@@ -156,36 +232,137 @@
     words(api, B, 'title', 'headline', title, B.TY.headline.size * k, B.TY.headline.lh * k, d.weights.title, d.ink, 0.15, 0.7);
     if (sub) { B.y += B.TY.headline.gap; words(api, B, 'sub', 'units', sub, B.TY.units.size, B.TY.units.lh, 400, d.muted, 0.45, 0.5); }
     const read = M.readTime(T.wordCount(title)) + 0.15 * (T.wordCount(kicker) + T.wordCount(sub));
-    return { layers: B.layers, rule: B.c.rule, read, values: [] };
+    return { layers: settle(B), rule: B.c.rule, read, values: [], mode: B.mode };
   };
 
+  // A title and a list under it; in a row band, the title on the left and
+  // the list beside it, so a squarer frame keeps room for the world.
+  function titleAndList(api, B, title, list) {
+    const d = api.design, K = M.layout.K, S = api.frame.safe;
+    if (B.mode !== 'row') {
+      words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.15, 0.7);
+      B.y += B.TY.headline.gap * 2;
+      list();
+      return;
+    }
+    const y0 = B.y, x = B.x, w = B.w, tw = Math.round(S.w * 0.38);
+    words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.15, 0.7, tw);
+    const titleBottom = B.y;
+    B.y = y0; B.x = S.x + tw + 24 * K; B.w = S.x + S.w - B.x;
+    list();
+    B.y = Math.max(B.y, titleBottom);
+    B.x = x; B.w = w;
+  }
+
   BANDS['bullet-stack'] = (s, api) => {
-    const T = api.T, d = api.design, K = M.layout.K, S = api.frame.safe;
+    const T = api.T, d = api.design, K = M.layout.K;
     const pts = (s.points || []).map((t, i) => api.R.fill(t, 'points[' + i + ']'));
     if (pts.length < 1 || pts.length > 3) throw new Error('points: use 1 to 3');
     const icons = (s.picture && s.picture.icons) || null;
     if (icons && icons.length !== pts.length) throw new Error('picture.icons: one scene id per point (' + pts.length + ')');
     const kicker = api.copy('kicker'), title = api.copy('title');
     const B = head(api, kicker);
-    words(api, B, 'title', 'headline', title, B.TY.headline.size, B.TY.headline.lh, d.weights.title, d.ink, 0.15, 0.7);
-    B.y += B.TY.headline.gap * 2;
     const size = B.TY.headline.size * 0.72, lh = size * 1.2;
     const indent = icons ? size * 2.6 : size * 0.32 + 10 * K;
-    pts.forEach((t, i) => {
+    titleAndList(api, B, title, () => pts.forEach((t, i) => {
       const at = 0.6 + i * 0.6;
-      const y0 = B.y;
       if (icons) {
-        const id = icons[i];
-        B.layers.push({ kind: 'draw', id: 'icon-' + i, box: { x: S.x, y: y0, w: indent, h: lh * 2 }, at, dur: 0.5, fn(cx, p, info) { drawIcon(cx, info.C, id, S.x + indent * 0.42, y0 + lh * 0.75, p); } });
+        const id = icons[i], pos = { x: B.x + indent * 0.42, y: B.y + lh * 0.75 };
+        B.layers.push({ kind: 'draw', id: 'icon-' + i, pos, box: { x: B.x, y: B.y, w: indent, h: lh * 2 }, at, dur: 0.5, fn(cx, p, info) { drawIcon(cx, info.C, id, pos.x, pos.y, p); } });
       } else {
         const mark = size * 0.32;
-        B.layers.push({ kind: 'rect', id: 'mark-' + i, x: S.x, y: y0 + (lh - mark) / 2, w: mark, h: mark, color: d.subject, grow: 'x', at, dur: 0.3 });
+        B.layers.push({ kind: 'rect', id: 'mark-' + i, x: B.x, y: B.y + (lh - mark) / 2, w: mark, h: mark, color: d.subject, grow: 'x', at, dur: 0.3 });
       }
-      words(api, B, 'point-' + i, 'body', t, size, lh, d.weights.title, d.ink, at + 0.05, 0.55, S.w - indent, S.x + indent);
+      words(api, B, 'point-' + i, 'body', t, size, lh, d.weights.title, d.ink, at + 0.05, 0.55, B.w - indent, B.x + indent);
       if (i < pts.length - 1) B.y += 10 * K;
-    });
+    }));
     const read = Math.max(M.readTime(T.wordCount(pts[pts.length - 1])), M.readTime(T.wordCount(title))) + 0.15 * T.wordCount(kicker);
-    return { layers: B.layers, rule: B.c.rule, read, values: [], icons };
+    return { layers: settle(B), rule: B.c.rule, read, values: [], icons, mode: B.mode };
+  };
+
+  // Dated events and numbered steps: words-led scenes; the world holds where it is.
+  function listing(s, api, items, mark) {
+    const T = api.T, d = api.design, K = M.layout.K;
+    const kicker = api.copy('kicker'), title = api.copy('title');
+    const B = head(api, kicker);
+    const size = B.TY.headline.size * 0.72, lh = size * 1.2, lab = B.TY.units.size * 1.1;
+    titleAndList(api, B, title, () => items.forEach((it, i) => {
+      const at = 0.6 + i * 0.5;
+      words(api, B, 'mark-' + i, 'label', mark(it, i), lab, lab * 1.3, 700, d.accentText, at, 0.4);
+      words(api, B, 'item-' + i, 'body', it.text, size, lh, 600, d.ink, at + 0.1, 0.5);
+      if (i < items.length - 1) B.y += 10 * K;
+    }));
+    const read = M.readTime(T.wordCount(items[items.length - 1].text)) + 0.15 * (T.wordCount(kicker) + T.wordCount(title));
+    return { layers: settle(B), rule: B.c.rule, read, values: [], mode: B.mode };
+  }
+  BANDS['timeline'] = (s, api) => {
+    const ev = (s.events || []).map((e, i) => ({ date: api.R.fill(e.date, 'events[' + i + '].date'), text: api.R.fill(e.text, 'events[' + i + '].text') }));
+    if (ev.length < 2 || ev.length > 5) throw new Error('events: use 2 to 5');
+    return listing(s, api, ev, e => e.date);
+  };
+  BANDS['steps'] = (s, api) => {
+    const st = (s.steps || []).map((t, i) => ({ text: api.R.fill(t, 'steps[' + i + ']') }));
+    if (st.length < 2 || st.length > 4) throw new Error('steps: use 2 to 4');
+    return listing(s, api, st, (e, i) => 'Step ' + (i + 1));
+  };
+
+  // A quote, verbatim: all its words on screen in muted, brightening in reading order.
+  BANDS['quote'] = (s, api) => {
+    const T = api.T, d = api.design, K = M.layout.K;
+    const qid = String((s.copy && s.copy.quote) || '').replace(/[{}]/g, '');
+    const q = api.claim(qid);
+    const body = q.display != null ? String(q.display) : String(q.verbatim || '');
+    if (!body) throw new Error('quote claim "' + qid + '" has no display or verbatim text');
+    const name = api.copy('name'), role = api.copy('role');
+    const B = head(api, null);
+    const text = '“' + body + '”';
+    const fit = T.fit(api.ctx, text, { weight: 400, family: d.font, maxW: B.w, maxH: B.TY.headline.size * 1.25 * 6, min: B.TY.headline.size, max: B.TY.headline.size * 1.4, lh: 1.25, maxLines: 6 });
+    words(api, B, 'quote', 'headline', text, fit.size, fit.lh, 400, d.ink, 0.2, 1);
+    const L = B.layers[B.layers.length - 1];
+    Object.assign(L, { from: d.muted, reveal: 'brighten', dur: Math.max(0.8, L.wordTotal * 0.18), ease: 'linear' });
+    B.y += 12 * K;
+    const attAt = 0.2 + L.dur + 0.1;
+    words(api, B, 'name', 'body', '— ' + name, B.TY.units.size, B.TY.units.lh, 600, d.ink, attAt, 0.4);
+    if (role) words(api, B, 'role', 'units', role, B.TY.units.size, B.TY.units.lh, 400, d.muted, attAt + 0.1, 0.4);
+    B.layers.forEach(l => { if (l.id !== 'quote') l.reveal = 'fade'; });
+    const read = M.readTime(L.wordTotal) * 0.8 + 0.15 * (T.wordCount(name) + T.wordCount(role));
+    return { layers: settle(B), rule: B.c.rule, read, values: [], mode: B.mode };
+  };
+
+  // A user's photo takes the stage for its beat; the world steps aside.
+  BANDS['photo-pan'] = (s, api) => {
+    const img = s.copy && s.copy.image;
+    if (!img || !/^data:image\//.test(img)) throw new Error('copy.image must be a data:image/... URI the user supplied');
+    const b = titled(Object.assign({}, s, { copy: Object.assign({}, s.copy, { title: s.copy.caption }) }), api, [], 0.8);
+    const box = stageBox(api, b.B);
+    b.layers.push({ kind: 'image', id: 'photo', src: img, x: box.x, y: box.y, w: box.w, h: box.h, at: 0.3, dur: 0.6 });
+    return Object.assign(b, { series: false, hideWorld: true });
+  };
+
+  // A custom painter takes the stage for its beat, with the 2.5D kit to draw with.
+  BANDS['custom'] = (s, api) => {
+    const painter = M.custom[s.draw];
+    if (!painter || typeof painter.draw !== 'function') throw new Error('no painter Motion.custom.' + s.draw + ' with a draw(ctx, lt, api) function');
+    const b = titled(s, api, [], 0);
+    const box = stageBox(api, b.B);
+    api.reserved.push(box);
+    const enter = +painter.enter || 1, seed = api.spec.meta.seed || 0;
+    b.layers.push({ kind: 'draw', id: 'custom', box, at: 0.5, dur: enter, ease: 'linear', fn(cx, p, a) {
+      const lt = a.lt - 0.5;
+      painter.draw(cx, Math.max(0, lt), {
+        box, design: a.design, paint: M.paint, ease: M.ease, mat: M.iso.materials(a.design),
+        at: (start, dur, ease) => M.ease.get(ease || 'outQuint')(M.ease.clamp01((lt - start) / (dur || 1e-6))),
+        rng: (...keys) => M.rng(seed, s.id, ...keys),
+        // A 2.5D view centred in the box: world (0, 0, 0) sits a little below its middle.
+        iso: k => M.iso.view(cx, { ax: box.x + box.w / 2, ay: box.y + box.h * 0.62, cx: 0, cy: 0, s: k || 1, font: a.design.font }, 'custom:' + s.id),
+        text: (str, x, y, o) => {
+          const size = (o && o.size) || a.design.size.label, f = M.text.font((o && o.weight) || 400, size, a.design.font);
+          M.paint.text(cx, str, x, y, { font: f, color: (o && o.color) || a.design.ink, h: size * 1.3, alpha: o && o.alpha, layer: 'custom-' + str.slice(0, 12), role: 'body', size });
+        }
+      });
+    } });
+    b.read = Math.max(+painter.read || 1.2, b.read);
+    return Object.assign(b, { series: false, hideWorld: true });
   };
 
   BANDS['source-card'] = (s, api) => {
@@ -196,8 +373,8 @@
     const Z = M.design.frameZone(api.frame, api.footerRows != null ? api.footerRows : 0);
     api.footerUsed = Z.rows;
     api.chrome = { kicker: srcs.length > 1 ? 'Sources' : 'Source', source: null };
-    const TY = M.layout.typeFor(api.frame);
-    const B = { y: Z.top, layers: [], TY };
+    const TY = M.layout.typeFor(api.frame), mode = bandMode(api.frame);
+    const B = { y: Z.top, x: S.x, w: mode === 'column' ? Math.round(S.w * COLUMN) : S.w, mode, zone: Z, layers: [], TY };
     let n = 0;
     srcs.forEach(src => {
       words(api, B, 'row-' + n++, n === 1 ? 'headline' : 'body', src.name, TY.headline.size * 0.9, TY.headline.lh * 0.9, 600, d.ink, 0.1, 0.6);
@@ -210,14 +387,20 @@
     if (note) words(api, B, 'row-' + n++, 'body', note, TY.units.size, TY.units.lh, 400, d.muted, 0.35, 0.6);
     B.layers.forEach(l => { l.reveal = 'fade'; });
     const wordsN = srcs.reduce((k, x) => k + T.wordCount(x.name), 1) + T.wordCount(note);
-    return { layers: B.layers, rule: true, read: Math.max(M.READ.source, M.readTime(wordsN) * 0.75), values: [] };
+    return { layers: settle(B), rule: true, read: Math.max(M.READ.source, M.readTime(wordsN) * 0.75), values: [], mode };
   };
 
+  // The outro keeps its own layout (the user's name and logo); the world fades out under it.
   function band(def, s, api) {
+    if (s.type === 'outro') {
+      const b = def.build(s, api);
+      return Object.assign(b, { bandBottom: api.frame.safe.y, values: [], hideWorld: true, mode: bandMode(api.frame) });
+    }
     const fn = (def && def.band) || BANDS[s.type];
     if (!fn) throw new Error('type "' + s.type + '" is not in the continuous style yet — set meta.style to "slides" for this video');
     const b = fn(s, api);
-    b.bandBottom = bottomOf(b.layers, api.frame.safe.y);
+    delete b.B;
+    b.bandBottom = bottomOf(b.layers.filter(l => l.kind !== 'image' && l.id !== 'custom'), api.frame.safe.y);
     return b;
   }
   function bottomOf(layers, floor) {
@@ -236,8 +419,8 @@
   // A place is one picture (plus its props) at one spot in the world. A scene
   // makes a new place, revisits one (`picture.at`, or a claim the place
   // already shows), or stays where the camera is.
-  // The scenes that rest on the last place rather than show one of their own.
-  const RESTS = ['bullet-stack', 'source-card', 'outro'];
+  // Words-led scenes rest on the place in view rather than show one of their own.
+  const RESTS = ['bullet-stack', 'source-card', 'outro', 'timeline', 'steps', 'quote', 'photo-pan', 'custom'];
 
   function plan(o) {
     const { list, fr, zone, design } = o;
@@ -254,7 +437,7 @@
         place = byScene[pic.at];
         if (!place) throw new Error(where(it) + '.at: "' + pic.at + '" is not a scene with a place before this one');
       }
-      const beat = { scene: it.id, index: i, place: null, acts: [], band: b.bandBottom, layers: b.layers, restOnly: RESTS.indexOf(it.type) >= 0 };
+      const beat = { scene: it.id, index: i, place: null, acts: [], band: b.bandBottom, layers: b.layers, restOnly: RESTS.indexOf(it.type) >= 0 && !pic.kind, hide: !!b.hideWorld };
       if (def && def.emphasis) {
         place = place || current;
         if (!place) throw new Error(where(it) + ': "' + kind + '" lifts a place, but there is none yet — give it "at"');
@@ -267,18 +450,28 @@
       } else if (!place && b.values && b.values.length) {
         // A figure a place already shows brings the camera back to it.
         place = places.find(p => b.values.some(v => p.claims.indexOf(v.claim.id) >= 0)) || null;
+        // A finding with no picture of its own rests on the place in view; the lint says so.
+        if (!place && !beat.restOnly) beat.fallback = b.values.map(v => v.display);
       }
       place = place || current;
       beat.place = place;
       if (place) {
         byScene[it.id] = place;
-        b.values && b.values.forEach(v => { if (place.claims.indexOf(v.claim.id) < 0) place.claims.push(v.claim.id); });
-        act(beat, place, it, pic);
+        // A beat resting on a borrowed place leaves it as it is: its figure
+        // isn't the place's, so nothing there moves for it.
+        if (!beat.fallback) {
+          b.values && b.values.forEach(v => { if (place.claims.indexOf(v.claim.id) < 0) place.claims.push(v.claim.id); });
+          act(beat, place, it, pic);
+        }
         current = place;
       }
       beats.push(beat);
     });
     if (!places.length) throw new Error('meta.style "continuous": no scene has a picture — give the first finding a "picture" (references/pictures.md)');
+    // Opening words with no picture of their own (a hook headline) open on
+    // the first place the story reaches: an establishing shot, its units yet
+    // to arrive.
+    for (const bt of beats) { if (bt.place) break; bt.place = places[0]; }
 
     // Every scene's timing must cover what its picture does.
     beats.forEach(bt => {
@@ -290,21 +483,26 @@
     // world, its key stays at label size. The world takes the largest scale
     // (up to 1) at which every place fits between the words and the footer.
     places.forEach(p => { p.geo = placeGeo(p); p.keyW = p.def.key ? Math.max(...keyLines(p).map(l => M.text.measure(o.ctx, l.text, M.text.font(600, LABEL, design.font)))) : 0; });
-    const S = fr.safe;
+    const S = fr.safe, K = M.layout.K, mode = bandMode(fr);
     const bottom = zone.ruleY - 14;
-    const dataBand = Math.max(...beats.filter(bt => bt.place && !bt.restOnly).map(bt => bt.band), zone.top);
-    const top = dataBand + STAGE_GAP;
-    const maxWide = fr.W - 2 * Math.min(S.x, fr.W - S.x - S.w);
+    // The stage: under the words (a stack or a row), or the room right of a
+    // wide frame's word column.
+    const colRight = S.x + Math.round(S.w * COLUMN) + 30 * K;
+    const dataBand = mode === 'column' ? zone.top : Math.max(...beats.filter(bt => bt.place && !bt.restOnly).map(bt => bt.band), zone.top);
+    const top = mode === 'column' ? zone.top + 10 : dataBand + STAGE_GAP;
+    // Across the frame, with some air at its edges.
+    const maxWide = mode === 'column' ? S.x + S.w - colRight : fr.W - 2 * Math.min(S.x, fr.W - S.x - S.w) - 60;
     const fits = k => {
       const bs = places.map(p => boxAt(p, k));
       return Math.max(...bs.map(b => b.y1)) - Math.min(...bs.map(b => b.y0)) <= bottom - top && Math.max(...bs.map(b => b.x1 - b.x0)) <= maxWide;
     };
-    let s = 1;
-    if (!fits(1)) { let lo = 0.2, hi = 1; for (let n = 0; n < 24; n++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; } s = lo; }
+    // The largest scale that fits, up to MAX_SCALE (a roomy wide stage draws the world a little larger).
+    let s = MAX_SCALE;
+    if (!fits(s)) { let lo = 0.2, hi = MAX_SCALE; for (let n = 0; n < 24; n++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; } s = lo; }
     places.forEach(p => { p.box = boxAt(p, s); });
     const minY = Math.min(...places.map(p => p.box.y0)), maxY = Math.max(...places.map(p => p.box.y1));
     const rowY = (top - minY + bottom - maxY) / 2;
-    const ax = S.x + S.w / 2;
+    const ax = mode === 'column' ? (colRight + S.x + S.w) / 2 : S.x + S.w / 2;
 
     // Places along one screen row, far enough apart that a neighbour stays
     // off the frame. A new place joins the end of the row nearer the place
@@ -332,25 +530,31 @@
       if (!p) { bt.cam = { x: 0, y: 0, alpha: 0 }; return; }
       const cx = p.sx + (p.box.x0 + p.box.x1) / 2;
       const placeTop = rowY + p.box.y0, placeBottom = rowY + p.box.y1;
-      // The closing beats' words sit a little closer to the world.
-      const need = Math.max(0, bt.band + STAGE_GAP * (bt.restOnly ? 0.6 : 1) - placeTop);
-      const room = bottom - placeBottom;
-      bt.cam = { x: cx, y: -Math.min(need, room), alpha: need <= room + 0.5 ? 1 : 0 };
+      // Words beside the world (a column) never push it; above it, the
+      // resting beats' words sit a little closer to it.
+      const need = mode === 'column' ? 0 : Math.max(0, bt.band + STAGE_GAP * (bt.restOnly ? 0.3 : 1) - placeTop);
+      // A resting beat may also use the last few pixels above the world's clip.
+      const room = bottom + (bt.restOnly ? 5 : 0) - placeBottom;
+      bt.cam = { x: cx, y: -Math.min(need, room), alpha: !bt.hide && need <= room + 0.5 ? 1 : 0 };
     });
     // The closing beats (summary, source) rest together: one camera for the
     // run, low enough for the deepest words, so it doesn't bob between them.
     for (let i = 0; i < beats.length; i++) {
-      if (!beats[i].restOnly) continue;
+      if (!beats[i].restOnly || beats[i].hide) continue;
       let j = i;
-      while (j + 1 < beats.length && beats[j + 1].restOnly && beats[j + 1].place === beats[i].place) j++;
+      while (j + 1 < beats.length && beats[j + 1].restOnly && !beats[j + 1].hide && beats[j + 1].place === beats[i].place) j++;
       const run = beats.slice(i, j + 1);
       const y = Math.min(...run.map(b => b.cam.y)), alpha = Math.min(...run.map(b => b.cam.alpha));
       run.forEach(b => { b.cam.y = y; b.cam.alpha = alpha; });
       i = j;
     }
-    beats.forEach(bt => { if (bt.place) bt.stageTop = Math.min(bt.band + STAGE_GAP, rowY + bt.place.box.y0 - bt.cam.y); });
+    beats.forEach(bt => {
+      if (bt.place) bt.stageTop = Math.min(bt.band + STAGE_GAP, rowY + bt.place.box.y0 - bt.cam.y);
+      // Where the beat's words are, for the audit: the world keeps out of it.
+      bt.bandRect = mode === 'column' ? { x0: S.x, y0: zone.top, x1: colRight - 30 * K, y1: zone.bottom } : { x0: 0, y0: zone.top, x1: fr.W, y1: bt.band };
+    });
 
-    return { places, beats, byScene, s, rowY, ax, bottom, safe: S, gap: STAGE_GAP, label: LABEL, font: design.font, mat: M.iso.materials(design) };
+    return { places, beats, byScene, s, rowY, ax, bottom, safe: S, gap: STAGE_GAP, label: LABEL, font: design.font, locale: o.spec.meta.locale, mode, mat: M.iso.materials(design) };
   }
 
   function defaultKind(it) {
@@ -359,6 +563,7 @@
     if (it.type === 'compare-bars' && b.series) return 'columns';
     if (it.type === 'ranked-list') return 'podium';
     if (it.type === 'share-split') return 'split';
+    if (it.type === 'trend-line') return 'ribbon';
     return null;
   }
 
@@ -512,7 +717,7 @@
       const sc = scenes[i];
       bt.t0 = sc.t0; bt.cStart = sc.cStart; bt.cEnd = sc.cEnd; bt.t1 = sc.t1; bt.ovIn = sc.ovIn; bt.exitStart = sc.exitStart;
       sc.place = bt.place ? bt.place.id : null;
-      sc.stageTop = bt.stageTop;
+      sc.stageTop = bt.stageTop; sc.bandRect = bt.bandRect;
       bt.acts.forEach(a => {
         const p = bt.place, T = sc.cStart + (a.at == null ? 0 : a.at);
         if (a.type === 'enter') p.enter = { t0: T, dur: a.dur };

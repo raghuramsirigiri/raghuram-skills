@@ -19,7 +19,8 @@ shape, timing, numbers, hedges and upgrade words, quotes, copy limits,
 determinism and offline-ness. Read every row; fix every FAIL in the spec,
 then run it again. A WARN is a judgement call: read it, act on it or say
 why not. The `timing` rows print each scene's handle and length: that is
-the scene list for the handover.
+the scene list for the handover. In the continuous style a `pictures` WARN
+names a finding with no picture of its own: give it one (`pictures.md`).
 
 ### 7.2 Run the audit in a browser
 
@@ -43,7 +44,11 @@ seconds, and **fails** on:
 - contrast under 4.5:1 (3:1 for large text);
 - a layer not held still long enough to read;
 - nothing readable by 0.5 s;
-- the export probe not round-tripping.
+- the export probe not round-tripping;
+- in the continuous style, `world-overlap` (a word touching a shape of the
+  world: a key, a label or the band's words) and `stage` (the place in view,
+  while a beat holds, running off the frame, into its words or past the
+  footer).
 
 It **warns** on single-frame pops, a still frame held longer than its read
 needs (`frozen`), and a scene whose hold frame
