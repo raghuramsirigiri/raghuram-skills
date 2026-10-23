@@ -202,7 +202,8 @@
     // The world (continuous style). Words never touch a shape (a place's own
     // labels may sit beside its own lines, a share's mark). While a beat holds, the
     // place in view sits wholly inside the frame, below its words and above
-    // the footer's hairline.
+    // the footer's hairline; a line the camera tracks along may run past the
+    // frame's sides.
     function worldChecks(t, recs, shapes) {
       const vis = shapes.filter(r => r.alpha > 0.06 && r.kind !== 'shadow');
       const words = recs.filter(r => r.alpha > 0.3 && !/^world-face:/.test(r.layer || ''));
@@ -220,7 +221,11 @@
       // The words' own room: the band above the world, or a wide frame's column beside it.
       const B = sc.bandRect || { x0: 0, y0: C.zone.top, x1: C.W, y1: C.zone.top };
       const intoWords = x0 < B.x1 + 12 && x1 > B.x0 - 12 && y0 < B.y1 + 12 && y1 > B.y0 - 12;
-      if (x0 < -1 || x1 > C.W + 1 || intoWords || y1 > C.zone.ruleY) {
+      // A line the camera tracks along runs past the frame's sides (and, in a
+      // wide frame, under the words' column, which clips it); its height must
+      // still keep clear of the words and the footer.
+      const bad = sc.tracked ? y1 > C.zone.ruleY || (B.x0 <= 0 && B.x1 >= C.W && y0 < B.y1 + 12) : x0 < -1 || x1 > C.W + 1 || intoWords || y1 > C.zone.ruleY;
+      if (bad) {
         once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the picture spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside the frame, clear of the words (' + [B.x0, B.y0, B.x1, B.y1].map(Math.round).join(',') + ') and above the footer (' + Math.round(C.zone.ruleY) + ')' });
       }
     }

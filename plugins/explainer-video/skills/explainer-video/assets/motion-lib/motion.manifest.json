@@ -127,17 +127,27 @@
     }
   },
   "pictures": {
-    "people": {"role": "data", "job": "a count of people, one dot each (or one per `per`), and shares of them", "scenes": ["big-number", "before-after", "compare-bars"], "needs": [], "options": {"whole": "claim id of the count, when the scene shows a share", "per": "people per dot, required above 2,000"}, "key": "1 dot = 1 person (or per people)", "notFor": "anything that is not people: visits, accounts, money"},
-    "dots": {"role": "data", "job": "a small share of anything: 1,000 dots, one per 0.1%, lit along the front", "scenes": ["big-number", "before-after", "compare-bars"], "needs": ["of"], "key": "1 dot = 0.1% of <of>", "notFor": "a count; a share above about 20% (use blocks)"},
-    "blocks": {"role": "data", "job": "a share as a 10 x 10 stack, one unit per 1%", "scenes": ["big-number", "before-after", "compare-bars"], "needs": ["of"], "skins": ["parcel", "card", "plain"], "liftable": true, "key": "= 1% of <of>", "notFor": "a count; a share below 2% (use dots)"},
-    "split": {"role": "data", "job": "parts of one whole, each lit in turn, the first (or emph) in the accent", "scenes": ["share-split"], "needs": ["of"], "skins": ["plain", "card", "parcel"], "key": "the unit, then each part with its swatch", "notFor": "shares of different wholes, or more than 100%"},
-    "columns": {"role": "data", "job": "2 to 6 values in one unit, standing in a row from zero", "scenes": ["compare-bars"], "needs": [], "key": "each value and label in the world", "notFor": "a long series (use a trend line); parts of a whole"},
-    "funnel": {"role": "data", "job": "stages that only narrow, each stage's loss a ghost above it", "scenes": ["compare-bars"], "needs": [], "key": "each value and label under the plate", "notFor": "stages that grow, or different units"},
-    "podium": {"role": "data", "job": "a ranking, largest first in the accent, long names wrapped", "scenes": ["ranked-list"], "needs": [], "key": "each value and label in the world", "notFor": "unranked categories"},
-    "ribbon": {"role": "data", "job": "a series over ordered time, drawn left to right; gaps stay gaps, a forecast is ghosted", "scenes": ["trend-line"], "needs": [], "key": "the end value, first and last x, the baseline when not zero", "notFor": "unordered categories"},
-    "building": {"role": "prop", "job": "where a finding happens: a home, a bank branch", "skins": ["home", "branch"], "notFor": "a cause the source does not state"},
-    "device": {"role": "prop", "job": "a website or app: a laptop or phone with a plain wireframe page", "skins": ["laptop", "phone"], "standalone": true, "notFor": "a real product's screen"},
-    "desk": {"role": "place", "job": "work waiting: an unsorted pile, empty trays, a calendar showing when it is due", "options": {"due": "words from the scene's copy", "from": "an earlier scene whose place the sheets lift off"}, "notFor": "a finding with a figure"},
-    "plinth": {"role": "emphasis", "job": "lifts the place in view (or `at`) for a verdict about it", "notFor": "a place that is not blocks"}
+    "note": "Phase 1 of the directed pictures: a picture is things x arrangement x action x camera, a regular chart, or a set piece. The full lists, held in step by tests, come with the lint (phase 3).",
+    "grammar": {
+      "things": "{ things, arrange, of, parts, to, per, hold, at, from, camera }",
+      "chart": "{ chart: columns | funnel | bars | line }",
+      "set": "{ set: desk, due, from }",
+      "act": "{ act: highlight, at }"
+    },
+    "arrangements": {
+      "piles": {"job": "the whole as one stack that parts, one pile per part; heights compare", "props": "none"},
+      "sort": {"job": "the whole dealt to a destination per part, piling at each", "props": "one per part, in \"to\""},
+      "queue": {"job": "a line; the share steps out of it; the camera tracks a line longer than the frame", "props": "the head of the line, optional"},
+      "group": {"job": "a crowd; the share gathers apart", "props": "none"}
+    },
+    "charts": {
+      "columns": {"scenes": ["compare-bars"], "job": "2 to 6 values in one unit, from zero"},
+      "funnel": {"scenes": ["compare-bars"], "job": "stages that only narrow; each loss a ghost"},
+      "bars": {"scenes": ["ranked-list"], "job": "a ranking, largest first"},
+      "line": {"scenes": ["trend-line"], "job": "ordered time; gaps stay gaps, a forecast dashed"}
+    },
+    "sets": {
+      "desk": {"job": "work waiting: an in-tray, empty trays, a calendar showing when it is due", "options": {"due": "words from the scene's copy", "from": "an earlier scene of things whose share is carried into the in-tray"}}
+    }
   }
 }
