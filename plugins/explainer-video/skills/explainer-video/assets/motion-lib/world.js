@@ -2,7 +2,11 @@
  * motion-lib/world.js — the continuous style: one 2.5D world the camera
  * travels across, with the words in a band at the top of the frame.
  *
- *   meta.style: "continuous"     scene.picture: { kind, at, from, of, … }
+ *   meta.style: "continuous"
+ *   scene.picture: { things, arrange, of, parts, to, per, hold, at, from, camera }
+ *                | { chart: "columns" | "bars" | "funnel" | "line" }
+ *                | { set: "desk", due, from }
+ *                | { act: "highlight", at }
  *
  * compile (core.js) asks band() for each scene's words, plan() for the
  * places, the camera and what each picture does on each beat, and finish()
@@ -12,10 +16,15 @@
  *   - The words own a band at the top; the world stays below it and above the
  *     footer rule. Nothing in the world enters the band.
  *   - The places sit on one screen row, in the order the story first reaches
- *     them, so every pan between them is level. The camera only pans; the
- *     world's scale is set once per video, so nothing zooms.
- *   - A picture shows its number: one unit per stated thing, with its key on
- *     screen. Two states of one measure play last year, then now.
+ *     them, so every pan between them is level. The camera only pans (and
+ *     tracks along a line too long for the frame); the world's scale is set
+ *     once per video, so nothing zooms.
+ *   - A picture is directed from its finding: the noun gives its things
+ *     (things/), the number their arrangement (arrange.js), the verb what they
+ *     do (act.js). Series, rankings and funnels are regular flat charts.
+ *   - A picture shows its number: the things drawn are the claim exactly,
+ *     with the key on screen. Two states of one measure play last year, then
+ *     now, and no thing moves from one part to another between them.
  *   - A picture's words come from the scene's copy or its claims.
  *   - Everything is a pure function of t.
  */
@@ -27,21 +36,6 @@
   const lerp = (a, b, k) => a + (b - a) * k;
   const GHOST = 0.32;            // what's left of a unit's accent after a fall: the share that was lost
   const STAGE_GAP = 36;          // between the words' band and the world, frame px
-  const LABEL = 30;              // world labels (keys, marks), frame px
-  const MAX_SCALE = 1.3;         // the world's largest scale; it is set once per video
-
-  // ── the picture registry ─────────────────────────────────────────────
-  const PICS = {};
-  function register(def) {
-    if (!def || !def.kind || typeof def.draw !== 'function') throw new Error('pictures.register: need { kind, draw }');
-    PICS[def.kind] = def;
-  }
-  function getPic(kind, where) {
-    const d = PICS[kind];
-    if (!d) throw new Error(where + ': unknown picture "' + kind + '" — use ' + Object.keys(PICS).sort().join(', '));
-    return d;
-  }
-  M.pictures = { register, get: getPic, list: PICS };
 
   // ── the words: each scene's band ─────────────────────────────────────
   //
@@ -166,14 +160,14 @@
     const rows = M.chart.rows(api, [s.before, s.after], 'before/after');
     return twoStates(s, api, rows, api.copy('title'), api.copy('units'), api.copy('kicker'));
   };
-  // Two shares of one measure move one figure; anything else is drawn by its
-  // picture (columns, a funnel), each value labelled in the world.
+  // Two shares of one measure move one figure, unless they are drawn as a
+  // chart; anything else is drawn by its chart (columns, a funnel), each
+  // value labelled in the world.
   BANDS['compare-bars'] = (s, api) => {
     const rows = M.chart.rows(api, s.bars, 'bars');
     if (rows.length < 2 || rows.length > 6) throw new Error('bars: use 2 to 6 bars (got ' + rows.length + ')');
     const shares = rows.every(r => /%\s*$/.test(r.display));
-    const kind = s.picture && s.picture.kind;
-    if (rows.length === 2 && shares && (!kind || ['blocks', 'people', 'dots'].indexOf(kind) >= 0)) return twoStates(s, api, rows, api.copy('title'), api.copy('units'), api.copy('kicker'));
+    if (rows.length === 2 && shares && !(s.picture && s.picture.chart)) return twoStates(s, api, rows, api.copy('title'), api.copy('units'), api.copy('kicker'));
     return titled(s, api, rows, 0.3 * (rows.length - 1));
   };
   BANDS['ranked-list'] = (s, api) => {
@@ -416,52 +410,90 @@
 
   // ── the plan: places, what each beat does on its place, the camera ───
   //
-  // A place is one picture (plus its props) at one spot in the world. A scene
-  // makes a new place, revisits one (`picture.at`, or a claim the place
-  // already shows), or stays where the camera is.
+  // A place is one picture at one spot on the world's row:
+  //   things  a noun's things in an arrangement (arrange.js), moved by act.js
+  //   chart   a regular flat chart (pictures/charts.js), filling the stage
+  //   set     a set piece with no figure (pictures/desk.js)
+  // A scene makes a new place, goes back to one (`picture.at`, or a claim
+  // the place already shows), acts on one (`picture.act`), or rests on the
+  // place in view.
   // Words-led scenes rest on the place in view rather than show one of their own.
   const RESTS = ['bullet-stack', 'source-card', 'outro', 'timeline', 'steps', 'quote', 'photo-pan', 'custom'];
+  // The scenes each chart draws.
+  const CHART_OF = { columns: ['compare-bars'], funnel: ['compare-bars'], bars: ['ranked-list'], line: ['trend-line'] };
+  const CAMERAS = ['pan', 'track', 'hold'];
+  const COUNT_MAX = 200;          // a count draws one thing each up to this; above it, `per`
+  const TRACK_SPEED = 1000;       // a tracking camera's pace, frame px a second
+  const MAX_SCALE = 2;
+  const COS = 0.8660254, XU = 1.2247449;    // screen x per row unit u, at scale 1
+  const MOVERS = 12, STAG = 0.07;          // things carried from one place to the next
+  const isShare = v => /%\s*$/.test(String(v.display));
+  const noDigits = (str, where) => {
+    if (/\d/.test(String(str))) throw new Error(where + ': "' + str + '" — a picture\'s words are the spec\'s own, without digits (the figure comes from its claim)');
+  };
 
   function plan(o) {
-    const { list, fr, zone, design } = o;
+    const { list, fr, zone, design, spec, ctx } = o;
+    const S = fr.safe, K = M.layout.K, mode = bandMode(fr);
+    const W = {
+      design, mat: M.iso.materials(design), font: design.font, locale: spec.meta.locale, tf: fr.profile.type,
+      label: design.size.label * fr.profile.type, gap: STAGE_GAP, safe: S, mode, ctx
+    };
+    const custom = composeAll(spec.meta.things);
     const places = [], beats = [], byScene = {};
     let current = null;
-    const where = it => 'scene "' + it.id + '" picture';
 
     list.forEach((it, i) => {
-      const s = it.spec, b = it.built, pic = s.picture || {};
-      const kind = pic.kind || defaultKind(it);
-      const def = kind ? getPic(kind, where(it)) : null;
+      const s = it.spec, b = it.built, pic = s.picture || null;
+      const where = 'scene "' + it.id + '" picture';
+      const beat = { scene: it.id, index: i, it, place: null, acts: [], band: b.bandBottom, layers: b.layers, restOnly: RESTS.indexOf(it.type) >= 0 && !pic, hide: !!b.hideWorld };
       let place = null;
-      if (pic.at) {
-        place = byScene[pic.at];
-        if (!place) throw new Error(where(it) + '.at: "' + pic.at + '" is not a scene with a place before this one');
-      }
-      const beat = { scene: it.id, index: i, place: null, acts: [], band: b.bandBottom, layers: b.layers, restOnly: RESTS.indexOf(it.type) >= 0 && !pic.kind, hide: !!b.hideWorld };
-      if (def && def.emphasis) {
-        place = place || current;
-        if (!place) throw new Error(where(it) + ': "' + kind + '" lifts a place, but there is none yet — give it "at"');
-        if (!place.def.liftable) throw new Error(where(it) + ': "' + kind + '" cannot lift a "' + place.kind + '" place');
-        beat.acts.push({ type: 'lift', at: 0.1, dur: 1.0 });
-      } else if (!place && def) {
-        place = newPlace(def, kind, pic, it, places.length, o.R);
-        place.cameFrom = (pic.from && byScene[pic.from]) || current;
-        places.push(place);
-      } else if (!place && b.values && b.values.length) {
-        // A figure a place already shows brings the camera back to it.
-        place = places.find(p => b.values.some(v => p.claims.indexOf(v.claim.id) >= 0)) || null;
-        // A finding with no picture of its own rests on the place in view; the lint says so.
-        if (!place && !beat.restOnly) beat.fallback = b.values.map(v => v.display);
+      if (pic) {
+        const makes = ['things', 'chart', 'set'].filter(k => pic[k] != null);
+        if (makes.length > 1) throw new Error(where + ': give one of "things", "chart" or "set", not ' + makes.join(' and '));
+        if (pic.kind != null) throw new Error(where + '.kind: pictures are directed now — give "things" and "arrange", a "chart" or a "set" (references/pictures.md)');
+        if (pic.at != null) {
+          if (makes.length) throw new Error(where + ': "at" goes back to an earlier place and "' + makes[0] + '" makes a new one — give one or the other');
+          place = byScene[pic.at];
+          if (!place) throw new Error(where + '.at: "' + pic.at + '" is not a scene with a place before this one');
+        }
+        if (pic.act != null) {
+          if (pic.act !== 'highlight') throw new Error(where + '.act: "' + pic.act + '" — use "highlight"');
+          place = place || current;
+          if (!place) throw new Error(where + ': there is no place yet to highlight — give it "at"');
+          if (place.kind !== 'things') throw new Error(where + ': "highlight" lifts a share of things, and scene "' + place.scene + '" shows a ' + (place.chart || place.set));
+          beat.highlight = true;
+        } else if (makes.length) {
+          place = newPlace(pic, it, places.length, custom, where);
+          place.cameFrom = current;
+          if (pic.from != null) {
+            const src = byScene[pic.from];
+            if (!src) throw new Error(where + '.from: "' + pic.from + '" is not a scene with a place before this one');
+            if (place.kind === 'chart') throw new Error(where + '.from: a chart takes no things from another place — drop "from"');
+            if (src.kind !== 'things') throw new Error(where + '.from: scene "' + pic.from + '" shows a ' + (src.chart || src.set) + ', which has no things to carry');
+            place.cameFrom = place.from = src;
+          }
+          places.push(place);
+        } else if (!place) throw new Error(where + ': give it "things", "chart", "set", "at" or "act" (references/pictures.md)');
+      } else {
+        // A series, a ranking or a trend is a regular chart unless it says otherwise.
+        const dc = defaultChart(it);
+        if (dc) { place = newPlace({ chart: dc }, it, places.length, custom, where); place.cameFrom = current; places.push(place); }
+        else if (b.values && b.values.length) {
+          // A figure a place already shows brings the camera back to it.
+          place = places.find(p => b.values.some(v => v.claim && p.claims.indexOf(v.claim.id) >= 0)) || null;
+          // A finding with no picture of its own rests on the place in view; the lint says so.
+          if (!place && !beat.restOnly) beat.fallback = b.values.map(v => v.display);
+        }
       }
       place = place || current;
       beat.place = place;
       if (place) {
         byScene[it.id] = place;
-        // A beat resting on a borrowed place leaves it as it is: its figure
-        // isn't the place's, so nothing there moves for it.
+        // A beat resting on a borrowed place leaves it as it is.
         if (!beat.fallback) {
-          b.values && b.values.forEach(v => { if (place.claims.indexOf(v.claim.id) < 0) place.claims.push(v.claim.id); });
-          act(beat, place, it, pic);
+          (b.values || []).forEach(v => { if (v.claim && place.claims.indexOf(v.claim.id) < 0) place.claims.push(v.claim.id); });
+          place.beats.push(beat);
         }
         current = place;
       }
@@ -469,73 +501,91 @@
     });
     if (!places.length) throw new Error('meta.style "continuous": no scene has a picture — give the first finding a "picture" (references/pictures.md)');
     // Opening words with no picture of their own (a hook headline) open on
-    // the first place the story reaches: an establishing shot, its units yet
-    // to arrive.
+    // the first place the story reaches: an establishing shot, its things
+    // yet to arrive.
     for (const bt of beats) { if (bt.place) break; bt.place = places[0]; }
 
-    // Every scene's timing must cover what its picture does.
-    beats.forEach(bt => {
-      const end = bt.acts.reduce((m, a) => Math.max(m, a.at + a.dur), 0);
-      if (end > 0) bt.layers.push({ kind: 'draw', id: 'picture', at: 0, dur: end, fn() {} });
+    // What each place shows, now that every beat on it is known.
+    places.forEach(p => { if (p.kind === 'things') shapeThings(p); else if (p.kind === 'chart') shapeChart(p); });
+
+    // The stage: under the deepest band of words that shows a figure (a stack
+    // or a row), or the room right of a wide frame's word column.
+    const bottom = zone.ruleY - 14;
+    const colRight = S.x + Math.round(S.w * COLUMN) + 30 * K;
+    const acting = beats.filter(bt => bt.place && bt.place.beats.indexOf(bt) >= 0 && !bt.restOnly && !bt.hide);
+    const top = mode === 'column' ? zone.top + 10 : Math.max(zone.top, ...acting.map(bt => bt.band)) + STAGE_GAP;
+    const stage = mode === 'column' ? { x: colRight, y: top, w: S.x + S.w - colRight, h: bottom - top } : { x: S.x, y: top, w: S.w, h: bottom - top };
+    if (stage.h < 160) throw new Error('the words leave the world ' + Math.round(stage.h) + ' px of stage in ' + fr.format + ' — shorten the longest title or units line');
+    W.stage = stage;
+
+    // One scale for the video: the largest at which every place of things
+    // (and every set) fits the stage. Charts are laid out in the stage itself.
+    const boxAt = (p, s) => (p.kind === 'things' ? thingsBox(p, s, W) : setBox(p, s));
+    const fitsAt = s => places.every(p => {
+      if (p.kind === 'chart') return true;
+      const bx = boxAt(p, s);
+      return bx.y1 - bx.y0 <= stage.h && (p.tracked || bx.x1 - bx.x0 <= stage.w);
+    });
+    let s = Math.min(MAX_SCALE, stage.h / 470);
+    for (let n = 0; n < 90 && s > 0.25 && !fitsAt(s); n++) s *= 0.97;
+    W.s = s;
+    places.forEach(p => {
+      if (p.kind === 'chart') {
+        p.def.layout(p, stage, W, ctx);
+        const g = p.geo.box;
+        Object.assign(p, { ax: 0, ay: 0, fx0: stage.x, fx1: stage.x + stage.w, fy0: g.y, fy1: g.y + g.h });
+        return;
+      }
+      const bx = p.box = boxAt(p, s);
+      p.ay = stage.y + (stage.h - (bx.y1 - bx.y0)) / 2 - bx.y0;
+      // A line longer than the stage starts at its head; the camera tracks to its tail.
+      if (p.tracked) { p.ax = stage.x + 12 - bx.x0; p.trackLen = Math.max(0, bx.x1 - bx.x0 + 24 - stage.w); }
+      else p.ax = stage.x + stage.w / 2 - (bx.x0 + bx.x1) / 2;
+      Object.assign(p, { fx0: p.ax + bx.x0, fx1: p.ax + bx.x1, fy0: p.ay + bx.y0, fy1: p.ay + bx.y1 });
+      // Things in flight keep below the stage's top edge.
+      p.ceil = (stage.y + 6 - p.ay) / s;
     });
 
-    // Geometry. Each place's box about its anchor: the shapes scale with the
-    // world, its key stays at label size. The world takes the largest scale
-    // (up to 1) at which every place fits between the words and the footer.
-    places.forEach(p => { p.geo = placeGeo(p); p.keyW = p.def.key ? Math.max(...keyLines(p).map(l => M.text.measure(o.ctx, l.text, M.text.font(600, LABEL, design.font)))) : 0; });
-    const S = fr.safe, K = M.layout.K, mode = bandMode(fr);
-    const bottom = zone.ruleY - 14;
-    // The stage: under the words (a stack or a row), or the room right of a
-    // wide frame's word column.
-    const colRight = S.x + Math.round(S.w * COLUMN) + 30 * K;
-    const dataBand = mode === 'column' ? zone.top : Math.max(...beats.filter(bt => bt.place && !bt.restOnly).map(bt => bt.band), zone.top);
-    const top = mode === 'column' ? zone.top + 10 : dataBand + STAGE_GAP;
-    // Across the frame, with some air at its edges.
-    const maxWide = mode === 'column' ? S.x + S.w - colRight : fr.W - 2 * Math.min(S.x, fr.W - S.x - S.w) - 60;
-    const fits = k => {
-      const bs = places.map(p => boxAt(p, k));
-      return Math.max(...bs.map(b => b.y1)) - Math.min(...bs.map(b => b.y0)) <= bottom - top && Math.max(...bs.map(b => b.x1 - b.x0)) <= maxWide;
-    };
-    // The largest scale that fits, up to MAX_SCALE (a roomy wide stage draws the world a little larger).
-    let s = MAX_SCALE;
-    if (!fits(s)) { let lo = 0.2, hi = MAX_SCALE; for (let n = 0; n < 24; n++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; } s = lo; }
-    places.forEach(p => { p.box = boxAt(p, s); });
-    const minY = Math.min(...places.map(p => p.box.y0)), maxY = Math.max(...places.map(p => p.box.y1));
-    const rowY = (top - minY + bottom - maxY) / 2;
-    const ax = mode === 'column' ? (colRight + S.x + S.w) / 2 : S.x + S.w / 2;
-
-    // Places along one screen row, far enough apart that a neighbour stays
-    // off the frame. A new place joins the end of the row nearer the place
-    // the story comes from, so the camera never crosses a place to reach it.
+    // Places along one screen row, just over a frame apart: a neighbour stays
+    // off the frame while a beat holds, and in a pan the place in view slides
+    // out as the next slides in. A new place joins the end of the row nearer
+    // the place the story comes from, so the camera never crosses a place to
+    // reach it.
     const row = [];
     places.forEach(p => {
       const from = p.cameFrom ? row.indexOf(p.cameFrom) : -1;
       if (row.length > 1 && from >= 0 && from < (row.length - 1) / 2 + 0.01) row.unshift(p); else row.push(p);
     });
-    let u = 0;
     row.forEach((p, k) => {
-      if (k > 0) {
-        const prev = row[k - 1];
-        const dist = fr.W * 0.62 + (prev.box.x1 - p.box.x0);
-        u += dist / (2 * M.iso.COS * s);
-      }
-      p.x = u; p.y = -u;
-      p.sx = 2 * u * M.iso.COS * s;          // the place's anchor, in screen px along the row
+      const q = row[k - 1];
+      p.sx = k ? q.sx + Math.max((q.trackLen || 0) + fr.W - p.fx0 + 30, q.fx1 + 30) : 0;
     });
 
-    // The camera on each beat: the place's box centred on the safe area, and
-    // lowered (a pan down) only when the beat's words reach further down.
+    // What each beat does on its place, in content time (0 = the beat's
+    // words start; negative = during the pan in).
+    beats.forEach(bt => { const p = bt.place; if (p && p.beats.indexOf(bt) >= 0) actsFor(bt, p, W); });
+    // Every scene's timing must cover what its picture does, and give its
+    // world labels (the parts' names, the key, a mark) their time to be read.
+    beats.forEach(bt => {
+      const end = bt.acts.reduce((m, a) => Math.max(m, (a.at || 0) + (a.dur || 0)), bt.trackDef ? bt.trackDef.at + bt.trackDef.dur : 0);
+      if (end > 0) bt.layers.push({ kind: 'draw', id: 'picture', at: 0, dur: end, fn() {} });
+      bt.acts.forEach(a => { if (a.type === 'parts' || a.type === 'key' || a.type === 'mark') bt.layers.push({ kind: 'draw', id: 'world-' + a.type, role: 'label', at: Math.max(0, a.at), dur: 0.45, fn() {} }); });
+    });
+
+    // The camera on each beat: on its place, lowered (a pan down) only when
+    // the beat's words reach further down; a tracked beat ends at the line's tail.
     beats.forEach(bt => {
       const p = bt.place;
-      if (!p) { bt.cam = { x: 0, y: 0, alpha: 0 }; return; }
-      const cx = p.sx + (p.box.x0 + p.box.x1) / 2;
-      const placeTop = rowY + p.box.y0, placeBottom = rowY + p.box.y1;
+      if (!p) { bt.cam = bt.camIn = { x: 0, y: 0, alpha: 0 }; return; }
       // Words beside the world (a column) never push it; above it, the
       // resting beats' words sit a little closer to it.
-      const need = mode === 'column' ? 0 : Math.max(0, bt.band + STAGE_GAP * (bt.restOnly ? 0.3 : 1) - placeTop);
+      const need = mode === 'column' ? 0 : Math.max(0, bt.band + STAGE_GAP * (bt.restOnly ? 0.3 : 1) - p.fy0);
       // A resting beat may also use the last few pixels above the world's clip.
-      const room = bottom + (bt.restOnly ? 5 : 0) - placeBottom;
-      bt.cam = { x: cx, y: -Math.min(need, room), alpha: !bt.hide && need <= room + 0.5 ? 1 : 0 };
+      const room = bottom + (bt.restOnly ? 5 : 0) - p.fy1;
+      const y = -Math.min(need, room), alpha = !bt.hide && need <= room + 0.5 ? 1 : 0;
+      const x = p.sx + (p.tracked && p.trackedBy != null && p.trackedBy < bt.index ? p.trackLen : 0);
+      bt.camIn = { x, y, alpha };
+      bt.cam = bt.trackDef ? { x: p.sx + p.trackLen, y, alpha } : bt.camIn;
     });
     // The closing beats (summary, source) rest together: one camera for the
     // run, low enough for the deepest words, so it doesn't bob between them.
@@ -545,170 +595,378 @@
       while (j + 1 < beats.length && beats[j + 1].restOnly && !beats[j + 1].hide && beats[j + 1].place === beats[i].place) j++;
       const run = beats.slice(i, j + 1);
       const y = Math.min(...run.map(b => b.cam.y)), alpha = Math.min(...run.map(b => b.cam.alpha));
-      run.forEach(b => { b.cam.y = y; b.cam.alpha = alpha; });
+      run.forEach(b => { b.cam = b.camIn = { x: b.cam.x, y, alpha }; });
       i = j;
     }
     beats.forEach(bt => {
-      if (bt.place) bt.stageTop = Math.min(bt.band + STAGE_GAP, rowY + bt.place.box.y0 - bt.cam.y);
+      if (bt.place) bt.stageTop = Math.min(bt.band + STAGE_GAP, bt.place.fy0 - bt.cam.y);
       // Where the beat's words are, for the audit: the world keeps out of it.
       bt.bandRect = mode === 'column' ? { x0: S.x, y0: zone.top, x1: colRight - 30 * K, y1: zone.bottom } : { x0: 0, y0: zone.top, x1: fr.W, y1: bt.band };
     });
 
-    return { places, beats, byScene, s, rowY, ax, bottom, safe: S, gap: STAGE_GAP, label: LABEL, font: design.font, locale: o.spec.meta.locale, mode, mat: M.iso.materials(design) };
+    return Object.assign(W, { places, beats, byScene, s, bottom, colRight });
   }
 
-  function defaultKind(it) {
-    const b = it.built, v = b.values && b.values[0];
-    if (it.type === 'big-number' && v && /%\s*$/.test(v.display)) return 'blocks';
+  function defaultChart(it) {
+    const b = it.built;
     if (it.type === 'compare-bars' && b.series) return 'columns';
-    if (it.type === 'ranked-list') return 'podium';
-    if (it.type === 'share-split') return 'split';
-    if (it.type === 'trend-line') return 'ribbon';
+    if (it.type === 'ranked-list') return 'bars';
+    if (it.type === 'trend-line') return 'line';
     return null;
   }
 
-  function newPlace(def, kind, pic, it, n, R) {
-    if (def.prop && !def.standalone) throw new Error('scene "' + it.id + '" picture: "' + kind + '" is a prop — put it in another picture\'s "props"');
-    const props = (pic.props || []).map(name => {
-      const pd = PICS[name] || Object.values(PICS).find(d => d.prop && d.skins && d.skins.indexOf(name) >= 0);
-      if (!pd || !pd.prop) throw new Error('scene "' + it.id + '" picture.props: "' + name + '" is not a prop');
-      return { def: pd, pic: { kind: pd.kind, skin: pd.kind === name ? undefined : name }, fills: [], lifts: [], marks: [], flips: [] };
-    });
-    (def.needs || []).forEach(k => { if (!pic[k]) throw new Error('scene "' + it.id + '" picture: "' + kind + '" needs "' + k + '" (references/pictures.md)'); });
-    if (def.skins && pic.skin && def.skins.indexOf(pic.skin) < 0) throw new Error('scene "' + it.id + '" picture.skin: "' + pic.skin + '" — use ' + def.skins.join(', '));
-    const place = { id: 'place-' + n + '-' + it.id, kind, def, pic, scene: it.id, props, claims: [], fills: [], lifts: [], marks: [], enter: null, movers: null, flips: [], level: 0 };
-    if (def.prepare) def.prepare(place, it, R);
-    return place;
+  // Custom things from meta.things, composed from the kit.
+  function composeAll(def) {
+    const out = {};
+    if (def == null) return out;
+    if (typeof def !== 'object' || Array.isArray(def)) throw new Error('meta.things: { name: [parts] } (references/pictures.md § Custom things)');
+    Object.keys(def).forEach(name => { out[name] = M.things.compose(name, def[name]); });
+    return out;
   }
 
-  // What a beat does on its place, in content time (0 = the beat's words
-  // start; negative = during the pan in). Counters and figures in the band
-  // are retimed to move with the units.
-  function act(bt, place, it, pic) {
-    const b = it.built, type = it.type, def = place.def;
-    const first = place.scene === it.id;
-    const fig = b.fig;
-    // Units start landing as the place slides in; the first beat has no pan.
-    // A picture that draws a series (columns) builds once the camera is there.
-    const pre = bt.index === 0 ? 0.2 : def.enterAt != null ? def.enterAt : -0.8;
-    const enterDur = typeof def.enterDur === 'function' ? def.enterDur(place) : def.enterDur || 1.8;
-    if (first && def.data) bt.acts.push({ type: 'enter', at: pre, dur: enterDur });
-    if (b.series && !def.series && !def.parts) throw new Error('scene "' + it.id + '" picture: "' + place.kind + '" cannot show ' + type + ' — use ' + (type === 'share-split' ? '"split"' : '"columns", "funnel" or "podium"') + ' (references/pictures.md)');
-    if (def.parts && first) {
-      // Each part lights in turn, largest share of attention to the first.
-      let t = pre + enterDur * 0.75, at = 0;
-      b.values.forEach(r => {
-        const n = Math.round(r.value), dur = def.fillDur(n);
-        bt.acts.push({ type: 'fill', at: t, dur, from: at, to: at + n, unit: def.unitDur, ghost: false });
-        at += n; t += dur + 0.3;
-      });
-      place.level = at;
+  function newPlace(pic, it, n, custom, where) {
+    const base = { id: 'place-' + n + '-' + it.id, scene: it.id, pic, beats: [], claims: [], steps: [], marks: [], lifts: [], flips: [], enter: null, movers: null };
+    const refuse = (keys, why) => keys.forEach(k => { if (pic[k] != null) throw new Error(where + ': ' + why + ' — drop "' + k + '"'); });
+    if (pic.chart != null) {
+      const def = M.charts && M.charts[pic.chart];
+      if (!def) throw new Error(where + '.chart: "' + pic.chart + '" — use ' + Object.keys(M.charts || {}).join(', '));
+      if (pic.to != null) throw new Error(where + '.to: a prop must give, take or hold things, and a chart has none — drop "to"');
+      refuse(['things', 'arrange', 'per', 'hold', 'parts', 'of', 'camera'], 'a chart draws its values itself');
+      if (CHART_OF[pic.chart].indexOf(it.type) < 0) throw new Error(where + '.chart: "' + pic.chart + '" draws a ' + CHART_OF[pic.chart].join(' or ') + ', not a ' + it.type);
+      return Object.assign(base, { kind: 'chart', chart: pic.chart, def });
     }
-    if (first && pic.from) bt.acts.push({ type: 'movers', from: pic.from, at: 0, dur: 0.9 });
-    if (first && def.flip && pic.due) bt.acts.push({ type: 'flip', at: 1.8, dur: 0.7 });
+    if (pic.set != null) {
+      const def = M.things.get(pic.set, where + '.set', custom);
+      if (def.role !== 'set') throw new Error(where + '.set: "' + pic.set + '" is not a set piece — use ' + setNames().join(', '));
+      refuse(['to', 'things', 'arrange', 'per', 'hold', 'parts', 'of', 'camera'], 'a set piece shows no figure');
+      const p = Object.assign(base, { kind: 'set', set: def.name, def });
+      if (def.prepare) def.prepare(p, it);
+      return p;
+    }
+    const th = M.things.get(pic.things, where + '.things', custom);
+    if (th.role !== 'unit') throw new Error(where + '.things: "' + pic.things + '" is a ' + th.role + ' — things are what the finding counts; a place or device they go to goes in "to"');
+    const arrange = pic.arrange;
+    if (!M.arrange.ARRANGE[arrange]) throw new Error(where + '.arrange: ' + (arrange == null ? 'say how the things stand' : '"' + arrange + '"') + ' — use ' + M.arrange.names.join(', ') + ' (references/pictures.md)');
+    if (!M.arrange.fits(th, arrange)) throw new Error(where + ': ' + (th.people ? 'people' : th.name + 's') + ' don\'t stand in "' + arrange + '"');
+    if (pic.of == null || String(pic.of).trim() === '') throw new Error(where + ': give "of", what one ' + th.name + ' stands for (the key says it)');
+    noDigits(pic.of, where + '.of');
+    if (pic.parts != null) {
+      if (!Array.isArray(pic.parts) || pic.parts.some(x => typeof x !== 'string' || !x.trim())) throw new Error(where + '.parts: a list of labels, the share\'s first');
+      pic.parts.forEach((x, k) => noDigits(x, where + '.parts[' + k + ']'));
+    }
+    const camera = pic.camera || 'pan';
+    if (CAMERAS.indexOf(camera) < 0) throw new Error(where + '.camera: "' + camera + '" — use ' + CAMERAS.join(', '));
+    if (camera === 'track' && arrange !== 'queue') throw new Error(where + '.camera: "track" follows a queue along its length');
+    if (pic.hold != null) {
+      if (!th.people) throw new Error(where + '.hold: a pose for people, and "' + th.name + '" are not people');
+      if ((th.poses || []).indexOf(pic.hold) < 0 || pic.hold === 'walk' || pic.hold === 'stand') throw new Error(where + '.hold: "' + pic.hold + '" — use ' + th.poses.filter(x => x !== 'walk' && x !== 'stand').join(', '));
+    }
+    if (pic.per != null && !(Number.isInteger(pic.per) && pic.per > 1)) throw new Error(where + '.per: a whole number above 1 — how many of "' + pic.of + '" one ' + th.name + ' stands for');
+    const to = pic.to == null ? [] : Array.isArray(pic.to) ? pic.to : [pic.to];
+    const props = to.map((nm, k) => {
+      const d = M.things.get(nm, where + '.to[' + k + ']', custom);
+      if (d.role !== 'prop') throw new Error(where + '.to: "' + nm + '" is not a place or device things go to — use ' + propNames().join(', '));
+      return { def: d, name: nm };
+    });
+    // A prop has a job: things go to it (sort), or a line leads to it (queue).
+    if ((arrange === 'piles' || arrange === 'group') && props.length) throw new Error(where + '.to: a prop must give, take or hold things, and in "' + arrange + '" nothing goes to one — drop "to", or sort the things to it');
+    if (arrange === 'queue' && props.length > 1) throw new Error(where + '.to: a line leads to one place — give one');
+    return Object.assign(base, { kind: 'things', thing: th, arrange, props, camera, hold: pic.hold || null, per: pic.per || null });
+  }
+  const setNames = () => M.things.names().filter(k => M.things.list[k].role === 'set');
+  const propNames = () => M.things.names().filter(k => M.things.list[k].role === 'prop');
 
-    if (type === 'big-number' && fig) {
-      const v = b.values[0];
-      if (def.shares && /%\s*$/.test(v.display)) {
-        const to = place.unitsFor(v);
-        const from = place.level;
-        const at = first ? pre + enterDur * 0.75 : 0.3, dur = def.fillDur(Math.abs(to - from));
-        bt.acts.push({ type: 'fill', at, dur, from, to, unit: def.unitDur, ghost: false });
-        place.level = to;
-        fig.at = at; fig.dur = dur; fig.countEase = 'linear';
-      } else if (def.counts) {
-        fig.at = Math.max(0.1, pre); fig.dur = enterDur + 0.2;   // the count rolls as the units arrive
-      } else if (def.data) {
-        throw new Error('scene "' + it.id + '" picture: "' + place.kind + '" shows a share in %, and "' + v.display + '" is not one (references/pictures.md)');
-      }
-    }
-    if ((type === 'before-after' || type === 'compare-bars') && fig && def.shares) {
-      const [r0, r1] = b.values;
-      const u0 = place.unitsFor(r0), u1 = place.unitsFor(r1);
-      const now = place.level;
-      const keys = [];
-      let t = first ? 0.5 : 0.3;
-      if (now === u1 && u0 !== u1) {
-        // The place already shows "now": go back to "then", and return.
-        const d0 = 0.6;
-        bt.acts.push({ type: 'fill', at: t, dur: d0, from: u1, to: u0, unit: Math.min(0.35, d0), ghost: false });
-        keys.push({ at: t, dur: d0, value: r0.value, display: r0.display, label: r0.label });
-        t += d0 + 1.0;
-        bt.acts.push({ type: 'fill', at: t, dur: d0, from: u0, to: u1, unit: Math.min(0.35, d0), ghost: false });
-        keys.push({ at: t, dur: d0, value: r1.value, display: r1.display, label: r1.label });
-        fig.start = { value: r1.value, display: r1.display };
-        t += d0;
-      } else {
-        // Fill to "then", mark it, then move to "now": a fall leaves a ghost of what was lost.
-        const d0 = def.fillDur(Math.abs(u0 - now));
-        bt.acts.push({ type: 'fill', at: t, dur: d0, from: now, to: u0, unit: def.unitDur, ghost: false });
-        keys.push({ at: t, dur: d0, value: r0.value, display: r0.display, label: r0.label });
-        t += d0 + 0.1;
-        bt.acts.push({ type: 'mark', at: t, dur: 0.6, units: u0, label: r0.label + ': ' + r0.display });
-        t += 0.9;
-        const d1 = Math.max(0.6, Math.min(1.2, def.fillDur(Math.abs(u1 - u0)) * 2));
-        bt.acts.push({ type: 'fill', at: t, dur: d1, from: u0, to: u1, unit: Math.min(0.35, d1), ghost: u1 < u0 });
-        keys.push({ at: t, dur: d1, value: r1.value, display: r1.display, label: r1.label });
-        t += d1;
-      }
-      place.level = u1;
-      fig.keys = keys;
-      fig.at = 0.1; fig.dur = t;
-    }
+  function shapeChart(p) {
+    const b = p.beats[0].it.built, where = 'scene "' + p.scene + '" picture.chart';
+    if (p.chart === 'line') { p.line = b.line; p.rows = []; return; }
+    if (!b.series) throw new Error(where + ': two shares of one measure are things, not a "' + p.chart + '" — give it "things"');
+    p.rows = b.values;
+    if (p.rows.length < 2) throw new Error(where + ': a chart needs two or more values');
+    if (p.rows.some(r => !(r.value >= 0))) throw new Error(where + ': values must be zero or more');
   }
 
-  // The place's shapes' box at scale 1 about its anchor (its centre on the ground).
-  function placeGeo(p) {
-    const pts = [];
-    const add = (x, y, w, d, h) => {
-      for (const [a, b] of [[x, y], [x + w, y], [x, y + d], [x + w, y + d]]) {
-        pts.push([(a - b) * M.iso.COS, (a + b) * 0.5]);
-        pts.push([(a - b) * M.iso.COS, (a + b) * 0.5 - h]);
-      }
-    };
-    const f = p.def.footprint(p);
-    p.half = { x: f.w / 2, y: f.d / 2 };
-    // A picture laid out along the screen row (columns) gives its own box.
-    if (p.def.geo) { const g = p.def.geo(p, 1); pts.push([g.x0, g.y0], [g.x1, g.y1]); }
-    else add(-f.w / 2, -f.d / 2, f.w + (f.shadow || 0), f.d + (f.shadow || 0) * 0.4, f.h);
-    // Props stand to its left on screen, side by side, a little back: they
-    // widen the place, never make it taller. (Screen offset to world:
-    // x - y = dx / cos30, x + y = 2 dy.)
-    let edge = p.def.geo ? p.def.geo(p, 1).x0 : -(p.half.x + p.half.y) * M.iso.COS;
-    p.props.forEach(pr => {
-      const g = pr.def.footprint(pr), hw = (g.w + g.d) / 2 * M.iso.COS;
-      const sx = edge - 36 - hw, sy = -24;
-      pr.dx = (sx / M.iso.COS + 2 * sy) / 2;
-      pr.dy = (2 * sy - sx / M.iso.COS) / 2;
-      edge = sx - hw;
-      add(pr.dx - g.w / 2, pr.dy - g.d / 2, g.w + (g.shadow || 0), g.d, g.h);
+  // What a beat shows on a place of things: a share, two states of one
+  // share, parts of a whole, or a count.
+  function showing(bt) {
+    const it = bt.it, b = it.built, type = it.type, scene = it.id;
+    const vals = b.values || [];
+    if (bt.highlight || !vals.length) return null;
+    if (type === 'big-number') return isShare(vals[0]) ? { kind: 'share', rows: [vals[0]], scene } : { kind: 'count', v: vals[0], scene };
+    if (type === 'before-after' || (type === 'compare-bars' && !b.series)) {
+      if (!vals.every(isShare)) throw new Error('scene "' + scene + '" picture: ' + vals.map(v => v.display).join(' and ') + ' are counts — things show two states of one share; draw counts as { "chart": "columns" }');
+      return { kind: 'two', rows: vals, scene };
+    }
+    if (type === 'share-split') return { kind: 'split', rows: vals, scene };
+    throw new Error('scene "' + scene + '" picture: things can\'t show a ' + type + ' — give it a chart (' + Object.keys(CHART_OF).filter(k => CHART_OF[k].indexOf(type) >= 0).join(', ') + ')');
+  }
+  const valuesOf = sh => (sh.kind === 'count' ? [] : sh.rows.map(r => r.value));
+  // The count each part holds when a beat shows its rows.
+  function countsFor(p, rows) {
+    const c = p.parts.map(() => 0);
+    let used = 0;
+    rows.forEach((r, i) => {
+      const n = Math.round(r.value * p.T / 100);
+      const k = p.split ? i : 0;
+      c[k] += n; used += n;
     });
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    pts.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+    c[c.length - 1] += p.T - used;
+    return c;
+  }
+
+  function shapeThings(p) {
+    const where = 'scene "' + p.scene + '" picture', pic = p.pic, th = p.thing;
+    p.beats.forEach(bt => { bt.showing = showing(bt); });
+    const shows = p.beats.map(bt => bt.showing).filter(Boolean);
+    const first = shows[0];
+    if (!first) throw new Error(where + ': things show a figure, and this scene has none — give it a "set" or a "chart"');
+    // The parts: the share first, the rest last.
+    let parts;
+    if (first.kind === 'split') {
+      if (p.arrange === 'queue' || p.arrange === 'group') throw new Error(where + ': a queue or a group shows one share — show parts of a whole as "piles" or "sort"');
+      const rows = first.rows, sum = rows.reduce((n, r) => n + r.value, 0);
+      const lead = Math.max(0, rows.findIndex(r => r.emph));
+      parts = rows.map((r, i) => ({ label: r.label + '  ' + r.display, kind: i === lead ? 'share' : 'part' }));
+      if (sum > 100.5) throw new Error(where + ': the parts add up to ' + sum + '%, more than the whole');
+      if (sum < 99.5) {
+        const lab = pic.parts && pic.parts[rows.length];
+        if (!lab) throw new Error(where + '.parts: the parts add up to ' + sum + '% — give a label for the rest, after one per part');
+        parts.push({ label: lab, kind: 'rest' });
+      } else parts[parts.length - 1].rest = true;
+      p.split = true;
+      shows.forEach(sh => { if (sh.kind !== 'split') throw new Error('scene "' + sh.scene + '" picture: the place of scene "' + p.scene + '" shows parts of a whole — give this finding a place of its own'); });
+    } else {
+      const need = p.arrange === 'piles' || p.arrange === 'sort' ? 2 : 1;
+      const share = shows.some(sh => sh.kind !== 'count');
+      if (share && (!pic.parts || pic.parts.length < need)) throw new Error(where + '.parts: name the share' + (need > 1 ? ' and the rest' : '') + ', e.g. ["Online", "Branch or phone"] — words, no digits');
+      parts = [{ label: pic.parts ? pic.parts[0] : null, kind: 'share' }, { label: pic.parts ? pic.parts[1] || null : null, kind: 'rest' }];
+      p.hasShare = share;
+      shows.forEach(sh => { if (sh.kind === 'split') throw new Error('scene "' + sh.scene + '" picture: parts of a whole need a place of their own'); });
+    }
+    // The whole: a count's own things, or the exact whole for every share it shows.
+    if (first.kind === 'count') {
+      const v = first.v;
+      if (p.per) p.T = Math.max(1, Math.round(v.value / p.per));
+      else {
+        if (!Number.isInteger(v.value) || v.value > COUNT_MAX) throw new Error(where + ': ' + v.display + ' is drawn one ' + th.name + ' each only up to ' + COUNT_MAX + ' — give "per" (one ' + th.name + ' for so many ' + pic.of + ')');
+        p.T = v.value;
+      }
+      if (p.T < 2) throw new Error(where + ': ' + v.display + ' at "per" ' + p.per + ' is fewer than two things — a smaller "per"');
+      p.count = true;
+      shows.forEach(sh => valuesOf(sh).forEach(x => {
+        if (Math.abs(x * p.T / 100 - Math.round(x * p.T / 100)) > 1e-6) throw new Error('scene "' + sh.scene + '" picture: ' + x + '% of the ' + p.T + ' things of scene "' + p.scene + '" is not a whole number of them — give it a place of its own');
+      }));
+      shows.forEach(sh => { if (sh.kind === 'count' && sh !== first) throw new Error('scene "' + sh.scene + '" picture: a second count needs a place of its own'); });
+    } else {
+      const firstVals = valuesOf(first);
+      p.T = M.arrange.exactWhole([].concat(...shows.map(valuesOf)), p.arrange, th.people);
+      if (!p.T) {
+        const T1 = M.arrange.exactWhole(firstVals, p.arrange, th.people);
+        const bad = T1 && shows.find(sh => !M.arrange.exactWhole(firstVals.concat(valuesOf(sh)), p.arrange, th.people));
+        if (bad) throw new Error('scene "' + bad.scene + '" picture: ' + valuesOf(bad).join('% and ') + '% is not a whole number of the things of scene "' + p.scene + '" — give it a place of its own');
+        throw new Error(where + ': no whole of 10, 20, 25, 50, 100 or 200 things shows ' + firstVals.join('% and ') + '% exactly — draw it as a chart');
+      }
+      shows.forEach(sh => { if (sh.kind === 'count') throw new Error('scene "' + sh.scene + '" picture: a count needs a place of its own'); });
+    }
+    // Each part's most things, over every beat.
+    const caps = parts.map(() => 0);
+    p.parts = parts;
+    shows.forEach(sh => {
+      const sets = sh.kind === 'count' ? [parts.map((x, i) => (i === parts.length - 1 ? p.T : 0))] : sh.kind === 'two' ? sh.rows.map(r => countsFor(p, [r])) : [countsFor(p, sh.rows)];
+      sets.forEach(c => c.forEach((n, i) => { caps[i] = Math.max(caps[i], n); }));
+    });
+    parts.forEach((pp, i) => { pp.cap = caps[i]; pp.tint = tintFor(pp, i, parts); });
+    // A sort needs a destination per part.
+    if (p.arrange === 'sort' && p.props.length !== parts.length) throw new Error(where + '.to: a sort sends each part somewhere — give one destination per part (' + parts.length + ': ' + parts.map(x => x.label || 'the rest').join(', ') + ')');
+    // Then, marked: the share's level on the earlier state, labelled.
+    const two = shows.find(sh => sh.kind === 'two');
+    p.markText = two ? { 0: two.rows[0].label + ': ' + two.rows[0].display } : {};
+  }
+  function tintFor(pp, i, parts) {
+    if (pp.kind === 'share') return m => m.A;
+    if (pp.kind === 'rest' || pp.rest) return m => m.N;
+    const k = parts.slice(0, i).filter(q => q.kind === 'part').length;
+    return m => m.gray(0.42 + 0.16 * k);
+  }
+
+  // A place of things at scale s: its arrangement, the labels over its parts,
+  // its key; the box about its anchor, in frame px.
+  function thingsBox(p, s, W) {
+    const LB = W.label, lh = LB * 1.3, ctx = W.ctx;
+    const listed = p.arrange === 'piles' || p.arrange === 'sort';   // a label over each part; else the share is in the key
+    p.parts.forEach((pp, i) => {
+      const lines = [];
+      if (listed && pp.label) lines.push({ text: pp.label, color: W.design.ink, weight: 600, id: 'part' + i, mark: false });
+      if (p.markText[i]) lines.push({ text: p.markText[i], color: W.design.muted, weight: 400, id: 'mark' + i, mark: true });
+      pp.lines = lines;
+      pp.labelW = lines.length ? Math.max(...lines.map(l => M.text.measure(ctx, l.text, M.text.font(l.weight, LB, W.font)))) : 0;
+    });
+    // The arrangement keeps the parts' labels apart.
+    p.labelHalfU = p.parts.map(pp => (pp.labelW ? pp.labelW / 2 + LB * 0.5 : 0) / (XU * s));
+    const L = p.layout = M.arrange.ARRANGE[p.arrange](p);
+    const ub = M.arrange.unitBox(p.thing, s);
+    const B = M.arrange.bounds(p, L, s);
+    let x0 = B.X0, x1 = B.X1, y0 = B.Y0, y1 = B.Y1;
+    p.labelSpots = [];
+    p.parts.forEach((pp, i) => {
+      if (!pp.lines.length) return;
+      const r = partRegion(p, L, i, s, ub);
+      const y = r.y0 - 14 - pp.lines.length * lh;
+      p.labelSpots.push({ part: i, x: r.cx, y, lines: pp.lines });
+      x0 = Math.min(x0, r.cx - pp.labelW / 2); x1 = Math.max(x1, r.cx + pp.labelW / 2); y0 = Math.min(y0, y);
+    });
+    // The parts' names stand on one line, the highest of them.
+    const top = Math.min(...p.labelSpots.map(sp => sp.y));
+    p.labelSpots.forEach(sp => { sp.y = top; });
+    // The key under the picture: what one thing stands for, and for a line
+    // or a crowd, which of them are the share.
+    const kf = M.text.font(600, LB, W.font);
+    const lines = [{ text: M.arrange.keyText(p), icon: 'unit' }];
+    if (!listed && p.hasShare && p.parts[0].label) lines.push({ text: p.parts[0].label, icon: 'share' });
+    const kw = Math.max(...lines.map(l => M.text.measure(ctx, l.text, kf))) + LB * 1.7;
+    const ky = y1 + 22;
+    p.tracked = p.arrange === 'queue' && p.camera !== 'hold' && (p.camera === 'track' || x1 - x0 > W.stage.w);
+    const kx = p.tracked ? x0 : (x0 + x1) / 2 - kw / 2;
+    p.key = { x: kx, y: ky, w: kw, lines };
+    y1 = ky + lines.length * lh;
+    if (!p.tracked) { x0 = Math.min(x0, kx); x1 = Math.max(x1, kx + kw); }
     return { x0, y0, x1, y1 };
   }
-  // The place's box on screen at world scale s: its shapes, and its key at label size.
-  // A picture with labels laid out among its shapes (columns) gives its box at s itself.
-  function boxAt(p, s) {
-    const g = p.geo, b = p.def.geo && !p.props.length ? p.def.geo(p, s) : { x0: g.x0 * s, y0: g.y0 * s, x1: g.x1 * s, y1: g.y1 * s };
-    if (p.def.key) {
-      const k = keySpot(p, p.keyW, s);
-      b.x0 = Math.min(b.x0, k.x); b.x1 = Math.max(b.x1, k.x + k.w); b.y1 = Math.max(b.y1, k.y + LABEL * 1.3 * keyLines(p).length);
+  // A part's screen region at scale s: its things at their most, and its destination.
+  function partRegion(p, L, i, s, ub) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity;
+    const add = (X, Y, l, r, t) => { x0 = Math.min(x0, X - l); x1 = Math.max(x1, X + r); y0 = Math.min(y0, Y - t); };
+    L.parts[i].slots.forEach(q => add((q.x - q.y) * COS * s, ((q.x + q.y) / 2 - q.z) * s, ub.l, ub.r, ub.t));
+    const pr = L.props.find(r => r.part === i);
+    let cx = null;
+    if (pr) {
+      const g = pr.def.size, X = (pr.pos.x - pr.pos.y) * COS * s, half = (g.w + g.d) / 2 * COS * s;
+      add(X, ((pr.pos.x + pr.pos.y) / 2) * s, half, half, (g.h + (g.w + g.d) / 4) * s);
+      cx = X;
     }
-    return b;
+    return { x0, x1, y0, cx: cx != null ? cx : (x0 + x1) / 2 };
   }
-  // A key's lines: { text, swatch } (swatch: a colour, or null for the unit itself).
-  const keyLines = p => [].concat(p.def.key(p)).map(l => (typeof l === 'string' ? { text: l, swatch: null } : l));
+  // A set piece's box at scale s about its anchor.
+  function setBox(p, s) { return p.def.box(p, s); }
 
-  // Where a place's key goes, at scale s about its anchor: from the left
-  // corner, under the front-left edge, in the empty ground below it.
-  function keySpot(p, textW, s) {
-    const hx = p.half.x, hy = p.half.y, C = M.iso.COS;
-    const L = [-(hx + hy) * C * s, (hy - hx) * 0.5 * s], F = [(hx - hy) * C * s, (hx + hy) * 0.5 * s];
-    const slope = (F[1] - L[1]) / (F[0] - L[0]);
-    const w = textW + LABEL * 1.6;
-    // Under the edge as far as the text reaches; never lower than just under the front corner.
-    return { x: L[0], y: L[1] + slope * Math.min(w, F[0] - L[0]) + 12, w };
+  // ── what each beat does ──────────────────────────────────────────────
+  const arrivalDur = p => (p.thing.people ? 2.0 : Math.min(2.0, 0.9 + p.T * 0.008));
+  const arrivalUnit = p => (p.thing.people ? (p.arrange === 'queue' ? 1.3 : 1.2) : p.arrange === 'sort' ? 0.55 : 0.42);
+
+  function actsFor(bt, p, W) {
+    const b = bt.it.built, fig = b.fig, A = bt.acts;
+    const first = p.beats[0] === bt;
+    const pre = bt.index === 0 ? 0.2 : -0.8;
+    // A chart builds once the camera is there.
+    if (p.kind === 'chart') { if (first) A.push({ type: 'enter', at: bt.index === 0 ? 0.2 : 0.15, dur: p.def.enterDur(p) }); return; }
+    if (p.kind === 'set') {
+      if (first && p.from) A.push({ type: 'movers', from: p.from });
+      if (first && p.month) A.push({ type: 'flip', at: 1.8, dur: 0.7 });
+      return;
+    }
+    // Things: they arrive as the place slides in (the first beat has no pan).
+    let t = pre;
+    if (first) {
+      if (p.from) A.push({ type: 'movers', from: p.from });
+      // A sort's whole streams in as it is dealt: it arrives, unseen, beyond the frame.
+      const stream = p.layout.stream;
+      const dur = p.tracked ? 3.5 : stream ? 0.02 : arrivalDur(p);
+      // A tracked line files in from its head; the camera waits at each of
+      // the share until it has arrived.
+      if (p.tracked) {
+        const unit = arrivalUnit(p), ready = k => t + k / Math.max(1, p.T - 1) * (dur - unit) + unit;
+        p.trackedBy = bt.index; bt.trackDef = trackPlan(p, W, 0.6, ready);
+      }
+      A.push({ type: 'step', at: t, dur, unit: stream ? 0.01 : arrivalUnit(p), counts: { W: p.T } });
+      A.push({ type: 'key', at: t + (stream ? 0.8 : dur * (p.tracked ? 0.15 : 0.6)) });
+      // A sort's destinations are named from the start: things go to them.
+      if (p.arrange === 'sort') A.push({ type: 'parts', at: Math.max(t, 0.1) });
+      t = p.tracked ? 0.6 : stream ? t + 0.1 : t + dur + 0.25;
+    }
+    if (bt.highlight) { A.push({ type: 'lift', at: 0.1, dur: 1.0 }); return; }
+    const sh = bt.showing;
+    if (!sh) return;
+    if (sh.kind === 'count') { if (fig) { fig.at = Math.max(0.1, pre); fig.dur = arrivalDur(p) + 0.2; } return; }
+    if (!first) t = 0.3;
+    if (sh.kind === 'share' || sh.kind === 'split') {
+      const d = goTo(bt, p, countsFor(p, sh.rows), t, null, W);
+      // The figure counts as the share's things land, and keeps rolling until
+      // the last has: it never rests on a figure the source doesn't state.
+      if (fig) { fig.at = d.at; fig.dur = d.dur; fig.countEase = 'linear'; }
+      return;
+    }
+    // Two states of one share: then, marked, then now. A place already
+    // showing "now" goes back to "then" first.
+    const [r0, r1] = sh.rows, c0 = countsFor(p, [r0]), c1 = countsFor(p, [r1]);
+    const same = (x, y) => !!x && x.every((n, i) => n === y[i]);
+    const back = same(p.state, c1) && !same(c0, c1);
+    const keys = [];
+    const d0 = goTo(bt, p, c0, t, null, W);
+    keys.push({ at: d0.at, dur: d0.dur, value: r0.value, display: r0.display, label: r0.label });
+    t = d0.at + d0.dur + 0.1;
+    A.push({ type: 'mark', at: t, dur: 0.5, part: 0, units: c0[0], label: p.markText[0] });
+    t += 1.0;
+    // A fall leaves a ghost of the share that was lost.
+    const d1 = goTo(bt, p, c1, t, c1[0] < c0[0] ? [0] : null, W);
+    keys.push({ at: d1.at, dur: d1.dur, value: r1.value, display: r1.display, label: r1.label });
+    if (fig) {
+      if (back) fig.start = { value: r1.value, display: r1.display };
+      fig.keys = keys; fig.at = Math.min(0.1, keys[0].at); fig.dur = d1.at + d1.dur;
+    }
+  }
+  // Move the place's parts to `target`: the first time, things leave the
+  // whole for their parts; after that, things fade or fresh ones come in.
+  function goTo(bt, p, target, t, ghost, W) {
+    const counts = {};
+    target.forEach((n, i) => { counts[i] = n; });
+    let dur, unit, times = null;
+    if (!p.state) {
+      const moved = target.reduce((n, c, i) => n + (p.layout.parts[i].stays ? 0 : c), 0);
+      unit = p.thing.people ? 0.9 : 0.6;
+      if (p.tracked && bt.trackDef) {
+        // Along a tracked line, each of the share steps out as the camera reaches it.
+        times = trackTimes(bt);
+        t = times.length ? times[0] : t;
+        dur = times.length ? times[times.length - 1] - times[0] + unit : unit;
+      } else dur = Math.min(3.0, 0.9 + moved * 0.022);
+      if (p.layout.stream) unit = 0.95;
+      bt.acts.push({ type: 'step', at: t, dur, unit, counts, parting: true, times });
+      if (p.arrange === 'piles') bt.acts.push({ type: 'parts', at: t + dur + 0.05 });
+    } else {
+      const changed = target.reduce((n, c, i) => n + Math.abs(c - p.state[i]), 0) / 2;
+      dur = Math.max(0.6, Math.min(1.4, 0.4 + changed * 0.12));
+      unit = Math.min(0.5, dur);
+      bt.acts.push({ type: 'step', at: t, dur, unit, counts, ghost });
+    }
+    p.state = target.slice();
+    return { at: t, dur, times };
+  }
+  // The tracking camera's path along a line: from its head, it eases to a
+  // stop at each of the share (who steps out as it arrives), holds a beat,
+  // and travels on to the tail. Keys are { t, x } in content time and
+  // camera offset from the place's home.
+  const DWELL = 0.9;
+  function trackPlan(p, W, at, ready) {
+    const L = p.layout, from = (L.parts[0] && L.parts[0].from) || [], Xc = W.stage.x + W.stage.w * 0.55;
+    const travel = d => Math.max(0.5, Math.abs(d) / TRACK_SPEED);
+    const keys = [{ t: at, x: 0 }], steps = [];
+    from.forEach(k => {
+      const last = keys[keys.length - 1];
+      let x = clamp((p.ax + XU * M.arrange.uOf(L.whole[k]) * W.s - Xc) / (p.trackLen || 1)) * p.trackLen;
+      if (x - last.x < 40) x = last.x;
+      const t = Math.max(x === last.x ? last.t : last.t + travel(x - last.x), ready(k) + 0.15);
+      if (t > last.t) keys.push({ t, x });
+      steps.push(t - 0.15);
+      keys.push({ t: t + DWELL, x });
+    });
+    const last = keys[keys.length - 1];
+    if (p.trackLen - last.x > 1) keys.push({ t: last.t + travel(p.trackLen - last.x), x: p.trackLen });
+    return { at, dur: keys[keys.length - 1].t - at, keys, steps };
+  }
+  // When each of the share steps out of a tracked line.
+  function trackTimes(bt) {
+    const ts = bt.trackDef.steps.slice();
+    for (let i = 1; i < ts.length; i++) ts[i] = Math.max(ts[i], ts[i - 1] + 0.35);
+    return ts;
   }
 
   // Absolute times, once the timeline is known.
@@ -718,27 +976,35 @@
       bt.t0 = sc.t0; bt.cStart = sc.cStart; bt.cEnd = sc.cEnd; bt.t1 = sc.t1; bt.ovIn = sc.ovIn; bt.exitStart = sc.exitStart;
       sc.place = bt.place ? bt.place.id : null;
       sc.stageTop = bt.stageTop; sc.bandRect = bt.bandRect;
+      if (bt.trackDef) { bt.track = { t0: sc.cStart + bt.trackDef.at, dur: bt.trackDef.dur, keys: bt.trackDef.keys.map(k => ({ t: sc.cStart + k.t, x: k.x })) }; sc.tracked = true; }
       bt.acts.forEach(a => {
         const p = bt.place, T = sc.cStart + (a.at == null ? 0 : a.at);
-        if (a.type === 'enter') p.enter = { t0: T, dur: a.dur };
-        else if (a.type === 'fill') p.fills.push({ t0: T, dur: a.dur, from: a.from, to: a.to, unit: a.unit, ghost: a.ghost });
+        if (a.type === 'step') p.steps.push({ t0: T, dur: a.dur, unit: a.unit, counts: a.counts, parting: !!a.parting, ghost: a.ghost || null, times: a.times ? a.times.map(x => sc.cStart + x) : null });
+        else if (a.type === 'enter') p.enter = { t0: T, dur: a.dur };
+        else if (a.type === 'key') p.showKey = T;
+        else if (a.type === 'parts') p.showParts = T;
+        else if (a.type === 'mark') p.marks.push({ t0: T, dur: a.dur, part: a.part, units: a.units, label: a.label });
         else if (a.type === 'lift') p.lifts.push({ t0: T, dur: a.dur });
-        else if (a.type === 'mark') p.marks.push({ t0: T, dur: a.dur, units: a.units, label: a.label });
         else if (a.type === 'flip') p.flips.push({ t0: T, dur: a.dur });
-        else if (a.type === 'movers') {
-          const from = W.byScene[a.from];
-          if (!from) throw new Error('scene "' + bt.scene + '" picture.from: "' + a.from + '" has no place before it');
-          // They lift just before the pan and ride it in.
-          p.movers = { from, t0: sc.t0 - 0.25, dur: (sc.cStart - sc.t0) + 0.85 };
-        }
+        // Carried things lift as the pan starts, once the earlier place's labels have gone, and ride it in.
+        else if (a.type === 'movers') p.movers = { from: a.from, t0: sc.t0, dur: (sc.cStart - sc.t0) + 0.75 };
       });
     });
-    W.places.forEach(p => { p.fills.sort((a, b) => a.t0 - b.t0); });
+    W.places.forEach(p => { if (p.kind === 'things') M.act.plan(p); });
   }
 
   // ── the camera ───────────────────────────────────────────────────────
   // Where the camera is at t, and how much each place is "the one in view"
-  // (keys show on the place in view and fade as the camera leaves).
+  // (labels show on the place in view and fade as the camera leaves).
+  function camAt(b, t) {
+    if (!b.track || t <= b.track.t0) return b.camIn;
+    const K = b.track.keys;
+    let x = K[K.length - 1].x;
+    for (let i = 0; i < K.length - 1; i++) {
+      if (t < K[i + 1].t) { x = lerp(K[i].x, K[i + 1].x, M.ease.sineInOut(clamp((t - K[i].t) / (K[i + 1].t - K[i].t || 1)))); break; }
+    }
+    return { x: b.camIn.x + x, y: b.cam.y, alpha: b.cam.alpha };
+  }
   function camera(W, t) {
     const B = W.beats;
     // The beat arriving: in the overlap between two beats, the later one,
@@ -746,22 +1012,23 @@
     let i = 0;
     for (let k = B.length - 1; k >= 0; k--) if (t >= B[k].t0) { i = k; break; }
     const b = B[i];
-    // World labels (keys, marks) are read with their beat's words: when the
-    // camera is about to move to another place they leave with the words,
-    // and they come back once it has arrived.
-    const moves = (x, y) => x && y && (x.place !== y.place || x.cam.x !== y.cam.x || x.cam.y !== y.cam.y);
+    // World labels are read with their beat's words: when the camera is
+    // about to move to another place they leave with the words, and they
+    // come back once it has arrived.
+    const moves = (x, y) => x && y && (x.place !== y.place || Math.abs(x.cam.x - y.camIn.x) > 0.5 || Math.abs(x.cam.y - y.camIn.y) > 0.5);
     if (i > 0 && t < b.cStart && b.ovIn > 0) {
       const a = B[i - 1], g = M.ease.glide(clamp((t - b.t0) / b.ovIn));
       const view = {};
       if (a.place) view[a.place.id] = (view[a.place.id] || 0) + (1 - g);
       if (b.place) view[b.place.id] = (view[b.place.id] || 0) + g;
-      return { x: lerp(a.cam.x, b.cam.x, g), y: lerp(a.cam.y, b.cam.y, g), alpha: lerp(a.cam.alpha, b.cam.alpha, g), view, labels: moves(a, b) ? 0 : 1, beat: b, g };
+      return { x: lerp(a.cam.x, b.camIn.x, g), y: lerp(a.cam.y, b.camIn.y, g), alpha: lerp(a.cam.alpha, b.camIn.alpha, g), view, labels: moves(a, b) ? 0 : 1, beat: b, g };
     }
     const view = {};
     if (b.place) view[b.place.id] = 1;
     const fadeIn = moves(B[i - 1], b) ? sstep(b.cStart, b.cStart + 0.4, t) : 1;
     const fadeOut = moves(b, B[i + 1]) ? 1 - sstep(b.exitStart, b.cEnd, t) : 1;
-    return { x: b.cam.x, y: b.cam.y, alpha: b.cam.alpha, view, labels: fadeIn * fadeOut, beat: b, g: 1 };
+    const c = camAt(b, t);
+    return { x: c.x, y: c.y, alpha: c.alpha, view, labels: fadeIn * fadeOut, beat: b, g: 1 };
   }
 
   // ── painting ─────────────────────────────────────────────────────────
@@ -772,63 +1039,123 @@
     const prevScene = M.debug.scene;
     M.debug.scene = sceneId;
     ctx.save();
-    M.paint.clipRect(ctx, 0, 0, C.W, W.bottom + 6);
+    // The world's room: under the words (beside a wide frame's column) and
+    // above the footer. Shapes record only what shows of them.
+    const clip = W.mode === 'column' ? { x0: W.stage.x - 24, y0: 0, x1: C.W, y1: W.bottom + 6 } : { x0: 0, y0: W.stage.y - W.gap * 0.5 - cam.y, x1: C.W, y1: W.bottom + 6 };
+    M.paint.clipRect(ctx, clip.x0, clip.y0, clip.x1 - clip.x0, clip.y1 - clip.y0);
+    // Records are cut to the clip's height only, so a place that spills off
+    // the frame's sides still shows in the audit.
+    M.iso.clipBox = { x0: -1e9, y0: clip.y0, x1: 1e9, y1: clip.y1 };
     ctx.globalAlpha *= cam.alpha;
-    const camv = { ax: W.ax, ay: W.rowY, cx: cam.x, cy: cam.y, s: W.s, font: W.font };
-    W.cam = cam;   // which place is in view: labels show on it and fade as the camera leaves
+    W.cam = cam;
     W.places.forEach(p => {
-      const sx = W.ax + p.sx - cam.x;
-      if (sx + p.box.x1 < -40 || sx + p.box.x0 > C.W + 40) return;   // off the frame
-      const V = M.iso.view(ctx, camv, p.id);
-      p.props.forEach(pr => pr.def.draw(V, Object.assign({}, pr, { x: p.x + pr.dx, y: p.y + pr.dy }), t, W));
-      p.def.draw(V, p, t, W);
-      label(ctx, V, p, t, W, cam);
+      const dx = p.sx - cam.x, dy = -cam.y;
+      if (p.fx1 + dx <= 0 || p.fx0 + dx >= C.W) return;   // off the frame
+      if (p.kind === 'chart') {
+        ctx.save(); ctx.translate(dx, dy);
+        p.def.draw(M.iso.flat(ctx, p.id, W.font), p, t, W);
+        ctx.restore();
+        return;
+      }
+      const V = M.iso.view(ctx, { ax: p.ax + dx, ay: p.ay + dy, cx: 0, cy: 0, s: W.s, font: W.font }, p.id);
+      if (p.kind === 'set') { p.def.draw(V, p, t, W); return; }
+      M.act.draw(V, p, t, W);
+      drawMarks(V, p, t, W);
+      thingLabels(ctx, p, t, W, cam, dx, dy);
     });
-    W.places.forEach(p => { if (p.movers) (p.def.drawMovers || movers)(M.iso.view(ctx, camv, p.id + ':movers'), p, t, W); });
+    W.places.forEach(p => { if (p.movers) drawMovers(ctx, p, t, W, cam); });
+    M.iso.clipBox = null;
     ctx.restore();
     M.debug.scene = prevScene;
   }
 
-  // The key under a place, while it carries data and is the place in view.
-  function label(ctx, V, p, t, W, cam) {
-    if (!p.def.key || !p.enter) return;
-    const shown = sstep(p.enter.t0 + p.enter.dur * 0.6, p.enter.t0 + p.enter.dur * 0.6 + 0.5, t) * (cam.view[p.id] || 0) * cam.labels;
-    if (shown <= 0.001) return;
-    const k = LABEL;
-    const lines = keyLines(p);
-    const f = M.text.font(600, k, W.font);
-    const widths = lines.map(l => M.text.measure(V.ctx, l.text, f));
-    const [ax, ay] = V.P(p.x, p.y, 0);
-    const spot = keySpot(p, Math.max(...widths), V.s);
-    const x = ax + spot.x;
-    V.ctx.save(); V.ctx.globalAlpha *= shown;
-    lines.forEach((l, n) => {
-      const y = ay + spot.y + n * k * 1.3;
-      if (l.swatch) M.paint.rect(V.ctx, x + k * 0.25, y + k * 0.25, k * 0.7, k * 0.7, l.swatch);
-      else if (p.def.keyIcon) p.def.keyIcon(V, x + k * 0.55, y + k * 0.6, p, W);
-      M.paint.text(V.ctx, l.text, x + k * 1.6, y, { font: f, color: W.mat.ink, h: k * 1.2, w: widths[n], alpha: 1, layer: 'world-label:' + p.id + ':' + n, role: 'label', size: k });
+  // The level a part stood at "then": a tick across its pile.
+  function drawMarks(V, p, t, W) {
+    p.marks.forEach(mk => {
+      const a = sstep(mk.t0, mk.t0 + mk.dur, t) * (W.cam.view[p.id] || 0) * W.cam.labels;
+      const slots = p.layout.parts[mk.part].slots;
+      if (a <= 0.001 || !mk.units || !slots[mk.units - 1]) return;
+      const q = slots[mk.units - 1], z = q.z + p.thing.size.h + 0.6;
+      const half = (0.7071 * (p.thing.size.w + p.thing.size.d)) / 2 + 16, u = M.arrange.uOf(q), v = M.arrange.vOf(q);
+      const A = M.arrange.pt(u - half, v + 4, z), B = M.arrange.pt(u + half, v + 4, z);
+      V.ctx.save(); V.ctx.globalAlpha *= a;
+      V.line([A.x, A.y, z], [B.x, B.y, z], W.design.ink, Math.max(2, 2.2 * W.s));
+      V.ctx.restore();
     });
-    V.ctx.restore();
   }
 
-  // Carry-over: a few units lift off the earlier place and travel on the
-  // camera's own easing, so on screen they drift steadily to the new one,
-  // where they settle and fade into it. They stand for the link the story
-  // makes (answers to a desk, visits to applications), never for a count.
-  const MOVERS = 12;
-  function movers(V, p, t, W) {
-    const mv = p.movers, from = mv.from;
-    if (!from.def.unitPos) return;
-    const n = from.dots || 100, F = Math.max(0.6, mv.dur - (MOVERS - 1) * 0.07), ctx = V.ctx, a0 = ctx.globalAlpha;
-    const to = p.def.landing ? p.def.landing(p) : { x: p.x, y: p.y, z: 40 };
-    for (let k = 0; k < MOVERS; k++) {
-      const q = clamp((t - mv.t0 - k * 0.07) / F);
+  // The labels over a place's parts and the key under it, while it is the
+  // place in view. A tracked line's key stays put while the camera tracks.
+  function thingLabels(ctx, p, t, W, cam, dx, dy) {
+    const seen = (cam.view[p.id] || 0) * cam.labels;
+    if (seen <= 0.001) return;
+    const LB = W.label, lh = LB * 1.3, F = M.iso.flat(ctx, p.id, W.font);
+    const ax = p.ax + dx, ay = p.ay + dy;
+    p.labelSpots.forEach(sp => sp.lines.forEach((ln, n) => {
+      const mk = ln.mark ? p.marks.find(x => x.part === sp.part) : null;
+      const at = ln.mark ? mk && mk.t0 : p.showParts;
+      if (at == null) return;
+      F.text(ln.text, ax + sp.x, ay + sp.y + n * lh, { size: LB, weight: ln.weight, color: ln.color, align: 'center', alpha: seen * sstep(at, at + 0.45, t), id: ln.id });
+    }));
+    if (p.showKey == null || !p.key) return;
+    const a = seen * sstep(p.showKey, p.showKey + 0.5, t);
+    if (a <= 0.001) return;
+    const kd = p.tracked ? (dx > 0 ? dx : dx < -p.trackLen ? dx + p.trackLen : 0) : dx;
+    const kx = p.ax + kd + p.key.x, ky = ay + p.key.y;
+    ctx.save(); ctx.globalAlpha *= a;
+    p.key.lines.forEach((ln, n) => {
+      const y = ky + n * lh;
+      keyIcon(ctx, p, kx + LB * 0.62, y + lh * 0.5, ln.icon, W);
+      F.text(ln.text, kx + LB * 1.7, y + (lh - LB * 1.25) / 2, { size: LB, weight: 600, color: W.design.ink, id: 'key' + n });
+    });
+    ctx.restore();
+  }
+  // One of the place's things, small, centred on (x, y): the key's unit, or the share.
+  function keyIcon(ctx, p, x, y, kind, W) {
+    const th = p.thing, m = W.mat, g = th.size;
+    const k = th.people ? W.label * 1.2 / (g.h * 1.06) : W.label * 1.05 / ((g.w + g.d) * COS);
+    const lift = th.people ? g.h * 0.5 : g.h * 0.5 - (g.w + g.d) * 0.06;
+    const V = M.iso.view(ctx, { ax: x, ay: y + lift * k, cx: 0, cy: 0, s: k, font: W.font }, p.id + ':key');
+    const share = kind === 'share';
+    th.draw(V, 0, 0, 0, { mat: m, body: share ? m.A : th.natural ? m[th.natural] : m.N2, kind: share ? 'share' : th.people ? 'rest' : 'part', seed: 5, pose: share && p.hold ? p.hold : 'stand', phase: 0 });
+  }
+
+  // Carry-over: a few of the earlier place's share lift off it and travel
+  // on the camera's own easing, so on screen they drift steadily to the new
+  // place, where they settle into it, greyed: the link the story makes
+  // (unsent forms to a desk), never a count. The earlier place keeps all of
+  // its things.
+  function carryFrom(src, p, k, W) {
+    const L = src.layout, share = L.parts[0].slots, n = share.length;
+    const q = share[Math.max(0, n - 1 - (k % Math.max(1, n)))] || L.whole[k % L.whole.length];
+    const u = M.arrange.uOf(q) + (src.ax + src.sx - p.ax - p.sx) / (XU * W.s), v = M.arrange.vOf(q) + (src.ay - p.ay) / (0.7071 * W.s);
+    return M.arrange.pt(u, v, q.z);
+  }
+  function landing(p, k) {
+    if (p.def && p.def.landing) return p.def.landing(p, k);
+    const w = p.layout.whole;
+    return w[k % w.length];
+  }
+  const carryFlight = p => Math.max(0.6, p.movers.dur - (MOVERS - 1) * STAG);
+  // How many carried things have landed by t, and where each lies.
+  function carried(p, t) {
+    if (!p.movers) return [];
+    const out = [], F = carryFlight(p);
+    for (let k = 0; k < MOVERS; k++) if (t >= p.movers.t0 + k * STAG + F) out.push({ k, pos: landing(p, k) });
+    return out;
+  }
+  function drawMovers(ctx, p, t, W, cam) {
+    const mv = p.movers, src = mv.from, th = src.thing, m = W.mat, F = carryFlight(p);
+    const V = M.iso.view(ctx, { ax: p.ax + p.sx - cam.x, ay: p.ay - cam.y, cx: 0, cy: 0, s: W.s, font: W.font }, p.id + ':movers');
+    const a0 = ctx.globalAlpha;
+    for (let k = MOVERS - 1; k >= 0; k--) {
+      const q = clamp((t - mv.t0 - k * STAG) / F);
       if (q <= 0 || q >= 1) continue;
-      const fr = from.def.unitPos(from, Math.floor((k + 0.5) / MOVERS * n * 0.9));
+      const a = carryFrom(src, p, k, W), b = landing(p, k);
       const e = M.ease.glide(clamp((q - 0.12) / 0.8)), land = sstep(0.75, 1, q);
-      const z = lerp(10, to.z, land) + sstep(0, 0.2, q) * (1 - land) * 120;
-      ctx.globalAlpha = a0 * Math.min(1, q * 6) * (1 - sstep(0.85, 1, q));
-      V.token(lerp(fr.x, to.x + (k % 4 - 1.5) * 16, e), lerp(fr.y, to.y + (Math.floor(k / 4) - 1) * 16, e), z, 7, 9, W.mat.N2.top, W.mat.N2.right);
+      const z = lerp(a.z, b.z, land) + sstep(0, 0.2, q) * (1 - land) * 120;
+      ctx.globalAlpha = a0 * Math.min(1, q * 6);
+      th.draw(V, lerp(a.x, b.x, e), lerp(a.y, b.y, e), z, { mat: m, body: m.between(m.A, th.natural ? m[th.natural] : m.N2, land), kind: 'part', seed: k, pose: 'stand' });
     }
     ctx.globalAlpha = a0;
   }
@@ -836,38 +1163,23 @@
   // A small picture of a scene's place, for the summary's points.
   function drawIcon(ctx, C, sceneId, x, y, alpha) {
     const W = C.world, p = W && W.byScene[sceneId];
-    if (!p || !p.def.icon || alpha <= 0.001) return;
+    if (!p || alpha <= 0.001) return;
     ctx.save(); ctx.globalAlpha *= alpha;
-    const V = M.iso.view(ctx, { ax: x, ay: y, cx: 0, cy: 0, s: 1, font: W.font }, 'icon:' + sceneId);
-    p.def.icon(V, p, W);
+    if (p.kind === 'chart') p.def.icon(M.iso.flat(ctx, 'icon:' + sceneId, W.font), x, y, W);
+    else if (p.kind === 'set') { if (p.def.icon) p.def.icon(M.iso.view(ctx, { ax: x, ay: y, cx: 0, cy: 0, s: 1, font: W.font }, 'icon:' + sceneId), p, W); }
+    else {
+      const th = p.thing, g = th.size, k = th.people ? 42 / g.h : 40 / ((g.w + g.d) * COS);
+      const V = M.iso.view(ctx, { ax: x, ay: y + (th.people ? 20 : 6), cx: 0, cy: 0, s: k, font: W.font }, 'icon:' + sceneId);
+      const sp = th.people ? th.spacing || 22 : 0;
+      [-1, 0, 1].forEach((d, i) => {
+        const o = { mat: W.mat, body: i === 2 ? W.mat.A : th.natural ? W.mat[th.natural] : W.mat.N2, kind: i === 2 ? 'share' : th.people ? 'rest' : 'part', seed: i, pose: 'stand' };
+        if (th.people) th.draw(V, d * sp / 1.41, -d * sp / 1.41, 0, o);
+        else th.draw(V, 0, 0, i * (th.stack || g.h + 1), o);
+      });
+    }
     ctx.restore();
   }
 
-  // ── state helpers the pictures read ──────────────────────────────────
-  // How lit unit k is at t (0..1): each fill moves the units between its
-  // from and to, one after another; a fall ends at a ghost when asked to.
-  function litAt(p, k, t) {
-    let lit = 0;
-    for (const g of p.fills) {
-      if (t < g.t0) break;
-      const lo = Math.min(g.from, g.to), hi = Math.max(g.from, g.to);
-      if (k < lo || k >= hi) continue;
-      const n = hi - lo, up = g.to > g.from;
-      const idx = up ? k - lo : hi - 1 - k;
-      const st = g.t0 + (n > 1 ? idx / (n - 1) : 0) * Math.max(0, g.dur - g.unit);
-      const q = sstep(st, st + g.unit, t);
-      lit += ((up ? 1 : g.ghost ? GHOST : 0) - lit) * q;
-    }
-    return lit;
-  }
-  // How far unit k has arrived (0..1), the units landing in a diagonal sweep.
-  function arrivedAt(p, i, j, n, t, each) {
-    if (!p.enter) return 1;
-    const t0 = p.enter.t0 + (i + j) / (2 * Math.max(1, n - 1)) * Math.max(0, p.enter.dur - each);
-    return clamp((t - t0) / each);
-  }
-  const liftAt = (p, t, h) => p.lifts.reduce((m, l) => Math.max(m, h * M.ease.outQuint(clamp((t - l.t0) / l.dur))), 0);
-
-  M.world = { plan, band, finish, paint, camera, drawIcon, litAt, arrivedAt, liftAt, sstep, clamp, lerp, GHOST, BANDS, LABEL };
+  M.world = { plan, band, finish, paint, camera, drawIcon, carried, sstep, clamp, lerp, GHOST, BANDS };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.world;
 })(typeof window !== 'undefined' ? window : globalThis);

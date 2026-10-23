@@ -357,8 +357,8 @@ function loadEngine() {
   vm.createContext(sb);
   const runF = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sb, { filename: f });
   runF(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
-  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world'].forEach(n => runF(path.join(MLIB, n + '.js')));
-  ['pictures', 'scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, d, f))));
+  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world', 'arrange', 'act'].forEach(n => runF(path.join(MLIB, n + '.js')));
+  ['things', 'pictures', 'scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).sort().forEach(f => runF(path.join(MLIB, d, f))));
   // Custom painters live in the page; stand in for them so timing compiles.
   scenes.filter(s => s.type === 'custom' && s.draw).forEach(s => {
     const mt = new RegExp('Motion\\.custom\\.' + s.draw + '\\s*=\\s*\\{[^}]*?enter\\s*:\\s*([\\d.]+)[^}]*?read\\s*:\\s*([\\d.]+)').exec(html);
