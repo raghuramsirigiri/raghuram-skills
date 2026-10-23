@@ -342,7 +342,8 @@ if (final) {
   if (!/M\.player = \{/.test(html)) fin.push('player.js is not inlined');
   const engineKB = Math.round(Buffer.byteLength(html.replace(/data:[^"')\s]*/g, '')) / 1024);
   const totalMB = Buffer.byteLength(html) / 1048576;
-  if (engineKB > 300) warn('final', 'page without its data URIs is ' + engineKB + ' KB (engine budget about 250 KB)');
+  // The engine with the continuous style's world and pictures inlined is about 330 KB.
+  if (engineKB > 400) warn('final', 'page without its data URIs is ' + engineKB + ' KB (engine budget about 350 KB)');
   if (totalMB > 15) warn('final', 'page is ' + totalMB.toFixed(1) + ' MB including assets; above 15 MB some browsers struggle');
   fin.length ? fin.forEach(x => fail('final', x)) : pass('final', 'one standalone file, ' + Math.round(Buffer.byteLength(html) / 1024) + ' KB');
 }

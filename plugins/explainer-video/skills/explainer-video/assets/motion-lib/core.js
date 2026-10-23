@@ -25,7 +25,7 @@
   const M = root.Motion = root.Motion || {};
   M.scenes = M.scenes || {};
   M.custom = M.custom || {};
-  M.version = '1.0.0';
+  M.version = '1.1.0';
 
   // ── seeded hash rng: stable for (seed, keys) whatever the draw order ──
   function hashStr(s) {

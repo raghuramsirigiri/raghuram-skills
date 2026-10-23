@@ -1,6 +1,6 @@
 ---
 name: explainer-video
-description: Turn an article, news story, report findings, insights, notes or a table into a short explainer video — motion graphics, 15–60 s, 9:16 for Reels/Shorts/TikTok, 1:1, 4:5 or 16:9 — rendered entirely in JavaScript in the same design system as chart-dashboard and social-post, as one standalone HTML file that plays the video and exports it as MP4 in the browser, with every figure and hedge faithful to the source and a dated source card. Use for "make a video / reel / short / animated explainer / motion graphic from this". Not for still social cards (social-post) or slide decks. No other apps, no CDN, works offline; never posts.
+description: Turn an article, news story, report findings, insights, notes or a table into a short explainer video — one continuous 2.5D world the camera pans across (or slides), each finding a picture that carries its figure, 15–60 s, 9:16 for Reels/Shorts/TikTok, 1:1, 4:5 or 16:9 — rendered entirely in JavaScript in the same design system as chart-dashboard and social-post, as one standalone HTML file that plays the video and exports it as MP4 in the browser, with every figure and hedge faithful to the source and a dated source card. Use for "make a video / reel / short / animated explainer / motion graphic from this". Not for still social cards (social-post) or slide decks. No other apps, no CDN, works offline; never posts.
 ---
 
 # Explainer video

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "note": "Per-scene facts for the agent and for check-video.js. Slot names and word limits must match each scene's registered `slots` (tests/scenes.test.js holds them in step). `minDur` is typical content time at the default copy length; the compiler computes the real minimum from the words. `pictures` lists the continuous style's pictures (pictures/*.js); the tests hold it in step with the registered ones.",
   "formats": {
     "9:16": { "size": [1080, 1920], "safe": { "top": 250, "right": 150, "bottom": 380, "left": 60 } },

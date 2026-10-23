@@ -29,7 +29,7 @@
       "name": "insights-explainer",
       "prompt": "Make a 45-second explainer video for our all-hands screen (landscape) from these survey insights.",
       "files": ["skills/explainer-video/evals/survey-insights.md"],
-      "expected_output": "16:9, about 45 s, three evidence scenes (delivery 61→72%, recommend 64→58%, app users 65% with its n = 46 caveat on screen, or left out with a reason). Changes in points. No causes.",
+      "expected_output": "16:9, about 45 s, three evidence scenes (delivery 61→72%, recommend 64→58%, app users 65% with its n = 46 caveat on screen, or left out with a reason). Changes in points. No causes. One continuous world: each finding on a picture that fits it (pictures.md § Choosing), last year then now on one place.",
       "runs": 3,
       "assertions": [
         "finalize.js exits 0; audit ok for every cut",
@@ -39,6 +39,10 @@
         "If 65% is shown, the scene itself says the base is small (46 app users / indicative) and the caption repeats it; if left out, the handover says why",
         "No cause for any change anywhere",
         "Source card names the Linden Co-op 2026 survey and a date",
+        "The video is one continuous world (meta.style \"continuous\", or unset with pictures) and check-video.js shows no 'pictures' warning; or the run says why slides",
+        "Picture fit: delivery 61% → 72% on blocks (of delivery users) or people with its base; recommend 64% → 58% on people (all respondents) or blocks; never people for a share of a subgroup drawn as all members",
+        "If 65% is shown, its picture or units make the small base visible (46 app users), and it is not drawn as a share of all 1,204 members",
+        "Audit ok including world-overlap and stage, in the 16:9 cut (words in a left column, the world beside them)",
         "Handover with handles and the closing line"
       ]
     },
@@ -137,6 +141,26 @@
         "meta.brand.logo holds the supplied SVG as a data URI and an outro scene shows it",
         "Audit ok, including contrast; finalize.js exits 0",
         "Facts follow eval 1's rules"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "picture-fit",
+      "prompt": "Make a 60-second vertical video of these Business Banking digital sales and website analytics findings for our team channel.",
+      "files": ["skills/explainer-video/evals/business-banking-web.md"],
+      "expected_output": "One continuous world, 9:16, 50–66 s, room for every finding. Each finding on the picture its data shape calls for: share of new accounts on blocks (41% → 46%, last year then now), roughly 1.5% of visits on dots, the application funnel, quarterly openings on columns or a ribbon, the device split, the product podium. No people (nothing counts people). No cause for anything (the redesigned form has no stated link). Hedge 'roughly' kept.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; check-video.js --final exits 0 with no 'pictures' warning (or the handover says why a finding rests)",
+        "VideoAudit.run({ exportProbe: true }) is ok, including world-overlap and stage",
+        "meta.style is \"continuous\" (or unset with pictures); cut 'main' is 9:16, 50–66 s",
+        "Picture fit, for every finding the video shows, as the KEY lists: blocks for the online share (of: new business accounts), dots for 1.5% (of: product page visits), funnel (or columns) for started/submitted/opened, columns or ribbon for the quarters, split for devices, podium for products",
+        "No 'people' picture anywhere; no change drawn as a share (5 points is never 5 blocks)",
+        "41% → 46% stated in points, never 'up 12%'",
+        "The 1.5% keeps 'roughly' on screen and in the caption",
+        "No cause anywhere: the redesigned application form is not linked to any figure, on screen, in the caption, or in chat",
+        "Source card names Fernhill Bank's Digital Sales team note with its date (9 Oct 2026)",
+        "Handover with V handles, the pictures used, and the closing line"
       ]
     }
   ]
