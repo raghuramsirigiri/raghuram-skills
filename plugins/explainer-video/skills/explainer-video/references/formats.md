@@ -35,6 +35,13 @@ list text; the source line stays card size. A title on its own
 display size, a headline beside a chart to 1.5×. The source card and the
 outro grow until they hold about two thirds of the frame.
 
+**The continuous style's band** (`continuous.md`) follows the frame too:
+stacked at the top of a 9:16 frame with the world below; a row in 4:5 and
+1:1 (a figure on the left with its words beside it, or a summary's title
+beside its points), so the world keeps its height; a left column (40%) in
+16:9, the world in the room to its right. The world's scale is the largest
+at which every place fits that stage, at most 1.3.
+
 **Fill.** The audit measures how much of the safe area each scene's
 mid-hold frame covers, and warns under 60%. The safe area is cut into
 cells a tenth of its short side; a blank cell counts as empty only when its

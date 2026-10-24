@@ -113,6 +113,17 @@ user wants a plain frame. It is ground, not content:
   audit's fill check measures each scene without it: the art fills what a
   good layout leaves, it doesn't stand in for one.
 
+## The world's materials (continuous style)
+
+The world is flat and corporate, in the same family as the card: no
+outlines; three tints per surface from one light at the top left (top
+lightest, the left face mid, the right face darkest); a soft contact
+shadow toward the front right. Every tint is mixed from the preset's
+background and ink (`iso.js` `materials`), so a brand palette recolours the
+world with the card. The accent is for data only: lit units, the emph
+column, the ribbon's line; props and places stay neutral. The halftone
+keeps clear of the world's stage as it does of the words.
+
 ## Emphasis
 
 Two colours, not a rainbow. The subject (the bar, the stretch of line, the

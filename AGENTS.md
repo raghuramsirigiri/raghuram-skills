@@ -147,7 +147,13 @@ topic with figures in it.
   fails on drift. Everything else in it (`assets/motion-lib/`, `references/`)
   is its own. Its output is JavaScript only: Canvas 2D plus the browser's
   WebCodecs and Web Audio. Never add ffmpeg, Remotion, a render pipeline, TTS
-  or a CDN animation library.
+  or a CDN animation library. Its default style is one continuous 2.5D world
+  (`references/continuous.md`): each finding is a picture in
+  `assets/motion-lib/pictures/` that carries its figure, one unit per stated
+  thing with its key on screen. A new picture needs its row in
+  `references/pictures.md` § Choosing (when to use it, and when not) and its
+  entry in `motion.manifest.json` § `pictures`; the tests hold the manifest in
+  step with the registered pictures.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
