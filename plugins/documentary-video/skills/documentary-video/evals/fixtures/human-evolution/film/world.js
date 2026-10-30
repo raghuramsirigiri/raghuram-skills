@@ -22,8 +22,8 @@ window.buildWorld = function () {
   const walkers = [C.hominin('walker', { height: 0.92 }), C.hominin('walker', { height: 1.08 })].map(f => root.add(f));
 
   // Lucy's tree
-  root.add(C.tree('round', 7), { at: [142, 5, 0] });
-  const lucy = root.add(C.hominin('lucy'), { at: [141, 2.4, 0] });
+  root.add(C.tree('round-hero', 7), { at: [142, 5, 0] });   // seen close in B4: built at hero tier
+  const lucy = root.add(C.hominin('lucy', { hero: true }), { at: [141.6, 3.9, 0] });
 
   // the oldest tools, on a patch of rock
   root.add(C.boulder(2.4, 3, 'n2a'), { at: [171, 1.6, 0] });
@@ -47,7 +47,7 @@ window.buildWorld = function () {
   // the rise at Jebel Irhoud
   root.add(C.boulder(7, 21, 'n2a'), { at: [362, 6, 0] });
   root.add(C.boulder(4, 22, 'n2'), { at: [368, 2, 0] });
-  const sapiensMorocco = root.add(C.hominin('sapiens', { spear: true }), { at: [359.5, 0.4, 0] });   // in front of the rise, the rocks behind
+  const sapiensMorocco = root.add(C.hominin('sapiens', { spear: true, hero: true }), { at: [359.5, 0.4, 0] });   // in front of the rise, the rocks behind
 
   // the row of four, with their pebbles (1 pebble = 50 cubic centimetres)
   const ROW = [['lucy', 9], ['erectus', 20], ['neanderthal', 30], ['sapiens', 27]];
@@ -63,7 +63,7 @@ window.buildWorld = function () {
   for (let i = 0; i < 40; i++) root.add(C.tree('conifer'), { at: [520 + rng() * 130, (rng() < 0.5 ? -1 : 1) * (6 + rng() * 40), 0], scale: 0.9 + rng() * 0.6 });
   for (let i = 0; i < 10; i++) root.add(C.boulder(1.5 + rng() * 2, 30 + i, 'n2'), { at: [525 + rng() * 120, (rng() - 0.5) * 60, 0] });
   const neanderthals = [0, 1, 2, 3].map(i => root.add(C.hominin('neanderthal', { height: 0.92 + i * 0.05 })));
-  const traveller = root.add(C.hominin('sapiens'), { at: [600, -0.6, 0] });
+  const traveller = root.add(C.hominin('sapiens', { hero: true }), { at: [600, -0.6, 0] });
   const necklace = traveller.bones.torso.add(C.beads(), { at: [0, -traveller.dims.depth * 0.95, traveller.dims.torso * 0.98] });
 
   // the raised map, off to the north

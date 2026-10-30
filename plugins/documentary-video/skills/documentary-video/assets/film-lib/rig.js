@@ -13,19 +13,21 @@
   'use strict';
   const Film = root.Film = root.Film || {};
 
-  // Fractions of height. Stylised like the reference crowd: a big head, a
-  // soft block of a body, short arms. Every one can be overridden.
+  // Fractions of height, after the way isometric illustration draws people
+  // (and explainer-video's people): a big round head on a visible neck, a
+  // soft block of a torso with the arms tucked against it, thick legs. Every
+  // one can be overridden.
   const P = {
     height: 1.72,
     head: 0.095,      // head radius
-    neck: 0.015,      // gap from torso top to head
-    torso: 0.30,      // torso length (hip joint to shoulder top)
-    shoulders: 0.12,  // half-width at the shoulders
-    depth: 0.08,      // half-depth of the torso, front to back
-    hips: 0.058,      // half-distance between the hip joints
+    neck: 0.03,       // neck length, torso top to head
+    torso: 0.29,      // torso length (hip joint to shoulder top)
+    shoulders: 0.125, // half-width at the shoulders
+    depth: 0.075,     // half-depth of the torso, front to back
+    hips: 0.06,       // half-distance between the hip joints
     arm: 0.33,        // shoulder to fingertip
-    leg: 0.47,        // hip joint to sole
-    limb: 0.042,      // arm and leg radius
+    leg: 0.46,        // hip joint to sole
+    limb: 0.06,       // leg radius (arms are about two thirds of it)
     hand: 0,          // hand radius (0: none, the default; the arm just ends)
     foot: 0,          // foot length (0: none, the default; legs stand on their ends)
     stoop: 0          // a lean of the spine the figure always has (degrees forward)
@@ -34,8 +36,16 @@
   const NAMES = ['pelvis', 'torso', 'head', 'shoulderL', 'elbowL', 'handL', 'shoulderR', 'elbowR', 'handR',
     'hipL', 'kneeL', 'footL', 'hipR', 'kneeR', 'footR'];
 
+  // The soft dark spot under a figure that tells the eye it stands on the
+  // ground (the way illustration grounds people); shared by every figure.
+  function spotPicture(c, w, h) {
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(20,20,20,0.30)'); g.addColorStop(0.55, 'rgba(20,20,20,0.16)'); g.addColorStop(1, 'rgba(20,20,20,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  }
+
   // spec: { height, ...fractions above, colors: { skin, hair, top, bottom, shoes },
-  //         skip: ['torso', 'armL', ...] default parts not to draw,
+  //         skip: ['torso', 'hips', 'neck', 'head', 'armL', ..., 'spot'] default parts not to draw,
   //         dress(bones, dims): add costume parts to bones (each a Film.group),
   //         pose: a pose (see Figure.pose) }
   Film.figure = function (spec) {
@@ -50,9 +60,9 @@
 
     const fig = Film.group({ name: spec.name || 'figure' });
     const b = {};
-    const r = d.limb;
+    const r = d.limb, ra = r * 0.68;
     const upperArm = d.arm * 0.47, foreArm = d.arm * 0.53 - d.hand;
-    const footH = d.foot ? r : 0;
+    const footH = d.foot ? r * 0.8 : 0;
     const thigh = (d.leg - footH) * 0.5, shin = (d.leg - footH) * 0.5;
 
     b.pelvis = fig.group({ name: 'pelvis', at: [0, 0, d.leg] });
@@ -60,7 +70,7 @@
     b.head = b.torso.group({ name: 'head', at: [0, 0, d.torso + d.neck] });
     for (const side of ['L', 'R']) {
       const sx = side === 'L' ? 1 : -1;
-      b['shoulder' + side] = b.torso.group({ name: 'shoulder' + side, at: [sx * (d.shoulders - r * 0.35), 0, d.torso - r * 1.9] });
+      b['shoulder' + side] = b.torso.group({ name: 'shoulder' + side, at: [sx * (d.shoulders + ra * 0.55), 0, d.torso - ra * 1.3] });
       b['elbow' + side] = b['shoulder' + side].group({ name: 'elbow' + side, at: [0, 0, -upperArm] });
       b['hand' + side] = b['elbow' + side].group({ name: 'hand' + side, at: [0, 0, -foreArm] });
       b['hip' + side] = b.pelvis.group({ name: 'hip' + side, at: [sx * d.hips, 0, 0] });
@@ -68,34 +78,55 @@
       b['foot' + side] = b['knee' + side].group({ name: 'foot' + side, at: [0, 0, -shin] });
     }
 
-    // default body: rounded parts the dress can cover or replace
+    // default body: soft blocks and rods the dress can cover or replace
     const down = [180, 0, 0];
-    if (!skip.has('torso')) {
-      const w = d.shoulders, len = d.torso + w * 0.15;
-      b.torso.capsule(w, Math.max(2 * w, len), { name: 'top', color: col.top, at: [0, 0, -w * 0.35], scale: [1, d.depth / w, 1] });
-    }
-    if (!skip.has('head')) b.head.sphere(d.head, { name: 'skin', color: col.skin, at: [0, 0, d.head] });
+    if (!skip.has('torso')) b.torso.rounded([d.shoulders * 2, d.depth * 2, d.torso + d.head * 0.15], { name: 'top', color: col.top, at: [0, 0, -d.head * 0.25], round: 0.42 });
+    if (!skip.has('hips')) b.pelvis.rounded([(d.hips + r) * 2 * 0.98, d.depth * 1.9, d.torso * 0.38], { name: 'bottom', color: col.bottom, at: [0, 0, -d.torso * 0.24], round: 0.5 });
+    if (!skip.has('neck')) b.torso.cylinder(d.head * 0.36, d.neck + d.head * 0.4, { name: 'skin', color: col.skin, at: [0, 0, d.torso - d.head * 0.1], seg: 16 });
+    if (!skip.has('head')) b.head.sphere(d.head, { name: 'skin', color: col.skin, at: [0, 0, d.head], seg: 32 });
     for (const side of ['L', 'R']) {
       if (!skip.has('arm' + side)) {
-        b['shoulder' + side].capsule(r, upperArm + r, { name: 'top', color: col.top, rot: down, at: [0, 0, r * 0.5] });
-        b['elbow' + side].capsule(r * 0.95, foreArm + r, { name: 'top', color: col.top, rot: down, at: [0, 0, r * 0.5] });
+        b['shoulder' + side].capsule(ra, upperArm + ra * 1.2, { name: 'top', color: col.top, rot: down, at: [0, 0, ra * 0.6] });
+        b['elbow' + side].capsule(ra * 0.92, foreArm + ra, { name: 'top', color: col.top, rot: down, at: [0, 0, ra * 0.5] });
         if (d.hand) b['hand' + side].sphere(d.hand, { name: 'skin', color: col.skin, at: [0, 0, -d.hand * 0.6] });
       }
       if (!skip.has('leg' + side)) {
-        b['hip' + side].capsule(r * 1.15, thigh + r, { name: 'bottom', color: col.bottom, rot: down, at: [0, 0, r * 0.6] });
-        b['knee' + side].capsule(r, shin + r * 0.5, { name: 'bottom', color: col.bottom, rot: down, at: [0, 0, r * 0.5] });
-        if (d.foot) b['foot' + side].box([r * 2.2, d.foot, footH * 1.1], { name: 'shoes', color: col.shoes, at: [0, -d.foot * 0.3, -footH], bevel: r * 0.9 });
+        b['hip' + side].capsule(r, thigh + r * 1.2, { name: 'bottom', color: col.bottom, rot: down, at: [0, 0, r * 0.6] });
+        b['knee' + side].capsule(r * 0.94, shin + r, { name: 'bottom', color: col.bottom, rot: down, at: [0, 0, r * 0.5] });
+        if (d.foot) b['foot' + side].box([r * 1.9, d.foot, footH], { name: 'shoes', color: col.shoes, at: [0, -d.foot * 0.3, -r * 0.4], bevel: r * 0.6 });
       }
     }
-    if (spec.dress) spec.dress(b, Object.assign({ upperArm, foreArm, thigh, shin, colors: col }, d));
+    if (!skip.has('spot')) fig.decal(H * 0.42, H * 0.42, spotPicture, { name: 'spot', rot: [-90, 0, 0], at: [0, 0, 0.004], px: 120, key: 'figure-spot' });
+    if (spec.dress) spec.dress(b, Object.assign({ upperArm, foreArm, thigh, shin, armRadius: ra, colors: col }, d));
 
     fig.bones = b;
     fig.dims = d;
     fig.pose = pose;
+    fig.plant = plant;
     fig.reach = reach;
     fig.pose(Object.assign({}, spec.pose));
     return fig;
   };
+
+  // Lower or raise the body so its lowest point rests on the ground (z = 0 of
+  // the figure's own frame), whatever the pose: a figure sitting on the
+  // ground sits on it, a stride never sinks a foot or lifts the body off.
+  function plant() {
+    const keep = this.matrix;
+    this.matrix = Film.M.identity();
+    let lo = Infinity;
+    this.walk((m, Wm) => {
+      if (m.name === 'spot') return;
+      const bb = m.geom.bounds;
+      for (let i = 0; i < 8; i++) {
+        const z = Film.M.point(Wm, [i & 1 ? bb.hi[0] : bb.lo[0], i & 2 ? bb.hi[1] : bb.lo[1], i & 4 ? bb.hi[2] : bb.lo[2]])[2];
+        if (z < lo) lo = z;
+      }
+    });
+    this.matrix = keep;
+    if (lo !== Infinity) { const at = this.bones.pelvis.at; this.bones.pelvis.set({ at: [at[0], at[1], at[2] - lo] }); }
+    return this;
+  }
 
   // A pose, in degrees. Every field is optional; anything left out is the
   // standing pose. Forward means towards the way the figure faces.
@@ -106,25 +137,28 @@
   //   elbowL/R  bend (forearm comes forward and up)
   //   legL/legR [swing forward, out to the side]
   //   kneeL/R   bend (shin goes back)
-  //   crouch    lowers the pelvis by this many metres (bend the knees to match)
+  //   seat      sit on something this high (metres): the pelvis rests on it
+  //   plant     false to leave the body where the pose puts it (default: the
+  //             lowest point is planted on the ground)
   function pose(p) {
     p = p || {};
     this._pose = p;
     const b = this.bones, d = this.dims;
     const pair = (v, def) => Array.isArray(v) ? v : [v || 0, def];
-    b.pelvis.set({ at: [0, 0, d.leg - (p.crouch || 0)] });
+    b.pelvis.set({ at: [0, 0, p.seat != null ? p.seat + d.limb * 0.9 : d.leg - (p.crouch || 0)] });
     b.torso.set({ rot: [(d.stoop || 0) + (p.spine || 0), 0, p.twist || 0] });
     const h = pair(p.head, 0);
     b.head.set({ rot: [h[0], 0, h[1]] });
     for (const side of ['L', 'R']) {
       const sx = side === 'L' ? 1 : -1;
-      const a = pair(p['arm' + side], 5), l = pair(p['leg' + side], 0);
+      const a = pair(p['arm' + side], 4), l = pair(p['leg' + side], 0);
       b['shoulder' + side].set({ rot: [-a[0], -sx * a[1], 0] });
       b['elbow' + side].set({ rot: [-(p['elbow' + side] || 0), 0, 0] });
       b['hip' + side].set({ rot: [-l[0], -sx * l[1], 0] });
       b['knee' + side].set({ rot: [p['knee' + side] || 0, 0, 0] });
       b['foot' + side].set({ rot: [-(p['knee' + side] || 0) + l[0], 0, 0] });
     }
+    if (p.seat == null && p.plant !== false) this.plant();
     return this;
   }
   // Put a hand on a point (in the space the figure is placed in): the arm's

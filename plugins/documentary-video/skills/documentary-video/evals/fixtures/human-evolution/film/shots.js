@@ -43,7 +43,7 @@ window.buildShots = function (W) {
       stat: date(3.2, 1, '', ' million'),
       caption: 'Lucy: a little over 1 metre tall, upright, still climbing.',
       labels: [label('Ethiopia', P.ethiopia, 0.2)],
-      cam: { from: { target: [141, 2.4, 0.7], az: -135, el: 14, dist: 5.5 }, to: { target: [141, 2.6, 1.0], az: -75, el: 16, dist: 5 } },
+      cam: { from: { target: [141.6, 3.9, 0.35], az: -124, el: 16, dist: 6.5 }, to: { target: [141.6, 3.9, 0.45], az: -90, el: 18, dist: 5.8 } },
       setup() { W.rest(); },
       update(t) { const u = E.smooth(E.span(t, 0.45, 0.8)); W.lucy.pose({ armR: [5 + 150 * u, 8], armL: [5 + 130 * u, 5], elbowR: 20 * u, spine: -6 * u }); } },
 

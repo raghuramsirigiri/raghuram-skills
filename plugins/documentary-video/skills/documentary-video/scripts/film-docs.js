@@ -198,7 +198,7 @@ function parseBible(md) {
       const get = k => { const r = body.match(new RegExp('^' + k + ':\\s*(.*)$', 'mi')); return r ? r[1].trim() : null; };
       const m = head.match(/^(K\d+)\s*[·|\-]\s*(.+?)\s*[·|\-]\s*(.+)$/);
       items.push({ head, section, id: m && m[1], name: m && m[2], nouns: m ? ids(m[3], 'N') : [],
-        job: get('Story job'), apart: get('Tell apart from'), look: get('Look'), states: get('States'), scale: get('Scale') });
+        job: get('Story job'), tier: get('Tier'), apart: get('Tell apart from'), look: get('Look'), states: get('States'), scale: get('Scale') });
     }
   }
   return { era: field(md, 'Era'), items };
@@ -216,8 +216,10 @@ function checkBible(md, briefMd, screenMd) {
     if (!['characters', 'props', 'places'].includes(it.section)) errors.push(it.id + ': sits under "## ' + it.section + '"; use Characters, Props or Places');
     if (!it.nouns.length) errors.push(it.id + ' (' + it.name + '): traces to no noun; every item comes from a brief noun');
     for (const n of it.nouns) { if (!nouns.has(n)) errors.push(it.id + ': noun ' + n + ' is not in the brief'); else covered.add(n); }
-    for (const [k, label] of [['job', 'Story job'], ['apart', 'Tell apart from'], ['look', 'Look'], ['states', 'States'], ['scale', 'Scale']])
+    for (const [k, label] of [['job', 'Story job'], ['tier', 'Tier'], ['apart', 'Tell apart from'], ['look', 'Look'], ['states', 'States'], ['scale', 'Scale']])
       if (!it[k]) errors.push(it.id + ': missing "' + label + ':" line');
+    if (it.tier && !/^(hero|supporting|background)\b/i.test(it.tier))
+      errors.push(it.id + ': Tier starts with hero, supporting or background, got "' + it.tier.slice(0, 30) + '"');
   }
   const shown = new Set();
   for (const bt of s.beats) for (const n of [...ids(bt.place, 'N'), ...ids(bt.cast, 'N')]) shown.add(n);
@@ -228,6 +230,8 @@ function checkBible(md, briefMd, screenMd) {
   }
   for (const it of bb.items) if (it.id && it.nouns.length && !it.nouns.some(n => shown.has(n)))
     warnings.push(it.id + ' (' + it.name + '): no beat shows it; it may not need building');
+  const heroes = bb.items.filter(it => /\bhero\b/i.test(it.tier || ''));
+  if (heroes.length > 6) warnings.push(heroes.length + ' items have a hero tier; a hero takes real care to build, so check each is seen close');
   return { bible: bb, errors, warnings };
 }
 
