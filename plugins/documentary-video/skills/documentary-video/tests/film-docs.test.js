@@ -44,28 +44,28 @@ test('brief: an abstract noun with nothing standing for it fails', () => {
   assert.ok(has(D.checkBrief(b, doc), /N11 \(cancellation\): an abstract noun needs "stands for"/));
 });
 
-test('screenplay: a number in a caption that its claims do not hold fails', () => {
-  const s = sp.replace('waited 6.2 minutes', 'waited 7 minutes');
-  assert.ok(has(D.checkScreenplay(s, brief), /B2: caption number 7 is not in the claims it cites/));
+test('screenplay: a number in a callout or caption that its claims do not hold fails', () => {
+  assert.ok(has(D.checkScreenplay(sp.replace('Callout: 6.2 minutes', 'Callout: 7 minutes'), brief), /B3: callout number 7 is not in the claims it cites/));
+  assert.ok(has(D.checkScreenplay(sp.replace('Caption: The average wait for a car.', 'Caption: The average wait was 7 minutes.'), brief), /B3: caption number 7/));
 });
 
 test('screenplay: a hedged, rounded number is allowed; an unhedged one is not', () => {
-  const ok = sp.replace('waits reach 9.8 minutes', 'waits reach about 10 minutes');
-  assert.ok(!has(D.checkScreenplay(ok, brief), /B3/));
-  const bad = sp.replace('waits reach 9.8 minutes', 'waits reach 10 minutes');
-  assert.ok(has(D.checkScreenplay(bad, brief), /B3: caption number 10/));
+  const ok = sp.replace('Callout: 9.8 minutes', 'Callout: about 10 minutes');
+  assert.ok(!has(D.checkScreenplay(ok, brief), /B4/));
+  const bad = sp.replace('Callout: 9.8 minutes', 'Callout: 10 minutes');
+  assert.ok(has(D.checkScreenplay(bad, brief), /B4: callout number 10/));
 });
 
 test('screenplay: a count needs its key, beats need claims or a tag, length must fit', () => {
-  assert.ok(has(D.checkScreenplay(sp.replace('Key: 1 car = 1% of online drivers\n', ''), brief), /B4: a Count needs a Key/));
-  assert.ok(has(D.checkScreenplay(sp.replace('Claims: C3', 'Claims: —'), brief), /B2: a beat with no claims/));
-  assert.ok(has(D.checkScreenplay(sp.replace('### B4 · 9 s', '### B4 · 30 s'), brief), /beats add up to 111 s/));
+  assert.ok(has(D.checkScreenplay(sp.replace('Key: 1 car = 1% of online drivers\n', ''), brief), /B5: a Count needs a Key/));
+  assert.ok(has(D.checkScreenplay(sp.replace('Claims: C3', 'Claims: —'), brief), /B3: a beat with no claims/));
+  assert.ok(has(D.checkScreenplay(sp.replace('### B5 · 6 s', '### B5 · 46 s'), brief), /beats add up to 105 s/));
   assert.ok(has(D.checkScreenplay(sp.replace('Claims: C3', 'Claims: C99'), brief), /claim C99 is not in the brief/));
 });
 
 test('screenplay: a count that matches no figure is flagged', () => {
   const r = D.checkScreenplay(sp.replace('Count: 38 of 100 cars lit', 'Count: 45 of 100 cars lit'), brief);
-  assert.ok(r.warnings.some(w => /B4: Count/.test(w)));
+  assert.ok(r.warnings.some(w => /B5: Count/.test(w)));
 });
 
 test('bible: an item that traces to no brief noun fails', () => {

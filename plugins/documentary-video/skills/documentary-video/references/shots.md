@@ -31,10 +31,11 @@ window.buildShots = function (W) {          // W is what buildWorld returned
 - **`update(t, s)`** moves things: `t` runs 0 to 1 over the beat, `s` is
   seconds. Compute positions from `t` (never accumulate from the last frame),
   so any frame can be drawn on its own.
-- **`cut: true`** where the camera jumps rather than travels. The film has
-  one transition, a short dip to the background, and it happens only at
-  cuts. Prefer travelling: a camera that moves from the last beat's framing to
-  the next is what makes the film continuous.
+- **`cut: true`** where the camera jumps rather than travels: a hard cut,
+  like an edit. The film fades in at its start and out at its end, and
+  nowhere else; a fade or dip at every cut makes the film blink. Mix cuts
+  with travel: a beat that starts where the last one's camera ended carries
+  the viewer through the world.
 
 ## The camera
 
@@ -74,13 +75,39 @@ Night wants something glowing (windows, lamps) or it is only darker.
   you can watch.
 - `Film.ease.span(t, a, b)`: a window of the beat: 0 before `a`, 1 after `b`.
 
+## Words on screen
+
+Each beat carries its words as fields; the player draws them on the fixed
+layer, animated in, never zooming.
+
+- `caption`, `key`: copied from the screenplay.
+- `stat: { value, decimals, prefix, suffix, label, window }`: the screenplay's
+  Callout as a big number that counts up over `window` (fractions of the
+  beat). `from` counts from a value other than 0; `still: true` shows it
+  without counting (a goal, an "under 5"). When the number is a count of
+  things lighting or leaving, use `count: (t, beat) => beat.lit` and have
+  `update` set `this.lit` from the world, so the number on screen is always
+  the number lit.
+- `labels: [{ text, at, window }]`: names of places, pinned to a point in the
+  world with a leader line, following the camera. Name a place the first time
+  the camera arrives there, so the viewer knows where they are.
+- `timer: { at, value, unit, window }`: a ring over a wait that fills and
+  counts as the wait runs (a rider at the kerb, a queue at a desk).
+- `card: { title, sub }`: the opening title and the closing line, over the
+  dimmed world.
+
+The callout and caption sit in a panel bottom left, the key top right, the
+act top left. Frame each shot so the action sits in the upper two thirds or
+the right half, clear of the panel.
+
 ## The figure in the action
 
 The count in a beat's `Count:` line is what lights or moves: 38 cars light,
 27 riders walk away. Light them one after another (`stagger`, `light`) so the
 viewer sees the number build, hold the end state for the last 15-20% of the
 beat so it can be read, and keep the beat's `key` on screen (the player shows
-it top right).
+it top right). The callout counts in step with the units, so the picture and
+the number land together.
 
 ## Checking
 

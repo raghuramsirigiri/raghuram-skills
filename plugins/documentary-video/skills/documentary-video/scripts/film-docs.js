@@ -118,7 +118,7 @@ function parseScreenplay(md) {
     beats.push({
       head, id: m && m[1], secs: m ? parseFloat(m[2]) : NaN, tag: m && m[3] ? m[3].toLowerCase() : null,
       place: get('Place'), cast: get('Cast'), camera: get('Camera'), action: get('Action'),
-      count: get('Count'), key: get('Key'), caption: get('Caption'), claims: get('Claims')
+      count: get('Count'), key: get('Key'), callout: get('Callout'), caption: get('Caption'), claims: get('Claims')
     });
   }
   return { logline: field(md, 'Logline'), shape: field(md, 'Shape'), beats };
@@ -151,7 +151,7 @@ function checkScreenplay(md, briefMd) {
     // numbers on screen come from the claims the beat cites
     const allowed = [];
     for (const c of cids) if (claims.has(c)) { const r = claims.get(c); allowed.push(...numbers(r.figure + ' ' + r.claim + ' ' + r.source)); }
-    for (const [label, text] of [['caption', bt.caption], ['key', bt.key]]) {
+    for (const [label, text] of [['caption', bt.caption], ['callout', bt.callout], ['key', bt.key]]) {
       if (!text) continue;
       const re = /\d[\d,]*(?:\.\d+)?/g; let m;
       while ((m = re.exec(text))) {
@@ -171,7 +171,7 @@ function checkScreenplay(md, briefMd) {
       if (!fits) warnings.push(tag + ': Count "' + bt.count + '" doesn\'t obviously match a figure in ' + (cids.join(' ') || 'its claims') + '; check the unit');
     }
     if (bt.caption) {
-      const words = bt.caption.split(/\s+/).length;
+      const words = (bt.caption + ' ' + (bt.callout || '')).split(/\s+/).length;
       if (words / bt.secs > 3.2) warnings.push(tag + ': caption has ' + words + ' words for ' + bt.secs + ' s; hard to read in time');
     }
   }

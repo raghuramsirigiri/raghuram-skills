@@ -72,10 +72,15 @@ Each beat:
 - **Count** (when the beat shows a figure as things): how many units, out
   of how many, and what one unit is. Then **Key**: the line that tells the
   viewer what one unit is, which stays on screen while units carry data.
-- **Caption**: the words on screen, short enough to read in the beat (about
-  three words a second, at most two lines). Numbers in a caption come from
-  the claims the beat cites, written as the document did or rounded with
-  "about".
+- **Callout** (when the beat has a figure): the number and two or three
+  words, shown big in the highlight colour and counting up as the action
+  builds it: `38% of online drivers`, `6.2 minutes`, `+31% requests`. It is
+  the number the viewer should remember from the beat.
+- **Caption**: the line that finishes the callout's sentence, or the whole
+  sentence when there's no callout. Short enough to read in the beat (about
+  three words a second, one line where possible). Numbers in a callout or
+  caption come from the claims the beat cites, written as the document did or
+  rounded with "about".
 - **Claims**: the claim ids the beat shows, or `—` for an establishing,
   transition or closing beat.
 
@@ -98,9 +103,15 @@ thousands, one unit stands for many, and the Key says how many.
 
 ## Pacing
 
-Beats of about 4-9 seconds; an establishing beat can be longer. The total
-should be within about 10% of the brief's Length. One idea per beat: if a
-beat has two figures, it's usually two beats.
+A produced explainer is brisk. Beats of about 3-6 seconds, one idea each:
+if a beat has two figures, it's usually two beats. Something is always
+moving: traffic, people, the camera. A beat that only holds a view feels slow
+however short it is. The total should be within about 10% of the brief's
+Length; 45-75 s is the usual range for a document's worth of claims.
+
+Open on a title beat (`establishing`, its caption is the film's title) and
+close on a `closing` beat whose caption is the thesis in the viewer's words.
+These two have no numbers.
 
 ## Check
 

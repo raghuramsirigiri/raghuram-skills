@@ -191,9 +191,20 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     // light: an orthographic box around the objects (not the ground), or,
     // for a big world, around what the camera looks at (o.focus), so the
     // shadow map's detail goes where the viewer is looking
-    const L = o.light, lc = o.focus ? o.focus.center : c, lR = o.focus ? o.focus.radius : R * 1.15;
+    const L = o.light, lUp = Math.abs(L[2]) > 0.99 ? [0, 1, 0] : [0, 0, 1];
+    let lc = o.focus ? o.focus.center : c, lR = o.focus ? o.focus.radius : R * 1.15;
+    // Stable shadows: as the camera moves, the box changes size only in
+    // steps and slides only in whole shadow texels, so edges don't shimmer.
+    if (o.focus) {
+      lR = Math.pow(2, Math.ceil(Math.log2(lR)));
+      const S0 = o.shadowSize, texel = 2 * lR / S0;
+      const m0 = M.lookAt(V.add(lc, V.mul(L, lR * 2)), lc, lUp);
+      const right = [m0[0], m0[4], m0[8]], up = [m0[1], m0[5], m0[9]];
+      const a = V.dot(lc, right), b = V.dot(lc, up);
+      lc = V.add(lc, V.add(V.mul(right, Math.round(a / texel) * texel - a), V.mul(up, Math.round(b / texel) * texel - b)));
+    }
     const lEye = V.add(lc, V.mul(L, lR * 2));
-    const lView = M.lookAt(lEye, lc, Math.abs(L[2]) > 0.99 ? [0, 1, 0] : [0, 0, 1]);
+    const lView = M.lookAt(lEye, lc, lUp);
     const lightVP = M.mul(M.ortho(-lR, lR, -lR, lR, 0.01, lR * 4), lView);
 
     // pass 1: shadow depth

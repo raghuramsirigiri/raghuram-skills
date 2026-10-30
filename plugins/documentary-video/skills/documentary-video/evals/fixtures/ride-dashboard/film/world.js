@@ -113,17 +113,18 @@ window.buildWorld = function () {
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rr() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     return order.slice(0, k);
   }
-  // k riders light up, step out of the crowd and walk away east along the pavement
+  // k riders step out of the crowd one after another, lighting up as each
+  // one leaves, and walk away east along the pavement. Returns how many have
+  // left, so the on-screen count is always the count in the world.
   function walkAway(idx, t, a, b) {
+    let gone = 0;
     idx.forEach((ri, n) => {
       const f = riders[ri], s = spots[ri];
       const local = F.verbs.stagger(F.ease.span(t, a, b), n, idx.length, 0.7);
-      f.paint(local > 0 || t > a ? 'hl' : f._top, 'top');
-      const lightUp = F.ease.span(t, a - 0.12, a);
-      if (lightUp > 0) f.paint('hl', 'top');
-      const path = [s, [s[0], -94.2, 0.15], [s[0] + 28, -94.2, 0.15]];
-      if (local > 0) F.verbs.walk(f, path, local);
+      f.paint(local > 0 ? 'hl' : f._top, 'top');
+      if (local > 0) { gone++; F.verbs.walk(f, [s, [s[0], -94.2, 0.15], [s[0] + 28, -94.2, 0.15]], local); }
     });
+    return gone;
   }
 
   function setNight(on) {

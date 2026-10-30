@@ -2,7 +2,7 @@
 
 Thesis: Riders wait longest when drivers are somewhere else (on the airport rank at the morning peak, and arriving too late in the rain), and long waits make riders give up.
 Audience: Metro Rides' operations and leadership team; they know the dashboard, not the story it tells.
-Length: 90 s
+Length: 65 s
 Frame: 16:9
 Document: ride-dashboard.md (fictional company and figures)
 
