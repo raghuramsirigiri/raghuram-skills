@@ -19,45 +19,73 @@ film, from what the document says it is.
 
 ## The look
 
-- A pale, endless floor (`ground`); objects in light neutrals (`n0a`, `n1`,
-  `n2a`, `paper`), darker neutrals (`n2`, `n3`, `n4`, `n5`) for contrast
-  parts: screens, tyres, hair, roofs, shadows inside openings.
-- **One highlight colour carries the claim**: `hl` goes only on the parts the
-  current number counts (the stack of applications, the one person, the
-  trucks that were late). `hl2` for a second group in a comparison, `hlSoft`
-  for the whole a share is drawn from. An item is neutral unless its state
-  says highlighted.
-- Flat shading, no outlines, no gradients: form comes from the sun and the
-  shadows, so give things real thickness and real gaps.
-- Sizes are **metres**, and true to life. A laptop is 0.33 m wide, a door
-  2.1 m tall, a person 1.6-1.85 m, a tank 7 m long. The camera zooms; the
-  world doesn't cheat its scale, so props sit together believably.
+Think of a toy diorama, or an isometric illustration of a city, rather than a
+model kit. Things are built from a few simple masses with softened edges, and
+the world carries just enough detail to tell its story. It is close to low
+poly without being strict about it: an organic thing can be a faceted lump, a
+made thing a bevelled block, a person a few rounded parts.
+
+- **Colour is quiet.** Most of the world is one family of light neutrals
+  (`paper`, `n0a`, `n1`, `n2a`), with darker neutrals (`n2` … `n5`) only where
+  a part needs to separate: a window band, a tyre, a doorway, hair. Tone does
+  the work colour would do elsewhere, the way a monotone city illustration
+  still tells a factory from a warehouse.
+- **The highlight carries the claim.** `hl` goes on the things the current
+  number counts (the stack of applications, the one person, the late trucks),
+  `hl2` on a second group in a comparison, `hlSoft` on the whole a share is
+  drawn from. Because everything else is quiet, one lit thing reads at once.
+- **Form comes from light.** Flat shading, soft shadows, no outlines: a
+  bevelled edge catches a line of light, a facet turns its own tone, a gap
+  casts a shadow. That's most of the detail an item needs.
+- **Sizes are real metres.** A person is 1.6-1.85 m, a door 2.1 m, a bus
+  12 m. Simple shapes at true scale sit together believably, and the camera
+  can go anywhere.
 
 ## Designing an item
 
-Work in three passes, and stop at the pass that makes it recognisable from
-the hero angle at the size it will appear in the film.
+The question for every item is **what does this film need the viewer to tell
+apart?** Detail goes there and nowhere else.
 
-1. **Silhouette.** The 2-5 masses that make it read: a bank is a block, a
-   pediment, a row of columns, steps. A tank is a hull, a turret, a gun and two
-   track runs. Get proportions right here: most failed props are a correct
-   part list at the wrong proportions.
-2. **Structure.** The parts that say *which* one it is: the laptop's hinge gap
-   and thin lid, the tank's sloped glacis and road wheels, the hominin's
-   stoop and long arms. Real gaps and overhangs, so the shadows draw them.
-3. **Surface.** Flat detail goes on a `decal`, not in geometry: a screen's UI,
-   a form's lines, windows on a far building, a sign, a map, a dial. Keep
-   decals to the item's own neutrals plus `hl` where the claim lives.
+- A film about a city's commute needs *a building*, so every building can be a
+  bevelled block with a band of window grid, and every tree the same faceted
+  ball on a stick. Nobody needs to know which tree it is.
+- A film about deforestation needs oak versus pine versus palm, so the trees
+  differ, but only in their silhouette: a wide flattened lump, a stack of
+  narrowing tiers, a fan of leaves on a tall thin trunk. Still no bark, still
+  no leaves drawn one by one.
+- A film about a hospital needs the emergency entrance to read, so that
+  building gets its canopy and a sign; the ward block behind it stays a block.
 
-What fails, and why it fails:
-- **A box with a label** is not a prop. If the label is what tells you what it
-  is, the prop has failed: the shape must say it.
-- **Generic stand-ins**: a cylinder for every tree, a cube for every
-  building. Ask what makes *this* thing different from the next one in the
-  same film, and build that difference.
-- **Anachronism and wrong setting**: check the bible's era rules.
-- **Too much detail at film size**: bolts on a building seen from 80 m away.
-  Detail costs nothing to render, but it adds noise.
+So build in this order and stop as soon as the item does its job at the size
+it appears in the film:
+
+1. **Masses.** The two to five shapes that make the silhouette: a block and a
+   roof; a hull, a cabin and a funnel; a body, a head and legs. Most of the
+   work is getting their proportions right.
+2. **The telling detail**, only if the story needs it: the one or two features
+   that make it *this* thing and not its neighbour (the factory's saw-tooth
+   roof and chimney, the tanker's round tank, the bus's long window band). A
+   window grid or a sign usually belongs on a `decal`, kept simple.
+
+What tends to go wrong:
+- **Too much.** Rails, rivets, handles, buttons, stitching, fingers. Each one
+  makes the item busier and the claim harder to see. If removing a part
+  doesn't change what the viewer understands, leave it out.
+- **Too little to read.** A plain box where the story needed a hospital. The
+  fix is a better silhouette, not a label.
+- **Living things made too exact.** People, animals and plants read better
+  as chunky, slightly imperfect forms: a polar bear as rounded blocks, a
+  penguin as a capsule with a beak, a crowd as simple rounded figures that
+  vary a little in height and tone. No faces unless the story is about one.
+- **Anachronism and wrong setting**: check the bible's era rules. A simple
+  shape can still be the wrong shape (a modern car in 1944).
+
+Useful shapes for this look: `box` with a `bevel` for anything built,
+`facet` for anything grown or natural (canopies, bushes, rocks, hills, ice,
+lumpy animals), `rounded` for soft made things (sacks, cushions, car bodies),
+`cylinder`/`cone` with a low `seg` (6-8) for faceted trunks, poles and
+cone trees, `extrude` for silhouettes (roofs, saw-tooth sheds, vehicles in
+profile).
 
 ## The API
 
@@ -68,6 +96,21 @@ Load order in a page: `theme.js`, `geom.js`, `scene.js`, `render.js`,
 const g = Film.group({ name, at, rot, scale });   // a cast item, or a part of one
 ```
 
+**Where things sit.** `z` is up and an item's front faces `-y`. Most solids
+stand on their `at` (`box`, `extrude`, `cylinder`, `cone`, `capsule`, `lathe`,
+`rounded`, `tray`, `facet` start at its height and rise). These are centred on
+it instead: `sphere`, `torus` (centred on its own `z = 0`), `decal` and `label`
+(the picture's centre), anything laid on its side with `axis`, and the
+push direction of an `extrude` with `axis: 'x'` or `'y'`. A `loft` with
+`axis: 'x'` runs from `x = w` of its first section to its last; `axis: 'y'`
+runs along `y`, which is the way for an animal or a vehicle to face `-y`
+(give the head or nose the most negative `w`).
+
+**Which way things turn.** `rot: 90` turns `+x` towards `+y` (anticlockwise
+seen from above), so a part pointing along `+x` points along `+y` after it.
+`rot: [a, 0, 0]` with `a` positive tips the front (`-y`) down, the way a head
+nods; `[0, a, 0]` with `a` positive tips the top towards `+x`.
+
 Every solid takes `o = { at: [x,y,z], rot, scale, color, name, shadow, opacity }`
 and returns its mesh. `opacity` below 1 makes glass, water or haze (it casts no
 shadow); use it sparingly, a dark solid often reads better as a window. `rot` is degrees: a number turns about the vertical, `[x, y, z]`
@@ -76,7 +119,8 @@ on `z = 0`, and its front faces `-y` (towards the default camera).
 
 | Call | Makes |
 | --- | --- |
-| `g.box([w, d, h], o)` | a block standing on its `at`, centred in x and y. `o.bevel` rounds the vertical edges (metres) |
+| `g.box([w, d, h], o)` | a block standing on its `at`, centred in x and y. `o.bevel` cuts every edge (metres; about 3-8% of the smallest side gives the soft toy edge) |
+| `g.facet([w, d, h], o)` | a faceted lump sitting on its `at`: `o.detail` 0 (20 faces: rocks, a boulder, a crude animal body) or 1 (80: canopies, bushes, hills), `o.seed` and `o.jitter` (how lumpy, default 0.12) |
 | `g.extrude(outline, depth, o)` | any 2D outline `[[x, y], ...]` (concave is fine) pushed up by `depth`. `o.axis: 'x'` or `'y'` stands the outline upright, so `[[x, z], ...]` with `axis: 'y'` is a side profile: a roof, a car body, a ramp, a chair. Use this most: it's how a shape gets its character |
 | `g.rounded([w, d, h], o)` | a soft block, every edge rounded by `o.round` (0.1 nearly a box, 1 an ellipsoid): sacks, cushions, loaves, foliage clumps, boulders, car bodies, a bulky coat |
 | `g.tray([w, d, h], o)` | an open box with walls `o.wall` thick; `o.open: 'top'` (default), a side (`'-y'` …) or `'none'`: trays, crates, drawers, containers, rooms with an inside |
@@ -84,7 +128,7 @@ on `z = 0`, and its front faces `-y` (towards the default camera).
 | `g.cone(r, h, o)` | a cone |
 | `g.sphere(r, o)` | a sphere centred on `at` |
 | `g.capsule(r, len, o)` | a rounded rod from `z = 0` up to `len` |
-| `g.lathe([[r, z], ...], o)` | a profile turned about the vertical: bottles, vases, domes, helmets, hats. `o.open` leaves the ends uncapped: a pipe, a bucket wall, a funnel mouth |
+| `g.lathe([[r, z], ...], o)` | a profile turned about the vertical: bottles, vases, domes, helmets, hats. `o.seg` sets the facets for the whole profile (4 makes it square all the way down), so a dented crown and a round brim are two parts. `o.open` leaves the ends uncapped: a pipe, a bucket wall, a funnel mouth |
 | `g.torus(R, r, o)` | a ring lying flat (`o.axis` stands it up): tyres, hoops, rims, life rings, steering wheels |
 | `g.tube(points, r, o)` | a round tube through 3D points, smoothed (`o.smooth: false` for straight runs, `o.closed` for a loop): ropes, cables, hoses, pipes, vines, tails, a slung strap |
 | `g.loft([[w, outline], ...], o)` | a skin through cross-sections with the same number of points: `o.axis 'x'` (default) puts each `[[y, z], ...]` outline at `x = w`: hulls, fuselages, car bodies, whales, loaves; `'z'` stacks `[[x, y], ...]` plans by height: tapering towers, trunks. The way to get curves a box or extrusion can't: a boat's sheer, a car's roofline |
@@ -109,13 +153,17 @@ Name the parts the claim may light (`name: 'stack'`), and parts that move.
 ## Figures
 
 `Film.figure(spec)` is a jointed body with plain rounded parts, nothing more:
-no clothes, no hair, no face, no species. You make it someone.
+no hands, no feet, no clothes, no hair, no face, no species. That plainness is
+the look: a crowd of simple rounded figures reads as people, and one of them
+lit reads as *the* person. You make it someone with proportion, tone and the
+one or two things that say who they are (a helmet, a white coat, a pack), and
+add hands or feet only when the story uses them.
 
 ```js
 Film.figure({
   height: 1.62,                       // metres
   head: 0.1, torso: 0.3, shoulders: 0.12, depth: 0.08, hips: 0.058,
-  arm: 0.33, leg: 0.47, limb: 0.042, hand: 0.03, foot: 0.08,   // fractions of height
+  arm: 0.33, leg: 0.47, limb: 0.042, hand: 0, foot: 0,   // fractions of height (hand 0.03, foot 0.08 to add them)
   stoop: 0,                           // a permanent forward lean, degrees
   colors: { skin, hair, top, bottom, shoes },
   skip: ['torso', 'head', 'armL', 'armR', 'legL', 'legR'],     // default parts to leave out
@@ -147,8 +195,8 @@ the figure standing, then turn the whole figure (`rot: [-90, 0, 0]` puts it on
 its back with its head to `+y`) and lift it onto the bed.
 
 Hair, hats and helmets: a `lathe` dome or a `rounded` cap clearly larger than
-the head (about 1.08x) and offset, never a sphere the same size as the head:
-two surfaces that close together flicker. The same goes for any two faces
+the head (about 1.08x) and offset, rather than a sphere the same size as the
+head, because two surfaces that close together flicker. The same goes for any two faces
 that share a plane: separate them by a few millimetres or inset one.
 
 A part painted on a bone moves with every bone below it, so a short sleeve is
@@ -157,7 +205,7 @@ its own part on `shoulderL`, with the default arm left in skin colour.
 Proportions make the character as much as clothing does: a child is short
 with a big head, an early hominin stoops (`stoop: 20`) with long arms
 (`arm: 0.42`) and short legs, a soldier in winter kit is bulky (`depth: 0.1`),
-a crowd (`depth: 0.1`), a crowd varies height and build a little per person
+and a crowd varies height, build and tone a little per person
 (`Film.rng(seed)`). Four-legged animals and vehicles are built from solids
 directly, and face `-y` like everything else (a truck's nose towards `-y`).
 
@@ -176,7 +224,12 @@ window.CAST = [
 ];
 ```
 
-`note` holds the bible handle the item traces to. Copy
+`note` holds the bible handle the item traces to.
+
+The sheet looks at each item from azimuth -55 (front-left; 0 is from `+x`,
+-90 straight from the front), 26 degrees up, with a 28 degree lens, plus a
+small view from behind. An item or state can set its own `view: { az, el, fov,
+focus }` when another angle shows what matters. Copy
 `templates/sheet.html` and the `assets/film-lib/` folder beside `cast.js`,
 open `sheet.html` in a browser, and look at it. `sheet.html?only=truck&cols=1`
 shows one item big. An item (or a state) can set `view: { az, el, fov, focus:
@@ -191,7 +244,8 @@ exist from the front.
 Look at each cell at its real size, without reading its caption, and ask:
 1. Would someone name this item correctly? If not, fix the silhouette and
    proportions before adding anything.
-2. Is it *this film's* version of the thing (era, place, type), not a generic one?
+2. Does it carry the detail the story needs to tell it apart, and nothing much more?
+   A generic version is right when the story doesn't care which one it is.
 3. Does the highlighted state light only the counted part, and is that part
    big enough to count from the film's camera?
 4. Is its size right next to a 1.7 m person?

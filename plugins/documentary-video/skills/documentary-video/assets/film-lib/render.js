@@ -53,11 +53,12 @@ void main(){ gl_Position = uLightVP*uModel*vec4(aPos,1.); }`;
 precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
 
   // Tones: an unshadowed top face shows its colour exactly; the face turned
-  // to the sun about 0.9 of it, the face turned away about 0.78; a cast
-  // shadow takes about 0.8 off the ground. Tuned against the reference stills.
+  // to the sun about 0.89 of it, the face turned away about 0.72, so facets
+  // and bevels separate the way they do in a toy-diorama illustration; a cast
+  // shadow takes a little off the ground. Tuned against the reference stills.
   const DEFAULTS = {
     light: V.norm([-0.35, -0.6, 0.75]),
-    ambient: 0.71, sky: 0.14, sun: 0.2,
+    ambient: 0.65, sky: 0.14, sun: 0.28,
     shadowDark: 0.06, soft: 1.6, shadowSize: 2048,
     ground: true
   };

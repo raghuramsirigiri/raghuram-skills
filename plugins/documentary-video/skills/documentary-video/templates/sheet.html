@@ -18,14 +18,21 @@
 <script src="film-lib/render.js"></script>
 <script src="film-lib/rig.js"></script>
 <script src="film-lib/sheet.js"></script>
-<!-- the film's cast: sets window.CAST = [{ name, note, make(state), states }] -->
-<script src="cast.js"></script>
+<!-- the film's cast: sets window.CAST = [{ name, note, make(state), states }].
+     Loaded with a fresh query each time, so an edit always shows on reload. -->
 <script>
+  const cast = document.createElement('script');
+  cast.src = 'cast.js?t=' + Date.now();
+  cast.onload = draw;
+  cast.onerror = () => { document.title = 'Cast sheet: cast.js failed to load'; };
+  document.body.appendChild(cast);
+  function draw() {
   // ?only=<part of a name> shows just those items; ?cols=1 shows them big
   const q = new URLSearchParams(location.search);
   const res = Film.sheet(document.getElementById('sheet'), window.CAST || [], {
     title: window.CAST_TITLE || 'Cast', only: q.get('only') || '', cols: +q.get('cols') || 0 });
   document.title = 'Cast sheet: ' + res.cells + ' views, ' + res.errors.length + ' errors';
+  }
 </script>
 </body>
 </html>

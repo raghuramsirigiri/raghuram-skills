@@ -130,6 +130,12 @@
     const seg = o && o.seg || 24;
     return addMesh(this, cached('sp' + [r, seg], () => G.sphere(r, seg)), o);
   };
+  // a faceted lump (o.detail 0 or 1, o.seed, o.jitter): canopies, bushes, rocks, hills, a chunky animal
+  Group.prototype.facet = function (size, o) {
+    o = o || {};
+    const key = 'fa' + size + '|' + [o.detail, o.seed, o.jitter];
+    return addMesh(this, cached(key, () => G.facet(size[0], size[1], size[2], o)), o);
+  };
   Group.prototype.rounded = function (size, o) {
     const round = o && o.round != null ? o.round : 0.4;
     return addMesh(this, cached('ro' + size + '|' + round, () => G.rounded(size[0], size[1], size[2], round)), o);

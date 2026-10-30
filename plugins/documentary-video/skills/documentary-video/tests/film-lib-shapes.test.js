@@ -67,3 +67,21 @@ test('axis on an extrude orients its outline once, not twice', () => {
   const b = g.bounds();
   assert.ok(near(b.lo[0], -2, 1e-6) && near(b.hi[0], 2, 1e-6) && near(b.hi[2], 1, 1e-6), JSON.stringify(b));
 });
+
+test('a bevelled box keeps its size and closes its surface', () => {
+  const g = Film.geom.box(2, 1, 3, 0.1);
+  assert.deepStrictEqual(g.bounds.lo.map(v => +v.toFixed(6)), [-1, -0.5, 0]);
+  assert.deepStrictEqual(g.bounds.hi.map(v => +v.toFixed(6)), [1, 0.5, 3]);
+  assert.strictEqual(g.count, (6 * 2 + 12 * 2 + 8) * 3, '6 faces, 12 edge bevels, 8 corners');
+});
+
+test('a facet lump sits on the ground, keeps its seed, and points its faces out', () => {
+  const a = Film.geom.facet(2, 2, 1.5, { seed: 3 }), b = Film.geom.facet(2, 2, 1.5, { seed: 3 });
+  assert.ok(near(a.bounds.lo[2], 0, 1e-6) && a.bounds.hi[2] > 1.2);
+  assert.deepStrictEqual(Array.from(a.pos), Array.from(b.pos));
+  assert.strictEqual(Film.geom.facet(1, 1, 1, { detail: 0 }).count, 60);
+  for (let i = 0; i < a.pos.length; i += 9) {
+    const c = [0, 1, 2].map(k => (a.pos[i + k] + a.pos[i + 3 + k] + a.pos[i + 6 + k]) / 3);
+    assert.ok(a.nrm[i] * c[0] + a.nrm[i + 1] * c[1] + a.nrm[i + 2] * (c[2] - 0.75) > 0);
+  }
+});

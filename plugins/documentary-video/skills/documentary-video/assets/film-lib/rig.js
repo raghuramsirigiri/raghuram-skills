@@ -26,8 +26,8 @@
     arm: 0.33,        // shoulder to fingertip
     leg: 0.47,        // hip joint to sole
     limb: 0.042,      // arm and leg radius
-    hand: 0.03,       // hand radius (0 for none)
-    foot: 0.08,       // foot length (0 for none)
+    hand: 0,          // hand radius (0: none, the default; the arm just ends)
+    foot: 0,          // foot length (0: none, the default; legs stand on their ends)
     stoop: 0          // a lean of the spine the figure always has (degrees forward)
   };
   const COLORS = { skin: 'n2a', hair: 'n4', top: 'n1', bottom: 'n3', shoes: 'n5' };

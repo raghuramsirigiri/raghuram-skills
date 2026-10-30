@@ -129,9 +129,8 @@ test('a figure exposes every bone to dress, and skip drops default parts', () =>
 test('a forward arm swing moves the hand forward (-y)', () => {
   const f = Film.figure();
   f.pose({ armL: [80, 0] });
-  let handY = null;
-  f.walk((m, W) => { if (m.name === 'skin' && W[14] > 1 && W[14] < 1.5 && W[12] > 0) handY = W[13]; });
-  assert.ok(handY !== null && handY < -0.3, 'hand y ' + handY);
+  const handY = f.locate('handL')[1];
+  assert.ok(handY < -0.3, 'hand y ' + handY);
 });
 
 test('rounded and tray stand on the ground at the size asked for', () => {

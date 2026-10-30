@@ -138,8 +138,12 @@
     const [u, v] = az >= ax && az >= ay ? [0, 1] : ax >= ay ? [1, 2] : [2, 0];
     const sgn = (az >= ax && az >= ay ? n[2] : ax >= ay ? n[0] : n[1]) >= 0 ? 1 : -1;
     const P = pts.map(p => [p[u], p[v] * sgn]);
-    const idx = P.map((_, i) => i), out = [];
     const area2 = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    // either winding is accepted: clip in counter-clockwise order
+    let sa = 0;
+    for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length]; sa += a[0] * b[1] - b[0] * a[1]; }
+    const idx = P.map((_, i) => i), out = [];
+    if (sa < 0) idx.reverse();
     const inside = (p, a, b, c) => area2(a, b, p) >= 0 && area2(b, c, p) >= 0 && area2(c, a, p) >= 0;
     let guard = 0;
     while (idx.length > 3 && guard++ < 10000) {
@@ -188,10 +192,11 @@
   const G = {};
 
   // w along x, d along y, h up; centred on x and y, sitting on z = 0.
-  // `bevel` rounds the four vertical edges by that much (metres).
+  // `bevel` cuts every edge at 45 degrees by that much (metres): the soft,
+  // toy-like block that catches a thin line of light along each edge.
   G.box = function (w, d, h, bevel) {
     check('box', w > 0 && d > 0 && h > 0, 'size must be three positive numbers, got ' + [w, d, h]);
-    if (bevel) return G.extrude(roundRect(w, d, Math.min(bevel, w / 2, d / 2)), h);
+    if (bevel) return chamferBox(w, d, h, Math.min(bevel, w / 2.01, d / 2.01, h / 2.01));
     const x = w / 2, y = d / 2, b = new Builder();
     const c = [[-x,-y,0],[x,-y,0],[x,y,0],[-x,y,0],[-x,-y,h],[x,-y,h],[x,y,h],[-x,y,h]];
     b.poly([c[4], c[5], c[6], c[7]], [0, 0, 1]);
@@ -203,15 +208,70 @@
     return b.done();
   };
 
-  function roundRect(w, d, r) {
-    const pts = [], x = w / 2 - r, y = d / 2 - r, seg = 4;
-    const corners = [[x, -y, -90], [x, y, 0], [-x, y, 90], [-x, -y, 180]];
-    for (const [cx, cy, a0] of corners) for (let i = 0; i <= seg; i++) {
-      const a = (a0 + 90 * i / seg) * D2R;
-      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  function chamferBox(w, d, h, c) {
+    const X = w / 2, Y = d / 2, Z = h / 2, b = new Builder();
+    const S = [-1, 1];
+    // three points per corner, one on each face the corner touches
+    const P = (sx, sy, sz, face) => face === 'x' ? [sx * X, sy * (Y - c), Z + sz * (Z - c)]
+      : face === 'y' ? [sx * (X - c), sy * Y, Z + sz * (Z - c)] : [sx * (X - c), sy * (Y - c), Z + sz * Z];
+    for (const s of S) {
+      b.poly([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => P(s, u, v, 'x')), [s, 0, 0]);
+      b.poly([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => P(u, s, v, 'y')), [0, s, 0]);
+      b.poly([[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => P(u, v, s, 'z')), [0, 0, s]);
     }
-    return pts;
+    for (const a of S) for (const e of S) {
+      // the bevel along each of the twelve edges
+      b.poly([P(a, e, -1, 'x'), P(a, e, -1, 'y'), P(a, e, 1, 'y'), P(a, e, 1, 'x')], V.norm([a, e, 0]));
+      b.poly([P(a, -1, e, 'x'), P(a, -1, e, 'z'), P(a, 1, e, 'z'), P(a, 1, e, 'x')], V.norm([a, 0, e]));
+      b.poly([P(-1, a, e, 'y'), P(-1, a, e, 'z'), P(1, a, e, 'z'), P(1, a, e, 'y')], V.norm([0, a, e]));
+    }
+    for (const sx of S) for (const sy of S) for (const sz of S) {
+      b.poly([P(sx, sy, sz, 'x'), P(sx, sy, sz, 'y'), P(sx, sy, sz, 'z')], V.norm([sx, sy, sz]));
+    }
+    return b.done();
   }
+
+  // A faceted lump: an icosahedron (detail 0, 20 faces) or once divided
+  // (detail 1, 80 faces), each corner pushed in or out a little by a seeded
+  // amount, scaled to w x d x h and sitting on z = 0. Flat-shaded, so it reads
+  // as cut paper: canopies, bushes, rocks, hills, ice, clouds, a lumpy animal.
+  G.facet = function (w, d, h, opts) {
+    opts = opts || {};
+    check('facet', w > 0 && d > 0 && h > 0, 'size must be three positive numbers');
+    const t = (1 + Math.sqrt(5)) / 2;
+    let verts = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+      [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map(V.norm);
+    let faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6],
+      [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+    for (let k = 0; k < (opts.detail == null ? 1 : opts.detail); k++) {
+      const mid = new Map(), next = [];
+      const m = (a, c) => {
+        const key = a < c ? a + '_' + c : c + '_' + a;
+        if (!mid.has(key)) { verts.push(V.norm(V.mul(V.add(verts[a], verts[c]), 0.5))); mid.set(key, verts.length - 1); }
+        return mid.get(key);
+      };
+      for (const [a, b2, c] of faces) {
+        const ab = m(a, b2), bc = m(b2, c), ca = m(c, a);
+        next.push([a, ab, ca], [b2, bc, ab], [c, ca, bc], [ab, bc, ca]);
+      }
+      faces = next;
+    }
+    const rnd = Film.rng ? Film.rng(opts.seed || 1) : Math.random;
+    const jit = opts.jitter == null ? 0.12 : opts.jitter;
+    verts = verts.map(v => V.mul(v, 1 + (rnd() * 2 - 1) * jit));
+    let lo = Infinity;
+    for (const v of verts) lo = Math.min(lo, v[2] * h / 2);
+    const P = verts.map(v => [v[0] * w / 2, v[1] * d / 2, v[2] * h / 2 - lo]);
+    const b = new Builder();
+    for (const [a, b2, c] of faces) b.tri(P[a], P[b2], P[c]);
+    // keep each face's normal pointing out
+    for (let i = 0; i < b.n.length; i += 9) {
+      const cx = (b.p[i] + b.p[i + 3] + b.p[i + 6]) / 3, cy = (b.p[i + 1] + b.p[i + 4] + b.p[i + 7]) / 3, cz = (b.p[i + 2] + b.p[i + 5] + b.p[i + 8]) / 3 - h / 2;
+      if (b.n[i] * cx + b.n[i + 1] * cy + b.n[i + 2] * cz < 0) for (let k = 0; k < 9; k++) b.n[i + k] = -b.n[i + k];
+    }
+    return b.done();
+  };
+
 
   // A 2D outline [[x,y],...] (any winding, may be concave) pushed up by h.
   // axis 'z' (default): outline on the ground, extruded up from z = 0.

@@ -14,8 +14,9 @@
     const o = Object.assign({ az: -55, el: 26, fov: 28, title: 'Cast' }, opts);
     const vw = root.innerWidth || 1680;
     if (o.only) items = items.filter(it => it.name.toLowerCase().includes(o.only.toLowerCase()));
+    // cells fill the window: asked-for columns always fit, at the cost of cell size
     if (!o.cols) o.cols = Math.max(1, Math.floor(vw / (o.cellW || 420)));
-    if (!o.cellW) o.cellW = Math.max(420, Math.floor(vw / o.cols));
+    if (!o.cellW) o.cellW = Math.max(240, Math.floor((vw - 20) / o.cols));
     if (!o.cellH) o.cellH = Math.round(o.cellW * 0.81);
     const dpr = Math.min(2, root.devicePixelRatio || 1);
     const cells = [];
