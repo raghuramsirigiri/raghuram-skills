@@ -230,9 +230,9 @@ window.CAST = [
 The sheet looks at each item from azimuth -55 (front-left; 0 is from `+x`,
 -90 straight from the front), 26 degrees up, with a 28 degree lens, plus a
 small view from behind. An item or state can set its own `view: { az, el, fov,
-focus }` when another angle shows what matters. Copy
-`templates/sheet.html` and the `assets/film-lib/` folder beside `cast.js`,
-open `sheet.html` in a browser, and look at it. `sheet.html?only=truck&cols=1`
+focus }` when another angle shows what matters. Write `cast.js` into the
+staged folder's `film/` (`references/render.md` § Staging), open the folder's
+`sheet.html` in a browser, and look at it. `sheet.html?only=truck&cols=1`
 shows one item big. An item (or a state) can set `view: { az, el, fov, focus:
 [[x, y, z], [x, y, z]] }` to be judged from a better angle, or framed on the part
 that matters rather than its whole road or yard. The page title reports the

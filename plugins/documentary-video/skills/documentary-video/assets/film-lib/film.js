@@ -9,11 +9,13 @@
 // things: t runs 0..1 over the beat, s is seconds into it.
 //
 // The words are where the film's numbers meet its pictures:
-//   stat    { value, decimals, prefix, suffix, label, window: [a, b], from, still, count(t) }
+//   stat    { value, decimals, prefix, suffix, label, window: [a, b], from, still, count(t), max }
 //           a big number that counts up (from `from`, default 0) while the
 //           action builds it; `still` for a goal or a comparison, which
 //           shouldn't count; count(t, beat) to read the count from the world
-//           (e.g. how many have lit), so number and picture always agree
+//           (e.g. how many have lit), so number and picture always agree;
+//           count returns null to show no number yet; max is the largest
+//           value it reaches, so the panel is sized for it
 //   labels  [{ text, at: [x, y, z], window: [a, b] }]
 //           names pinned to places in the world, following the camera
 //   timer   { at: [x, y, z], value, unit, window: [a, b] }
@@ -240,11 +242,15 @@
       const m = words.length ? measureLines(ctx, words, maxW) : { n: 0, width: 0 };
       const lines = m.n, statH = b.stat ? 92 * u : 0, lh = 36 * u;
       // the panel hugs its words, so it covers as little of the world as it can
-      let statW = 0;
+      // the number is as big as the panel lets it be: a long one ("400,000 to
+      // 40,000") shrinks so it and its label still fit
+      let statW = 0, statPx = 76 * u;
+      const numText = (s, v) => (s.prefix || '') + fmt(v, s.decimals) + (s.suffix || '');
       if (b.stat) {
         const s = b.stat;
-        ctx.font = '800 ' + 76 * u + 'px ' + font;
-        const nw = ctx.measureText((s.prefix || '') + fmt(s.count ? 100 : s.value, s.decimals) + (s.suffix || '')).width;
+        ctx.font = '800 ' + statPx + 'px ' + font;
+        let nw = ctx.measureText(numText(s, s.count ? (s.max != null ? s.max : 100) : s.value)).width;
+        if (nw > maxW * 0.72) { statPx *= maxW * 0.72 / nw; nw = maxW * 0.72; }
         ctx.font = '600 ' + 19 * u + 'px ' + font;
         statW = nw + 14 * u + Math.min(maxW - nw, ctx.measureText(s.label || '').width);
         ctx.font = capFont;
@@ -260,9 +266,10 @@
       if (b.stat) {
         const s = b.stat, w = s.window || [0.1, 0.7], f = ease.out(ease.span(st.t, w[0], w[1]));
         const v = s.count ? s.count(st.t, b) : s.still ? s.value : (s.from || 0) + (s.value - (s.from || 0)) * f;
-        ctx.font = '800 ' + 76 * u + 'px ' + font; ctx.fillStyle = Film.hex('hl');
-        const num = (s.prefix || '') + fmt(v, s.decimals) + (s.suffix || '');
-        ctx.globalAlpha = k; ctx.fillText(num, x + 30 * u, ty + 56 * u);
+        ctx.font = '800 ' + statPx + 'px ' + font; ctx.fillStyle = Film.hex('hl');
+        // a count that has nothing to count yet returns null: no number, not a 0
+        const num = v == null ? '' : numText(s, v);
+        ctx.globalAlpha = k; ctx.fillText(num, x + 30 * u, ty + 28 * u + statPx * 0.37);
         if (s.label) {
           const nw = ctx.measureText(num).width;
           ctx.font = '600 ' + 19 * u + 'px ' + font; ctx.fillStyle = Film.hex('n5');

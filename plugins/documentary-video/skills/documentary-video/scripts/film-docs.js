@@ -167,7 +167,10 @@ function checkScreenplay(md, briefMd) {
     if (bt.count && !bt.key) errors.push(tag + ': a Count needs a Key line saying what one unit is');
     if (bt.count) {
       const [a, of] = numbers(bt.count);
-      const fits = allowed.some(v => v === a || (of && Math.abs(a / of * 100 - v) <= 0.6));
+      // a key that sets a unit ("1 pebble = 50 cubic centimetres") scales the count
+      const km = (bt.key || '').match(/^\s*1\s+[^=]+=\s*([\d,]+(?:\.\d+)?)/);
+      const per = km ? parseFloat(km[1].replace(/,/g, '')) : 1;
+      const fits = allowed.some(v => v === a || Math.abs(a * per - v) <= v * 0.01 || (of && Math.abs(a / of * 100 - v) <= 0.6));
       if (!fits) warnings.push(tag + ': Count "' + bt.count + '" doesn\'t obviously match a figure in ' + (cids.join(' ') || 'its claims') + '; check the unit');
     }
     if (bt.caption) {

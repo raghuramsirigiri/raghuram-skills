@@ -5,7 +5,9 @@
       "id": 1,
       "name": "ride-dashboard-film",
       "prompt": "Turn this quarterly operations dashboard into a short documentary-style video for our leadership team, about a minute long.",
-      "files": ["fixtures/ride-dashboard.md"],
+      "files": [
+        "fixtures/ride-dashboard.md"
+      ],
       "expected_output": "A one-file film page with an MP4 export, built through brief, screenplay, bible, cast, world and shots; every on-screen number traces to a quoted claim; the report lists beats with handles and ends with the tracing closing line.",
       "expectations": [
         "film/brief.md passes check-brief.js against the document",
@@ -20,7 +22,9 @@
       "id": 2,
       "name": "trace-on-request",
       "prompt": "Turn this quarterly operations dashboard into a short documentary-style video for our leadership team, about a minute long.",
-      "files": ["fixtures/ride-dashboard.md"],
+      "files": [
+        "fixtures/ride-dashboard.md"
+      ],
       "turns": [
         "Where does the 38% on the airport rank come from?",
         "Why are there only 100 cars? We have thousands of drivers.",
@@ -33,6 +37,22 @@
         "The answer about 100 cars cites the key and the claim, not a guess",
         "The causation pushback is checked against the claims, and the film is corrected if it implied a cause",
         "The request to show Q4 waits falling is declined as not in the document"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "human-evolution-film",
+      "prompt": "Can you turn this article into a short documentary-style video? Around a minute and a bit, for a general audience.",
+      "files": [
+        "fixtures/human-evolution.md"
+      ],
+      "expected_output": "A one-file film page with an MP4 export; each species built as its own build of the plain body (stoop, proportions, brow), trees told apart by silhouette by region, abstract figures shown as concrete things from the period (pebbles, beads, a path), and every date on screen quoted from the article with its 'about'.",
+      "expectations": [
+        "Every date and figure on screen appears in a brief claim quoted from the article",
+        "Approximate dates keep their 'about' or 'roughly' where the article has it",
+        "Nothing implies who made the oldest stone tools, since the article does not say",
+        "Species are told apart by build, not by labels on their bodies",
+        "The finished page loads no external script and plays with no camera warnings"
       ]
     }
   ]
