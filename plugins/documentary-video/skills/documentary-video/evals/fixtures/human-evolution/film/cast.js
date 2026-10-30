@@ -6,7 +6,7 @@
   // ── the hominins (K1, K2, K3, K6, K7, K8): one plain body, told apart by build ──
   function brow(b, d, k) {
     // a brow ridge and a jaw that juts: older species more, sapiens none
-    b.head.rounded([d.head * 1.35, d.head * 0.4, d.head * 0.24], { at: [0, -d.head * 0.8, d.head * 1.12], round: 0.7, color: k.skin, name: 'skin' });
+    b.head.rounded([d.head * 1.5, d.head * 0.9, d.head * 0.5], { at: [0, -d.head * 0.35, d.head * 1.05], round: 0.9, color: k.skin, name: 'skin' });   // a soft overhang, the same skin
     if (k.jaw) b.head.rounded([d.head * 1.1, d.head * 0.9, d.head * 0.7], { at: [0, -d.head * 0.55, d.head * 0.25], round: 0.7, color: k.skin, name: 'skin' });
   }
   const KINDS = {
@@ -23,17 +23,20 @@
     F._check('hominin', k, 'unknown kind ' + kind);
     const fig = F.figure({
       height: (o.height || 1) * k.height, stoop: k.stoop, arm: k.arm, leg: k.leg, head: k.head,
+      hand: o.hero ? 0.032 : 0, foot: o.hero ? 0.075 : 0,
       shoulders: k.shoulders || 0.12, depth: k.depth || 0.08,
       colors: { skin: k.skin, top: k.skin, bottom: k.skin, hair: 'n5' },
       dress(b, d) {
-        if (k.brow) brow(b, d, k);
+        // faces stay plain: these figures are told apart by build, and a brow
+        // or jaw added to a plain round head reads as goggles, not as a face
+        // heroes get what a close camera sees: hands and feet (see dims below)
         if (k.cape) b.torso.rounded([d.shoulders * 2.25, d.depth * 2.4, d.torso * 0.5], { at: [0, 0.01, d.torso * 0.58], round: 0.75, color: 'n4', name: 'top' });
         if (k.wrap) {
           b.pelvis.box([d.hips * 3.6, d.depth * 2.4, d.leg * 0.22], { at: [0, 0, -d.leg * 0.16], bevel: 0.03, color: 'paper', name: 'top' });
           b.torso.tube([[-d.shoulders * 0.8, -d.depth * 1.05, d.torso * 0.95], [d.shoulders * 0.6, -d.depth * 1.05, 0.05]], 0.03, { color: 'paper', smooth: false });
         }
         if (o.axe) b.handR.add(handAxe(), { at: [0, -0.02, -0.06], rot: [0, 90, 0] });
-        if (o.spear) b.handR.rod([0, 0, -1.1], [0, 0, 0.9], 0.015, { color: 'n4' });
+        if (o.spear) b.handR.rod([0, 0, -(d.leg + d.arm * 0.5) * 0.98], [0, 0, 0.9], 0.015, { color: 'n4' });   // the tip rests at the ground
       }
     });
     return fig;
@@ -53,6 +56,14 @@
         g.cone(w / 2, 2.2, { at: [0, 0, z], seg: 7, color: 'n3' });
         g.cone(w / 2 * 0.62, 1.0, { at: [0, 0, z + 1.2], seg: 7, color: 'paper' });   // snow on each tier
       });
+    } else if (kind === 'round-hero') {
+      // seen close (Lucy's tree): a tapered trunk, two limbs, three lumps in two tones
+      g.cylinder(0.3, 3.4, { top: 0.2, seg: 14, color: 'n3' });
+      g.rod([0, 0, 2.4], [1.3, 0.4, 3.8], 0.11, { color: 'n3' });
+      g.rod([0, 0, 2.8], [-1.1, -0.3, 4.0], 0.1, { color: 'n3' });
+      g.facet([4.2, 4, 3.4], { at: [0, 0, 3.3], detail: 1, seed: s, jitter: 0.05, color: 'n2a' });
+      g.facet([2.6, 2.5, 2.2], { at: [1.6, 0.5, 3.6], detail: 1, seed: s + 2, jitter: 0.05, color: 'n2' });
+      g.facet([2.4, 2.3, 2.1], { at: [-1.4, -0.4, 3.9], detail: 1, seed: s + 4, jitter: 0.05, color: { mix: ['n2a', 'n1', 0.4] } });
     } else {
       g.cylinder(0.25, 3.2, { seg: 6, color: 'n3' });
       g.facet([5, 5, 4.2], { at: [0, 0, 2.6], seed: s, color: 'n2a' });
@@ -111,9 +122,11 @@
   function pebbles(n) {
     const g = F.group({ name: 'pebbles' });
     g.stones = [];
+    // a low heap: the base ring sized to the count, each layer smaller
+    const base = Math.max(4, Math.ceil(n / 2.6));
     let i = 0;
     for (let layer = 0; i < n; layer++) {
-      const per = Math.max(1, Math.min(n - i, 10 - layer * 3));
+      const per = Math.max(1, Math.min(n - i, Math.round(base - layer * base / 4)));
       for (let k = 0; k < per && i < n; k++, i++) {
         const a = k / per * Math.PI * 2 + layer * 0.5, r = per > 1 ? 0.035 * per - layer * 0.02 : 0;
         g.stones.push(g.rounded([0.12, 0.11, 0.08], { at: [Math.cos(a) * r, Math.sin(a) * r, layer * 0.065], round: 0.8, color: 'n2a', name: 'pebble' }));

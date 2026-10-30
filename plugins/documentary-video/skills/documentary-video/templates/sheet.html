@@ -22,7 +22,9 @@
      Loaded with a fresh query each time, so an edit always shows on reload. -->
 <script>
   const cast = document.createElement('script');
-  cast.src = 'film/cast.js?t=' + Date.now();
+  // ?cast=samples/tiers.js opens another cast file (the tier samples)
+  const q0 = new URLSearchParams(location.search);
+  cast.src = (q0.get('cast') || 'film/cast.js') + '?t=' + Date.now();
   cast.onload = draw;
   cast.onerror = () => { document.title = 'Cast sheet: film/cast.js failed to load'; };
   document.body.appendChild(cast);

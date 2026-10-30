@@ -194,11 +194,11 @@
     // o.key: decals with the same key and size share one picture (window
     // bands on a hundred buildings are one texture, not a hundred)
     const tk = o.key && 'tex|' + o.key + '|' + pw + 'x' + ph;
+    // the picture is painted the first time the renderer needs it, not here,
+    // so building a world costs no canvas work (and runs without a canvas)
     if (tk && cache.has(tk)) o.tex = cache.get(tk);
     else {
-      const cv = makeCanvas(pw, ph), ctx = cv.getContext('2d');
-      draw(ctx, pw, ph);
-      o.tex = { canvas: cv };
+      o.tex = { draw, pw, ph, canvas: null };
       if (tk) cache.set(tk, o.tex);
     }
     return addMesh(this, cached('pl' + [w, h], () => G.plane(w, h)), o);

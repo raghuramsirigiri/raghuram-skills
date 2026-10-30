@@ -99,9 +99,12 @@ layer, animated in, never zooming.
 - `card: { title, sub }`: the opening title and the closing line, over the
   dimmed world.
 
-The callout and caption sit in a panel bottom left, the key top right, the
-act top left. Frame each shot so the action sits in the upper two thirds or
-the right half, clear of the panel.
+The words follow the design system the other skills share: the callout's
+number in ink at weight 700 with its words lighter on the same baseline, the
+caption under it, a short highlight rule above, over a soft fade from the
+bottom of the frame (dark at night, with pale words); the key top right, the
+act top left in small capitals. Frame each shot so the action sits in the
+upper two thirds, clear of the lower third.
 
 ## The figure in the action
 

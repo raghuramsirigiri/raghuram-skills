@@ -25,6 +25,7 @@ country's vehicles, logos, real people's likeness>
 
 ### K1 · applicant · N3
 Story job: the people who apply; a crowd of them shows a share
+Tier: background (a crowd, never closer than 15 m); the one applicant B2 follows is hero
 Tell apart from: branch staff (K2), who wear a lanyard and stand behind the counter
 Look: plain rounded figures, varied heights and greys; no faces
 States: standing, queueing, walking away; one lit
@@ -34,6 +35,7 @@ Scale: 1.6-1.85 m
 
 ### K3 · loan application form · N1
 Story job: each form is 1% of applications; stacks of them carry C1 and C2
+Tier: supporting (stacks seen from a few metres)
 Tell apart from: nothing else in the film is paper, so a thin sheet with two grey lines reads
 Look: a thin pale slab with a darker header band (decal); stacks of them
 States: single, stack of 100, part of a stack lit
@@ -43,6 +45,7 @@ Scale: A4, 0.21 x 0.3 m; a stack of 100 is about 1 cm per 10 forms, drawn thicke
 
 ### K4 · bank branch · N2
 Story job: where applications used to start; the film returns here in 2025
+Tier: supporting (the street at mid distance); the rest of the street is background
 Tell apart from: the shops on the same street: a pediment and columns
 Look: a bevelled block with a shallow pediment and four columns, steps; the street around it as plain blocks
 States: busy (2023), quiet (2025)
@@ -54,6 +57,19 @@ Each entry:
   Places. An item can serve several nouns (`N3 N5`).
 - **Story job**: what the item does in the film. It decides everything
   else.
+- **Tier**: `hero`, `supporting` or `background`: how closely the film
+  sees it, read off the screenplay's Camera lines. This decides how much care
+  the item gets in step 4 (`references/cast.md` § How much detail).
+  - **hero**: some beat frames it close, so it fills a good part of the
+    frame: the one person the story follows, a hand, a phone, a tool, a face
+    in a crowd the camera picks out. Few items are heroes; most films have
+    two to five.
+  - **supporting**: seen at mid distance, as one of a few: a figure at a
+    desk, a vehicle in a street, a building the camera arrives at.
+  - **background**: only ever part of something larger: a crowd, a street, a
+    forest, a skyline, a marker on a map.
+  An item the film sees both ways gets both, and is built at each: a crowd of
+  background riders and the one hero rider the camera follows.
 - **Tell apart from**: what the viewer must be able to tell it from, and
   the one or two features that do it. When nothing needs telling apart, say
   so: the item can be as plain as the style allows. This line is where the

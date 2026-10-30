@@ -115,8 +115,12 @@ test('a figure is as tall as its spec, and a crouch makes it shorter', () => {
   }
   const f = Film.figure();
   const tall = f.bounds().hi[2];
-  f.pose({ crouch: 0.3, kneeL: 60, kneeR: 60, legL: [40, 0], legR: [40, 0] });
-  assert.ok(f.bounds().hi[2] < tall - 0.25);
+  f.pose({ kneeL: 110, kneeR: 110, legL: [80, 0], legR: [80, 0] });
+  const b = f.bounds();
+  assert.ok(b.hi[2] < tall - 0.3, 'a deep knee bend is shorter: ' + b.hi[2]);
+  assert.ok(Math.abs(b.lo[2]) < 0.005, 'and still rests on the ground (planted): ' + b.lo[2]);
+  f.pose({ seat: 0.45, legL: [90, 0], legR: [90, 0], kneeL: 90, kneeR: 90 });
+  assert.ok(f.bounds().lo[2] > -0.01, 'sitting on a seat leaves the feet at or above the floor');
 });
 
 test('a figure exposes every bone to dress, and skip drops default parts', () => {

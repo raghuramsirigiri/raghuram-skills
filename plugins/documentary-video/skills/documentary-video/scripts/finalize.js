@@ -32,6 +32,8 @@ if (argv.includes('--stage')) {
   fs.mkdirSync(path.join(dir, 'film'), { recursive: true });
   for (const f of fs.readdirSync(LIB)) fs.copyFileSync(path.join(LIB, f), path.join(dir, 'film-lib', f));
   for (const f of ['film.html', 'sheet.html']) fs.copyFileSync(path.join(TEMPLATES, f), path.join(dir, f));
+  fs.mkdirSync(path.join(dir, 'samples'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(TEMPLATES, 'samples'))) fs.copyFileSync(path.join(TEMPLATES, 'samples', f), path.join(dir, 'samples', f));
   console.log('staged film-lib/, film.html and sheet.html in ' + dir + '; write the steps\' files in ' + path.join(dir, 'film'));
   process.exit(0);
 }
