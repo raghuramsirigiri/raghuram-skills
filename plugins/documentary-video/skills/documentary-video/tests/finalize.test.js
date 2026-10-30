@@ -25,7 +25,7 @@ function staged() {
 
 test('--stage copies the engine and both pages', () => {
   const dir = staged();
-  for (const f of ['film.html', 'sheet.html', 'film-lib/film.js', 'film-lib/render.js', 'film-lib/export.js', 'film-lib/theme.js'])
+  for (const f of ['film.html', 'sheet.html', 'compare.html', 'samples/tiers.js', 'film-lib/film.js', 'film-lib/render.js', 'film-lib/export.js', 'film-lib/theme.js'])
     assert.ok(fs.existsSync(path.join(dir, f)), f);
 });
 
@@ -37,6 +37,10 @@ test('finalize folds the film into one page that loads no script from a file', (
   assert.strictEqual((html.match(/<script src=/g) || []).length, 0);
   for (const marker of ['film-lib/theme.js', 'film-lib/film.js', 'film-lib/export.js', 'film/cast.js', 'film/world.js', 'film/shots.js'])
     assert.ok(html.includes('/* ' + marker + ' */'), marker + ' inlined');
+  // the side-by-side comparison folds too, into its own file
+  const cmp = fs.readFileSync(path.join(dir, 'kerb-compare.html'), 'utf8');
+  assert.strictEqual((cmp.match(/<script src=/g) || []).length, 0);
+  assert.ok(cmp.includes('/* film/shots.js */') && cmp.includes('color: true'));
   // theme before the engine, the film's scripts before the page's own
   assert.ok(html.indexOf('/* film-lib/theme.js */') < html.indexOf('/* film-lib/scene.js */'));
   assert.ok(html.indexOf('/* film/shots.js */') < html.indexOf('const load'));

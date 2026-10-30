@@ -374,7 +374,8 @@
   }
 
   // ── the player ────────────────────────────────────────────────────────
-  // spec: { world, beats, size: [w, h], source, ss (supersampling, default 2) }
+  // spec: { world, beats, size: [w, h], source, ss (supersampling, default 2),
+  //         color (true: the world in colour; default monotone) }
   Film.film = function (canvas, spec) {
     const o = Object.assign({ size: [1280, 720], fade: 0.5, ss: 2 }, spec);
     const [W, H] = o.size;
@@ -456,6 +457,7 @@
       const b = beats[i], s = T - b.start, t = s / b.dur;
       if (i !== current) { if (b.setup) b.setup(); current = i; }
       if (b.update) b.update(t, s);
+      Film.worldColor(!!o.color);   // per player, so two can share a page
       const sky = skyAt(b, t), cam = camAt(b, t);
       if (b._focus === undefined) b._focus = shadowFocus(b);
       r.render(o.world, cam, { light: sky.light, exposure: sky.exposure, soft: sky.soft, groundColor: o.ground,

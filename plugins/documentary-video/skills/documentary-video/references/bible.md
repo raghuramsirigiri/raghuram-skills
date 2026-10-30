@@ -82,6 +82,11 @@ Each entry:
 
 ## Setting
 
+`World tone` says monotone (the default) or colour, and colour only when the
+user asked for it. Either way, the Look lines name material roles (wall,
+roof, leaf, water, clothA…) where things have a natural colour, so the same
+cast renders in both (`references/cast.md` § Colour).
+
 The setting fixes what the whole world shares. The era and place decide what
 things look like (a 1944 truck, an early hominin's posture, a UK ambulance),
 and "Not in this world" lists what would break it. Real people in the
