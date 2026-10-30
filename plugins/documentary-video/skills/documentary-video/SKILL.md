@@ -32,7 +32,7 @@ small: a mistake is found at the step that made it, not in the finished film.
 | 4. Cast | `film/cast.js` + its sheet | `references/cast.md` | the contact sheet (`templates/sheet.html`), looked at |
 | 5. World | `film/world.js` | `references/world.md` | the first wide shot, looked at |
 | 6. Shots | `film/shots.js` | `references/shots.md` | `templates/film.html?strip` (key frames) and its warnings |
-| 7. Render | `<name>.html`, then MP4 | `references/render.md` | one full play in the browser |
+| 7. Render | `<name>.html`, then MP4 | `references/render.md` | `scripts/finalize.js`, one full play, the export |
 
 Run each check from the skill folder, or give it full paths. A check prints
 what is wrong with handles and line numbers, and exits non-zero until it's
@@ -71,6 +71,21 @@ Ask at most two, and only when the answer changes the film:
   one transition for the whole film, captions and titles on a fixed layer
   that never zooms (the world may).
 
+## Before step 4
+
+Stage the working folder once, so the contact sheet and the player run in a
+browser while the film is made: `node <skill>/scripts/finalize.js <folder>
+--stage` (`references/render.md`).
+
+## Tracing
+
+Every number and every look in the film traces back to the document:
+beat → claim → quote, and cast item → noun → the document's words. The report
+names the handles; the trail itself is shown only when someone asks.
+`references/tracing.md` has the handles, the trace block, the questions to
+expect (including the pushback and the request to show something the
+document doesn't say) and the closing line every report ends with.
+
 ## Where things go
 
 ```
@@ -81,7 +96,8 @@ film/bible.md           3. characters, props, places, era rules
 film/cast.js            4. every cast item as code
 film/world.js           5. places laid out along the camera's path
 film/shots.js           6. the timeline
-film.html + film-lib/   the player while the film is made (templates/film.html)
+film.html, sheet.html   the player and the contact sheet while it's made (--stage)
+film-lib/               the engine, copied by --stage
 ```
 
 A later request ("make act 2 shorter", "the tank looks wrong") changes the

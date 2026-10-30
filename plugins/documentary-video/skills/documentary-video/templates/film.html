@@ -27,7 +27,7 @@
   ?t=<seconds> opens at a moment; ?strip shows the key-frame strip instead.
 -->
 <canvas id="stage"></canvas>
-<div id="bar"><button id="play">Play</button><input id="seek" type="range" min="0" max="1000" value="0"><span id="info"></span></div>
+<div id="bar"><button id="play">Play</button><input id="seek" type="range" min="0" max="1000" value="0"><span id="info"></span><button id="export">Export MP4</button></div>
 <div id="warn"></div>
 <canvas id="strip"></canvas>
 <script src="film-lib/theme.js"></script>
@@ -36,13 +36,17 @@
 <script src="film-lib/render.js"></script>
 <script src="film-lib/rig.js"></script>
 <script src="film-lib/film.js"></script>
+<script src="film-lib/mux-mp4.js"></script>
+<script src="film-lib/mux-webm.js"></script>
+<script src="film-lib/export.js"></script>
 <script>
   const load = f => new Promise((ok, no) => {
     const s = document.createElement('script'); s.src = 'film/' + f + '?t=' + Date.now();
     s.onload = ok; s.onerror = () => no(new Error('film/' + f + ' failed to load')); document.body.appendChild(s);
   });
   (async () => {
-    await load('cast.js'); await load('world.js'); await load('shots.js');
+    // a finalized film carries these inline; while it's being made they load from film/
+    if (!window.buildShots) { await load('cast.js'); await load('world.js'); await load('shots.js'); }
     const meta = window.FILM_META || {};
     const W = buildWorld();
     const player = Film.film(document.getElementById('stage'), Object.assign({ world: W.root, beats: buildShots(W) }, meta));
@@ -60,6 +64,16 @@
     seek.oninput = () => player.seek(seek.value / 1000 * player.duration);
     btn.onclick = () => { player.playing ? player.pause() : player.play(); btn.textContent = player.playing ? 'Pause' : 'Play'; };
     document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); btn.click(); } });
+    const ex = document.getElementById('export');
+    ex.onclick = async () => {
+      ex.disabled = true; player.pause(); btn.textContent = 'Play';
+      try {
+        const r = await Film.exportFilm(player, { onProgress: p => { ex.textContent = 'Exporting ' + Math.round(p * 100) + '%'; } });
+        Film.saveFile(r.blob, (meta.name || 'film') + '.' + r.ext);
+        ex.textContent = 'Saved ' + r.ext.toUpperCase() + ' (' + (r.blob.size / 1e6).toFixed(1) + ' MB)';
+      } catch (e) { ex.textContent = 'Export failed: ' + e.message; }
+      ex.disabled = false;
+    };
     player.seek(+q.get('t') || 0.5);
     document.title = 'Film: ' + player.duration + ' s, ' + player.warnings.length + ' warnings';
   })().catch(e => { document.title = 'Film error: ' + e.message; document.getElementById('warn').textContent = e.stack || e.message; console.error(e); });
