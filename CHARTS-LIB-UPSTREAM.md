@@ -1,4 +1,4 @@
-# charts-lib: changes to apply upstream
+# charts-lib: changes to apply upstream 
 
 The skill ships a copy of `charts-lib` in
 `plugins/chart-dashboard/skills/chart-dashboard/assets/charts-lib/`, built from
