@@ -87,7 +87,10 @@ layer, animated in, never zooming.
   without counting (a goal, an "under 5"). When the number is a count of
   things lighting or leaving, use `count: (t, beat) => beat.lit` and have
   `update` set `this.lit` from the world, so the number on screen is always
-  the number lit.
+  the number lit. A count that has nothing to count yet returns `null`
+  (no number is shown rather than a 0); give it `max`, the largest value it
+  reaches, so the panel is sized for it. A long number ("400,000 to 40,000")
+  shrinks to fit the panel by itself; a date is usually `still`.
 - `labels: [{ text, at, window }]`: names of places, pinned to a point in the
   world with a leader line, following the camera. Name a place the first time
   the camera arrives there, so the viewer knows where they are.

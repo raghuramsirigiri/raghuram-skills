@@ -34,7 +34,7 @@ Then:
    warnings line under the player must be empty.
 2. Export: the button renders every frame at 30 fps (not in real time, so
    nothing drops) and saves an H.264 MP4, or a WebM where H.264 isn't
-   available. A 60-second 720p film takes about 10-20 s and 30-40 MB. For
+   available. A 60-90 second 720p film takes from about 10 s (a city of simple blocks) to about a minute (a landscape of hundreds of trees and rocks), and 30-45 MB. For
    1080p, set `size: [1920, 1080]` in `window.FILM_META`.
 3. Hand over the `.html` and the `.mp4`. The `film/` folder stays beside them:
    it is how a later request changes one scene.
