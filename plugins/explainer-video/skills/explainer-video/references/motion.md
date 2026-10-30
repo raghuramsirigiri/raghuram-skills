@@ -81,8 +81,10 @@ from two corners of the frame, around the content and never on it.
 
 ## Custom scenes
 
-Only when no catalog scene can show the finding. The page registers a
-painter, and the spec names it (`"type": "custom", "draw": "name"`):
+For a finding whose thing the catalogue doesn't draw (`pictures.md` § A
+finding the catalogue doesn't draw), or a scene no catalog type can show.
+The page registers a painter, and the spec names it (`"type": "custom",
+"draw": "name"`, with `"claims"` listing the figures it draws):
 
 ```js
 Motion.custom.tideClock = {
@@ -102,6 +104,9 @@ The contract:
   before. That is what makes export, motion blur and the audit work.
 - **No `Math.random`** (use `api.rng(...keys)`, seeded), no `Date.now`, no
   timers, no state kept between calls, no `requestAnimationFrame`.
+- **Figures through `api.value(id)` and `api.display(id)`**, for ids in
+  the scene's `claims`, never a typed number. Reading a claim it didn't
+  list throws.
 - **Text through `api.text`**, so the audit sees it (safe zone, overlap,
   contrast, read time).
 - **Colours from `api.design`** (`subject`, `context`, `ink`, `muted`,

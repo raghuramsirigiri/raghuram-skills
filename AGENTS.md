@@ -148,12 +148,17 @@ topic with figures in it.
   is its own. Its output is JavaScript only: Canvas 2D plus the browser's
   WebCodecs and Web Audio. Never add ffmpeg, Remotion, a render pipeline, TTS
   or a CDN animation library. Its default style is one continuous 2.5D world
-  (`references/continuous.md`): each finding is a picture in
-  `assets/motion-lib/pictures/` that carries its figure, one unit per stated
-  thing with its key on screen. A new picture needs its row in
-  `references/pictures.md` § Choosing (when to use it, and when not) and its
-  entry in `motion.manifest.json` § `pictures`; the tests hold the manifest in
-  step with the registered pictures.
+  (`references/continuous.md`). **That style is frozen at 1.1.0**: never add
+  a picture, prop, skin or `things/` library, and never grow its layout
+  (`world.js`, `iso.js`, `pictures/`). Each round that did fixed the story
+  being worked on and nothing else, and new topics fell back to the nearest
+  picture or to plain boxes. A finding the catalogue doesn't draw is drawn by
+  that video's own custom painter (`references/pictures.md` § A finding the
+  catalogue doesn't draw), and a video is built scene by scene
+  (`references/verify-and-ship.md` § Build in stages). `node --test
+  plugins/explainer-video/skills/explainer-video/tests/freeze.test.js` fails
+  on any change to the frozen files; a real bug fix there updates its hash
+  in the same commit and says why.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.

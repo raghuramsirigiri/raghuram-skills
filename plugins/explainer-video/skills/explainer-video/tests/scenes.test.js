@@ -120,3 +120,19 @@ test('chart scenes refuse bad data with readable errors', () => {
   assert.throws(one({ id: 'x', type: 'photo-pan', copy: { caption: 'c', image: 'https://example.com/a.jpg' } }), /data:image/);
   assert.throws(one({ id: 'x', type: 'custom', draw: 'missing' }), /Motion.custom.missing/);
 });
+
+test('a custom painter draws its figures from the claims it names', () => {
+  const w = load();
+  const seen = [];
+  w.Motion.custom.cars = { enter: 0.5, read: 1.2, draw(ctx, lt, api) { seen.push([api.value('F4'), api.display('F4')]); } };
+  const spec = gallery();
+  spec.scenes = [{ id: 'cars', type: 'custom', draw: 'cars', claims: ['F4'], copy: { title: 'Cars' } }, { id: 'src', type: 'source-card' }];
+  spec.cuts = { m: { format: '9:16', scenes: ['cars', 'src'] } };
+  const C = w.Motion.compile(spec, 'm', { measure: mockCtx() });
+  const sc = C.scenes[0];
+  assert.deepStrictEqual([...sc.used], ['F4'], 'the scene cites the claim it draws, so its source line lists it');
+  w.Motion.seek(mockCtx(), C, (sc.enterEnd + sc.exitStart) / 2);
+  assert.deepStrictEqual([...seen[seen.length - 1]], [62, '62%']);
+  w.Motion.custom.cars.draw = (ctx, lt, api) => api.value('F5');
+  assert.throws(() => w.Motion.seek(mockCtx(), C, (sc.enterEnd + sc.exitStart) / 2), /not in its "claims"/);
+});

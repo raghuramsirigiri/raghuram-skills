@@ -71,9 +71,11 @@ Beats at the same place keep the camera still; only the words change.
 1. Set `meta.style: "continuous"` (or `"slides"` when the user asks for
    slides). A spec that sets neither gets the world when its scenes have
    pictures, slides when none do.
-2. Give each finding a `picture` from `pictures.md` § Choosing: the data
-   shape picks the kind; `of` names what one unit is a share of; `props`
-   set the scene (`["branch"]`, `["laptop"]`).
+2. Give each finding a `picture` from `pictures.md` § Choosing when one
+   *is* the thing it counts: `of` names what one unit is a share of; `props`
+   set the scene (`["branch"]`, `["laptop"]`). Any other thing is a
+   `custom` scene that draws it (`pictures.md` § A finding the catalogue
+   doesn't draw); it takes the stage for its beat.
 3. Point a later scene back at an earlier place with `at` when it is about
    the same thing (a verdict, last year's figure). A claim the place already
    shows brings the camera back by itself.

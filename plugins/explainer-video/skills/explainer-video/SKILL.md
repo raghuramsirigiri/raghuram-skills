@@ -71,12 +71,19 @@ has it.
    `references/story.md`. Hook → context → evidence → (so what) → source
    card, about one scene per 3–5 s. List what you leave out.
 
-4. **Choose each scene's type, its picture, and the look.** Read
-   `references/scenes.md` and `references/video-charts.md` (data shape →
-   scene, honest motion). Every video is one continuous 2.5D world the
-   camera travels across, unless the user asks for slides: read
-   `references/continuous.md`, then give each finding the picture that
-   carries its figure from `references/pictures.md`. Read
+4. **Choose each scene's type, draw each finding's own thing, and the
+   look.** Read `references/scenes.md` and `references/video-charts.md`
+   (data shape → scene, honest motion). Every video is one continuous 2.5D
+   world the camera travels across, unless the user asks for slides: read
+   `references/continuous.md`. Then name the thing each finding counts (its
+   noun) and read `references/pictures.md`. A catalogue picture is used only
+   when its job *is* that thing (`people` for people, `parcel` blocks for
+   parcels); a series or a comparison of values takes its flat chart. Any
+   other noun (cars, cups, panels, meals) you draw yourself for this video,
+   as a custom painter (`pictures.md` § A finding the catalogue doesn't
+   draw, under its contract in `references/motion.md` § Custom scenes). Never give it the nearest picture, plain blocks, or a chart
+   because the drawing is harder. The catalogue is closed: never add a
+   picture, prop or layout rule to the skill to fit one story. Read
    `references/design.md` for the preset, and for a brand recolour when the
    user gave brand colours, a site or a logo (run `scripts/generate-theme.js`
    or `extract-theme.js`; the palette goes in `meta.palette`).
@@ -88,17 +95,23 @@ has it.
    the whole spec: `meta.style` (`"continuous"`, or `"slides"` when asked)
    and a `picture` on each finding; every figure in copy is a claim id
    (`"F1"` or `{F1}`), never typed digits. Fill the caption and the alt
-   text. Use a `custom` scene only when nothing in the catalog fits, under
-   its contract (`references/motion.md` § Custom scenes).
+   text.
+
+   Then build it in stages, cheapest check first, so a mistake costs one
+   scene and not a re-render: stage (`finalize.js --stage`) and run
+   `check-video.js` until no FAIL, with no browser yet. Then write the
+   custom painters **one at a time**: audit that scene alone
+   (`VideoAudit.run({ cut, scenes: ['<id>'] })`), look at its still, fix it,
+   then write the next (`references/verify-and-ship.md` § 7.0).
 
 6. **Sound only if asked.** Read `references/audio.md` before turning
    `meta.audio.score` on.
 
 7. **Verify before reporting done.** Read `references/verify-and-ship.md` and
-   follow it in full: stage with `node <skill-dir>/scripts/finalize.js
-   <slug>.html --stage`; run `node <skill-dir>/scripts/check-video.js
-   <slug>.html` and fix every FAIL; in a browser, `VideoAudit.run` on every
-   cut with `exportProbe: true` until each is `ok`; look at one contact sheet;
+   follow it in full: run `node <skill-dir>/scripts/check-video.js
+   <slug>.html` and fix every FAIL; once every scene has passed on its own,
+   in a browser, `VideoAudit.run` on every cut with `exportProbe: true` until
+   each is `ok`; look at one contact sheet;
    re-read every figure and hedge against the source. Without a browser, the
    static check and the re-read are the floor, and you say the frames weren't
    checked.
