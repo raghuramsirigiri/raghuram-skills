@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monotone and colour</title>
+<style>
+  :root { --bg: #ecebe7; --ink: #222; --muted: #666; }
+  html, body { margin: 0; background: var(--bg); font: 14px "Inter", "Segoe UI", Arial, sans-serif; color: var(--ink); }
+  header { max-width: 1600px; margin: 0 auto; padding: 18px 16px 6px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); }
+  .pair { max-width: 1600px; margin: 8px auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; box-sizing: border-box; }
+  @media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+  figure { margin: 0; }
+  figcaption { font-weight: 600; margin: 0 0 6px; }
+  figcaption span { font-weight: 400; color: var(--muted); }
+  canvas.stage { display: block; width: 100%; aspect-ratio: 16 / 9; background: #f4f4f0; border-radius: 6px; }
+  canvas.strip { display: none; width: 100%; border-radius: 6px; }
+  body.strips canvas.stage { display: none; } body.strips canvas.strip { display: block; }
+  #bar { max-width: 1600px; margin: 10px auto 24px; padding: 0 16px; display: flex; gap: 10px; align-items: center; box-sizing: border-box; }
+  #seek { flex: 1; } button { font: inherit; padding: 5px 14px; } #warn { color: #b31b38; max-width: 1600px; margin: 0 auto; padding: 0 16px; }
+</style>
+</head>
+<body>
+<!--
+  The same film in both palettes, side by side and in step, from one built
+  world: the default monotone and the colour option. Sits beside film/ and
+  film-lib/ like film.html (finalize.js --stage copies it).
+-->
+<header><h1 id="title">Monotone and colour</h1><p>The same film, the same frame: the default monotone world on the left, the colour option on the right. The highlight marks what each beat counts in both.</p></header>
+<div class="pair">
+  <figure><figcaption>Monotone <span>(default)</span></figcaption><canvas class="stage" id="a"></canvas><canvas class="strip" id="sa"></canvas></figure>
+  <figure><figcaption>Colour <span>(FILM_META.color = true)</span></figcaption><canvas class="stage" id="b"></canvas><canvas class="strip" id="sb"></canvas></figure>
+</div>
+<div id="bar"><button id="play">Play</button><input id="seek" type="range" min="0" max="1000" value="0"><span id="info"></span><button id="strips">Key frames</button></div>
+<div id="warn"></div>
+<script src="film-lib/theme.js"></script>
+<script src="film-lib/geom.js"></script>
+<script src="film-lib/scene.js"></script>
+<script src="film-lib/render.js"></script>
+<script src="film-lib/rig.js"></script>
+<script src="film-lib/film.js"></script>
+<script>
+  const load = f => new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = 'film/' + f + '?t=' + Date.now();
+    s.onload = ok; s.onerror = () => no(new Error('film/' + f + ' failed to load')); document.body.appendChild(s);
+  });
+  (async () => {
+    if (!window.buildShots) { await load('cast.js'); await load('world.js'); await load('shots.js'); }
+    const meta = Object.assign({}, window.FILM_META);
+    // one world and one set of beats, drawn by two players at the same moment
+    const W = buildWorld(), beats = buildShots(W);
+    const mono = Film.film(document.getElementById('a'), Object.assign({}, meta, { world: W.root, beats, color: false }));
+    const colour = Film.film(document.getElementById('b'), Object.assign({}, meta, { world: W.root, beats, color: true }));
+    const dur = mono.duration, seek = document.getElementById('seek'), info = document.getElementById('info'), btn = document.getElementById('play');
+    document.getElementById('warn').textContent = mono.warnings.join('\n');
+    let T = 0.5, playing = false, wall = 0, from = 0;
+    const show = () => { const i = mono.frame(T); colour.frame(T); seek.value = Math.round(T / dur * 1000); info.textContent = i.beat + ' · ' + T.toFixed(1) + ' / ' + dur + ' s'; };
+    const tick = () => { if (!playing) return; T = from + (performance.now() - wall) / 1000; if (T >= dur) { T = dur - 1e-3; playing = false; btn.textContent = 'Play'; } show(); if (playing) requestAnimationFrame(tick); };
+    btn.onclick = () => { playing = !playing; btn.textContent = playing ? 'Pause' : 'Play'; if (playing) { if (T >= dur - 0.01) T = 0; from = T; wall = performance.now(); requestAnimationFrame(tick); } };
+    seek.oninput = () => { playing = false; btn.textContent = 'Play'; T = seek.value / 1000 * dur; mono.seek(T); colour.seek(T); show(); };
+    document.getElementById('strips').onclick = () => {
+      const on = document.body.classList.toggle('strips');
+      if (on) { mono.strip(document.getElementById('sa'), { cols: 3, w: 300 }); colour.strip(document.getElementById('sb'), { cols: 3, w: 300 }); }
+      mono.seek(T); colour.seek(T); show();
+    };
+    const q = new URLSearchParams(location.search);
+    T = +q.get('t') || 0.5; mono.seek(T); colour.seek(T); show();
+    if (q.has('strips')) document.getElementById('strips').click();
+    if (meta.name) document.getElementById('title').textContent = 'Monotone and colour: ' + meta.name.replace(/-/g, ' ');
+    document.title = 'Compare: ' + dur + ' s, ' + mono.warnings.length + ' warnings';
+  })().catch(e => { document.title = 'Compare error: ' + e.message; document.getElementById('warn').textContent = e.stack || e.message; console.error(e); });
+</script>
+</body>
+</html>

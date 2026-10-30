@@ -24,6 +24,7 @@
   const cast = document.createElement('script');
   // ?cast=samples/tiers.js opens another cast file (the tier samples)
   const q0 = new URLSearchParams(location.search);
+  Film.worldColor(q0.get('color') === '1');   // ?color=1 shows the cast in colour
   cast.src = (q0.get('cast') || 'film/cast.js') + '?t=' + Date.now();
   cast.onload = draw;
   cast.onerror = () => { document.title = 'Cast sheet: film/cast.js failed to load'; };

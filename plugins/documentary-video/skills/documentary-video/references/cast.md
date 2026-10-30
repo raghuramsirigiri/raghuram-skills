@@ -38,6 +38,8 @@ made thing a bevelled block, a person a few rounded parts.
 - **Form comes from light.** Flat shading, soft shadows, no outlines: a
   bevelled edge catches a line of light, a facet turns its own tone, a gap
   casts a shadow. That's most of the detail an item needs.
+- **Colour is an option, never the default** (§ Colour, below): the same
+  cast renders monotone or in colour when its parts name material roles.
 - **Sizes are real metres.** A person is 1.6-1.85 m, a door 2.1 m, a bus
   12 m. Simple shapes at true scale sit together believably, and the camera
   can go anywhere.
@@ -87,6 +89,36 @@ lumpy animals), `rounded` for soft made things (sacks, cushions, car bodies),
 `cylinder`/`cone` with a low `seg` (6-8) for faceted trunks, poles and
 cone trees, `extrude` for silhouettes (roofs, saw-tooth sheds, vehicles in
 profile).
+
+## Colour
+
+The film is monotone unless the user asks for colour. Write the cast so it
+can be either: wherever the real thing has a natural colour, name its
+**material role** instead of a grey, and the palette decides what it looks
+like.
+
+| Role | For | Monotone | Colour |
+| --- | --- | --- | --- |
+| `leaf`, `leafDark`, `leafLight` | foliage, hedges, grass in volume | n2a, n2, n1 | sage greens |
+| `trunk`, `wood` | bark, timber, furniture | n3, n2a | warm browns |
+| `grass`, `earth`, `sand`, `rock`, `snow`, `ice` | ground and terrain | light neutrals | soft green, beige, sand, grey, white, pale blue |
+| `water` | rivers, lakes, sea | n1 | muted teal |
+| `wall`, `concrete`, `brick` | buildings and paving | paper, n1, n1 | warm white, stone, clay |
+| `roof`, `roofDark` | roofs, doors | n2, n3 | terracotta |
+| `metal`, `glass`, `tyre` | machines, windows, wheels | n2a, n5, n7 | grey, slate, near black |
+| `skin1` … `skin3`, `hair`, `hairLight` | people | n2a, n5, n4 | three skin tones, dark and light hair |
+| `clothA` … `clothE`, `clothLight` | clothes, awnings, fabric | neutrals | slate, mustard, rose, sage, plum, cream |
+
+- In colour every hue is muted and light, so the world reads as an
+  illustrated diorama and the **highlight still stands out**: `hl`, `hl2` and
+  `hlSoft` are the theme's in both palettes. Don't use a role for what a claim
+  counts; that is what `hl` is for.
+- Things with no natural colour (a generic block, a crate, a coin's face) can
+  keep plain neutrals; they stay grey in colour too, which is right.
+- A brand can set any role's colour in its palette as `w-<role>` (for
+  example `w-roof`), through the theme scripts like any other colour.
+- `sheet.html?color=1` shows the cast in colour; `film.html?color=1` and
+  `?color=0` switch the player; `compare.html` plays both side by side.
 
 ## How much detail: the tier
 
