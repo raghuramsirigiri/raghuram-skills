@@ -211,7 +211,8 @@ directly, and face `-y` like everything else (a truck's nose towards `-y`).
 
 ## The cast file and the sheet
 
-One file, `cast.js`, sets `window.CAST`. Each entry is one item; `states`
+One file, `cast.js`, sets `window.Cast` (the builder functions, which the
+world in step 5 uses) and `window.CAST` (the list the sheet shows). Each entry is one item; `states`
 are the looks the film needs (empty and full, closed and open, neutral and
 highlighted). Put shared helpers at the top of the file.
 

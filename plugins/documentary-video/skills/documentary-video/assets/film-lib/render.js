@@ -12,14 +12,19 @@
 
   const VS = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
-uniform mat4 uModel, uVP, uLightVP; uniform mat3 uNM;
+uniform mat4 uModel, uVP, uLightVP; uniform mat3 uNM; uniform float uNormalBias;
 out vec3 vN; out vec4 vL; out vec2 vUV;
-void main(){ vec4 w = uModel*vec4(aPos,1.); vN = uNM*aN; vL = uLightVP*w; vUV = aUV; gl_Position = uVP*w; }`;
+void main(){
+  vec4 w = uModel*vec4(aPos,1.); vN = uNM*aN; vUV = aUV;
+  // look up the shadow a little off the surface, along its normal: no acne on curves
+  vL = uLightVP*(w + vec4(normalize(vN)*uNormalBias, 0.));
+  gl_Position = uVP*w;
+}`;
 
   const FS = `#version 300 es
 precision highp float; precision highp sampler2DShadow;
 in vec3 vN; in vec4 vL; in vec2 vUV;
-uniform vec3 uColor, uLight, uK; uniform float uTexel, uSoft, uShadowDark, uBias, uAlpha;
+uniform vec3 uColor, uLight, uK; uniform float uTexel, uSoft, uShadowDark, uBias, uAlpha, uGlow, uExposure;
 uniform sampler2DShadow uShadow; uniform sampler2D uTex; uniform int uUseTex;
 out vec4 o;
 float shadowAt(){
@@ -33,6 +38,7 @@ void main(){
   vec3 n = normalize(vN);
   vec4 base = vec4(uColor,uAlpha);
   if(uUseTex==1){ base = texture(uTex, vUV); if(base.a<0.02) discard; }
+  if(uGlow > 0.5){ o = vec4(base.rgb, base.a); return; }   // lamps, lit windows: no light, no shade
   float sh = shadowAt();
   float d = max(dot(n,uLight),0.);
   float lit = uK.x + uK.y*(0.5+0.5*n.z) + uK.z*d*sh - uShadowDark*(1.-sh);
@@ -43,7 +49,7 @@ void main(){
   float up = max(n.z, 0.);
   vec3 c = base.rgb*min(lit - sat*0.16*(1.-up), 1.02);
   c = mix(c, vec3(1.), sat*0.38*up*up*sh);
-  o = vec4(c, base.a);
+  o = vec4(c*uExposure, base.a);
 }`;
 
   const DEPTH_VS = `#version 300 es
@@ -179,13 +185,15 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     // nothing shows. It is drawn first without writing depth: a flat shape
     // laid at z = 0 never fights it.
     const groundR = Math.max(R * 8, V.len(V.sub(cam.eye, c)) * 4);
-    const ground = o.ground ? [{ geom: this.groundGeom, color: 'ground', shadow: false },
+    const ground = o.ground ? [{ geom: this.groundGeom, color: o.groundColor || 'ground', shadow: false },
       M.mul(M.translate(c[0], c[1], 0), M.scale(groundR * 2, groundR * 2, 1))] : null;
 
-    // light: an orthographic box around the objects (not the ground)
-    const L = o.light, lR = R * 1.15;
-    const lEye = V.add(c, V.mul(L, lR * 2));
-    const lView = M.lookAt(lEye, c, Math.abs(L[2]) > 0.99 ? [0, 1, 0] : [0, 0, 1]);
+    // light: an orthographic box around the objects (not the ground), or,
+    // for a big world, around what the camera looks at (o.focus), so the
+    // shadow map's detail goes where the viewer is looking
+    const L = o.light, lc = o.focus ? o.focus.center : c, lR = o.focus ? o.focus.radius : R * 1.15;
+    const lEye = V.add(lc, V.mul(L, lR * 2));
+    const lView = M.lookAt(lEye, lc, Math.abs(L[2]) > 0.99 ? [0, 1, 0] : [0, 0, 1]);
     const lightVP = M.mul(M.ortho(-lR, lR, -lR, lR, 0.01, lR * 4), lView);
 
     // pass 1: shadow depth
@@ -208,7 +216,8 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
 
     // pass 2: colour
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    const bg = Film.color(o.bg || 'ground');
+    // the background is the ground's colour seen at the horizon, darkened by the same exposure
+    const bg = Film.color(o.bg || o.groundColor || 'ground').map(v => v * (o.exposure || 1));
     gl.clearColor(bg[0], bg[1], bg[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const P = this.main, u = P.u;
@@ -221,6 +230,8 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     gl.uniform1f(u.uSoft, o.soft);
     gl.uniform1f(u.uShadowDark, o.shadowDark);
     gl.uniform1f(u.uBias, 0.0008);
+    gl.uniform1f(u.uExposure, o.exposure || 1);
+    gl.uniform1f(u.uNormalBias, 2 * lR / S * 1.5);   // one and a half shadow texels
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex);
     gl.uniform1i(u.uShadow, 0);
     gl.uniform1i(u.uTex, 1);
@@ -229,6 +240,7 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
       gl.uniformMatrix3fv(u.uNM, false, M.normal(W));
       gl.uniform3fv(u.uColor, Film.color(m.color));
       gl.uniform1f(u.uAlpha, m.opacity == null ? 1 : m.opacity);
+      gl.uniform1f(u.uGlow, m.glow ? 1 : 0);
       gl.bindVertexArray(this.vao(m.geom));
       gl.drawArrays(gl.TRIANGLES, 0, m.geom.count);
     };

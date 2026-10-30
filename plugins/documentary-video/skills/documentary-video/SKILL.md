@@ -30,8 +30,8 @@ small: a mistake is found at the step that made it, not in the finished film.
 | 2. Screenplay | `film/screenplay.md` | `references/screenplay.md` | `node scripts/check-screenplay.js film/screenplay.md film/brief.md` |
 | 3. Bible | `film/bible.md` | `references/bible.md` | `node scripts/check-bible.js film/bible.md film/brief.md film/screenplay.md` |
 | 4. Cast | `film/cast.js` + its sheet | `references/cast.md` | the contact sheet (`templates/sheet.html`), looked at |
-| 5. World | `film/world.js` + a map still | `references/world.md` | the map still, looked at |
-| 6. Shots | `film/shots.js` + a key-frame strip | `references/shots.md` | the strip, and `scripts/check-shots.js` |
+| 5. World | `film/world.js` | `references/world.md` | the first wide shot, looked at |
+| 6. Shots | `film/shots.js` | `references/shots.md` | `templates/film.html?strip` (key frames) and its warnings |
 | 7. Render | `<name>.html`, then MP4 | `references/render.md` | one full play in the browser |
 
 Run each check from the skill folder, or give it full paths. A check prints
@@ -81,6 +81,7 @@ film/bible.md           3. characters, props, places, era rules
 film/cast.js            4. every cast item as code
 film/world.js           5. places laid out along the camera's path
 film/shots.js           6. the timeline
+film.html + film-lib/   the player while the film is made (templates/film.html)
 ```
 
 A later request ("make act 2 shorter", "the tank looks wrong") changes the

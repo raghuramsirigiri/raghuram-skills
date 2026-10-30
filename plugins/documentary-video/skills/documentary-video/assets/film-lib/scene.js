@@ -81,6 +81,7 @@
     this.name = o.name || '';
     this.tex = o.tex || null;
     this.twoSided = !!o.twoSided;
+    this.glow = !!o.glow;                 // drawn in its own colour, unlit: lamps, lit windows, screens at night
     this.opacity = o.opacity == null ? 1 : o.opacity;    // < 1: glass, water, haze; drawn after solids, casts no shadow
     if (this.opacity < 1) this.shadow = false;
     // axis 'x' or 'y' lays a round solid (cylinder, cone, lathe, capsule, torus) on its side,
@@ -190,9 +191,16 @@
     o = Object.assign({ shadow: false }, o);
     const px = Math.min(o.px || 400, 2048 / Math.max(w, h));   // a big facade still fits one texture
     const pw = Math.max(2, Math.round(w * px)), ph = Math.max(2, Math.round(h * px));
-    const cv = makeCanvas(pw, ph), ctx = cv.getContext('2d');
-    draw(ctx, pw, ph);
-    o.tex = { canvas: cv };
+    // o.key: decals with the same key and size share one picture (window
+    // bands on a hundred buildings are one texture, not a hundred)
+    const tk = o.key && 'tex|' + o.key + '|' + pw + 'x' + ph;
+    if (tk && cache.has(tk)) o.tex = cache.get(tk);
+    else {
+      const cv = makeCanvas(pw, ph), ctx = cv.getContext('2d');
+      draw(ctx, pw, ph);
+      o.tex = { canvas: cv };
+      if (tk) cache.set(tk, o.tex);
+    }
     return addMesh(this, cached('pl' + [w, h], () => G.plane(w, h)), o);
   };
   // Text on a surface, sized by its cap height in metres (o.size, default 0.1).
