@@ -109,24 +109,37 @@
   };
 
   // Lower or raise the body so its lowest point rests on the ground (z = 0 of
-  // the figure's own frame), whatever the pose: a figure sitting on the
-  // ground sits on it, a stride never sinks a foot or lifts the body off.
+  // the figure's own frame), whatever the pose: a stride never sinks a foot
+  // or lifts the body off. Only the body counts: whatever the hands hold (a
+  // spear, a stick, a bag) may reach below the feet without lifting them.
   function plant() {
-    const keep = this.matrix;
-    this.matrix = Film.M.identity();
+    const b = this.bones, M = Film.M;
+    const held = new Set([b.handL, b.handR]);
     let lo = Infinity;
-    this.walk((m, Wm) => {
-      if (m.name === 'spot') return;
-      const bb = m.geom.bounds;
-      for (let i = 0; i < 8; i++) {
-        const z = Film.M.point(Wm, [i & 1 ? bb.hi[0] : bb.lo[0], i & 2 ? bb.hi[1] : bb.lo[1], i & 4 ? bb.hi[2] : bb.lo[2]])[2];
-        if (z < lo) lo = z;
+    (function visit(n, W) {
+      if (held.has(n)) return;
+      for (const c of n.children) {
+        const Wc = M.mul(W, c.matrix);
+        if (c.children) { if (c.visible !== false) visit(c, Wc); continue; }
+        if (c.name === 'spot' || c.visible === false) continue;
+        const bb = c.geom.bounds;
+        for (let k = 0; k < 8; k++) {
+          const z = M.point(Wc, [k & 1 ? bb.hi[0] : bb.lo[0], k & 2 ? bb.hi[1] : bb.lo[1], k & 4 ? bb.hi[2] : bb.lo[2]])[2];
+          if (z < lo) lo = z;
+        }
       }
-    });
-    this.matrix = keep;
-    if (lo !== Infinity) { const at = this.bones.pelvis.at; this.bones.pelvis.set({ at: [at[0], at[1], at[2] - lo] }); }
+    })(this, M.identity());
+    if (lo !== Infinity) { const at = b.pelvis.at; b.pelvis.set({ at: [at[0], at[1], at[2] - lo] }); }
     return this;
   }
+
+  // Sitting on the ground: knees up above the hips, feet in front, the seat
+  // on the ground, hands resting forward. (Thighs level with the shins hanging
+  // down is sitting on a chair: give it a seat height, or it sits on air.)
+  // (Angles found by searching for the pose where seat and feet touch down
+  // together: thighs about 26 degrees above level, knees open about 64.)
+  const SIT_GROUND = { legL: [116, 12], legR: [116, 12], kneeL: 64, kneeR: 64, spine: 12, head: [-4, 0],
+    armL: [58, 12], armR: [58, 12], elbowL: 28, elbowR: 28 };
 
   // A pose, in degrees. Every field is optional; anything left out is the
   // standing pose. Forward means towards the way the figure faces.
@@ -137,11 +150,14 @@
   //   elbowL/R  bend (forearm comes forward and up)
   //   legL/legR [swing forward, out to the side]
   //   kneeL/R   bend (shin goes back)
+  //   sit       'ground': sit on the ground, knees up (any field above
+  //             still overrides it)
   //   seat      sit on something this high (metres): the pelvis rests on it
   //   plant     false to leave the body where the pose puts it (default: the
-  //             lowest point is planted on the ground)
+  //             lowest point of the body is planted on the ground)
   function pose(p) {
     p = p || {};
+    if (p.sit === 'ground') p = Object.assign({}, SIT_GROUND, p);
     this._pose = p;
     const b = this.bones, d = this.dims;
     const pair = (v, def) => Array.isArray(v) ? v : [v || 0, def];
@@ -159,6 +175,10 @@
       b['foot' + side].set({ rot: [-(p['knee' + side] || 0) + l[0], 0, 0] });
     }
     if (p.seat == null && p.plant !== false) this.plant();
+    // Sitting on nothing: thighs near level or above it, no seat, and the
+    // pelvis still high off the ground. The film lists it as a warning.
+    const thigh = Math.min(pair(p.legL, 0)[0], pair(p.legR, 0)[0]);   // both thighs forward (one down is kneeling)
+    this.floating = p.seat == null && p.plant !== false && thigh > 55 && b.pelvis.at[2] > d.leg * 0.4;
     return this;
   }
   // Put a hand on a point (in the space the figure is placed in): the arm's

@@ -36,7 +36,7 @@
           b.torso.tube([[-d.shoulders * 0.8, -d.depth * 1.05, d.torso * 0.95], [d.shoulders * 0.6, -d.depth * 1.05, 0.05]], 0.03, { color: 'paper', smooth: false });
         }
         if (o.axe) b.handR.add(handAxe(), { at: [0, -0.02, -0.06], rot: [0, 90, 0] });
-        if (o.spear) b.handR.rod([0, 0, -1.1], [0, 0, 0.9], 0.015, { color: 'n4' });
+        if (o.spear) b.handR.rod([0, 0, -(d.leg + d.arm * 0.5) * 0.98], [0, 0, 0.9], 0.015, { color: 'n4' });   // the tip rests at the ground
       }
     });
     return fig;

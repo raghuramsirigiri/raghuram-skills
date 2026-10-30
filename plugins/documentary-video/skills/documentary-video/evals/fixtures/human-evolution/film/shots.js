@@ -107,7 +107,7 @@ window.buildShots = function (W) {
       stat: date(300000),
       caption: 'The oldest known Homo sapiens, Jebel Irhoud, Morocco.',
       labels: [label('Jebel Irhoud, Morocco', P.jebel, 0.3)],
-      cam: { from: { target: [359.5, 0.4, 1.3], az: -112, el: 4, dist: 7 }, to: { target: [359.6, 0.4, 1.4], az: -84, el: 6, dist: 5.5 } },
+      cam: { from: { target: [359.5, 0.4, 0.45], az: -112, el: 7, dist: 7 }, to: { target: [359.6, 0.4, 0.55], az: -86, el: 9, dist: 6 } },
       setup() { W.rest(); } },
 
     { id: 'B11', act: 'Our species', dur: 6, claims: 'C4 C7 C12 C14', cut: true, sky: 'day',

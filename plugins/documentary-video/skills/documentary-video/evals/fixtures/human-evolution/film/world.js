@@ -39,8 +39,8 @@ window.buildWorld = function () {
   const fire = root.add(C.fire(), { at: [312, 6.5, 0] });
   const sitters = [0, 1, 2].map(i => {
     const a = -Math.PI / 2 + (i - 1) * 1.1, f = root.add(C.hominin('erectus'));
-    f.set({ at: [312 + Math.cos(a) * 1.3, 6.5 + Math.sin(a) * 1.3, 0], rot: Math.atan2(Math.cos(a), Math.sin(a)) * 180 / Math.PI + 180 });
-    f.pose({ crouch: 0.45, legL: [80, 0], legR: [80, 0], kneeL: 95, kneeR: 95, spine: 15, armL: [30, 8], armR: [30, 8], elbowL: 50, elbowR: 50 });
+    f.set({ at: [312 + Math.cos(a) * 1.6, 6.5 + Math.sin(a) * 1.6, 0], rot: Math.atan2(Math.cos(a), Math.sin(a)) * 180 / Math.PI + 180 });
+    f.pose({ sit: 'ground' });   // seat and feet on the ground, knees up
     return f;
   });
 

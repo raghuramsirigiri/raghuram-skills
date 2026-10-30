@@ -436,6 +436,10 @@
       for (const b of beats) for (const t of [0, 0.25, 0.5, 0.75, 1]) {
         if (b.setup) b.setup();
         if (b.update) b.update(t, t * b.dur);
+        // a figure posed sitting with nothing under it reads as floating
+        let floaters = 0;
+        (function visit(n) { if (n.visible === false) return; if (n.floating) floaters++; for (const c of n.children || []) if (c.children) visit(c); })(o.world);
+        if (floaters && !o.warnings.some(w => w.startsWith(b.id + ' '))) o.warnings.push(b.id + ' at ' + Math.round(t * 100) + '%: ' + floaters + ' figure' + (floaters > 1 ? 's sit' : ' sits') + " on nothing (pose them with sit: 'ground', or a seat height)");
         const e = camAt(b, t).eye;
         if (e[2] < 0.3) o.warnings.push(b.id + ' at ' + Math.round(t * 100) + '%: the camera is below the ground');
         else if (boxes.some(([lo, hi]) => e[0] > lo[0] && e[0] < hi[0] && e[1] > lo[1] && e[1] < hi[1] && e[2] > lo[2] && e[2] < hi[2]))

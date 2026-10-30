@@ -242,9 +242,14 @@ ground, such as one lying on a bed).
 out]`, `elbowL/R`, `legL/legR: [forward, out]`, `kneeL/R`, `crouch` (metres,
 bend the knees to match). The figure's left is `+x`.
 
-Sitting on a chair: `seat: 0.45, legL: [90, 0], legR: [90, 0], kneeL: 90,
-kneeR: 90`. Sitting on the ground: `legL: [80, 8], legR: [80, 8], kneeL: 100,
-kneeR: 100, spine: 10`, and planting does the rest. Lying down: build
+Sitting on the ground: `pose({ sit: 'ground' })`: knees up above the hips,
+seat and feet both down, hands forward (any field you add still overrides
+it). Sitting on a chair or bench: `seat: 0.45, legL: [90, 0], legR: [90, 0],
+kneeL: 90, kneeR: 90`, with the seat built under it. Thighs level and shins
+hanging down with no `seat` is a chair pose with no chair: the figure sits on
+air, and the player lists it as a warning. Planting counts only the body,
+never what the hands hold, so a spear or a stick doesn't lift the feet; make
+a held pole long enough to reach the ground, not through it. Lying down: build
 the figure standing, then turn the whole figure (`rot: [-90, 0, 0]` puts it on
 its back with its head to `+y`) and lift it onto the bed.
 
