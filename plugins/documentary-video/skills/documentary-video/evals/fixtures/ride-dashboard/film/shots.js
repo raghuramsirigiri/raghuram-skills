@@ -97,7 +97,7 @@ window.buildShots = function (W) {
         return F.lerpCamera(a, F.camera(kerbLow), E.smooth(E.span(t, 0.08, 0.45)));
       },
       setup() { nightOn(false); noCars(); W.crowd(100, { phone: 'long' }); this.who = W.pick(27, 11); },
-      update(t) { this.lit = W.walkAway(this.who, t, 0.35, 0.95); } },
+      update(t) { this.lit = W.walkAway(this.who, t, 0.35, 0.8, this.dur); } },
 
     { id: 'B8', act: 'The morning peak', dur: 4, claims: 'C8', sky: 'day',
       key: '1 rider = 1% of riders shown that wait',
@@ -105,7 +105,7 @@ window.buildShots = function (W) {
       caption: 'when it shows under 5 minutes.',
       cam: { from: kerbLow, to: Object.assign({}, kerbLow, { az: -134, dist: 18 }) },
       setup() { nightOn(false); noCars(); W.crowd(100, { phone: 'short' }); this.who = W.pick(6, 23); },
-      update(t) { this.lit = W.walkAway(this.who, t, 0.15, 0.85); } },
+      update(t) { this.lit = W.walkAway(this.who, t, 0.15, 0.6, this.dur); } },
 
     { id: 'B9', act: 'Through the day', dur: 5, claims: 'C7 C6', cut: true,
       sky: t => F.mixSky('day', 'night', E.span(t, 0.3, 0.75)),
@@ -125,7 +125,7 @@ window.buildShots = function (W) {
       caption: 'before pickup, across the quarter.',
       cam: { from: { target: KERB, az: -156, el: 12, dist: 19 }, to: { target: KERB, az: -136, el: 14, dist: 18 } },
       setup() { nightOn(true); noCars(); W.crowd(100); this.who = W.pick(11, 31); },
-      update(t) { this.lit = W.walkAway(this.who, t, 0.1, 0.9); } },
+      update(t) { this.lit = W.walkAway(this.who, t, 0.1, 0.65, this.dur); } },
 
     { id: 'B11', act: 'The rain week', dur: 5, claims: 'C11', cut: true, sky: 'rain',
       stat: { value: 31, prefix: '+', suffix: '%', label: 'requests', window: [0.2, 0.8] },
@@ -142,29 +142,35 @@ window.buildShots = function (W) {
       cam: { from: { target: KERB, az: -146, el: 14, dist: 24 }, to: { target: [-5, -92, 1], az: -124, el: 15, dist: 24 } },
       setup() { nightOn(false); noCars(); W.crowd(100); this.who = W.pick(19, 47); [1, 2, 3].forEach(i => W.cars[i].set({ visible: true })); W.paintCars(null); },
       update(t) {
-        this.lit = W.walkAway(this.who, t, 0.05, 0.55);
+        this.lit = W.walkAway(this.who, t, 0.05, 0.5, this.dur);
         [1, 2, 3].forEach((i, k) => VB.move(W.cars[i], [[-70 - k * 9, -97.5, 0], [-22 + k * 8, -97.5, 0]], E.out(E.span(t, 0.55 + k * 0.08, 0.98))));
       } },
 
     { id: 'B13', act: 'What changes', dur: 5, claims: 'C14 C15', cut: true, sky: 'dawn',
       stat: { value: 5, still: true, prefix: 'under ', label: 'minutes' },
       caption: 'The Q4 goal: fewer cars at the airport, more downtown.',
-      labels: [Object.assign({ window: [0, 0.4] }, PLACES.rank), Object.assign({ window: [0.55, 1] }, PLACES.plaza)],
-      cam: t => {
-        // follow the convoy: from over the rank, along the road, to over the plaza
-        const lead = W.cars[10].at || RANK;
-        const a = F.camera({ target: RANK, az: -140, el: 38, dist: 110 });
-        const mid = F.camera({ target: [lead[0], lead[1], 0], az: -134, el: 46, dist: 190 });
-        const b = F.camera({ target: [-10, -84, 0], az: -128, el: 34, dist: 120 });
-        return t < 0.5 ? F.lerpCamera(a, mid, E.smooth(t / 0.5)) : F.lerpCamera(mid, b, E.smooth((t - 0.5) / 0.5));
-      },
+      labels: [Object.assign({ window: [0.05, 0.45] }, PLACES.rank), Object.assign({ window: [0.55, 1] }, PLACES.plaza)],
+      // two shots in one beat, cut at the middle: cars leave the rank, then the same cars arrive downtown
+      cam: t => t < 0.5
+        ? F.lerpCamera(F.camera({ target: [215, -30, 0], az: -150, el: 30, dist: 70 }), F.camera({ target: [200, -36, 0], az: -128, el: 28, dist: 64 }), E.smooth(t / 0.5))
+        : F.lerpCamera(F.camera({ target: [-14, -92, 1], az: -140, el: 18, dist: 40 }), F.camera({ target: [-8, -92, 1], az: -118, el: 16, dist: 34 }), E.smooth((t - 0.5) / 0.5)),
       setup() { nightOn(false); W.carsAt('peak'); W.crowd(100); },
       update(t) {
-        for (let i = 0; i < 20; i++) {
-          const s = W.rankSlots[i], u = VB.stagger(E.span(t, 0, 0.9), i, 20, 0.35);
-          VB.move(W.cars[i], [s, [s[0], -37.5, 0], [-20 + i * 3, -37.5, 0], [-20 + i * 3, -96.5, 0]], E.inOut(u));
+        for (let i = 0; i < 12; i++) {
+          const c = W.cars[i];
+          if (t < 0.5) {
+            // pull out of the bays and turn west on the airport road, at city speed (about 9 m/s)
+            const s = W.rankSlots[i], u = Math.max(0, t * 5 - i * 0.12);
+            const path = [s, [s[0], -37.5, 0], [s[0] - 60, -37.5, 0]];
+            VB.move(c, path, Math.min(1, u * 9 / VB.along(path, 1).length));
+          } else {
+            // arriving downtown along the plaza road, stopping at the kerb one behind another
+            const u = Math.max(0, (t - 0.5) * 5 - i * 0.1);
+            const stop = -2 - i * 5.5;
+            VB.move(c, [[stop - 40, -97.5, 0], [stop, -97.5, 0]], E.out(Math.min(1, u / 1.6)));
+          }
         }
-        crowdCount(Math.round(100 - 55 * E.inOut(E.span(t, 0.55, 1))));
+        crowdCount(t < 0.5 ? 100 : Math.round(100 - 45 * E.inOut(E.span(t, 0.65, 1))));
       } },
 
     { id: 'B14', dur: 3, sky: 'day',

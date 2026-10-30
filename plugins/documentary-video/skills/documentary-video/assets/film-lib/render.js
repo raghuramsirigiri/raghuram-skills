@@ -144,6 +144,9 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, t.canvas);
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    // window bands seen at a slant shimmer without anisotropic filtering
+    const an = gl.getExtension('EXT_texture_filter_anisotropic');
+    if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     this.texs.set(t, tx);
@@ -151,7 +154,7 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
   };
 
   // Projection and view for a camera at this canvas's aspect.
-  Renderer.prototype.viewProj = function (cam, R, c) {
+  Renderer.prototype.viewProj = function (cam, R, c, nearAt) {
     const aspect = this.canvas.width / this.canvas.height;
     let up = [0, 0, 1];
     if (cam.roll) {
@@ -161,13 +164,15 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     }
     const view = M.lookAt(cam.eye, cam.target, up);
     const d = V.len(V.sub(cam.eye, c));
-    const near = Math.max(0.02, d - R * 1.6), far = d + R * 3;
+    // A near plane far enough out keeps depth precise in wide shots, so
+    // flat things millimetres apart (roads, markings) don't fight
+    const near = nearAt || Math.max(0.02, d - R * 1.6), far = d + R * 3;
     let proj;
     if (!cam.fov) {
       const h = cam.height / (cam.zoom || 1) / 2;
       proj = M.ortho(-h * aspect, h * aspect, -h, h, near, far);
     } else {
-      proj = M.perspective(cam.fov / (cam.zoom || 1), aspect, Math.max(0.02, near * 0.5), far);
+      proj = M.perspective(cam.fov / (cam.zoom || 1), aspect, nearAt || Math.max(0.02, near * 0.5), far);
     }
     return M.mul(proj, view);
   };
@@ -193,10 +198,9 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     // shadow map's detail goes where the viewer is looking
     const L = o.light, lUp = Math.abs(L[2]) > 0.99 ? [0, 1, 0] : [0, 0, 1];
     let lc = o.focus ? o.focus.center : c, lR = o.focus ? o.focus.radius : R * 1.15;
-    // Stable shadows: as the camera moves, the box changes size only in
-    // steps and slides only in whole shadow texels, so edges don't shimmer.
+    // Stable shadows: the box (o.focus) is fixed for a whole beat by the
+    // film; snapping it to whole texels keeps it exact between beats too.
     if (o.focus) {
-      lR = Math.pow(2, Math.ceil(Math.log2(lR)));
       const S0 = o.shadowSize, texel = 2 * lR / S0;
       const m0 = M.lookAt(V.add(lc, V.mul(L, lR * 2)), lc, lUp);
       const right = [m0[0], m0[4], m0[8]], up = [m0[1], m0[5], m0[9]];
@@ -233,7 +237,7 @@ precision mediump float; out vec4 o; void main(){ o = vec4(1.); }`;
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const P = this.main, u = P.u;
     gl.useProgram(P.p);
-    gl.uniformMatrix4fv(u.uVP, false, this.viewProj(cam, R, c));
+    gl.uniformMatrix4fv(u.uVP, false, this.viewProj(cam, R, c, o.near));
     gl.uniformMatrix4fv(u.uLightVP, false, lightVP);
     gl.uniform3fv(u.uLight, L);
     gl.uniform3f(u.uK, o.ambient, o.sky, o.sun);

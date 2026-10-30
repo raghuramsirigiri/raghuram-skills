@@ -113,16 +113,24 @@ window.buildWorld = function () {
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rr() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     return order.slice(0, k);
   }
-  // k riders step out of the crowd one after another, lighting up as each
-  // one leaves, and walk away east along the pavement. Returns how many have
-  // left, so the on-screen count is always the count in the world.
-  function walkAway(idx, t, a, b) {
+  // k riders step out of the crowd one after another between fractions a and
+  // b of the beat, lighting up as each leaves, and walk east along the
+  // pavement at a person's pace (1.6 m/s; dur is the beat's length in
+  // seconds). Returns how many have left, so the on-screen count is the
+  // count in the world.
+  function walkAway(idx, t, a, b, dur) {
     let gone = 0;
     idx.forEach((ri, n) => {
       const f = riders[ri], s = spots[ri];
-      const local = F.verbs.stagger(F.ease.span(t, a, b), n, idx.length, 0.7);
-      f.paint(local > 0 ? 'hl' : f._top, 'top');
-      if (local > 0) { gone++; F.verbs.walk(f, [s, [s[0], -94.2, 0.15], [s[0] + 28, -94.2, 0.15]], local); }
+      const start = a + (b - a) * (idx.length > 1 ? n / (idx.length - 1) : 0);
+      const metres = Math.max(0, (t - start) * dur * 1.6);
+      f.paint(t >= start ? 'hl' : f._top, 'top');
+      if (t >= start) {
+        gone++;
+        const path = [s, [s[0], -94.2, 0.15], [s[0] + 40, -94.2, 0.15]];
+        const len = F.verbs.along(path, 1).length;
+        F.verbs.walk(f, path, Math.min(1, metres / len));
+      }
     });
     return gone;
   }

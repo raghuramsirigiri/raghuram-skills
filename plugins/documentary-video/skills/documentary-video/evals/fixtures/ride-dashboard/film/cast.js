@@ -127,12 +127,12 @@
     const g = F.group({ name: 'carPark' });
     g.flat([[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]], { at: [0, 0, 0.01], color: 'n0a' });
     g.decal(w, d, (c, pw, ph) => {
-      c.strokeStyle = F.hex('paper'); c.lineWidth = Math.max(1, pw / w * 0.12);
+      c.strokeStyle = F.hex('paper'); c.lineWidth = pw / w * 0.2;   // a few texels wide: thinner lines shimmer in motion
       for (let row = 0; row < 4; row++) for (let x = 0; x <= w; x += 2.6) {
         const y0 = (row * d / 4 + 1.5) / d * ph, y1 = y0 + 5 / d * ph;
         c.beginPath(); c.moveTo(x / w * pw, y0); c.lineTo(x / w * pw, y1); c.stroke();
       }
-    }, { rot: [-90, 0, 0], at: [0, 0, 0.02], px: 8, key: 'bays' + w + 'x' + d });
+    }, { rot: [-90, 0, 0], at: [0, 0, 0.02], px: 24, key: 'bays' + w + 'x' + d });
     return g;
   }
 

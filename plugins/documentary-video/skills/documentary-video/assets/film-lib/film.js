@@ -52,10 +52,13 @@
     Film._check('sky', k, 'unknown sky "' + s + '" (dawn, day, dusk, night, rain, or an object)');
     return Object.assign({ rain: 0 }, SKY.day, k, { light: V.norm(k.light || SKY.day.light) });
   };
+  // Exposure, softness and rain ease from a to b; the sun keeps a's angle.
+  // A sun that turns during a shot drags every shadow edge across the
+  // frame, which reads as flicker; it changes at a cut instead.
   Film.mixSky = function (a, b, t) {
     a = Film.sky(a); b = Film.sky(b);
     const L = (x, y) => x + (y - x) * t;
-    return { light: V.norm(V.lerp(a.light, b.light, t)), exposure: L(a.exposure, b.exposure),
+    return { light: a.light, exposure: L(a.exposure, b.exposure),
       soft: L(a.soft, b.soft), rain: L(a.rain || 0, b.rain || 0) };
   };
 
@@ -192,10 +195,10 @@
       ctx.strokeStyle = Film.hex('n8'); ctx.lineWidth = 1.5 * u;
       ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0], p[1] - lift); ctx.stroke();
       ctx.fillStyle = Film.hex('n8'); ctx.beginPath(); ctx.arc(p[0], p[1], 4 * u, 0, Math.PI * 2); ctx.fill();
-      ctx.font = '700 ' + 15 * u + 'px ' + font;
-      const s = l.text.toUpperCase(), tw = ctx.measureText(s).width;
-      ctx.fillStyle = Film.hex('n8'); roundRect(ctx, p[0] - 10 * u, p[1] - lift - 30 * u, tw + 20 * u, 28 * u, 4 * u); ctx.fill();
-      ctx.fillStyle = Film.hex('paper'); ctx.fillText(s, p[0], p[1] - lift - 11 * u);
+      // the chip is drawn once into a bitmap and moved as a picture: text
+      // redrawn at a new sub-pixel spot every frame shimmers
+      const chip = labelChip(l.text, u);
+      ctx.drawImage(chip, p[0] - 10 * u, p[1] - lift - 30 * u, chip.width / 2, chip.height / 2);
       ctx.globalAlpha = 1;
     }
 
@@ -275,6 +278,19 @@
     }
     sourceLine(ctx, W, H, pad, u, o);
   }
+  const chips = new Map();
+  function labelChip(text, u) {
+    const key = text + '|' + u;
+    if (chips.has(key)) return chips.get(key);
+    const s = text.toUpperCase(), f = '700 ' + 30 * u + 'px ' + Film.font;   // drawn at 2x
+    const m = Film._makeCanvas(2, 2).getContext('2d'); m.font = f;
+    const w = Math.ceil(m.measureText(s).width + 40 * u), h = Math.ceil(56 * u);
+    const cv = Film._makeCanvas(w, h), c = cv.getContext('2d');
+    c.fillStyle = Film.hex('n8'); roundRect(c, 0, 0, w, h, 8 * u); c.fill();
+    c.font = f; c.fillStyle = Film.hex('paper'); c.textBaseline = 'alphabetic'; c.fillText(s, 20 * u, 38 * u);
+    chips.set(key, cv);
+    return cv;
+  }
   function sourceLine(ctx, W, H, pad, u, o) {
     if (!o.source) return;
     ctx.font = '400 ' + 12 * u + 'px ' + Film.font;
@@ -314,9 +330,9 @@
   }
 
   // ── the player ────────────────────────────────────────────────────────
-  // spec: { world, beats, size: [w, h], source, ss (supersampling, default 1.5) }
+  // spec: { world, beats, size: [w, h], source, ss (supersampling, default 2) }
   Film.film = function (canvas, spec) {
-    const o = Object.assign({ size: [1280, 720], fade: 0.5, ss: 1.5 }, spec);
+    const o = Object.assign({ size: [1280, 720], fade: 0.5, ss: 2 }, spec);
     const [W, H] = o.size;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -331,6 +347,23 @@
       b.start = t0; t0 += b.dur;
     }
     const duration = t0;
+
+    // Shadows hold still for a whole beat. A close beat gets one shadow box
+    // covering everything its camera sees from start to end; a wide beat
+    // uses one box over the whole world. A box that followed the camera
+    // would slide across the world and flip whole walls in and out of
+    // shadow as it went.
+    // the whole world's box, measured once: moving things mustn't nudge it
+    const wb = o.world.bounds();
+    const WORLD_BOX = { center: V.mul(V.add(wb.lo, wb.hi), 0.5), radius: V.len(V.sub(wb.hi, wb.lo)) / 2 * 1.1 };
+    function shadowFocus(b) {
+      const cams = [0, 0.25, 0.5, 0.75, 1].map(t => camAt(b, t));
+      const reach = c => c.dist * Math.tan((c.fov || 30) / (c.zoom || 1) * Math.PI / 180) * 1.2 + 4;
+      if (cams.some(c => c.dist > 80)) return WORLD_BOX;
+      const center = V.mul(cams.reduce((a, c) => V.add(a, c.target), [0, 0, 0]), 1 / cams.length);
+      const radius = Math.max(...cams.map(c => V.len(V.sub(c.target, center)) + reach(c)));
+      return { center, radius };
+    }
 
     function camAt(b, t) {
       if (typeof b.cam === 'function') return b.cam(t);
@@ -376,9 +409,9 @@
       if (i !== current) { if (b.setup) b.setup(); current = i; }
       if (b.update) b.update(t, s);
       const sky = skyAt(b, t), cam = camAt(b, t);
-      const reach = cam.dist * Math.tan((cam.fov || 30) / (cam.zoom || 1) * Math.PI / 180) * 1.1;
+      if (b._focus === undefined) b._focus = shadowFocus(b);
       r.render(o.world, cam, { light: sky.light, exposure: sky.exposure, soft: sky.soft, groundColor: o.ground,
-        focus: { center: cam.target, radius: Math.max(6, reach) } });
+        focus: b._focus, near: Math.max(0.05, cam.dist * 0.03) });
       ctx.drawImage(glc, 0, 0, W, H);
       rain(ctx, W, H, sky.rain || 0, T);
       vignette(ctx, W, H);
