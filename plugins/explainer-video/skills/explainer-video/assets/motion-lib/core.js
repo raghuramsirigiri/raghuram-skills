@@ -143,11 +143,12 @@
       // The art keeps clear of the world's stage as well as the words.
       list.forEach((it, i) => { it.reserved.push({ x: 0, y: world.beats[i].band + world.gap / 2, w: fr.W, h: zone.ruleY - world.beats[i].band - world.gap / 2 }); });
     }
-    // Between two beats of the world: a pan when the camera moves, else the swap.
+    // Between two beats of the world: a pan when the camera moves, else the
+    // swap. A beat that tracks along a line starts where it arrives (camIn).
     const between = i => {
       if (i === 0) return M.transitions.get('cut');
       if (!world) return M.transitions.get('swap');
-      const a = world.beats[i - 1].cam, b = world.beats[i].cam;
+      const a = world.beats[i - 1].cam, b = world.beats[i].camIn || world.beats[i].cam;
       const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
       if (dx < 0.5 && dy < 0.5 && a.alpha === b.alpha) return M.transitions.get('swap');
       return Object.assign({}, M.transitions.get('pan'), { dur: dx < 0.5 ? 0.9 : Math.min(1.8, 1.25 + dx / 4000) });

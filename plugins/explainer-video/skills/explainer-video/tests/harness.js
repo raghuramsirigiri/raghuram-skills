@@ -7,13 +7,16 @@ const vm = require('vm');
 
 const SKILL = path.join(__dirname, '..');
 const LIB = path.join(SKILL, 'assets', 'motion-lib');
-const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world'];
+const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world', 'arrange', 'act'];
 
 function sceneFiles() {
   return fs.readdirSync(path.join(LIB, 'scenes')).filter(f => f.endsWith('.js')).sort();
 }
 function pictureFiles() {
   return fs.readdirSync(path.join(LIB, 'pictures')).filter(f => f.endsWith('.js')).sort();
+}
+function thingFiles() {
+  return fs.readdirSync(path.join(LIB, 'things')).filter(f => f.endsWith('.js')).sort();
 }
 
 // A fresh sandbox per call, so no state leaks between tests.
@@ -26,6 +29,7 @@ function load(opts) {
   const run = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sandbox, { filename: f });
   run(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
   ORDER.forEach(n => run(path.join(LIB, n + '.js')));
+  thingFiles().forEach(f => run(path.join(LIB, 'things', f)));
   pictureFiles().forEach(f => run(path.join(LIB, 'pictures', f)));
   (opts.scenes || sceneFiles()).forEach(f => run(path.join(LIB, 'scenes', f)));
   (opts.extra || []).forEach(n => run(path.join(LIB, n + '.js')));
@@ -85,4 +89,4 @@ const FIXTURE_SPEC = () => ({
   ]
 });
 
-module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, pictureFiles, FIXTURE_SPEC };
+module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, pictureFiles, thingFiles, FIXTURE_SPEC };
