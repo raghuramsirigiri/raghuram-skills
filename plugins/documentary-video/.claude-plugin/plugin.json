@@ -1,0 +1,15 @@
+{
+  "name": "documentary-video",
+  "description": "Turn any document (a sales summary, a dashboard's numbers, a history chapter, a science article) into a short documentary-style film: a screenplay, a cast, props and places all designed from that document, filmed in a flat-shaded 3D world in the charts-lib colours with a free camera, rendered in JavaScript and exported as MP4 in your browser. Every figure comes from your source. One standalone HTML file: no other apps, no CDN, works offline.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Raghuram Sirigiri"
+  },
+  "homepage": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "repository": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "license": "MIT",
+  "keywords": [
+    "documentary-video", "video", "film", "document-to-video", "explainer", "3d", "isometric", "webgl",
+    "screenplay", "storytelling", "data-storytelling", "mp4", "webcodecs", "javascript", "zero-dependency", "offline"
+  ]
+}
