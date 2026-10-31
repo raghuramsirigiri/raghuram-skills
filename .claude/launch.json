@@ -26,6 +26,19 @@
         "-c-1"
       ],
       "port": 8822
+    },
+    {
+      "name": "explainer-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "http-server",
+        ".",
+        "-p",
+        "8833",
+        "-c-1"
+      ],
+      "port": 8833
     }
   ]
 }
