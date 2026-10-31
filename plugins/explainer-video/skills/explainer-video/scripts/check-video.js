@@ -126,6 +126,7 @@ shape.length ? shape.forEach(x => fail('shape', x)) : pass('shape', scenes.lengt
 
 // ── 2. timing: compile every cut with the real engine ────────────────
 const compiled = {};
+const shapeLater = [];   // the page's own places, checked as the engine loads
 const RETIRED = ['people', 'dots', 'blocks', 'split', 'columns', 'funnel', 'podium', 'ribbon'];
 try {
   const sb = loadEngine();
@@ -160,6 +161,8 @@ try {
     } catch (e) { fail('timing', 'cut "' + name + '": ' + e.message); }
   }
 } catch (e) { fail('timing', 'could not load the engine: ' + e.message); }
+
+shapeLater.forEach(x => fail('pictures', x));
 
 // ── 3. numbers ───────────────────────────────────────────────────────
 const MULT = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, mn: 1e6, bn: 1e9, billion: 1e9, b: 1e9, tn: 1e12, trillion: 1e12 };
@@ -382,8 +385,36 @@ function loadEngine() {
     const mt = new RegExp('Motion\\.custom\\.' + s.draw + '\\s*=\\s*\\{[^}]*?enter\\s*:\\s*([\\d.]+)[^}]*?read\\s*:\\s*([\\d.]+)').exec(html);
     sb.Motion.custom[s.draw] = { enter: mt ? +mt[1] : 1, read: mt ? +mt[2] : 1.2, draw() {} };
   });
+  // Places the page draws for this video (Motion.pictures.register in its own
+  // script): stand in with their footprint so the world lays out as it will.
+  pagePlaces().forEach(p => {
+    if (sb.Motion.pictures.list[p.kind]) { shapeLater.push('the page registers a picture "' + p.kind + '", which is the library\'s own name — give the video\'s place a name of its own'); return; }
+    if (p.data) { shapeLater.push('the page\'s place "' + p.kind + '" carries data (' + p.data + ') — a place the video draws is a thing with no figure; a finding\'s figure is in the band, or in a custom painter'); return; }
+    if (!p.footprint) { shapeLater.push('the page\'s place "' + p.kind + '" needs footprint() { return { w, d, h } } with numbers, so the world can lay it out'); return; }
+    sb.Motion.pictures.register({ kind: p.kind, footprint: () => p.footprint, draw() {} });
+  });
   // Images are decoded in the browser; here any data URI counts as present.
   return sb;
+}
+// The places a page registers: { kind, footprint, data } read from each
+// Motion.pictures.register({...}) call in its own script.
+function pagePlaces() {
+  const out = [], re = /Motion\.pictures\.register\(\s*\{/g;
+  let m;
+  while ((m = re.exec(html))) {
+    let i = re.lastIndex, depth = 1;
+    while (i < html.length && depth) { const ch = html[i++]; if (ch === '{') depth++; else if (ch === '}') depth--; }
+    const body = html.slice(re.lastIndex, i - 1);
+    const kind = (/\bkind\s*:\s*['"]([\w-]+)['"]/.exec(body) || [])[1];
+    if (!kind) continue;
+    const fp = /footprint\s*\([^)]*\)\s*\{\s*return\s*(\{[^{}]*\})/.exec(body);
+    let footprint = null;
+    try { footprint = fp ? vm.runInNewContext('(' + fp[1] + ')') : null; } catch (e) { footprint = null; }
+    if (footprint && !['w', 'd', 'h'].every(k => typeof footprint[k] === 'number')) footprint = null;
+    const data = (body.match(/\b(data|shares|counts|series|parts)\s*:/g) || []).map(x => x.replace(/\s*:$/, '')).join(', ');
+    out.push({ kind, footprint, data });
+  }
+  return out;
 }
 function mockCtx() {
   let font = '10px sans-serif';

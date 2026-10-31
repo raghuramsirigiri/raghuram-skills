@@ -7,8 +7,9 @@ and its data pictures (`people`, `dots`, `blocks`, `split`, `columns`,
 `funnel`, `podium`, `ribbon`) are retired: they draw charts in 3D and
 shares as grids of units, and `check-video.js` fails them (`pictures.md` §
 Retired). In the world, a finding that is a real thing is a custom painter,
-which takes the stage for its beat; its own places are the desk and a
-device. A finding that is a value needs a flat chart, so a story built on
+which takes the stage for its beat. The places the camera pans between
+are drawn for this video, from the story's own nouns (§ Places the video
+draws), or the desk and a device. A finding that is a value needs a flat chart, so a story built on
 values belongs in slides: say so if the user asked for the world.
 
 The rest of this page describes the frozen engine as it is.
@@ -78,14 +79,46 @@ Beats at the same place keep the camera still; only the words change.
    A spec that sets no style gets slides.
 2. Draw each finding that is a real thing as a `custom` scene
    (`pictures.md` § Drawing the finding's own thing); it takes the stage
-   for its beat. Give the world one place of its own to stand on, a `desk`
-   or a `device`. Never a retired data picture.
+   for its beat. Give the world at least one place to stand on: one the
+   video draws (§ Places the video draws), a `desk` or a `device`. Never a
+   retired data picture.
 3. Point a later scene back at an earlier place with `at` when it is about
    the same thing (a verdict, last year's figure). A claim the place already
    shows brings the camera back by itself.
 4. Link places with `from` where the story moves something between them.
 5. Give the summary's points their places' icons: `"picture": { "icons":
    ["hook", "e3", "why"] }`, one scene id per point.
+
+## Places the video draws
+
+A place is a thing the story is set in: a forest, a hearth, a boat at a
+shore. Draw it for this video in the page's own script, with the 2.5D kit,
+and the camera pans to it like any place. It holds no figure: the figure
+is in the band, or in a custom painter.
+
+```js
+Motion.pictures.register({
+  kind: 'hearth',                                    // a name of its own, never a library one
+  footprint() { return { w: 440, d: 320, h: 120 }; },   // numbers: check-video.js lays it out from them
+  draw(V, p, t, W) {                                    // t is absolute: a pure function of it
+    const t0 = W.beats.find(b => b.place === p).cStart; // its beat's start, to act on
+    V.box(p.x - 220, p.y - 160, 0, 440, 320, 12, W.mat.N);
+  }
+});
+```
+
+- **Centred on `p.x`, `p.y`**, inside its footprint, with `V.box`,
+  `V.token`, `V.quad`, `V.poly` and `V.shadow`; colours from `W.mat`
+  (mixed with `Motion.design.mix` from `W.mat.bg` and `W.mat.ink`).
+- **Draw back to front** (smaller x + y first), so nearer shapes cover
+  farther ones.
+- **Act on its beats**: each beat standing on the place (its own scene, and
+  any with `"picture": { "at": … }`) has a `cStart`; trees grow in on the
+  first, a ridge rises on the next. Set a number `dur` where the action
+  needs longer than the words.
+- **No data flags** (`data`, `shares`, `counts`, `series`, `parts`):
+  `check-video.js` fails a page place that carries one, or one named like a
+  library picture.
 
 **Done when** `check-video.js` reports no `pictures` FAIL or warning, and
 the audit is `ok` on

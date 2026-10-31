@@ -87,7 +87,8 @@ picture or to plain boxes. So you draw the thing, for this video, as a
    steps aside for the beat. There is nothing else to fit.
 
 The painters draw the same in either style. In the continuous style the
-world also needs one place of its own (a desk or a device) to stand on.
+world also needs a place to stand on: one the video draws from the story's
+nouns (`continuous.md` § Places the video draws), a desk or a device.
 
 When the drawing doesn't fit its box or fails the audit, make it simpler,
 in this order: group the units (one per 2% or 5%, stated in the key), move
