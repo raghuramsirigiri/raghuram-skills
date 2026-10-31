@@ -1,0 +1,35 @@
+{
+  "version": "0.1.0",
+  "note": "Per-scene facts for the agent and for check-video.js. Slot names and word limits must match each scene's registered `slots` (tests/scenes.test.js holds them in step). `shapes` lists the story shapes: `built` ones have a grammar in shapes/*.js; the others are named and refused until they are built.",
+  "formats": {
+    "9:16": { "size": [1080, 1920], "safe": { "top": 250, "right": 150, "bottom": 380, "left": 60 } },
+    "4:5": { "size": [1080, 1350], "safe": { "top": 60, "right": 60, "bottom": 120, "left": 60 } },
+    "1:1": { "size": [1080, 1080], "safe": { "top": 60, "right": 60, "bottom": 60, "left": 60 } },
+    "16:9": { "size": [1920, 1080], "safe": { "top": 54, "right": 96, "bottom": 54, "left": 96 } }
+  },
+  "transitions": {
+    "cut": { "dur": 0, "ownsExit": true, "internal": "the first beat only" },
+    "swap": { "dur": 0.25, "ownsExit": false, "default": true, "note": "the one transition: the words leave, the shared frame swaps its words, the next words rise in" },
+    "travel": { "dur": 1.4, "ownsExit": false, "note": "the same swap with a longer quiet stretch while the stage changes; its length is set by the shape" }
+  },
+  "shapes": {
+    "transformation": { "built": true, "job": "one subject, its states", "maxLength": 60 },
+    "lineup": { "built": false, "job": "a cast on one stage, re-arranged per dimension", "maxLength": 90 },
+    "assembly": { "built": false, "job": "a thing built up step by step, cutaways as staged inserts", "maxLength": 60 },
+    "episodes": { "built": false, "job": "a place per item, the camera travels between them", "maxLength": 60 },
+    "journey": { "built": false, "job": "a schematic map stage for routes, campaigns and migrations", "maxLength": 90 }
+  },
+  "scenes": {
+    "beat": {
+      "job": "one finding in the card, over the stage",
+      "slots": { "kicker": { "words": 4 }, "title": { "words": 10 }, "units": { "words": 8 }, "value": { "claim": true }, "quote": { "claim": true }, "name": { "words": 6 } },
+      "data": "chart?: { kind: bars | line }; stage?: the shape's directions",
+      "minDur": 3.0
+    },
+    "source-card": {
+      "job": "every source with its date; the stage keeps moving",
+      "slots": { "note": { "words": 12 } },
+      "minDur": 2.5
+    }
+  }
+}
