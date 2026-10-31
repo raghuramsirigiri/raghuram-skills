@@ -16,15 +16,15 @@ A score synthesised in the page by Web Audio and rendered once, offline, at
 
 - `pulse`: a soft kick on each beat at `bpm` (default 112) and a quiet hat
   on the off-beat.
-- `ambient`: a low pad that changes chord with each scene.
+- `ambient`: a low pad that changes chord with each beat.
 
-Both add a sub note on each scene's downbeat, a short noise sweep on each
+Both add a sub note on each beat's downbeat, a short noise sweep on each
 transition and a tick when a counter lands. The effects sit 6 dB under the
 score, and the whole track is normalised to a conservative level with a peak
 ceiling.
 
-With a score on, **every scene's content starts on a beat**: the compiler
-holds the scene before a little longer to get there. Durations printed by
+With a score on, **every beat's words start on a musical beat**: the compiler
+holds the beat before a little longer to get there. Durations printed by
 `check-video.js` already include this.
 
 Preview plays the same rendered track as the export, so what you hear is

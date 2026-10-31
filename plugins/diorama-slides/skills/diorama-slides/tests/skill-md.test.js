@@ -1,4 +1,4 @@
-// node --test plugins/explainer-video/skills/explainer-video/tests/skill-md.test.js
+// node --test plugins/diorama-slides/skills/diorama-slides/tests/skill-md.test.js
 //
 // SKILL.md stays small enough to load whole and routes to every reference;
 // references point only at files this plugin carries (it installs alone);
@@ -65,9 +65,9 @@ test('no reference points at a file this plugin does not carry', () => {
 
 test('the closing line in SKILL.md and tracing.md\'s worked handover has the shape tracing.md fixes', () => {
   const tracing = read(path.join(refsDir, 'tracing.md'));
-  const template = 'Ask "where does <figure> come from?" or "why does the video open on <hook scene>?" to see the working behind any figure or choice.';
+  const template = 'Ask "where does <figure> come from?" or "why is <thing> drawn like that?" to see the working behind any figure or picture.';
   assert.ok(tracing.includes(template), 'tracing.md states the closing line template');
-  const shape = /^Ask "where does (V\d+\.\d+) come from\?" or "why does the video open on (V1)\?" to see the working behind any figure or choice\.$/;
+  const shape = /^Ask "where does (V\d+\.\d+) come from\?" or "why is (S\d+) drawn like that\?" to see the working behind any figure or picture\.$/;
   const skillLine = skill.split(/\r?\n/).find(l => l.startsWith('Ask "where does V'));
   assert.match(skillLine || '', shape);
   const block = tracing.match(/Handles live in the chat handover:\s*```([\s\S]*?)```/);
@@ -75,13 +75,32 @@ test('the closing line in SKILL.md and tracing.md\'s worked handover has the sha
   assert.match(block[1].trim().split(/\r?\n/).pop(), shape);
 });
 
-test('tracing.md carries the four trace headings, in order, and the choice and wording blocks', () => {
+test("tracing.md carries the trace and picture blocks' headings, in order, and the choice and wording blocks", () => {
   const t = read(path.join(refsDir, 'tracing.md'));
-  const at = ['**From your source**', '**Working**', '**Where it appears**', '**What would change it**'].map(h => t.indexOf(h));
-  at.forEach(i => assert.ok(i > 0));
-  for (let i = 1; i < at.length; i++) assert.ok(at[i] > at[i - 1]);
+  const inOrder = (heads, from) => {
+    const at = heads.map(h => t.indexOf(h, from));
+    at.forEach((i, n) => assert.ok(i > 0, heads[n]));
+    for (let i = 1; i < at.length; i++) assert.ok(at[i] > at[i - 1], heads[i]);
+  };
+  inOrder(['**From your source**', '**Working**', '**Where it appears**', '**What would change it**'], t.indexOf('## The trace block'));
+  inOrder(['**What the source says**', '**What I drew from it**', '**What I chose without the source**', '**What would change it**'], t.indexOf('## The picture block'));
   assert.match(t, /## The choice block/);
   assert.match(t, /## The wording block/);
+  assert.match(t, /Things on the stage are `S1, S2…`/);
+});
+
+test("tracing.md is this skill's own, not a copy of explainer-video's", () => {
+  const sib = path.join(SKILL_DIR, '..', '..', '..', 'explainer-video', 'skills', 'explainer-video', 'references', 'tracing.md');
+  if (!fs.existsSync(sib)) return;
+  assert.notStrictEqual(read(path.join(refsDir, 'tracing.md')), read(sib));
+  assert.match(read(path.join(refsDir, 'tracing.md')), /diorama-slides/);
+});
+
+test('SKILL.md names the five shapes and the one mode', () => {
+  ['transformation', 'lineup', 'assembly', 'episodes', 'journey'].forEach(n => assert.ok(skill.includes('**' + n + '**'), n));
+  assert.ok(!/meta\.style/.test(skill), 'no style switch');
+  assert.match(skill, /explainer-video/);
+  assert.match(skill, /documentary-video/);
 });
 
 test('verify is step 7 and shipping is step 8, as finalize.js and verify-and-ship.md say', () => {

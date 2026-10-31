@@ -20,39 +20,26 @@ social-post card.
 
 ## Layout per format
 
-Each aspect class gets its own composition, not one square card placed in a
-bigger frame (`layout.js` `PROFILE`, applied by `design.js` `card()`):
+Each aspect class composes the card and the stage its own way
+(`layout.js` `PROFILE`):
 
 | Class | Formats | Type step | Composition |
 | --- | --- | --- | --- |
-| `square` | 1:1 | 1× | the card: words on top, chart below |
-| `tall` | 9:16, 4:5 | 1.2× | the card, words a step larger; lists, steps and timelines spread down the height; bars thicken; a big number runs as wide as fits |
-| `wide` | 16:9 | 1.15× | words in a left column (40%), centred on its height; the chart, list, steps, timeline or photo beside them at full height; a big number in the left half with its words beside it |
+| `tall` | 9:16, 4:5 | 1.2× | the card across the top, the stage under it down to the footer, the full frame width |
+| `square` | 1:1 | 1× | as tall, with less stage: keep its beats' words short, and charts to beats of their own |
+| `wide` | 16:9 | 1.15× | the card in a left column (40%), the stage in the room to its right at full height |
 
-The type step applies to the kicker, headline and units and to chart and
-list text; the source line stays card size. A title on its own
-(`kicker-title`) grows to about twice the card headline, a hook to its
-display size, a headline beside a chart to 1.5×. The source card and the
-outro grow until they hold about two thirds of the frame.
+The type step applies to the kicker, headline and units and to chart text;
+the source line stays card size. A beat with a figure or a chart in the
+card gives the stage the room under it, and the camera reframes; a 1:1
+frame has little room to give, so a chart there usually belongs to a beat
+in the 9:16 or 16:9 cut only. `check-video.js` warns when the stage is left
+under about a fifth of the frame's height.
 
-**The continuous style's band** (`continuous.md`) follows the frame too:
-stacked at the top of a 9:16 frame with the world below; a row in 4:5 and
-1:1 (a figure on the left with its words beside it, or a summary's title
-beside its points), so the world keeps its height; a left column (40%) in
-16:9, the world in the room to its right. The world's scale is the largest
-at which every place fits that stage, at most 1.3.
-
-**Fill.** The audit measures how much of the safe area each scene's
-mid-hold frame covers, and warns under 60%. The safe area is cut into
-cells a tenth of its short side; a blank cell counts as empty only when its
-neighbours are blank too, so the gaps between lines belong to the
-composition and only real empty bands count. The source card and outro are
-measured but not warned on. A warning on an evidence scene usually means
-copy too short for the frame (one short line in a 9:16 kicker-title): give
-it a `units`/`sub` line, merge it into the next scene, or use a format that
-suits it. The engine lays out the frame; don't pad it with decoration.
-`tests/layout-gallery.html` shows every scene type in all four formats with
-its fill.
+**Fill.** The audit measures how much of the safe area each beat's
+mid-hold frame covers and warns under 60%. The stage usually fills it; a
+warning means the stage's room is mostly empty board (zoom in, or give the
+subject a larger `size`), never a reason to add decoration.
 
 ## Frame rate
 
@@ -61,9 +48,10 @@ longer exports). 24 and 25 are allowed when the user asks for film or PAL.
 
 ## Length
 
-Keep to **15–60 s**. Defaults: 30 s at 9:16 when the user doesn't say. A
-15 s cut holds a hook and one or two findings. Over 60 s, say it is long for
-a feed and offer two shorter videos.
+Keep to **15–60 s**; a lineup or a journey may run to **90 s** when its
+cast or route needs it, and you say so at handover. Defaults: about 30–45 s
+at 9:16 when the user doesn't say. A 15 s cut holds a hook and one or two
+states. `check-video.js` fails a cut over its shape's limit.
 
 ## Which format, when the user didn't say
 
@@ -81,18 +69,18 @@ will it play?"* Otherwise build 9:16 and say at handover that a 1:1 or
 
 ## Cuts
 
-One spec can hold several cuts: each a format plus a list of scene ids.
+One spec can hold several cuts: each a format plus a list of beat ids.
 They share the ledger, the copy and the sources, so a correction reaches
 every cut at once.
 
 ```json
 "cuts": {
-  "main":  { "format": "9:16", "scenes": ["hook", "ctx", "e1", "e2", "e3", "src"] },
-  "short": { "format": "1:1",  "scenes": ["hook", "e1", "src"] }
+  "main":  { "format": "9:16", "scenes": ["hook", "s1", "s2", "s3", "s4", "src"] },
+  "short": { "format": "1:1",  "scenes": ["hook", "s2", "src"] }
 }
 ```
 
-Every cut ends on the source card (then, optionally, the outro). The
+Every cut ends on the source card. The
 player's cut switcher picks which one plays and exports. Name the file
 `<title>-<cut>.mp4`; the player does this.
 

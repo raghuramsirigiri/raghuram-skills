@@ -10,30 +10,31 @@ A video built in one go shows every mistake at the end, and each fix costs
 a whole re-render. Build it so each check is the cheapest one that can
 catch the mistake:
 
-1. **The spec, no browser.** Write the claims, the story and every scene;
-   stage and run the static check (§ 7.1) until it has no FAIL. It compiles
-   every cut in seconds, so wrong ids, typed figures, dropped hedges, copy
-   limits, timing and a picture refusing its data all surface here.
-2. **Each custom painter alone.** Register one painter, serve the folder
-   (§ 7.2), and audit only its scene, then look at its still:
+1. **The spec, no browser.** Write the claims, the shape, the stage's
+   states or cast and every beat; stage and run the static check (§ 7.1)
+   until it has no FAIL. It compiles every cut in seconds, so wrong ids,
+   typed figures, dropped hedges, copy limits, an unknown state, a missing
+   painter and timing surface here.
+2. **The subject first, then each other thing.** Register the subject's
+   painter, serve the folder (§ 7.2), and look at one beat per state:
 
    ```js
    const r = await VideoAudit.run({ cut: 'main', scenes: ['e2'] });
    JSON.stringify({ ok: r.ok, fails: r.fails, warns: r.warns });
-   r.stills()[0].png      // the scene at the middle of its hold
+   r.stills()[0].png      // the beat at the middle of its hold
    ```
 
-   Scene mode paints that scene's frames only and runs the layout,
-   read-time, world and fill checks. Fix it until it is `ok` and the still
-   shows its thing, then write the next painter. Rerun only the scene you
-   changed, never the whole video, to check a fix.
-3. **The whole video, once.** When every scene has passed on its own, run
+   Then look at a frame in the middle of a change (`videoPlayer.seek(t)`
+   between two beats): the form must read at every point between the
+   states, not only at the ends. Then the ground and scenery. Rerun only
+   the beat you changed to check a fix.
+3. **The whole video, once.** When every beat has passed on its own, run
    § 7.2 in full: it adds the checks that need the whole cut (the hook by
-   0.5 s, pops, frozen holds, the export probe).
+   0.5 s, pops, frozen stretches, the export probe).
 
-A scene that fails the same check twice gets simpler, the way
-`pictures.md` § Drawing the finding's own thing says. It never gets
-swapped for a chart or the nearest picture.
+A thing that fails the same check twice gets simpler (fewer parts, a
+smaller zoom, a look that keeps it in its room), never swapped for a chart
+or a box.
 
 ## Step 7 — verify
 
@@ -46,14 +47,15 @@ node <skill-dir>/scripts/check-video.js video.html
 
 `--stage` puts `charts-lib/` and `motion-lib/` (with `audit.js`) beside the
 page. `check-video.js` compiles every cut with the real engine and checks
-shape, timing, numbers, hedges and upgrade words, quotes, copy limits,
-determinism and offline-ness. Read every row; fix every FAIL in the spec,
+the shape and its painters, timing and length, numbers (in copy and on the
+stage's labels), hedges and upgrade words, quotes, copy limits,
+determinism (and that stage words go through `api.label`) and
+offline-ness. Read every row; fix every FAIL in the spec,
 then run it again. A WARN is a judgement call: read it, act on it or say
-why not. The `timing` rows print each scene's handle and length: that is
-the scene list for the handover. A `pictures` FAIL names a retired 3D
-picture (a chart or a grid of units): draw the finding's thing with a custom
-painter (`pictures.md` § Drawing the finding's own thing), or give it its
-flat chart in the slides style.
+why not. The `timing` rows print each beat's handle and length: that is
+the beat list for the handover. A `stage` WARN means a beat leaves the
+stage too little room: shorten its words, or give its chart a beat of its
+own.
 
 ### 7.2 Run the audit in a browser
 
@@ -70,7 +72,7 @@ JSON.stringify(await Promise.all(Object.keys(Motion.readSpec().cuts).map(cut =>
 It paints every frame of every cut with instrumentation on, which takes
 seconds, and **fails** on:
 
-- a scene that throws;
+- a beat that throws;
 - text outside the safe zone;
 - two text layers overlapping;
 - text below 24 px;
@@ -78,16 +80,17 @@ seconds, and **fails** on:
 - a layer not held still long enough to read;
 - nothing readable by 0.5 s;
 - the export probe not round-tripping;
-- in the continuous style, `world-overlap` (a word touching a shape of the
-  world: a key, a label or the band's words) and `stage` (the place in view,
-  while a beat holds, running off the frame, into its words or past the
-  footer).
+- `stage`: the subject, while a beat holds, leaving its stage room (into
+  the card's words, past the footer, off the frame), or a stage label
+  touching the subject.
 
-It **warns** on single-frame pops, a still frame held longer than its read
-needs (`frozen`), and a scene whose hold frame
+Stage labels ride the world, so they are judged for size, contrast and the
+subject, not for holding still. It **warns** on single-frame pops, a stage
+that stops for longer than a beat's read (`frozen`), and a beat whose hold
+frame
 covers less than 60% of the safe area (`formats.md` § Layout per format;
-`stats.fill` lists every scene's figure). Fix the spec, never the
-check: shorten copy, pick a different scene, lengthen `dur`. Rerun until
+`stats.fill` lists every beat's figure). Fix the spec, never the
+check: shorten copy, change the zoom or the look, lengthen `dur`. Rerun until
 every cut has `ok: true`.
 
 The export probe encodes the first 2 s through the real export path and
@@ -100,18 +103,23 @@ this browser would give the user. Report it.
 VideoAudit.run({ cut: 'main' }).then(r => r.contactSheet())
 ```
 
-returns a PNG data URL: one frame per scene hold and per transition,
-labelled with `V` handles and timecodes outside the frames. Look at it (or
-take one screenshot of the player at a scene's hold). You are looking for
-what no check catches: a chart that doesn't say what its headline says, a
-scene that holds two ideas, a hook that isn't the strongest true thing.
+returns a PNG data URL: one frame per beat hold and per transition (the
+middle of each change), labelled with `V` handles and timecodes outside
+the frames. Look at it. You are looking for what no check catches: a thing
+that doesn't read as what the source names, a change whose middle reads as
+neither state, a stage that looks like separate scenes instead of one
+world, a chart that doesn't say what its headline says, a hook that isn't
+the strongest true thing.
 
 ### 7.4 Re-read every figure against the source
 
 Go back to the source, not your notes. For each claim: the `verbatim` is
 really in the source at the `locator`; the `display` matches it; a derived
 figure's `working` reproduces; every hedge from the source is on screen and
-in the caption; no word on screen says more than the source does. This is
+in the caption; no word on screen says more than the source does. Then the
+stage: every feature drawn on a thing (a fin, an open top, a charging post)
+is one the source names, and nothing real appears that the source doesn't
+mention. This is
 where a wrong paragraph or a dropped "could" is caught.
 
 **Without a browser**, 7.1 and 7.4 are the floor. Say plainly in the

@@ -320,6 +320,39 @@
         "zero-dependency",
         "offline"
       ]
+    },
+    {
+      "name": "diorama-slides",
+      "source": "./plugins/diorama-slides",
+      "description": "Turn an article, history, report or table into a short video where a still card of words (headline, figure, units, dated source) sits over a living 2.5D toy-diorama stage: one subject changing form era by era, drawn from your source's own nouns, with one fixed camera angle that pans and zooms on the world only. Between slides and a film: for stories where the thing itself changes, not for slide-style explainers with charts (explainer-video) or a cinematic 3D film (documentary-video). 15–60 s in 9:16, 4:5, 1:1 or 16:9, in the same design system as chart-dashboard. Every figure comes from your source with its hedges kept. One standalone HTML file that exports MP4 in your browser: no other apps, no CDN, works offline; never posts.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Raghuram Sirigiri"
+      },
+      "license": "MIT",
+      "keywords": [
+        "diorama",
+        "video",
+        "explainer",
+        "isometric",
+        "2.5d",
+        "motion-graphics",
+        "article-to-video",
+        "history-to-video",
+        "evolution",
+        "transformation",
+        "data-storytelling",
+        "reels",
+        "shorts",
+        "tiktok",
+        "mp4",
+        "webm",
+        "webcodecs",
+        "canvas",
+        "javascript",
+        "zero-dependency",
+        "offline"
+      ]
     }
   ]
 }

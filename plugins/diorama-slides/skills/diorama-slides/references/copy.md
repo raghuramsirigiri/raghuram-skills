@@ -36,13 +36,13 @@ per figure or quote that could appear on screen, in the spec's `claims`:
     Prefer a copied figure where one says the same thing.
   - `illustrative`: no source; written to show a shape. Allowed only when
     the user gave a topic with no figures (SKILL.md rule 1). The engine
-    labels every scene that shows one and the source card.
+    labels every beat that shows one and the source card.
 - **`hedge`**: the qualifier the source attaches (`could`, `estimated`,
   `up to`…). See § Hedges.
 - **`forecast`**: `true` for any projected, planned or target value.
 
 Tables and series go in `data` (`{ id, source, locator, unit, x, y }`),
-used by `trend-line`. A figure from a table that is painted as a label
+used by a beat's line chart. A figure from a table that is painted as a label
 (the end value) is still a claim.
 
 From a file: read `.md`, `.txt`, `.html` and `.csv` directly. Read
@@ -54,7 +54,7 @@ go to the web for figures the user didn't supply.
 ## Hedges: keep the source's certainty
 
 Shortening a sentence never upgrades it. When the source hedges a figure,
-the hedge (or an equivalent) is in the copy of **every scene that shows
+the hedge (or an equivalent) is in the copy of **every beat that shows
 it**, in the caption and in the alt text:
 
 | Source says | On screen, any of |
@@ -111,29 +111,27 @@ Quote only people the source quotes.
 
 | Layer | Limit |
 | --- | --- |
-| hook headline | 7 words |
-| big number's line | 8 words |
-| context title | 8 words, sub 10 |
-| evidence headline (states the finding with its number) | 10 words |
+| headline (states the finding with its number) | 10 words; a hook reads best at 7 |
 | kicker | 4 words |
 | units line | 8 words |
-| bar label | 3 words; ranked row 4 |
-| bullet | 7 words; step and timeline event 6 |
+| bar label | 3 words |
+| quote attribution | 6 words |
+| stage label (a stop, a place) | 3 words: a year or a name, never a figure |
 
-No full stop on headlines. One idea per layer. At most two kinetic layers
-(headline, line) are live at once. Kicker, units and source line are the
-card's furniture.
+No full stop on headlines. One idea per layer. Kicker, units and source
+line are the card's furniture; the stage's words are labels, not copy.
 
 ## Read time
 
 Each text layer is on screen, fully revealed and still, for at least
-**max(1.2 s, 0.5 s + 0.25 s per word)**. A scene's
+**max(1.2 s, 0.5 s + 0.25 s per word)**. A beat's
 read is counted from when its headline lands, so it runs alongside a chart
-that is still drawing. Every layer that lands later still gets its own time
+that is still drawing, and every beat holds at least 2 s so the stage gets
+looked at. Every layer that lands later still gets its own time
 once it has. A big number holds at least 1.5 s after its counter lands. The
 source card holds at least 2 s, and the final frame at least 1 s. The
 compiler builds these in when `dur` is `"auto"`. A number `dur`
-below a scene's minimum fails to compile. The audit measures what was actually
+below a beat's minimum fails to compile. The audit measures what was actually
 painted.
 
 ## Caption and alt text
@@ -142,6 +140,6 @@ painted.
   claim that is on screen in some cut, with its hedge. Name the source and
   its date. No handle, link or hashtag the user didn't give (hashtags: three
   at most). No `V` handles: the caption is public.
-- **Alt text**: an accessible description of the video's sequence of
+- **Alt text**: an accessible description of what the stage shows and the
   findings, in order, with their figures and hedges, ending with the
   source. One to four sentences.

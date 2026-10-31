@@ -1,4 +1,9 @@
-// node --test plugins/explainer-video/skills/explainer-video/tests/timeline.test.js
+// node --test plugins/diorama-slides/skills/diorama-slides/tests/timeline.test.js
+//
+// The timeline: whole frames, beats overlapping by their transition, the one
+// transition for the words (held longer when the stage changes), read time,
+// and a card layer that never moves: the kicker and the headline start in
+// the same place on every beat, in every format.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -9,150 +14,78 @@ function compile(spec, cut) {
   return { C: w.Motion.compile(spec, cut, { measure: mockCtx() }), M: w.Motion };
 }
 
-test('duration is a whole number of frames and frames = round(D * fps)', () => {
+test('duration is a whole number of frames', () => {
   const { C } = compile(FIXTURE_SPEC(), 'main');
   assert.strictEqual(C.frames, Math.round(C.duration * C.fps));
   assert.ok(Math.abs(C.duration * C.fps - C.frames) < 1e-9);
 });
 
-test('scenes overlap by exactly their incoming transition', () => {
+test('beats overlap by exactly their incoming transition; the first starts at 0', () => {
   const { C } = compile(FIXTURE_SPEC(), 'main');
+  assert.strictEqual(C.scenes[0].t0, 0);
+  assert.strictEqual(C.scenes[0].ovIn, 0);
   for (let i = 1; i < C.scenes.length; i++) {
     const a = C.scenes[i - 1], b = C.scenes[i];
-    assert.ok(Math.abs(a.t1 - b.t0 - (a.t1 - a.cEnd)) < 1e-9);
     assert.ok(Math.abs((a.t1 - b.t0) - b.trIn.dur) < 1e-9);
   }
 });
 
-test('every scene after the first arrives by the one transition, whatever the spec asks for', () => {
-  const s = FIXTURE_SPEC();
-  s.scenes[1].transitionIn = 'morph-bar';
-  s.scenes[2].transitionIn = 'flood';
-  const { C, M } = compile(s, 'main');
-  // `pan` belongs to the continuous style (world.test.js); a slide video only swaps.
-  assert.deepStrictEqual(Object.keys(M.transitions.list).sort(), ['cut', 'pan', 'swap']);
-  assert.strictEqual(C.scenes[0].trIn.name, 'cut');
-  for (const sc of C.scenes.slice(1)) {
-    assert.strictEqual(sc.trIn.name, 'swap', sc.id);
-    assert.ok(sc.exit > 0 || sc.last, `${sc.id}: content leaves before the next arrives`);
-  }
-});
-
-test('the first scene starts at 0 with no transition in', () => {
-  const { C } = compile(FIXTURE_SPEC(), 'main');
-  assert.strictEqual(C.scenes[0].t0, 0);
-  assert.strictEqual(C.scenes[0].ovIn, 0);
-});
-
-test('auto durations grow with word count (read-time rule)', () => {
-  const a = FIXTURE_SPEC(), b = FIXTURE_SPEC();
-  b.scenes[0].copy.title = 'Water use fell sharply across the whole of the valley this winter';
-  const da = compile(a, 'main').C.scenes[0].dur, db = compile(b, 'main').C.scenes[0].dur;
-  assert.ok(db > da + 1, `${da} vs ${db}`);
-});
-
-test('read-time formula: max(1.2, 0.5 + 0.25 per word)', () => {
-  const M = load({ scenes: [] }).Motion;
-  assert.strictEqual(M.readTime(1), 1.2);
-  assert.ok(Math.abs(M.readTime(8) - 2.5) < 1e-9);
-});
-
-test('reading starts when the headline lands: the hold is what the read still needs', () => {
-  const s = FIXTURE_SPEC();
-  s.data = [{ id: 'D1', source: 'A', locator: 't1', unit: 'litres', x: ['2022', '2023', '2024', '2025'], y: [150, 146, 141, 140] }];
-  s.scenes.splice(2, 0, { id: 'trend', type: 'trend-line', copy: { title: 'Use has fallen every year' }, series: 'D1' });
-  s.cuts.main.scenes.splice(2, 0, 'trend');
-  const { C } = compile(s, 'main');
-  const sc = C.scenes.find(x => x.id === 'trend');
-  const head = sc.layers.find(l => l.id === 'headline');
-  const headLanded = sc.cStart + head.at + head.dur;
-  // The line draws long after the headline lands; the read runs alongside it.
-  assert.ok(sc.enter > head.at + head.dur + 0.5, 'the chart draws after the headline lands');
-  assert.ok(sc.exitStart - headLanded >= sc.built.read - 1e-9, 'the read is all there, counted from the headline');
-  assert.ok(sc.dur < sc.enter + sc.built.read + sc.exit - 0.5, `the scene is shorter than entrance + read: ${sc.dur}`);
-});
-
-test('every layer is on screen long enough to read once it lands', () => {
+test('one transition for the words: a swap, held longer (travel) when the stage changes', () => {
   const { C, M } = compile(FIXTURE_SPEC(), 'main');
-  for (const sc of C.scenes) {
-    for (const l of sc.layers) {
-      if (l.kind !== 'text' && l.kind !== 'counter') continue;
-      const landed = sc.cStart + (l.at || 0) + (l.dur || 0);
-      const words = l.lines ? l.lines.reduce((n, ln) => n + M.text.wordCount(ln.text), 0) : 0;
-      const need = l.role === 'value' ? M.READ.number : l.role === 'label' ? M.READ.min : M.readTime(words);
-      const end = sc.last ? C.duration : sc.exitStart;
-      assert.ok(end - landed >= Math.min(need, sc.last ? Math.max(M.READ.final, sc.read) : need) - 1e-9, `${sc.id}/${l.id}: ${end - landed} s`);
-    }
-  }
+  assert.deepStrictEqual(Object.keys(M.transitions.list).sort(), ['cut', 'swap', 'travel']);
+  const [hook, mid, big, src] = C.scenes;
+  assert.strictEqual(hook.trIn.name, 'cut');
+  assert.strictEqual(mid.trIn.name, 'travel');
+  assert.strictEqual(big.trIn.name, 'travel');
+  assert.strictEqual(src.trIn.name, 'swap', 'the source card keeps the state, so the words only swap');
+  assert.ok(mid.trIn.dur > src.trIn.dur);
+  // The words do the same thing in both.
+  assert.strictEqual(M.transitions.list.travel.reveal, M.transitions.list.swap.reveal);
+  assert.strictEqual(M.transitions.list.travel.ownsExit, M.transitions.list.swap.ownsExit);
 });
 
-test('a numeric dur below the minimum fails, naming the scene', () => {
+test('a spec\'s old transitionIn is ignored', () => {
   const s = FIXTURE_SPEC();
-  s.scenes[1].dur = 0.8;
-  assert.throws(() => compile(s, 'main'), /scene "hook": dur 0.8 s is below its minimum/);
-});
-
-test('a numeric dur above the minimum is kept as the content length', () => {
-  const s = FIXTURE_SPEC();
-  s.scenes[1].dur = 9;
+  s.scenes[1].transitionIn = 'flood';
   const { C } = compile(s, 'main');
-  assert.strictEqual(C.scenes[1].dur, 9);
+  assert.strictEqual(C.scenes[1].trIn.name, 'travel');
 });
 
-test('the big number holds at least 1.5 s after its counter lands', () => {
+test('a dur below a beat\'s minimum fails to compile, naming the beat', () => {
+  const s = FIXTURE_SPEC();
+  s.scenes[1].dur = 0.5;
+  assert.throws(() => compile(s, 'main'), /scene "mid": dur 0.5 s is below its minimum/);
+});
+
+test('auto durations grow with the words, and every beat holds at least 2 s', () => {
+  const a = FIXTURE_SPEC(), b = FIXTURE_SPEC();
+  b.scenes[1].copy.title = 'The works grew across the whole of the valley that decade';
+  const da = compile(a, 'main').C.scenes[1], db = compile(b, 'main').C.scenes[1];
+  assert.ok(db.dur > da.dur);
+  assert.ok(da.read >= 2);
+});
+
+for (const format of ['9:16', '4:5', '1:1', '16:9']) {
+  test(format + ': the kicker and the headline start in the same place on every beat', () => {
+    const s = FIXTURE_SPEC();
+    s.cuts.main.format = format;
+    const { C } = compile(s, 'main');
+    const beats = C.scenes.filter(sc => sc.type === 'beat');
+    const heads = beats.map(sc => sc.layers.find(l => l.role === 'headline').lines[0]);
+    heads.forEach(h => { assert.strictEqual(h.x, heads[0].x); assert.strictEqual(h.y, heads[0].y); });
+    const kick = C.scenes.map(sc => sc.chrome && sc.chrome.kicker).filter(Boolean);
+    kick.forEach(k => { assert.strictEqual(k.x, kick[0].x); assert.strictEqual(k.y, kick[0].y); });
+  });
+}
+
+test('the headline is one size on every beat (the card never grows or shrinks)', () => {
   const { C } = compile(FIXTURE_SPEC(), 'main');
-  const hook = C.scenes.find(s => s.id === 'hook');
-  const counter = hook.layers.find(l => l.kind === 'counter');
-  const landed = hook.cStart + counter.at + counter.dur;
-  assert.ok(hook.exitStart - landed >= 1.5 - 1e-9, `${hook.exitStart - landed}`);
+  const sizes = new Set(C.scenes.filter(sc => sc.type === 'beat').map(sc => sc.layers.find(l => l.role === 'headline').size));
+  assert.strictEqual(sizes.size, 1);
 });
 
-test('the last scene has no exit and holds at least 1 s', () => {
-  const { C } = compile(FIXTURE_SPEC(), 'main');
-  const last = C.scenes[C.scenes.length - 1];
-  assert.strictEqual(last.exit, 0);
-  assert.ok(C.duration - last.enterEnd >= 1);
-});
-
-test('nothing zooms: no frame scales content, and a picture holds its size', () => {
+test('a beat carries one figure or one chart, not both', () => {
   const s = FIXTURE_SPEC();
-  const IMG = 'data:image/png;base64,AAAA';
-  s.scenes.splice(2, 0, { id: 'photo', type: 'photo-pan', copy: { caption: 'The new terminal opened in March', image: IMG } });
-  s.cuts.main.scenes.splice(2, 0, 'photo');
-  const w = load();
-  const C = w.Motion.compile(s, 'main', { measure: mockCtx(), images: { [IMG]: { width: 400, height: 300 } } });
-  for (let n = 0; n < C.frames; n += 3) {
-    const log = [];
-    w.Motion.seek(mockCtx(log), C, n / C.fps);
-    assert.ok(!log.some(l => l.startsWith('scale(')), `frame ${n} scales content`);
-  }
-  const photo = C.scenes.find(x => x.id === 'photo');
-  const drawn = t => { const log = []; w.Motion.seek(mockCtx(log), C, t); return log.find(l => l.startsWith('drawImage(')).split('|')[0]; };
-  assert.strictEqual(drawn(photo.enterEnd + 0.1), drawn(photo.exitStart - 0.05), 'the picture is the same size and place all through its hold');
-});
-
-test('unknown claim, scene, type and cut fail with readable errors', () => {
-  let s = FIXTURE_SPEC(); s.scenes[1].copy.value = 'F9';
-  assert.throws(() => compile(s, 'main'), /unknown claim "F9"/);
-  s = FIXTURE_SPEC(); s.cuts.main.scenes.push('nope');
-  assert.throws(() => compile(s, 'main'), /no scene with id "nope"/);
-  s = FIXTURE_SPEC(); s.scenes[0].type = 'spinning-logo';
-  assert.throws(() => compile(s, 'main'), /unknown type "spinning-logo"/);
-  assert.throws(() => compile(FIXTURE_SPEC(), 'long'), /no cut named "long"/);
-});
-
-test('two cuts compile from one spec with their own formats', () => {
-  const s = FIXTURE_SPEC();
-  const a = compile(s, 'main').C, b = compile(s, 'short').C;
-  assert.strictEqual(a.format, '9:16'); assert.strictEqual(b.format, '1:1');
-  assert.ok(b.duration < a.duration);
-});
-
-test('claim ids in copy resolve to their display text', () => {
-  const s = FIXTURE_SPEC();
-  s.scenes[0].copy.title = 'Use fell {F1} this winter';
-  const { C } = compile(s, 'main');
-  const head = C.scenes[0].layers.find(l => l.id === 'headline');
-  assert.match(head.lines.map(l => l.text).join(' '), /Use fell 12% this winter/);
-  assert.strictEqual(JSON.stringify(C.scenes[0].used), '["F1"]');
+  s.scenes[2].copy.value = 'F3';
+  assert.throws(() => compile(s, 'main'), /one figure or one chart/);
 });

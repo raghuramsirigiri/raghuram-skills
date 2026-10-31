@@ -170,6 +170,19 @@ topic with figures in it.
   plugins/documentary-video/skills/documentary-video/tests/shared-files.test.js`
   fails on drift. It ships primitives, never ready-made things: every cast
   item is built for its film from the document's nouns.
+- `plugins/diorama-slides/` is a card layer over a living 2.5D stage, copied
+  from explainer-video and changed: it carries its **own copy** of
+  `assets/charts-lib/theme.js` and the three brand-recolour scripts
+  (identical to chart-dashboard's) and of explainer-video's
+  `assets/motion-lib/mux-mp4.js` and `mux-webm.js`. The copies rule covers
+  it too: a change to any of them goes into every plugin that carries it,
+  in one commit, and `node --test
+  plugins/diorama-slides/skills/diorama-slides/tests/shared-files.test.js`
+  fails on drift. Everything else in it is its own; never change
+  explainer-video to suit it, or the reverse. It has one mode (no
+  `meta.style`); the story's shape decides how the stage moves, and every
+  thing on the stage is drawn by the video's own painter from the source's
+  nouns, never from a library of things.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
@@ -226,6 +239,10 @@ plugins/explainer-video/
   .claude-plugin/plugin.json
   skills/explainer-video/   SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
                             (assets/charts-lib/theme.js and the theme scripts are copies of chart-dashboard's)
+plugins/diorama-slides/
+  .claude-plugin/plugin.json
+  skills/diorama-slides/    SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
+                            (theme.js, the theme scripts and the muxers are copies)
 examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin

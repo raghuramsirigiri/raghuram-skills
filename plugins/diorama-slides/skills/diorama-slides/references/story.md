@@ -1,93 +1,113 @@
-# The story: spine, hook, budget, cuts
+# The story: its shape, the spine, the hook, the cuts
 
-**The product is the edit.** Any tool can animate text. What makes this
-video worth posting is three choices: which finding opens it, one idea per
-scene with time to read it, and what gets left out. Make them in that order,
-before writing any spec.
+**The product is the shape and the edit.** A video that picks a picture
+per finding comes out as a row of separate little scenes, one per section,
+however good each one is. So decide the story's shape first, from what the
+source is about as a whole, and only then cut it into beats. Then make the
+three edit choices: which finding opens it, one idea per beat with time to
+read it, and what gets left out.
+
+## The shape
+
+Read the source and ask what changes over the video. The answer names the
+shape. Each shape is a grammar for how beats drive the stage and the
+camera; it has no content of its own. The things on the stage are always
+drawn from the source's nouns (`stage.md`).
+
+| The source is about… | Shape | The stage | A beat moves it by… | Examples |
+| --- | --- | --- | --- | --- |
+| one subject and its states over time | **transformation** | the subject on a path of stops, one per state; a branching path for a lineage | naming the next state: the subject travels on and changes form | a family car across a century; a species' lineage; a phone's generations |
+| several things compared on more than one measure | **lineup** | the whole cast on one stage | naming the measure: the cast rearranges by it | dinosaurs by size, then diet, then hunting; planets by size, then by day length |
+| one thing made, step by step | **assembly** | the thing on its site, growing | naming the step: the next part goes on; a cutaway is a staged insert | a tower's construction; how a bridge is built |
+| a set of separate cases, places or events | **episodes** | a place per item on one board | naming the item: the camera travels to its place | tactics of a war's campaigns; five cities' answers to one problem |
+| a route, a campaign or a migration | **journey** | a schematic, stylised map | naming the leg: the mover goes on along the route | a migration; a supply route; an expedition |
+
+How to tell them apart:
+
+- **One subject or many?** One that changes is a transformation; many that
+  stay themselves and get compared is a lineup.
+- **Does the thing exist yet?** A thing that comes into being part by part
+  is an assembly, even when the source also gives its states.
+- **Does place matter?** If where each item happens is part of the point
+  (a front, a city, a site), it is episodes; if the path between places is
+  the point, it is a journey. A journey's map is schematic (land, water,
+  a route line, named places as plain labels), never the look of a real
+  map product.
+- **When two fit**, take the one that keeps a single world in view longest.
+  A history of one aircraft is a transformation, not episodes of its
+  models.
+
+A source that is only values (a margin, a ratio, a quarterly series) with
+no thing to show is not a story for this skill: say so and suggest
+explainer-video, which makes slides with flat charts.
+
+**This version builds `transformation`.** The other four are named in the
+spec format so a story can be planned in them, and `check-video.js` refuses
+them until their grammar ships. Say so if the story needs one.
 
 ## The spine
 
-A fixed spine with a variable middle, like a deck's:
+A fixed spine with a variable middle:
 
-| Beat | In a 30 s cut | Job | Scene types |
-| --- | --- | --- | --- |
-| **Hook** | 0–5 s | The single most surprising *true* thing, with its number if it has one. On screen by 0.5 s. | `big-number`, `hook-headline` |
-| **Context** | one scene | What happened, who, when, in one line. Skip it if the hook already says it. | `kicker-title`, `timeline` |
-| **Evidence** | 2–4 scenes | One finding each, each with its figure and at most one chart. | `big-number`, `compare-bars`, `trend-line`, `share-split`, `ranked-list`, `before-after`, `quote`, `steps` |
-| **So what** | optional | Only an implication **the source states**, attributed. Skip it if the source states none. | `kicker-title`, `quote` |
-| **Source card** | last 3 s | Every source with its date; "illustrative" when any figure is. Always present. | `source-card` |
-| **Outro** | optional | The user's own name, logo or call to action, if they gave one. | `outro` |
+| Beat | In a 30–45 s cut | Job |
+| --- | --- | --- |
+| **Hook** | 0–5 s | The single most surprising *true* thing, with its number if it has one, over the stage's first state. On screen by 0.5 s. |
+| **The middle** | 3–6 beats | One per state, measure, step, place or leg, in the shape's order, each with its figure in the card. |
+| **A value beat** | optional | A finding with no thing of its own (a price, a share, a rate), its flat chart in the card while the stage keeps going. |
+| **So what** | optional | Only an implication **the source states**, attributed. |
+| **Source card** | last | Every source with its date; "illustrative" when any figure is. Always. |
 
-The compiler sets each scene's real length from its words (`copy.md` §
-Read time), so the spine's times are a guide. Write the copy, compile, and
-read the per-scene durations `check-video.js` prints.
+The compiler sets each beat's real length from its words and from how far
+the stage moves into it, so the times are a guide: compile, and read the
+per-beat durations `check-video.js` prints.
 
-## Scene budget
+## Length
 
-About one scene per 3–5 s:
+About one beat per 3–6 s; a beat that changes the stage carries the
+change (1–2 s) before its words. **15–60 s** for every shape. A lineup or a
+journey may run to **90 s** when its cast or route needs it: say at
+handover that it is long for a feed, and offer a shorter cut.
 
-| Length | Scenes |
+| Length | Beats |
 | --- | --- |
-| 15 s | hook, 1–2 evidence, source card |
-| 30 s | hook, context, 2–3 evidence, source card |
-| 45 s | hook, context, 3–5 evidence, so-what, source card |
-| 60 s | hook, context, up to 7 evidence, source card |
-
-Beyond 60 s, say it is a long video for a feed and suggest two shorter
-ones from the same spec (`formats.md` § Cuts).
+| 15 s | hook, 1–2 more, source card |
+| 30 s | hook, 3–4, source card |
+| 45 s | hook, 5–6, source card |
+| 60 s (90 s lineup or journey) | hook, up to 8 (12), source card |
 
 ## Picking the hook
 
-This is the main judgement call. Take, in order:
+Take, in order: the finding the user asked about; else the largest change
+the source *states* (not one you compute and frame as bigger); else the most
+concrete number in the lede. Write it in the source's own register. "One of
+the best-selling" stays exactly that, never "the best-selling". When two
+findings are equally strong and the user picked neither, ask which leads.
 
-1. the finding the user asked about;
-2. else the largest change the source *states* (not one you compute and
-   frame as bigger);
-3. else the most concrete number in the lede.
+## One idea per beat
 
-Write the hook in the source's own register. A superlative goes in only if
-the source says it in those words. "Highest since 2011" stays exactly that.
-Never round it up to "record", "biggest ever" or "first". When two findings
-are about equally strong and the user picked neither, ask which leads (one
-question, the two candidates with their numbers). The choice block in
-`tracing.md` is how you explain the pick later.
+A beat carries one finding. If a sentence in the source holds two figures,
+the stronger gets the headline and the other goes in the units line or a
+beat of its own. A headline that needs "and" holds two ideas.
 
-## One idea per scene
+## The stage tells no cause
 
-A scene carries one finding. If a sentence in the source holds two
-figures, the stronger one gets the scene and the other goes in the
-units line or a scene of its own. A scene that needs "and" in its headline
-holds two ideas.
+The stage shows what changed, never why. A fuel pump at the 1979 stop is
+there because the source gives that car's fuel use; it may not appear next
+to a fuel-price figure the source doesn't link to the car. Two facts in the
+same source are two facts, on screen, in the order of beats, and on the
+stage.
 
 ## What to leave out, and saying so
 
-Every source holds more than the video can carry. Leave out, in this order:
-
-1. background the viewer doesn't need to follow the findings;
-2. the weakest evidence: the smallest change, the figure with the most
-   caveats, the one needing the most context;
-3. findings that need a chart the frame can't hold (more than six bars,
-   more than one line).
-
-List what you left out in the handover. Never leave out a hedge, a caveat
-the source attaches to a figure you kept, or the source card.
+Leave out, in this order: background the viewer doesn't need; the weakest
+evidence (the smallest change, the most caveated figure); findings whose
+thing the source never describes (nothing to draw truthfully). List what
+you left out in the handover. Never leave out a hedge, a caveat the source
+attaches to a figure you kept, or the source card.
 
 ## A shorter cut of the same story
 
-A 15 s cut is not the 30 s cut sped up. Drop scenes, never read time:
-
-1. drop the context scene;
-2. drop the weakest evidence scenes until the budget fits;
-3. keep the hook and the source card, always.
-
-Cuts share one spec and one ledger, so a figure is correct in every cut at
-once (`formats.md` § Cuts).
-
-## No cause the source doesn't state
-
-Two facts in the same article are two facts. If the source says ridership
-rose and, three paragraphs later, that a route opened, the video does not
-say the route caused the rise. That holds for the words, for the order of
-scenes that implies it ("New route" right before "Ridership up 38%"), and
-for the caption. A cause goes in only when the source states it, attributed
-in its words ("the authority credits the new route").
+A 15 s cut is not the long cut sped up. Drop beats, never read time: keep
+the hook, the states or steps that carry the most change, and the source
+card. Cuts share one spec and one ledger, so a figure is correct in every
+cut at once (`formats.md` § Cuts).

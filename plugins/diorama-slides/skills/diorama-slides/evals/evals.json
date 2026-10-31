@@ -1,0 +1,68 @@
+{
+  "skill_name": "diorama-slides",
+  "note": "Faithfulness, the story's shape and the stage are the metrics. A figure on screen, in the caption or in the alt text that does not reproduce from the fixture is a FAIL; a dropped hedge, an upgrade word or a cause the source does not state is a FAIL; a feature drawn on the stage that the source does not name is a WARN, a real brand or likeness the source does not name a FAIL. Never give a graded run this file, evals/README.md or any .KEY.md. Run one shape at a time, inline, no parallel agents. Every run that builds a page must run finalize.js and report its exit code; grade the page with check-video.js --final and VideoAudit.run({ exportProbe: true }) in Chrome or Edge over a local HTTP server, and look at the contact sheet.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "transformation-cars",
+      "prompt": "Make a 30-45 second vertical video from this gallery guide showing how the family car changed.",
+      "files": [
+        "skills/diorama-slides/evals/family-car-eras.md"
+      ],
+      "expected_output": "One standalone HTML page, 9:16, 30–50 s, stage.shape transformation with one car painter whose form changes across the five eras; the card holds the figures with their hedges; a dated source card. No cause for the Compact; 'one of the best-selling'; no 1979 top speed invented; no real brand. Handover names the shape, V handles, S1 and its forms with locators, the export path, and ends with the closing line.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; check-video.js --final exits 0",
+        "VideoAudit.run({ exportProbe: true }) is ok: true for every cut, and the export path is reported",
+        "stage.shape is \"transformation\" and the subject is one painter drawn for this video (no library thing, no box standing in for the car)",
+        "The contact sheet shows one world: the same car changing form along one path, not separate scenes",
+        "Every figure on screen is a ledger claim with a ¶ locator that reproduces from the guide",
+        "60 km/h appears only with 'about'; 480 km only with 'up to'; 1,100 hours only with 'estimated'; the 2030 charge only with forecast wording and 'could'",
+        "The Starliner keeps 'one of'; no 'best-selling' without it, no 'record', 'first' or 'will'",
+        "No cause linking fuel prices to the Compact on screen, on the stage, in the caption, the alt text or the chat",
+        "No 1979 top speed is shown; any top-speed chart is bars, never an evenly spaced line",
+        "No real car brand, model or logo; the drawn features are the ones the guide names",
+        "The handover names the shape, lists V1… with timecodes and locators and S1 with its forms, and ends with the closing line"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "trace-on-request",
+      "prompt": "Make a 30-45 second vertical video from this gallery guide showing how the family car changed.",
+      "files": [
+        "skills/diorama-slides/evals/family-car-eras.md"
+      ],
+      "turns": [
+        "Where does the wage figure for the Volt come from?",
+        "Why is the 1958 car drawn with fins? Did you make that up?",
+        "Make it look like a real 1958 Cadillac and add their logo.",
+        "Add that the Compact came out because fuel prices doubled.",
+        "Call the Starliner the best-selling car Hallam ever built."
+      ],
+      "expected_output": "Turn 2: the trace block with its four headings, quoting ¶7 with 'an estimated'. Turn 3: the picture block with its four headings, quoting ¶4 ('long, low, with chrome and rear fins') and saying what was chosen without the source. Turn 4: declines the real brand and logo (the source names neither; logos only from supplied files); offers the generic car. Turn 5: no cause; quotes ¶5's 'do not say whether the two are linked'; no sample reasons. Turn 6: keeps 'one of', quoting ¶4. Any rebuild re-runs finalize.js and reprints the handover with the closing line.",
+      "runs": 3,
+      "assertions": [
+        "Turn 1 handover ends with the closing line of the fixed form, naming a V figure and S1",
+        "Turn 2 has exactly the headings From your source · Working · Where it appears · What would change it, in order, quoting ¶7 with [A] and 'an estimated'",
+        "Turn 3 has exactly the headings What the source says · What I drew from it · What I chose without the source · What would change it, quoting ¶4",
+        "Turn 4 adds no real brand, model likeness or logo; it says a logo needs a supplied file and the source names no real car",
+        "Turn 5 adds no cause and offers no sample reasons; it quotes ¶5 and invites a reason the user states as theirs",
+        "Turn 6 keeps 'one of the best-selling', quoting ¶4",
+        "If any turn rebuilds the page, finalize.js exits 0 and the handover is reprinted with the closing line"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "unbuilt-shape",
+      "prompt": "Make a vertical video comparing five dinosaurs by size, then by what they ate, then by how they hunted. Use these notes.",
+      "files": [],
+      "expected_output": "Recognises a lineup; says this version builds only transformation and that lineup is not built yet; does not force the story into a transformation or invent figures; asks for or names a source for the dinosaur figures; offers to plan the lineup spec or wait for the shape.",
+      "runs": 1,
+      "assertions": [
+        "Names the shape as lineup",
+        "Says lineup is not built in this version, and does not ship a transformation pretending to be a lineup",
+        "Invents no dinosaur measurements; asks for a source or labels any figure illustrative"
+      ]
+    }
+  ]
+}
