@@ -82,7 +82,6 @@
 <script src="motion-lib/art.js"></script>
 <script src="motion-lib/iso.js"></script>
 <script src="motion-lib/stage.js"></script>
-<script src="motion-lib/shapes/transformation.js"></script>
 <script src="motion-lib/scenes/beat.js"></script>
 <script src="motion-lib/scenes/source-card.js"></script>
 <script src="motion-lib/audio.js"></script>
@@ -91,14 +90,16 @@
 <script src="motion-lib/export.js"></script>
 <script src="motion-lib/player.js"></script>
 <script>
-/* The stage's painters go HERE, one for each thing on the stage, drawn from
-   this story's own nouns with the iso kit (references/stage.md § Drawing
-   the story's things). Write and look at them one at a time. A painter
-   draws with V (a view whose origin is the thing's place) and reads its
-   form from s; text only through api.label. Pure function of its inputs:
-   no Math.random (api.rng), Date.now, timers or state kept between calls.
+/* The world goes HERE: one painter for the whole stage, named in
+   spec.stage.world (references/stage.md § The world). Every beat's
+   stage.shows is something it makes happen, by that beat's progress
+   (w.progress), the story's clock (w.time) or a running total
+   (w.accumulate); things are drawn from this story's own nouns with the iso
+   kit. Figures come from w.value / w.share, words only through api.label.
+   Pure function of w: no Math.random (api.rng), Date.now, timers or state
+   kept between calls. Build and look at it a beat at a time.
 
-Motion.things.name = { draw(V, s, api) { … } };
+Motion.things.name = { marks(w) { return { … }; }, draw(w, api) { … } };
 */
 
 (async function () {

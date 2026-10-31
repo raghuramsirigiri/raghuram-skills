@@ -30,14 +30,14 @@ test('beats overlap by exactly their incoming transition; the first starts at 0'
   }
 });
 
-test('one transition for the words: a swap, held longer (travel) when the stage changes', () => {
+test('one transition for the words: a swap, held longer (travel) when story time changes', () => {
   const { C, M } = compile(FIXTURE_SPEC(), 'main');
   assert.deepStrictEqual(Object.keys(M.transitions.list).sort(), ['cut', 'swap', 'travel']);
   const [hook, mid, big, src] = C.scenes;
   assert.strictEqual(hook.trIn.name, 'cut');
   assert.strictEqual(mid.trIn.name, 'travel');
   assert.strictEqual(big.trIn.name, 'travel');
-  assert.strictEqual(src.trIn.name, 'swap', 'the source card keeps the state, so the words only swap');
+  assert.strictEqual(src.trIn.name, 'swap', 'the source card keeps story time, so the words only swap');
   assert.ok(mid.trIn.dur > src.trIn.dur);
   // The words do the same thing in both.
   assert.strictEqual(M.transitions.list.travel.reveal, M.transitions.list.swap.reveal);

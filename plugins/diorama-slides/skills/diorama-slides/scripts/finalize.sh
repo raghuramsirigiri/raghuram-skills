@@ -37,11 +37,10 @@ dir=$(cd "$(dirname "$target")" && pwd)
 name=$(basename "$target")
 
 if [ -n "$stage" ]; then
-  mkdir -p "$dir/charts-lib" "$dir/motion-lib/scenes" "$dir/motion-lib/shapes" || exit 1
+  mkdir -p "$dir/charts-lib" "$dir/motion-lib/scenes" || exit 1
   cp "$ASSETS/charts-lib/theme.js" "$dir/charts-lib/" || exit 1
   cp "$ASSETS/motion-lib/"*.js "$dir/motion-lib/" || exit 1
   cp "$ASSETS/motion-lib/scenes/"*.js "$dir/motion-lib/scenes/" || exit 1
-  cp "$ASSETS/motion-lib/shapes/"*.js "$dir/motion-lib/shapes/" || exit 1
   echo "staged charts-lib/ and motion-lib/ beside $name — open the page over http and run the audit (SKILL.md step 7)."
   echo "note: Node was not found, so check-video.js cannot run on this machine." >&2
   exit 0

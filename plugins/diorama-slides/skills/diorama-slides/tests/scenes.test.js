@@ -19,11 +19,11 @@ test('the manifest lists exactly the registered scenes, with the same slots', ()
   }
 });
 
-test('the shapes the manifest calls built are exactly the registered grammars', () => {
+test('the manifest\'s shapes are the engine\'s names, and none of them is a runtime grammar', () => {
   const M = load().Motion;
-  const built = Object.keys(manifest.shapes).filter(k => manifest.shapes[k].built).sort();
-  assert.strictEqual(JSON.stringify(Object.keys(M.stage.shapes).sort()), JSON.stringify(built));
   assert.strictEqual(JSON.stringify(Object.keys(manifest.shapes).sort()), JSON.stringify(M.stage.NAMES.slice().sort()));
+  assert.ok(!M.stage.shapes, 'shapes guide the story; the page\'s world decides what happens');
+  assert.ok(Object.values(manifest.shapes).every(v => typeof v.verified === 'boolean'));
 });
 
 test('lineups and journeys may run to 90 s; the rest to 60 s', () => {

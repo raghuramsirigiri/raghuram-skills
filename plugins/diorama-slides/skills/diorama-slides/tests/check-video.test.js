@@ -43,28 +43,35 @@ test('meta.style fails: this skill has one mode', () => {
   assert.ok(fails(check(s)).some(x => /one mode/.test(x)));
 });
 
-test('a shape that is named but not built fails before anything renders', () => {
+test('a shape that hasn\'t been through its acceptance video warns, and still builds', () => {
   const s = FIXTURE_SPEC(); s.stage.shape = 'journey';
-  assert.ok(fails(check(s)).some(x => /"journey" is not built yet/.test(x)));
+  const r = check(s);
+  assert.deepStrictEqual(fails(r), []);
+  assert.ok(r.rows.some(x => x.level === 'WARN' && /"journey" has not been through its acceptance video/.test(x.detail)));
 });
 
-test('a stage thing with no painter in the page fails', () => {
-  const s = FIXTURE_SPEC(); s.stage.scenery = 'trees';
-  assert.ok(fails(check(s)).some(x => /registers no Motion\.things\.trees/.test(x)));
+test('a world the page doesn\'t register fails', () => {
+  const s = FIXTURE_SPEC(); s.stage.world = 'town';
+  assert.ok(fails(check(s)).some(x => /registers no Motion\.things\.town/.test(x)));
+});
+
+test('a beat with no stage.shows fails: every beat directs the world', () => {
+  const s = FIXTURE_SPEC(); delete s.scenes[1].stage.shows;
+  assert.ok(fails(check(s)).some(x => /V2 mid: no stage\.shows/.test(x)));
 });
 
 test('a figure typed onto a stage label fails', () => {
-  const s = FIXTURE_SPEC(); s.stage.states[1].label = '40 pumps';
-  assert.ok(fails(check(s)).some(x => /typed onto the stage/.test(x)));
+  const p = 'Motion.things.works = { draw(w, api) { api.label("40 pumps", 0, 0, 0); } };';
+  assert.ok(fails(check(FIXTURE_SPEC(), p)).some(x => /stage label "40 pumps"/.test(x)));
 });
 
 test('a painter that paints text itself fails: stage words go through api.label', () => {
-  const p = 'Motion.things.block = { draw(V, s, api) { V.ctx.fillText("Pumps", 0, 0); } };';
+  const p = 'Motion.things.works = { draw(w, api) { api.ctx.fillText("Pumps", 0, 0); } };';
   assert.ok(fails(check(FIXTURE_SPEC(), p)).some(x => /api\.label/.test(x)));
 });
 
 test('a painter using Math.random fails', () => {
-  const p = 'Motion.things.block = { draw(V, s, api) { V.box(0, 0, 0, Math.random(), 1, 1, api.mat.N); } };';
+  const p = 'Motion.things.works = { draw(w, api) { api.view().box(0, 0, 0, Math.random(), 1, 1, api.mat.N); } };';
   assert.ok(fails(check(FIXTURE_SPEC(), p)).some(x => /Math\.random/.test(x)));
 });
 

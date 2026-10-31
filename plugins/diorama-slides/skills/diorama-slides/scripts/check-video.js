@@ -82,17 +82,16 @@ if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.au
 });
 if (meta.art != null && ['off', 'halftone'].indexOf(meta.art) < 0) shape.push('meta.art must be "off" or "halftone" (references/design.md § Artwork)');
 if (meta.style != null) shape.push('meta.style: this skill has one mode, the card over the stage; delete it (references/stage.md)');
-// The stage: a shape this version builds, and a painter in the page for every thing it names.
+// The stage: a known shape, and the page's own world painter.
 const stg = spec.stage || null;
 const SHAPES = manifest.shapes;
 if (!stg) shape.push('no "stage": every video is a card over a living stage (references/stage.md)');
 else {
   if (!SHAPES[stg.shape]) shape.push('stage.shape must be one of ' + Object.keys(SHAPES).join(', '));
-  else if (!SHAPES[stg.shape].built) shape.push('stage.shape "' + stg.shape + '" is not built yet in this version (built: ' + Object.keys(SHAPES).filter(k => SHAPES[k].built).join(', ') + ')');
+  else if (!SHAPES[stg.shape].verified) warn('stage', 'stage.shape "' + stg.shape + '" has not been through its acceptance video yet: look at the contact sheet harder (verified: ' + Object.keys(SHAPES).filter(k => SHAPES[k].verified).join(', ') + ')');
   const registered = new Set([...html.matchAll(/Motion\.things\.([A-Za-z_$][\w$]*)\s*=/g)].map(x => x[1]));
-  ['subject', 'ground', 'scenery'].forEach(k => {
-    if (stg[k] && !registered.has(stg[k])) shape.push('stage.' + k + ' names "' + stg[k] + '", but the page registers no Motion.things.' + stg[k]);
-  });
+  if (!stg.world) shape.push('stage.world: name the page\'s world painter (Motion.things.<name>)');
+  else if (!registered.has(stg.world)) shape.push('stage.world names "' + stg.world + '", but the page registers no Motion.things.' + stg.world);
 }
 const scenes = spec.scenes || [];
 const byId = {};
@@ -162,20 +161,10 @@ try {
         const B = sc.stageBox;
         if (B && B.h < C.H * 0.22) warn('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': the stage has ' + Math.round(B.h) + ' px of height under the card — shorten the words, or give the chart a beat of its own');
       });
-      // The stage acts out the story: a pace that carries a figure has that
-      // figure in the card somewhere in the cut, and every beat says what
-      // its stage shows.
-      const onScreen = new Set();
-      C.scenes.forEach(sc => sc.used.forEach(id => onScreen.add(id)));
-      const beats = (C.stage.plan && C.stage.plan.beats) || [];
-      [...new Set(beats.map(b => b.paceClaim).filter(Boolean))].forEach(id => {
-        if (!onScreen.has(id)) fail('stage', 'cut "' + name + '": the stage moves at the pace of ' + id + ', which no beat in the cut states — put its figure in the card where it first shows');
-      });
-      if (beats.length && !beats.some(b => b.paceClaim) && !(spec.stage.states || []).some(x => x.pace != null) && !scenes.some(x => x.stage && x.stage.pace != null)) {
-        warn('stage', 'cut "' + name + '": no state or beat sets a pace, so the subject only drifts at the fallback pace — does the story have a rate or a stop the stage should act out? (references/story.md § The point)');
-      }
+      // Every beat directs the world: what happens on the stage to show its
+      // insight (references/story.md § Direct each insight).
       C.scenes.forEach((sc, i) => {
-        if (sc.type === 'beat' && !(sc.spec.stage && sc.spec.stage.shows)) warn('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': no stage.shows — write what the stage does in this beat to act out its finding');
+        if (sc.type === 'beat' && !(sc.spec.stage && String(sc.spec.stage.shows || '').trim())) fail('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': no stage.shows — write what happens in the world to show this beat\'s insight, then make the world do it');
       });
       pass('timing', 'cut "' + name + '" · ' + C.format + ' · ' + C.shape + ' · ' + C.duration.toFixed(2) + ' s = ' + C.frames + ' frames at ' + C.fps + ' fps · ' +
         C.scenes.map((s, i) => 'V' + (i + 1) + ' ' + s.id + ' ' + s.dur.toFixed(1) + 's').join(', '));
@@ -243,11 +232,13 @@ function paintedStrings(s) {
 }
 const stripIds = str => String(str).replace(/\{[A-Za-z][\w.-]*\}/g, ' ');
 const numberFails = [];
-// The stage's own words (each state's label) are painted on every beat.
-((stg && stg.states) || []).forEach((x, i) => {
-  if (typeof x.label !== 'string') return;
-  numberTokens(x.label).forEach(t => numberFails.push('stage.states[' + i + '].label: "' + t.raw + '" is typed onto the stage — a stage label is a name or a year, never a figure'));
-  if (x.label.trim().split(/\s+/).length > 3) numberFails.push('stage.states[' + i + '].label: a stage label is at most three words');
+let own0;
+// The stage's own words: a label the page's painters set (api.label) is a
+// name or a year, never a figure.
+own0 = [];
+html.replace(/<script(?![^>]*\bsrc=)(?![^>]*application\/json)[^>]*>([\s\S]*?)<\/script>/g, (_, code) => { if (!/^\s*\/\*!/.test(code)) own0.push(code); });
+own0.join('\n').replace(/\.label\(\s*(['"`])([^'"`]*)\1/g, (_, q, str) => {
+  numberTokens(str).forEach(t => numberFails.push('a stage label "' + str + '" types "' + t.raw + '" — a figure is a claim, in the card'));
 });
 scenes.forEach(s => paintedStrings(s).forEach(p => {
   numberTokens(stripIds(p.text)).forEach(t => numberFails.push('scene "' + s.id + '" ' + p.where + ': "' + t.raw + '" is typed into copy — put it in the ledger and write {Fn}'));
@@ -401,9 +392,9 @@ function loadEngine() {
   const runF = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sb, { filename: f });
   runF(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
   ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'stage'].forEach(n => runF(path.join(MLIB, n + '.js')));
-  ['shapes', 'scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, d, f))));
-  // The stage's painters live in the page and draw only when a frame is
-  // painted; compiling needs none of them.
+  ['scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, d, f))));
+  // The world painter lives in the page and draws only when a frame is
+  // painted; compiling needs none of it.
   // Images are decoded in the browser; here any data URI counts as present.
   return sb;
 }

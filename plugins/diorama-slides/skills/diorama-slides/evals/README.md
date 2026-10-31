@@ -14,11 +14,20 @@ worked on doesn't go into the skill; the unseen topic is how that is caught.
 
 | Shape | Acceptance topic | Unseen topic (never tuned on) | Status |
 | --- | --- | --- | --- |
-| transformation | cars evolving (`family-car-eras.md`) | the camera, box camera to phone | built; acceptance video passes |
-| lineup | dinosaurs compared (by size, then diet, then hunting) | the planets compared | not built |
-| assembly | Burj Khalifa construction | how a suspension bridge is built | not built |
-| episodes | WW2 tactics, a campaign per place (neutral, non-graphic) | five cities' flood defences | not built |
-| journey | a migration route on a schematic map | a trade route across a continent | not built |
+| transformation | cars evolving (`family-car-eras.md`) | the camera, box camera to phone | acceptance video passes |
+| lineup | dinosaurs compared (by size, then diet, then hunting) | the planets compared | buildable; acceptance video not made yet |
+| assembly | Burj Khalifa construction | how a suspension bridge is built | buildable; acceptance video not made yet |
+| episodes | WW2 tactics, a campaign per place (neutral, non-graphic) | five cities' flood defences | buildable; acceptance video not made yet |
+| journey | a migration route on a schematic map | a trade route across a continent | buildable; acceptance video not made yet |
+
+**A generality probe** (`bakery-morning.md`, invented): after the engine
+stopped owning the world's behaviour, one video was built on a topic none
+of the above resembles (a clock, a count made, people arriving, a share
+sold, leftovers given away), with the documented contract only and no
+engine change for it. It found two engine gaps that every story would hit
+(the audit's subject was a fixed name rather than whatever the beat
+frames; a consequence couldn't play on through the hold), which were fixed
+in the engine, not in the page.
 
 Fixtures for the real-world topics (dinosaurs, Burj Khalifa, WW2) are
 written when their shape is built, from a source the user supplies or names
@@ -28,6 +37,9 @@ source.
 
 ## Fixtures
 
+- `bakery-morning.md`: an invented neighbourhood note about one bakery's
+  Saturday; hedges "about", "estimates", "usually"; clock times as claims.
+  The generality probe above; no key.
 - `family-car-eras.md`: an invented museum gallery guide to five
   generations of an invented maker's family car, 1912–2024. It plants a
   hedged top speed ("about"), a range with "up to", wage costs "about" and

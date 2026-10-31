@@ -1,9 +1,11 @@
-# The stage: its shape, its camera, its things
+# The stage: your world, its camera, its things
 
 The stage is the living half of the frame: a toy-like 2.5D diorama under
-the card, running without a break from the first frame to the last. The
-story's shape (`story.md`) decides how it moves; the things on it are drawn
-by you, for this video, from the source's nouns.
+the card, running without a break from the first frame to the last. It is
+**your world**: one painter the page registers draws all of it, and every
+insight in the video is something that painter makes happen
+(`story.md` § Direct each insight). The engine gives the painter time, the
+claims and a camera; it never decides what happens.
 
 ## The room the stage gets
 
@@ -21,163 +23,109 @@ fifth of the frame's height.
 - **One angle for the whole video**: an isometric view from the front
   right, never rotated, never tilted. Every beat sees the world from the
   same place, which is what makes it one world.
+- **Each beat frames a point**: `stage.focus` names a mark your world
+  returns from `marks(w)` (a mark may move, and the camera follows it) or
+  gives [x, y, z]; a beat without one keeps the one before. `stage.zoom`
+  (0.5–3) multiplies the scale that fits `stage.size` in the room;
+  `stage.look` nudges the framing by [x, y, z].
 - **Pan and zoom on the world only.** Between beats the camera eases (on
-  `glide`) to the next beat's framing over the words' swap and half a
-  second into the next words. During a beat it follows the subject. The
-  card, the kicker, the footer and every word painted above or below the
-  stage never zoom or move.
-- **Stage labels** (a stop's year, a place's name) are set at one size on
-  screen whatever the zoom, through `api.label`; they ride with the world,
-  fade before the stage's edges, and give way when the subject passes over
-  them.
-- A beat's `stage.zoom` (0.5–3, default 1) multiplies the scale fitted to
-  its room; `stage.look` ([x, y, z] in the subject's units) moves the point
-  the camera centres on, to look at a part (the fins, a doorway). The audit
-  fails a beat whose subject leaves its room while the words hold, so a
-  close zoom needs a look that keeps the subject in.
+  `glide`) over the words' swap and half a second into the next words. The
+  card, the kicker, the footer and every word above or below the stage
+  never zoom or move.
+- **Frame what the beat acts on.** Pick the focus and zoom so the thing that
+  changes reads at phone size: a loaf, a face, a gauge. When the audit's
+  `action` check says a beat changes little, look first at whether its
+  change is just too small to see; zoom in before adding anything.
+- **Stage labels** go through `api.label`: one size on screen whatever the
+  zoom, fading before the stage's edges, giving way to anything you pass to
+  `api.avoid`. A label is a name or a year, never a figure.
 
-## The stage acts out the story
-
-Every beat's `stage.shows` (`story.md` § The point) says what the stage does
-to show that beat's finding, and the directions make it happen. The shape
-gives the grammar; the story gives the motion:
-
-- **Pace.** How fast the subject moves is the story's when the story has a
-  rate: a state's `pace` (or a beat's) is a claim id, drawn in proportion
-  and from zero, the largest pace claim at `topPace` subject lengths per
-  second (2 by default). A top speed of 60 then 170 km/h is a car that
-  visibly triples its speed. A plain number is lengths per second for
-  motion that carries no figure. `0` halts the subject.
-- **Halts and stops.** The subject halts where the story stops: for fuel,
-  to charge, to unload. A beat with `pace: 0` eases to a stop over the
-  words' swap; the next pace pulls it away.
-- **Things where beats happen.** `api.beats` gives where the subject is at
-  each beat's middle, so a pump stands where the story stops for fuel and
-  a charging post where it charges. A thing can act during its beat
-  (`s.beat.id`, `s.beat.lt`): a meter fills to a claim's value, a crane
-  lifts, a door opens.
-- **Never static, never generic.** With no pace anywhere the subject drifts
-  slowly so the stage never freezes; that drift is a fallback, never the
-  story's motion. Motion comes from the finding's verb (a car speeds up, a
-  tower rises, a column marches), never from decoration added to fill a
-  hold. The audit's `frozen` warning catches a stage that stops.
-
-## Transformation
-
-One subject, its states, on one path.
+## The world
 
 ```json
-"stage": {
-  "shape": "transformation", "subject": "car", "size": [46, 20, 18],
-  "states": [
-    { "id": "open",   "label": "1912", "form": { "len": 38, "roof": 11, "wheel": 5.2, "open": 1 } },
-    { "id": "closed", "label": "1934", "form": { "len": 40, "roof": 17, "wheel": 4.4, "open": 0 } }
-  ],
-  "ground": "road", "scenery": "stops", "trail": "none"
-}
+"stage": { "shape": "assembly", "world": "mill", "size": [60, 40, 30], "time": 6 },
+"scenes": [ { "id": "dawn", "type": "beat", "copy": { … },
+              "stage": { "shows": "the wheel starts turning and the first sacks stack up", "time": 7, "focus": "wheel" } } ]
 ```
 
-and on each beat, `"stage": { "state": "closed", "zoom": 1.2, "look": [-6, 0, 0], "shows": "the closed car pulls away faster" }`.
-A state or a beat may also set `"pace"` (§ The stage acts out the story).
+```js
+Motion.things.mill = {
+  marks(w) { return { wheel: [-20, 0, 12], store: [25, -5, 4] }; },
+  draw(w, api) {
+    const V = api.view('ground'), M = api.view('store'), m = api.mat;
+    V.block(-50, -30, 0, 110, 60, 4, m.N2);                           // the board
+    const turned = w.accumulate('wheel', b => (w.has('dawn') && b.index >= 1 ? 1.2 : 0));
+    // … the wheel drawn at angle `turned`, the mill house, the river …
+    const sacks = Math.floor(w.share('F2', 'F2') * w.progress('dawn') * 12);   // 12 sacks = F2, key in the card
+    for (let i = 0; i < sacks; i++) M.block(18 + (i % 4) * 4, -10 + Math.floor(i / 4) * 4, 4, 3.5, 3.5, 3, m.N3);
+  }
+};
+```
 
-- **`subject`** names the painter (`Motion.things.car`); **`size`** is its
-  largest extent [length, depth, height] in its own units, which sets the
-  scale and the spacing of the stops.
-- **`states`**, in story order, each with an `id`, a short `label` (a year
-  or a name, never a figure) and a **`form`**: the numbers that describe
-  the subject in that state. The painter reads them; the engine blends
-  them as the subject changes (numbers and number arrays smoothly, a
-  profile `[[u, v]…]` point by point when two states have the same number
-  of points, anything else halfway).
-- A state with a **`parent`** other than the state before it starts a
-  branch: a lineage. The branch runs on its own lane behind the main line,
-  joined square to it, and the subject crosses to it. **`trail: "keep"`**
-  leaves each state standing at its stop once the subject moves on, so a
-  lineage stays in view.
-- **The grammar**: during a beat the subject travels at its pace, passing
-  its point at the middle of the beat, and the camera follows, so the base
-  slides by as fast as the subject goes. A beat that names a new state holds
-  the words' swap for 1–2 s while the subject travels on and changes form,
-  and the new state's stop is set where it arrives. A pace change with no
-  new state (pulling in, pulling away) eases over the same stretch. A beat
-  with no `state` keeps the one before.
-- **`ground`** (optional) is a painter that dresses the base for this story
-  (a road, a riverbank, rock strata); **`scenery`** (optional) draws things
-  beside the path, called twice per frame with `layer: 'back'` and
-  `'front'`. Both get the stops (`api.nodes`) and the visible range
-  (`api.range`). Put scenery only where the source names something there.
+`stage.world` names the painter; `stage.size` is the extent a beat frames
+at zoom 1; `stage.time` is where the story's clock starts. Everything the
+painter needs comes in `w`:
 
-### The other shapes (named, not built in this version)
+| `w.` | What it is |
+| --- | --- |
+| `t` | seconds since the video started |
+| `beat` | the beat the frame is in: `id`, `index`, `lt` (seconds into its words), `p` (its action's progress) |
+| `progress(id)` | a beat's action, 0 before it starts, 1 once done. An action runs from the previous beat's words leaving to the middle of its own read; ease it yourself |
+| `since(id)` | seconds since a beat's action finished (0 until then): a consequence that plays on through the hold, so the middle of a beat is never a frozen end state |
+| `has(id)` | whether the beat is in this cut (cuts drop beats) |
+| `time`, `timeAt(t)` | the story's clock: each beat's `stage.time` (a number or a claim), eased from one beat's to the next over the action |
+| `accumulate(key, rate)` | the exact running total of a rate you give per beat (`rate(b)` with `b.id`, `b.index`, `b.time`), easing between beats: distance from a speed, water from a flow, people from an arrival rate, sacks from an output |
+| `value(id)`, `display(id)`, `share(id, of)` | the claims; `share` is an amount in proportion and from zero, against another claim or a number |
+| `beats` | every beat's `id`, `time`, `mid` and `act`, to place a thing where a beat happens |
+| `blend(a, b, k)` | two forms blended (numbers, arrays, profiles of the same length) |
 
-- **Lineup**: a cast of painters on one stage; each beat names a measure,
-  and the cast rearranges by it (sorted by size, grouped by diet), every
-  member moving at once. A size comparison is drawn at true relative size
-  from the claims; a measure with no physical form is a flat chart in the
-  card while the cast stands by.
-- **Assembly**: one thing on its site; each beat names a step, and the
-  next part goes on (lifted, slid, stacked). A cutaway is a staged insert:
-  the camera zooms to the part while the rest stays in place.
-- **Episodes**: one board with a place per item; each beat names an item,
-  and the camera travels to its place, where its own thing plays.
-- **Journey**: a schematic map stage (land, water, a route line, plain
-  labels for named places); each beat names a leg, and the mover goes on
-  along the route while the camera follows. Never the look of a real map
-  product.
+and in `api`: `view(owner, origin)` (an iso view; name it after the mark
+it draws, and whatever the current beat focuses on is that beat's subject,
+which the audit keeps inside the stage's room while the words hold), `mat`,
+`iso`, `label`, `avoid`, `rect`, `rng(...keys)` (seeded), `ease`, `sstep`,
+`lerp`, `clamp`, `range` (the world's visible x range), `ctx`.
+
+**Drive each beat's action by its progress, its time or its rate**, never
+by testing which beat is on screen (`w.beat.id === …`): the world must
+stay where the story left it after the beat ends, and the audit's `action`
+check asks "what if this beat had never happened?" by taking those away.
+A beat's `wait` (seconds) holds the words' swap while a long action plays;
+by default 1.4 s when the story's clock moves, else the plain swap.
+
+## Never static, never generic
+
+Something is always happening: the world's own life (water running, people
+moving, a machine working) and each beat's action. The audit warns on a
+stage that stops (`frozen`) and on a beat that changes nothing (`action`).
+Motion comes from the source's nouns and verbs, never from decoration added
+to fill a hold, and never from a habit carried over from another story.
 
 ## Drawing the story's things
 
 There is no library of things, on purpose: a menu makes every video look
 the same, and any noun it lacks falls back to boxes. You draw each thing
-the stage needs, for this video:
+the world needs, for this video:
 
-1. **Name the thing, its forms and its verb** from the source: "an open
-   car with a folding cloth hood and spoked wheels", then "a closed
-   all-steel body with glass windows all round". The forms are the states'
-   numbers: lengths, a roof line, a wheel size, a 0–1 for a part that
-   comes and goes (an open top, fins, a light bar). The verb is how it
-   moves: wheels turn with `s.dist`.
+1. **Name the thing and what happens to it** from the source, in its
+   words. Its look follows from the features the source names; its states
+   are the numbers that change (a height, a fill, a count, a 0–1 for a
+   part that comes and goes).
 2. **Draw a few chunky shapes that read as that thing at the size it's
    drawn**, with the kit below. A side profile pushed across the thing's
-   depth (`V.extrude`) makes most vehicles, animals and buildings; a
+   depth (`V.extrude`) makes most vehicles, animals, people and buildings;
    `V.block` or `V.prism` makes masses; `V.cone` makes trees, roofs and
-   horns. Recognisable beats detailed: detail only where the story names
-   it (the fins the source mentions; no hubcaps it doesn't).
+   horns. Recognisable beats detailed: detail only where the story names it.
 3. **Neutrals for things, the accent for data only.** A thing is drawn in
    the materials' neutrals (`N`, `N2`, `N3`, `DARK`, `PAPER`, `glass`);
-   the accent marks a figure (a bar in the card, a mark the finding is
-   about), never a thing's paint.
-4. **Words only through `api.label`**, at one size on screen, and only a
-   name or a year: a figure lives in the card, as a claim.
-
-```js
-Motion.things.car = { draw(V, s, api) {
-  const f = s.form, m = api.mat, r = f.wheel, rot = s.dist / r;   // wheels roll with the distance
-  const side = api.iso.soften([[-f.len / 2, r * 0.55], [f.len / 2, r * 0.55], [f.len / 2, f.nose],
-    [f.len / 2 - f.hood, f.belt], [-f.len / 2, f.belt]], 1.2);
-  V.extrude(side, 'y', -9, 9, m.N3);                               // the body, from its side profile
-  if (f.roof > f.belt + 0.3) V.extrude([[8, f.belt], [4, f.roof], [-9, f.roof], [-13, f.belt]], 'y', -7, 7, m.N3);
-  [-12, 12].forEach(x => V.extrude(api.iso.ngon(x, r, r, 12, rot), 'y', 7, 10, m.DARK));
-} };
-```
-
-### The painter's contract
-
-- `draw(V, s, api)`. **V** is a view whose origin is the thing's place on
-  the base: x along the path (the direction of travel), y across it (+y
-  toward the viewer), z up. Draw far parts first, near parts last.
-- **s**: `form` (blended), `from`, `to`, `k` (0..1 through the change),
-  `state`, `dist` (distance travelled), `speed` (subject lengths per
-  second), `heading`, `beat` (`{ id, index, lt, dir }`, the beat the frame
-  is in and seconds into its words), `t`, `still` (a trail copy at its stop).
-- **api**: `mat` (the tints), `iso` (`soften`, `inset`, `ngon`, `blend`,
-  `shade`), `rng(...keys)` (seeded), `ease`, `sstep`, `lerp`, `clamp`,
-  `label`, `value(id)` and `display(id)` for claims, `beats` (where the
-  subject is at each beat's middle), `nodes`, `range`, `width`, `len`, and
-  for scenery `layer`. A figure drawn on the stage (a meter's fill) is read
-  with `api.value`, never typed, and the card states it.
-- **A pure function of its inputs.** No `Math.random`, `Date.now`, timers,
-  `requestAnimationFrame`, or state kept between calls; no `fillText`
-  (`check-video.js` fails each).
+   the accent marks what a figure is about (the part of a stock that is
+   gone, a meter's fill), never a thing's paint.
+4. **Figures come from the claims**, through `w.value` / `w.share`, never
+   typed, and the card states each figure the stage acts out. A count of
+   real things is one per thing or per a stated group, with the key in the
+   card's words.
+5. **A pure function of `w`.** No `Math.random`, `Date.now`, timers,
+   `requestAnimationFrame`, state kept between calls, or `fillText`
+   (`check-video.js` fails each).
 
 ### The kit
 
@@ -185,9 +133,10 @@ Motion.things.car = { draw(V, s, api) {
 bevelled by b), `V.prism(footprint, z, h, tint, b)`, `V.extrude(profile,
 axis, a0, a1, tint)` (axis `'y'`: a side view; `'x'`: a front view; `'z'`:
 a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.face(points3d, colour)`,
-`V.line`, `V.path`, `V.shadow`. Slanted faces are shaded from the one light
-by their normal, so a bevel, a windscreen or a cone's facets read without
-outlines.
+`V.line`, `V.path`, `V.shadow`, and `V.P(x, y, z)` for a screen point.
+Slanted faces are shaded from the one light by their normal, so a bevel, a
+windscreen or a cone's facets read without outlines. Depth order is yours:
+draw far things first (smaller x + y), near things last.
 
 ## Real things, brands and people
 

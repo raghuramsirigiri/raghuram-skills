@@ -28,7 +28,7 @@ const THEME = path.join(ASSETS, 'charts-lib', 'theme.js');
 const MLIB = path.join(ASSETS, 'motion-lib');
 
 // What --stage copies, listed so the cleanup can recognise its own folder.
-const SUBDIRS = ['scenes', 'shapes'];
+const SUBDIRS = ['scenes'];
 function motionFiles() {
   const top = fs.readdirSync(MLIB).filter(f => f.endsWith('.js')).sort();
   return SUBDIRS.reduce((out, d) => out.concat(fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).sort().map(f => d + '/' + f)), top);

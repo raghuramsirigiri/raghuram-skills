@@ -1,10 +1,10 @@
 // node --test plugins/diorama-slides/skills/diorama-slides/tests/stage.test.js
 //
-// The stage: the shapes this version builds and refuses, the transformation
-// grammar (the subject passes its stop mid-beat, never stops, changes form
-// between beats, branches onto a lane), the one camera angle that pans and
-// zooms the world while the card stays put, and words on the stage at one
-// size on screen.
+// The stage: the page's own world, drawn as a pure function of what the
+// story has done so far. The engine gives it time (each beat's progress,
+// story time eased between beats), exact running totals of rates the page
+// gives, the claims, and one camera angle that pans and zooms the world
+// while the card stays put. It decides nothing about what happens.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -12,118 +12,143 @@ const { load, mockCtx, FIXTURE_SPEC } = require('./harness');
 
 function compile(spec, cut) {
   const w = load();
-  return { C: w.Motion.compile(spec, cut || 'main', { measure: mockCtx() }), M: w.Motion };
+  return { C: w.Motion.compile(spec, cut || 'main', { measure: mockCtx() }), M: w.Motion, w };
 }
 const mid = sc => (sc.enterEnd + sc.exitStart) / 2;
 
-test('every video needs a stage, a shape and a built grammar', () => {
+test('every video names a shape and the page\'s world painter', () => {
   const a = FIXTURE_SPEC(); delete a.stage;
   assert.throws(() => compile(a), /spec\.stage is missing/);
   const b = FIXTURE_SPEC(); b.stage.shape = 'montage';
   assert.throws(() => compile(b), /stage\.shape must be one of transformation, lineup, assembly, episodes, journey/);
-  const c = FIXTURE_SPEC(); c.stage.shape = 'lineup';
-  assert.throws(() => compile(c), /"lineup" is not built yet in this version: the built shapes are transformation/);
+  const c = FIXTURE_SPEC(); delete c.stage.world;
+  assert.throws(() => compile(c), /stage\.world/);
 });
 
-test('a beat naming an unknown state fails, naming the beat', () => {
-  const s = FIXTURE_SPEC();
-  s.scenes[1].stage.state = 'huge';
-  assert.throws(() => compile(s), /scene "mid": stage\.state "huge" is not one of small, mid, big/);
-});
-
-test('the subject passes its stop at the middle of each beat, and never stops', () => {
-  const { C, M } = compile(FIXTURE_SPEC());
-  const T = M.stage.shapes.transformation;
-  C.scenes.slice(0, 3).forEach((sc, i) => {
-    const st = C.stage.plan.beats[i].state;
-    const a = T.subjectAt(C.stage, mid(sc));
-    assert.ok(Math.abs(a.x - C.stage.plan.node[st].x) < 1e-6, sc.id + ' is at its stop mid-beat');
-  });
-  let last = -Infinity;
-  for (let t = 0; t < C.duration; t += 0.1) {
-    const x = T.subjectAt(C.stage, t).x;
-    assert.ok(x > last, 'moving forward at ' + t.toFixed(1));
-    last = x;
+test('any shape compiles: the shape guides the story, it does not decide what happens', () => {
+  for (const shape of ['lineup', 'assembly', 'episodes', 'journey']) {
+    const s = FIXTURE_SPEC(); s.stage.shape = shape;
+    const { C, M } = compile(s);
+    assert.strictEqual(C.shape, shape);
+    M.seek(mockCtx(), C, mid(C.scenes[1]));
   }
 });
 
-test('the form changes between beats, smoothly, and has settled by the next beat\'s middle', () => {
+test('story time holds through a beat and eases to the next beat\'s over its action', () => {
   const { C, M } = compile(FIXTURE_SPEC());
-  const T = M.stage.shapes.transformation;
-  const [hook, next] = C.scenes;
-  const w = C.stage.windows[1];
-  assert.strictEqual(T.subjectAt(C.stage, w[0] - 0.01).k, 1);
-  assert.strictEqual(T.subjectAt(C.stage, w[0] - 0.01).to, 'small');
-  const half = T.subjectAt(C.stage, (w[0] + w[1]) / 2);
-  assert.ok(half.k > 0.3 && half.k < 0.7 && half.from === 'small' && half.to === 'mid');
-  assert.strictEqual(T.subjectAt(C.stage, mid(next)).to, 'mid');
-  assert.ok(w[0] >= hook.exitStart - 1e-9, 'the change waits for the words to leave');
+  const S = C.stage;
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[0])), 1990);
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[1])), 2005);
+  const act = S.beats[1].act, half = M.stage.timeAt(S, (act[0] + act[1]) / 2);
+  assert.ok(half > 1990 && half < 2005);
+  assert.ok(act[0] >= C.scenes[0].exitStart - 1e-9, 'the action waits for the words to leave');
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[3])), 2020, 'a beat with no time keeps the one before');
 });
 
-test('a state whose parent is not the one before starts a branch on a lane behind', () => {
-  const s = FIXTURE_SPEC();
-  s.stage.states.push({ id: 'side', label: '2010', parent: 'mid', form: { len: 12, h: 5 } });
-  s.scenes.splice(3, 0, { id: 'side', type: 'beat', copy: { title: 'A branch' }, stage: { state: 'side' } });
-  s.cuts.main.scenes.splice(3, 0, 'side');
-  const { C } = compile(s);
-  const n = C.stage.plan.node;
-  assert.strictEqual(n.big.y, n.mid.y, 'the first child stays on its parent\'s lane');
-  assert.ok(n.side.y < n.mid.y, 'a second child goes behind');
-  assert.strictEqual(n.side.depth, n.big.depth);
+test('story time may be a claim', () => {
+  const s = FIXTURE_SPEC(); s.scenes[2].stage.time = 'F3';
+  const { C, M } = compile(s);
+  assert.strictEqual(M.stage.timeAt(C.stage, mid(C.scenes[2])), 55);
+  const bad = FIXTURE_SPEC(); bad.scenes[2].stage.time = 'F9';
+  assert.throws(() => compile(bad), /"F9" is not a number or a claim/);
 });
 
-test('forms blend: numbers and number arrays smoothly, profiles point by point, the rest halfway', () => {
-  const { M } = compile(FIXTURE_SPEC());
-  const f = M.stage.blendForm({ a: 0, b: [0, 10], p: [[0, 0], [2, 2]], tag: 'x' }, { a: 10, b: [10, 20], p: [[4, 4], [6, 6]], tag: 'y' }, 0.25);
-  assert.strictEqual(f.a, 2.5);
-  assert.strictEqual(JSON.stringify(f.b), '[2.5,12.5]');
-  assert.strictEqual(JSON.stringify(f.p), '[[1,1],[3,3]]');
-  assert.strictEqual(f.tag, 'x');
+test('a beat whose story time changes holds the words\' swap longer; one that doesn\'t, swaps', () => {
+  const { C } = compile(FIXTURE_SPEC());
+  assert.strictEqual(C.scenes[1].trIn.name, 'travel');
+  assert.strictEqual(C.scenes[3].trIn.name, 'swap');
+  const s = FIXTURE_SPEC(); s.scenes[3].stage.wait = 2;
+  const c2 = compile(s).C;
+  assert.strictEqual(c2.scenes[3].trIn.name, 'travel');
+  assert.strictEqual(c2.scenes[3].trIn.dur, 2);
 });
 
-test('one camera angle: zoom changes the world\'s scale and nothing in the card', () => {
+test('each beat\'s progress runs 0 to 1 over its action, and stays 1 after', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, a = S.beats[2].act;
+  assert.strictEqual(M.stage.progress(S, 2, a[0] - 0.01), 0);
+  assert.ok(Math.abs(M.stage.progress(S, 2, (a[0] + a[1]) / 2) - 0.5) < 1e-9);
+  assert.strictEqual(M.stage.progress(S, 2, C.duration - 0.1), 1);
+});
+
+test("since counts the seconds after a beat's action, and is 0 under the override", () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, end = S.beats[2].act[1];
+  assert.strictEqual(M.stage.worldAt(S, end - 0.5).since('big'), 0);
+  assert.ok(Math.abs(M.stage.worldAt(S, end + 1.5).since('big') - 1.5) < 1e-9);
+  S.override = 2;
+  assert.strictEqual(M.stage.worldAt(S, end + 1.5).since('big'), 0);
+  S.override = null;
+});
+
+test('accumulate is the exact running total of a rate given per beat, easing between beats', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, rate = b => (b.id === 'big' ? 3 : 1);
+  const at = t => M.stage.accumulate(S, 'r', rate, t);
+  const a = S.beats[2].act;
+  assert.ok(Math.abs(at(a[0]) - a[0]) < 1e-9, 'rate 1 until big\'s action');
+  assert.ok(Math.abs(at(a[1]) - (a[0] + 2 * (a[1] - a[0]))) < 1e-9, 'a linear ramp from 1 to 3 averages 2');
+  assert.ok(Math.abs(at(a[1] + 1) - at(a[1]) - 3) < 1e-9, 'then rate 3');
+  let last = -1;
+  for (let x = 0; x < C.duration; x += 0.2) { assert.ok(at(x) >= last); last = at(x); }
+});
+
+test('the world gets the claims, in proportion from zero', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const w = M.stage.worldAt(C.stage, 1);
+  assert.strictEqual(w.value('F3'), 55);
+  assert.strictEqual(w.display('F2'), '40');
+  assert.ok(Math.abs(w.share('F2', 'F3') - 40 / 55) < 1e-12);
+  assert.throws(() => w.value('F9'), /unknown claim "F9"/);
+});
+
+test('the "what if this beat never happened" override takes the beat before\'s time, progress and rates', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, t = mid(C.scenes[2]);
+  const rate = b => (b.id === 'big' ? 3 : 1);
+  const real = [M.stage.timeAt(S, t), M.stage.accumulate(S, 'r', rate, t)];
+  S.override = 2;
+  assert.strictEqual(M.stage.timeAt(S, t), 2005);
+  assert.strictEqual(M.stage.progress(S, 2, t), 0);
+  assert.ok(Math.abs(M.stage.accumulate(S, 'r', rate, t) - t) < 1e-9);
+  S.override = null;
+  assert.strictEqual(real[0], 2020);
+  assert.ok(real[1] > t);
+});
+
+test('the camera frames each beat\'s focus at its zoom, and the card never moves with it', () => {
   const a = FIXTURE_SPEC(), b = FIXTURE_SPEC();
   b.scenes[1].stage.zoom = 2;
   const ca = compile(a).C, cb = compile(b).C;
-  assert.strictEqual(ca.stage.cams[1].zoom, 1.2);
-  assert.strictEqual(cb.stage.cams[1].zoom, 2);
+  assert.strictEqual(cb.stage.beats[1].zoom, 2);
   const at = C => JSON.stringify(C.scenes[1].layers.map(l => l.lines && l.lines.map(x => [x.x, x.y])));
   assert.strictEqual(at(cb), at(ca));
   const s = FIXTURE_SPEC(); s.scenes[1].stage.zoom = 5;
   assert.throws(() => compile(s), /stage\.zoom must be between 0\.5 and 3/);
+  const f = FIXTURE_SPEC(); f.scenes[1].stage.focus = 'nowhere';
+  const { C, M } = compile(f);
+  assert.throws(() => M.seek(mockCtx(), C, mid(C.scenes[1])), /the world names no such mark/);
 });
 
-test('the camera eases into each beat over its window, and holds within a beat', () => {
-  const s = FIXTURE_SPEC(); s.scenes[1].stage.zoom = 2;
-  const { C, M } = compile(s);
-  const w = C.stage.windows[1];
-  assert.strictEqual(M.stage.cameraAt(C.stage, w[0] - 0.01).zoom, 1);
-  assert.strictEqual(M.stage.cameraAt(C.stage, w[0] - 0.01).index, 0);
-  const z = M.stage.cameraAt(C.stage, (w[0] + w[1]) / 2).zoom;
-  assert.ok(z > 1 && z < 2);
-  assert.strictEqual(M.stage.cameraAt(C.stage, mid(C.scenes[1])).zoom, 2);
-});
-
-test('the stage keeps clear of the card: its room starts under every beat\'s words', () => {
+test('the stage keeps clear of the card in every format', () => {
   for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const s = FIXTURE_SPEC(); s.cuts.main.format = format;
     const { C } = compile(s);
     C.scenes.forEach(sc => {
       const B = sc.stageBox;
       sc.layers.filter(l => l.kind === 'text').forEach(l => l.lines.forEach(ln => {
-        const clear = ln.y + ln.h <= B.y || ln.x + ln.w <= B.x;
-        assert.ok(clear, format + ' ' + sc.id + ': "' + ln.text + '" sits clear of the stage');
+        assert.ok(ln.y + ln.h <= B.y || ln.x + ln.w <= B.x, format + ' ' + sc.id + ': "' + ln.text + '" sits clear of the stage');
       }));
     });
   }
 });
 
-test('stage labels are painted at one size on screen whatever the zoom, as role "stage"', () => {
+test('stage labels are one size on screen whatever the zoom, as role "stage"', () => {
   const sizes = [1, 1.6].map(zoom => {
     const s = FIXTURE_SPEC(); s.scenes.forEach(sc => { sc.stage = Object.assign({}, sc.stage, { zoom }); });
     const { C, M } = compile(s);
     const out = [];
-    for (let t = 0.7; t < C.duration; t += 0.25) {
+    for (let t = 0.7; t < C.duration; t += 0.5) {
       M.debug.record = [];
       M.seek(mockCtx(), C, t);
       M.debug.record.filter(r => r.role === 'stage').forEach(r => out.push(r.size));
@@ -131,7 +156,7 @@ test('stage labels are painted at one size on screen whatever the zoom, as role 
     M.debug.record = null;
     return out;
   });
-  assert.ok(sizes[0].length > 0 && sizes[1].length > 0, 'labels are painted at both zooms');
+  assert.ok(sizes[0].length > 0 && sizes[1].length > 0);
   assert.strictEqual(JSON.stringify([...new Set(sizes[0])]), JSON.stringify([...new Set(sizes[1])]));
 });
 
@@ -139,12 +164,20 @@ test('every frame is a pure function of t', () => {
   const { C, M } = compile(FIXTURE_SPEC());
   const at = t => { const log = []; M.seek(mockCtx(log), C, t); return log.join('\n'); };
   const t = [0.4, 5.2, 9.9, C.duration - 0.2];
-  const first = t.map(at), again = t.slice().reverse().map(at).reverse();
-  assert.deepStrictEqual(again, first);
+  assert.deepStrictEqual(t.slice().reverse().map(at).reverse(), t.map(at));
 });
 
-test('a missing painter is named', () => {
-  const s = FIXTURE_SPEC(); s.stage.subject = 'ghost';
+test('a missing world painter is named', () => {
+  const s = FIXTURE_SPEC(); s.stage.world = 'ghost';
   const { C, M } = compile(s);
   assert.throws(() => M.seek(mockCtx(), C, 1), /no painter Motion\.things\.ghost/);
+});
+
+test('forms blend: numbers and arrays smoothly, profiles point by point, the rest halfway', () => {
+  const { M } = compile(FIXTURE_SPEC());
+  const f = M.stage.blendForm({ a: 0, b: [0, 10], p: [[0, 0], [2, 2]], tag: 'x' }, { a: 10, b: [10, 20], p: [[4, 4], [6, 6]], tag: 'y' }, 0.25);
+  assert.strictEqual(f.a, 2.5);
+  assert.strictEqual(JSON.stringify(f.b), '[2.5,12.5]');
+  assert.strictEqual(JSON.stringify(f.p), '[[1,1],[3,3]]');
+  assert.strictEqual(f.tag, 'x');
 });

@@ -1,76 +1,86 @@
-# The story: its shape, the spine, the hook, the cuts
+# The story: its point, each insight's action, its shape, the cuts
 
-**The product is the shape and the edit.** A video that picks a picture
-per finding comes out as a row of separate little scenes, one per section,
-however good each one is. So decide the story's shape first, from what the
-source is about as a whole, and only then cut it into beats. Then make the
-three edit choices: which finding opens it, one idea per beat with time to
-read it, and what gets left out.
+**The product is what the world does.** The engine draws nothing of its
+own and decides nothing about what happens on the stage: you write the
+world, and every insight in the video is something you make happen in it.
+A video whose stage only does what is easy to animate (things gliding past,
+things growing, the same motion every beat) has ignored its source, however
+well each thing is drawn. So the order is: the point, then what each
+insight does to the world, then the shape that holds those together, then
+the edit.
 
-## The point, and what the stage must show
+## The point
 
-Before the shape, write two sentences:
+Write it in one sentence, in the source's terms, with its main figure: what
+the video is about. Then one more: what a viewer with the sound off must see
+happen to get it. That second sentence is the stage's job for the whole
+video, and every beat answers to it.
 
-1. **The point**: what the video is about, in the source's terms, with its
-   main figure. "A family car went from about 60 to 170 km/h in a century."
-2. **What the viewer must see**: the verb and the measure the stage acts
-   out, so the point lands with the sound off. "The car gets visibly faster
-   with each era."
+## Direct each insight
 
-The stage exists to show that. A story about speed is told by how fast the
-subject moves; a story about size by how big things stand beside each other;
-a story about building by the parts going on; a story about a route by the
-route being travelled. A world that follows the engine's defaults instead
-(the same slow drift for a race car and a glacier) ignores the video's
-purpose, however well each thing is drawn.
+An insight is a fact about something in a world. Showing it means making
+that something visibly be, or become, what the fact says. For each insight,
+before choosing anything to draw, answer in order:
 
-Then, for **every beat**, write what the stage does in it that shows its
-finding, in the spec as `stage.shows`: "the saloon pulls away faster than
-the tourer did", "the hatchback pulls in at a fuel pump", "the electric car
-stops at a charging post and its meter fills toward 80%". Take it from the
-finding's own verb and number, not from what the shape does anyway. A beat
-whose finding has nothing to act out (a price, a share) says so ("the car
-keeps its pace; the value is in the card's chart"), and its figure goes in
-the card. When a figure is acted out (a pace, a size), it is drawn in
-proportion, from zero, and the card states it on the beat it first appears.
+1. **What is it a fact about?** The noun, in the source's words: not "the
+   value" but whose value, of what, where.
+2. **If it happened in front of you, what would you see?** Not the number:
+   its consequence. Something appears or goes, fills or empties, gathers or
+   scatters, ages or wears, speeds up or waits, lights or goes dark, is
+   carried from one place to another, changes hands, changes shape, takes
+   longer. The source's own verb is usually the answer; when it has none,
+   ask what the figure would *do* to the noun.
+3. **How much, honestly?** Which claim sets it, and how it is drawn: real
+   things counted one for one (or per a stated group, with the key on
+   screen), an amount in proportion and from zero (`w.share`), the same
+   thing before and after. Never a grid of boxes, never a 3D chart.
+4. **Over what span?** The beat's own action (`w.progress`), the story's
+   own clock (`stage.time`: a year, an hour of the morning, an age, a
+   floor count, whatever the source measures time in), or something that
+   builds up at a rate the source gives (`w.accumulate`).
+5. **Would a muted viewer read it from the stage alone?** If the stage would
+   look the same had this beat never happened, it isn't directed yet. The
+   audit checks this (`action`).
+
+**Think of three, then choose.** For each insight write three different
+actions before picking one, and make at least one of them something other
+than moving or resizing the noun. Strike any that you would have drawn for
+a different story just as well, and any that is decoration. Keep the one
+most specific to this source's nouns and verbs. The result goes in the
+spec as the beat's `stage.shows`, one line ("the queue at the counter
+thins to a handful as the shelves empty"), and the world painter makes it
+happen. The examples in these references are invented and are not a menu:
+never reuse one because it is there.
+
+Some insights have no consequence in the world the source describes: a
+ratio between two firms, a survey's margin of error. Say so in `shows`
+("the stage holds; the ratio is in the card's chart"), give the figure its
+flat chart in the card, and keep the world alive with what it was already
+doing. That is the exception: if most beats need it, the source is a values
+story, and explainer-video (slides with charts) is the better skill.
 
 ## The shape
 
-Read the source and ask what changes over the video. The answer names the
-shape. Each shape is a grammar for how beats drive the stage and the
-camera; it has no content of its own. The things on the stage are always
-drawn from the source's nouns (`stage.md`).
+The shape is how the story is held together on one stage. It guides how
+you lay out the world and frame it; it does not decide what may happen in
+it, which is always the insights' business.
 
-| The source is about… | Shape | The stage | A beat moves it by… | Examples |
-| --- | --- | --- | --- | --- |
-| one subject and its states over time | **transformation** | the subject on a path of stops, one per state; a branching path for a lineage | naming the next state: the subject travels on and changes form | a family car across a century; a species' lineage; a phone's generations |
-| several things compared on more than one measure | **lineup** | the whole cast on one stage | naming the measure: the cast rearranges by it | dinosaurs by size, then diet, then hunting; planets by size, then by day length |
-| one thing made, step by step | **assembly** | the thing on its site, growing | naming the step: the next part goes on; a cutaway is a staged insert | a tower's construction; how a bridge is built |
-| a set of separate cases, places or events | **episodes** | a place per item on one board | naming the item: the camera travels to its place | tactics of a war's campaigns; five cities' answers to one problem |
-| a route, a campaign or a migration | **journey** | a schematic, stylised map | naming the leg: the mover goes on along the route | a migration; a supply route; an expedition |
+| The source is about… | Shape | How the world is laid out | How the camera tends to move |
+| --- | --- | --- | --- |
+| one subject and how it changes | **transformation** | the subject at the centre of its own surroundings, which change with it | stays with the subject |
+| several things compared | **lineup** | the whole cast on one stage, room to rearrange | pulls back to take in the cast, in to one member |
+| one thing coming into being | **assembly** | the thing on its site, room for what it grows into | rises with it, in to a part |
+| separate cases, places or events | **episodes** | one board, a place per item | travels from place to place |
+| a route, a campaign, a migration | **journey** | a schematic map (land, water, route lines, plain labels; never the look of a real map product) | follows what travels |
 
-How to tell them apart:
+How to tell them apart: one subject that changes, or many compared? Does
+the thing exist yet? Does place matter (episodes), or the path between
+places (journey)? When two fit, take the one that keeps a single world in
+view longest.
 
-- **One subject or many?** One that changes is a transformation; many that
-  stay themselves and get compared is a lineup.
-- **Does the thing exist yet?** A thing that comes into being part by part
-  is an assembly, even when the source also gives its states.
-- **Does place matter?** If where each item happens is part of the point
-  (a front, a city, a site), it is episodes; if the path between places is
-  the point, it is a journey. A journey's map is schematic (land, water,
-  a route line, named places as plain labels), never the look of a real
-  map product.
-- **When two fit**, take the one that keeps a single world in view longest.
-  A history of one aircraft is a transformation, not episodes of its
-  models.
-
-A source that is only values (a margin, a ratio, a quarterly series) with
-no thing to show is not a story for this skill: say so and suggest
-explainer-video, which makes slides with flat charts.
-
-**This version builds `transformation`.** The other four are named in the
-spec format so a story can be planned in them, and `check-video.js` refuses
-them until their grammar ships. Say so if the story needs one.
+`transformation` has been through its acceptance video; the others build
+and run the same way, and `check-video.js` warns until theirs has, so look
+at their contact sheets harder.
 
 ## The spine
 
@@ -118,9 +128,10 @@ beat of its own. A headline that needs "and" holds two ideas.
 
 ## The stage tells no cause
 
-The stage shows what changed, never why. A fuel pump at the 1979 stop is
-there because the source gives that car's fuel use; it may not appear next
-to a fuel-price figure the source doesn't link to the car. Two facts in the
+The stage shows what happened, never why. If a source gives a mill's
+output and, separately, a drought, the stage may show the mill slowing and
+the river low, but never the river's level driving the wheel unless the
+source says so. Two facts in the
 same source are two facts, on screen, in the order of beats, and on the
 stage.
 

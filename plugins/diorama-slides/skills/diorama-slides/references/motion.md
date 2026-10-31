@@ -37,11 +37,9 @@ them, a beat may hold one figure or one flat chart.
 
 **One transition for the words, every time.** The outgoing words rise and
 fade; for a quiet stretch the shared frame holds still and only swaps its
-words; then the incoming words rise in. When the next beat changes the
-stage (a new state), the quiet stretch runs longer (1–2 s, set by the
-shape from how far the stage moves) and the stage does its change in it:
-the subject travels to the next stop and changes form while the camera
-follows. The words never wait on anything else, and nothing sweeps, wipes
+words; then the incoming words rise in. When the next beat's action needs the
+stage to itself (the story's clock moves, or the beat sets `wait`), the
+quiet stretch runs longer (1.4 s by default) and the world acts in it. The words never wait on anything else, and nothing sweeps, wipes
 or crossfades the frame.
 
 ## The stage's motion
@@ -49,15 +47,13 @@ or crossfades the frame.
 - **The camera** has one angle for the whole video and only pans and zooms
   on the world (`stage.md` § The camera). Between beats it eases over the
   words' swap and half a second into the next words; during a beat it
-  follows the subject.
-- **A thing's change** (one form to the next) runs through the middle of
-  the travel on a smoothstep, so it starts and ends at rest while the
-  thing is already moving.
-- **The subject moves at the story's pace** (`stage.md` § The stage acts
-  out the story): a speed in the source is a speed on screen, in
-  proportion; a stop in the source is a halt. Pace changes ease over the
-  words' swap, so nothing jerks; parts move with the subject (wheels turn
-  with the distance travelled). The stage arrives over the first 0.6 s.
+  holds on its focus, following it if the focus moves.
+- **Each beat's action** runs from the previous words leaving to the
+  middle of its own read. Its pace, its easing and its shape are the
+  story's (a crowd gathers slowly, a light snaps on); the engine gives the
+  progress and the story's clock eases on `glide`. Rates ease from one
+  beat's to the next, so nothing jerks. The stage arrives over the first
+  0.6 s.
 - **Never static**: the audit warns (`frozen`) when nothing moves for longer
   than the beat's read.
 

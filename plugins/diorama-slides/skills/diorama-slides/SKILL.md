@@ -1,6 +1,6 @@
 ---
 name: diorama-slides
-description: Turn an article, report, history, notes or a table into a short video where a still card of words sits over a living 2.5D diorama stage — one subject changing form era by era, a cast rearranged per measure, a thing built step by step, a place per episode, or a route on a schematic map — 15–60 s (lineups and journeys to 90 s), 9:16, 4:5, 1:1 or 16:9, in the same design system as chart-dashboard, with every figure and hedge faithful to the source and a dated source card. One standalone HTML file that plays and exports MP4 in the browser. Use for "make a video where the thing itself changes / evolves / is built / travels". Not for slide-style explainers with charts (explainer-video) or a cinematic 3D film (documentary-video). No other apps, no CDN, works offline; never posts.
+description: Turn an article, report, history, notes or a table into a short video where a still card of words sits over a living 2.5D diorama world that acts out each insight, drawn from the source's own nouns — whether the story is one thing changing, a cast compared, a thing being built, a place per episode or a route on a schematic map — 15–60 s (lineups and journeys to 90 s), 9:16, 4:5, 1:1 or 16:9, in the same design system as chart-dashboard, with every figure and hedge faithful to the source and a dated source card. One standalone HTML file that plays and exports MP4 in the browser. Use for "make a video where the thing itself changes / evolves / is built / travels". Not for slide-style explainers with charts (explainer-video) or a cinematic 3D film (documentary-video). No other apps, no CDN, works offline; never posts.
 ---
 
 # Diorama slides
@@ -53,7 +53,7 @@ own nouns.
 6. **Sensitive topics stay neutral and non-graphic.** War, disaster,
    illness: no gore, no glorifying framing; tactics are movement and
    formations, never casualties (`references/stage.md` § Sensitive topics).
-7. **One idea per beat; the card carries it, the stage shows it.** At most
+7. **One idea per beat; the card states it, the world makes it happen.** At most
    one figure or one flat chart in the card. Values are flat charts, never
    3D charts, and a share is never a grid of boxes. The video works
    **muted**: the words on screen are the script.
@@ -84,41 +84,41 @@ own nouns.
    strong and the user picked neither). Defaults: 9:16, about 30–45 s,
    preset `default`. Never ask about style, colour, fonts or transitions.
 
-3. **Name the point, decide the shape, then the beats.** Read
-   `references/story.md`. First write the video's point with its main
-   figure, and what the viewer must *see* happen on the stage to get it
-   with the sound off (a speed story: the subject visibly gets faster). The
-   shape comes next, from what the source is about, not from its findings
-   one by one: **transformation** (one subject, its states),
-   **lineup** (a cast on one stage, rearranged per measure), **assembly**
-   (a thing built step by step), **episodes** (a place per item) or
-   **journey** (a route on a schematic map). Then the beats on the spine
-   (hook → states or measures or steps or places → so what → source card),
-   about one beat per 3–6 s, and what you leave out. For every beat, write
-   `stage.shows`: what the stage does in it that acts out its finding.
+3. **Name the point, direct each insight, then the shape and the beats.**
+   Read `references/story.md`. Write the video's point with its main figure,
+   and what a viewer must see happen to get it with the sound off. Then,
+   for each insight, ask what it is a fact about and what you would see
+   happen in the world if it happened in front of you; think of three
+   actions and keep the one most specific to this source. That becomes the
+   beat's `stage.shows`. Then the shape that holds the world together:
+   **transformation** (one subject that changes), **lineup** (a cast
+   compared), **assembly** (a thing coming into being), **episodes** (a
+   place per item) or **journey** (a route on a schematic map). The shape
+   guides layout and framing; it never decides what happens. Then the
+   beats on the spine (hook → the middle → source card), about one per
+   3–6 s, and what you leave out.
 
-4. **Plan the stage and draw its things.** Read `references/stage.md` for
-   the shape's grammar, how the story drives the stage (pace from claims,
-   halts, things where beats happen), the camera and the kit, and `references/design.md`
-   for the look, and `references/motion.md` for how the card and the
-   stage each move. Name each thing the stage needs from the source's nouns,
-   and its forms (a state's numbers: a length, a wheel, a roof line). A
-   plain value finding gets its flat chart in the card
-   (`references/video-charts.md`) while the stage stays alive. Never pick
-   a thing because a library has one: there is no library.
+4. **Write the world.** Read `references/stage.md` (the world painter, what
+   the engine gives it: each beat's progress, the story's clock, running
+   totals, the claims, the camera), `references/design.md` for the look and
+   `references/motion.md` for how the card and the stage each move. You draw
+   every thing from the source's nouns, and make each beat's `shows` happen
+   by its progress, its time or its rate. There is no library of things or
+   behaviours, on purpose. A value with nothing to act out gets a flat chart
+   in the card (`references/video-charts.md`) while the world keeps living.
 
 5. **Copy the template and write the spec.** Copy
    `<skill-dir>/templates/video.html` to `./<slug>.html` (or where the user
    asked) and leave its `charts-lib/…` and `motion-lib/…` script tags
    exactly as written; step 8 folds them in. Read `references/engine-api.md`
-   and write the whole spec: `stage` (shape, subject, size, states or cast),
+   and write the whole spec: `stage` (shape, world, size, the clock's start),
    each beat's copy and `stage` directions; every figure in copy is a claim
    id (`"F1"` or `{F1}`), never typed digits. Fill the caption, the alt text,
    the page's `<title>`, heading and lede.
 
    Then build it in stages, cheapest check first: stage
    (`finalize.js --stage`) and run `check-video.js` until no FAIL, with no
-   browser. Then write the stage's painters **one at a time**, the subject
+   browser. Then write the world **a beat at a time**, the hook's first
    first: look at one beat's still, fix it, then the next
    (`references/verify-and-ship.md` § Build in stages).
 

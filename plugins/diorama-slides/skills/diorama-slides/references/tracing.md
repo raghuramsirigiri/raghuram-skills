@@ -31,8 +31,8 @@ All examples use an invented story: a lamp maker's history.
 - Figures in the card are `V3.1, V3.2…` in reading order within the beat.
 - Sources are `[A]`, `[B]`… as on the source card.
 - A carried-over hedge is `V5.h`: the hedge word and its source sentence.
-- **Things on the stage are `S1, S2…`**: the subject is `S1`, then each
-  other thing in the order it first appears. A thing's form in one state
+- **Things on the stage are `S1, S2…`**: the thing the video is about is
+  `S1`, then each other thing in the order it first appears. A thing's form in one state
   is `S1@1956`.
 
 **Handles never go into the video, the caption or the alt text.** Handles live in the chat handover:
@@ -61,7 +61,7 @@ Ask "where does <figure> come from?" or "why is <thing> drawn like that?" to see
 
 The first slot takes the **first derived figure** in the card (the one
 most likely to be questioned), else the hook's figure. The second takes
-**S1**, the subject. Those are the two most-asked questions about this
+**S1**, the thing the video is about. Those are the two most-asked questions about this
 kind of video: a number, and whether the picture is true.
 
 ---
@@ -151,11 +151,11 @@ sales rose"*:
 - **"Make the drop look bigger" / "zoom in on the number."** Bars start at
   zero, and the camera never zooms the card. Offer a beat that states the
   change in words.
-- **"Why does it move so slowly / so fast?"** Answer from the beat's
-  `stage.shows` and its pace: a pace bound to a claim is that claim in
-  proportion (quote it); a halt is where the source stops. If the stage's
-  motion doesn't act out the finding, that's a fault in the video: fix the
-  pace or the action, not the words.
+- **"The stage doesn't show what the video is saying."** Answer from the
+  beat's `stage.shows` and the source sentence it acts out. If the world
+  doesn't make that insight happen (or does something any story would),
+  that's a fault in the video: redirect the beat (`story.md` § Direct each
+  insight) and rebuild, never only reword the card.
 - **"It's 44 W, not 40."** Re-read the source. If it says 40 W, quote it
   and hold. If it says 44 W, correct every cut and say so. Pushback alone
   moves nothing.

@@ -31,11 +31,10 @@ $utf8 = New-Object Text.UTF8Encoding $false
 function Read-Text($p) { [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($p)) }
 
 if ($stage) {
-  New-Item -ItemType Directory -Force -Path (Join-Path $dir 'charts-lib'), (Join-Path $dir 'motion-lib\scenes'), (Join-Path $dir 'motion-lib\shapes') | Out-Null
+  New-Item -ItemType Directory -Force -Path (Join-Path $dir 'charts-lib'), (Join-Path $dir 'motion-lib\scenes') | Out-Null
   Copy-Item (Join-Path $Assets 'charts-lib\theme.js') (Join-Path $dir 'charts-lib') -Force
   Copy-Item (Join-Path $Assets 'motion-lib\*.js') (Join-Path $dir 'motion-lib') -Force
   Copy-Item (Join-Path $Assets 'motion-lib\scenes\*.js') (Join-Path $dir 'motion-lib\scenes') -Force
-  Copy-Item (Join-Path $Assets 'motion-lib\shapes\*.js') (Join-Path $dir 'motion-lib\shapes') -Force
   Write-Output "staged charts-lib/ and motion-lib/ beside $name - open the page over http and run the audit (SKILL.md step 7)."
   [Console]::Error.WriteLine('note: Node was not found, so check-video.js cannot run on this machine.')
   exit 0

@@ -12,9 +12,6 @@ const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions
 function sceneFiles() {
   return fs.readdirSync(path.join(LIB, 'scenes')).filter(f => f.endsWith('.js')).sort();
 }
-function shapeFiles() {
-  return fs.readdirSync(path.join(LIB, 'shapes')).filter(f => f.endsWith('.js')).sort();
-}
 
 // A fresh sandbox per call, so no state leaks between tests.
 function load(opts) {
@@ -26,7 +23,6 @@ function load(opts) {
   const run = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sandbox, { filename: f });
   run(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
   ORDER.forEach(n => run(path.join(LIB, n + '.js')));
-  shapeFiles().forEach(f => run(path.join(LIB, 'shapes', f)));
   (opts.scenes || sceneFiles()).forEach(f => run(path.join(LIB, 'scenes', f)));
   (opts.extra || []).forEach(n => run(path.join(LIB, n + '.js')));
   // The page's own painter for the fixture's subject: a block whose length
@@ -72,21 +68,25 @@ function mockCtx(log) {
   return ctx;
 }
 
-const PAINTER = `Motion.things.block = { draw(V, s, api) {
-  const f = s.form;
-  V.block(-f.len / 2, -4, 0, f.len, 8, f.h, api.mat.N3);
-} };`;
+// The fixture's world, as a page would write it: a water works whose tank
+// fills with story time (the year), pumps that run at a rate per beat, and
+// a label. Its tank is the subject the camera keeps in the stage's room.
+const PAINTER = `Motion.things.works = {
+  marks(w) { return { tank: [0, 0, 6], pumps: [30, 0, 2] }; },
+  draw(w, api) {
+    const V = api.view('ground'), T = api.view('subject'), m = api.mat;
+    V.block(-40, -20, 0, 100, 40, 2, m.N2);
+    const h = 4 + (w.time - 1990) * 0.4;
+    T.block(-8, -8, 2, 16, 16, h, m.N3);
+    const turned = w.accumulate('pump', b => (b.id === 'big' ? 2 : 0.5));
+    T.block(26, -3, 2, 6, 6, 3 + Math.sin(turned) * 0.5, m.N);
+    api.label('Works', -8, 10, 0, { dy: 8 });
+  }
+};`;
 
 const FIXTURE_SPEC = () => ({
   meta: { title: 'Test', locale: 'en-GB', preset: 'default', fps: 30, seed: 3, audio: { score: 'off' } },
-  stage: {
-    shape: 'transformation', subject: 'block', size: [20, 8, 10],
-    states: [
-      { id: 'small', label: '1990', form: { len: 10, h: 4 } },
-      { id: 'mid', label: '2005', form: { len: 15, h: 7 } },
-      { id: 'big', label: '2020', form: { len: 20, h: 10 } }
-    ]
-  },
+  stage: { shape: 'transformation', world: 'works', size: [40, 20, 20], time: 1990 },
   cuts: {
     main: { format: '9:16', scenes: ['hook', 'mid', 'big', 'src'] },
     short: { format: '1:1', scenes: ['hook', 'big', 'src'] }
@@ -99,13 +99,13 @@ const FIXTURE_SPEC = () => ({
   ],
   data: [],
   scenes: [
-    { id: 'hook', type: 'beat', copy: { kicker: 'Northvale', title: 'Water use fell {F1} this winter' }, stage: { state: 'small' } },
-    { id: 'mid', type: 'beat', copy: { kicker: '2005', title: 'The works grew' }, stage: { state: 'mid', zoom: 1.2 } },
-    { id: 'big', type: 'beat', copy: { kicker: '2020', title: 'Pumps rose from {F2} to {F3}' }, stage: { state: 'big' },
+    { id: 'hook', type: 'beat', copy: { kicker: 'Northvale', title: 'Water use fell {F1} this winter' }, stage: { shows: 'the works at its smallest', focus: 'tank' } },
+    { id: 'mid', type: 'beat', copy: { kicker: '2005', title: 'The works grew' }, stage: { shows: 'the tank rises', time: 2005, zoom: 1.2 } },
+    { id: 'big', type: 'beat', copy: { kicker: '2020', title: 'Pumps rose from {F2} to {F3}' }, stage: { shows: 'the tank rises again and the pumps run faster', time: 2020, focus: 'pumps' },
       chart: { kind: 'bars', bars: [{ label: '2005', value: 'F2' }, { label: '2020', value: 'F3', emph: true }] } },
-    { id: 'src', type: 'source-card' }
+    { id: 'src', type: 'source-card', stage: { shows: 'the works runs on', zoom: 0.8 } }
   ],
   caption: 'Water use fell 12% this winter.', alt: 'A water works grows across three eras; use fell 12%.'
 });
 
-module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, shapeFiles, FIXTURE_SPEC, PAINTER };
+module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, FIXTURE_SPEC, PAINTER };

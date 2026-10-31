@@ -71,166 +71,13 @@
  },
  "stage": {
   "shape": "transformation",
-  "subject": "car",
+  "world": "museum",
   "size": [
    46,
    20,
    18
   ],
-  "ground": "road",
-  "scenery": "stops",
-  "states": [
-   {
-    "id": "tourer",
-    "label": "1912",
-    "form": {
-     "len": 38,
-     "width": 18,
-     "wheel": 5.2,
-     "axle": [
-      6,
-      6.5
-     ],
-     "belt": 11,
-     "nose": 9.5,
-     "hood": 13,
-     "deck": 6,
-     "tail": 10,
-     "cf": 6,
-     "rf": 6,
-     "rr": -6,
-     "cr": -8,
-     "roof": 11,
-     "open": 1,
-     "spokes": 1,
-     "fin": 0,
-     "chrome": 0,
-     "soft": 0.8,
-     "bar": 0
-    },
-    "pace": "F1"
-   },
-   {
-    "id": "saloon",
-    "label": "1934",
-    "form": {
-     "len": 40,
-     "width": 19,
-     "wheel": 4.4,
-     "axle": [
-      6.5,
-      7
-     ],
-     "belt": 10,
-     "nose": 9,
-     "hood": 12,
-     "deck": 6,
-     "tail": 8.5,
-     "cf": 8,
-     "rf": 4.5,
-     "rr": -9,
-     "cr": -13,
-     "roof": 17,
-     "open": 0,
-     "spokes": 0,
-     "fin": 0,
-     "chrome": 0.5,
-     "soft": 1.2,
-     "bar": 0
-    },
-    "pace": "F4"
-   },
-   {
-    "id": "starliner",
-    "label": "1958",
-    "form": {
-     "len": 46,
-     "width": 20,
-     "wheel": 3.8,
-     "axle": [
-      8,
-      8
-     ],
-     "belt": 8.5,
-     "nose": 7.5,
-     "hood": 15,
-     "deck": 11,
-     "tail": 8.5,
-     "cf": 8,
-     "rf": 2,
-     "rr": -6,
-     "cr": -12,
-     "roof": 13.5,
-     "open": 0,
-     "spokes": 0,
-     "fin": 4.5,
-     "chrome": 1,
-     "soft": 1.5,
-     "bar": 0
-    },
-    "pace": "F7"
-   },
-   {
-    "id": "compact",
-    "label": "1979",
-    "form": {
-     "len": 34,
-     "width": 18.5,
-     "wheel": 3.4,
-     "axle": [
-      5.5,
-      5.5
-     ],
-     "belt": 8.5,
-     "nose": 7,
-     "hood": 9,
-     "deck": 1.5,
-     "tail": 9,
-     "cf": 8,
-     "rf": 2,
-     "rr": -13,
-     "cr": -16,
-     "roof": 15.5,
-     "open": 0,
-     "spokes": 0,
-     "fin": 0,
-     "chrome": 0.2,
-     "soft": 1.2,
-     "bar": 0
-    }
-   },
-   {
-    "id": "volt",
-    "label": "2024",
-    "form": {
-     "len": 42,
-     "width": 19.5,
-     "wheel": 4,
-     "axle": [
-      7,
-      7
-     ],
-     "belt": 8.5,
-     "nose": 6.5,
-     "hood": 10,
-     "deck": 3,
-     "tail": 9,
-     "cf": 11,
-     "rf": -1,
-     "rr": -10,
-     "cr": -18,
-     "roof": 14,
-     "open": 0,
-     "spokes": 0,
-     "fin": 0,
-     "chrome": 0,
-     "soft": 2.5,
-     "bar": 1
-    },
-    "pace": "F6"
-   }
-  ],
-  "topPace": 2.2
+  "time": 1912
  },
  "cuts": {
   "main": {
@@ -415,9 +262,9 @@
     "units": "Top speed, 1912 Tourer to 2024 Volt"
    },
    "stage": {
-    "state": "tourer",
+    "focus": "car",
     "zoom": 1.05,
-    "shows": "the open Tourer drives at its top speed of about 60 km/h, the slowest pace in the video"
+    "shows": "the open 1912 Tourer drives at its top speed of about 60 km/h, the slowest pace in the video"
    }
   },
   {
@@ -429,9 +276,9 @@
     "units": "Glass windows all round, {F3}"
    },
    "stage": {
-    "state": "saloon",
+    "time": 1934,
     "zoom": 1.1,
-    "shows": "the closed Saloon pulls away faster, 95 km/h in proportion"
+    "shows": "the car closes up into a steel saloon with glass all round and pulls away faster, 95 km/h in proportion"
    }
   },
   {
@@ -443,14 +290,14 @@
     "units": "One of Hallam's best-selling cars: {F5} made"
    },
    "stage": {
-    "state": "starliner",
+    "time": 1958,
     "zoom": 1.0,
     "look": [
      -6,
      0,
      0
     ],
-    "shows": "the Starliner runs at 150 km/h in proportion; the base rushes by"
+    "shows": "it stretches long and low, grows fins and chrome, and runs at 150 km/h in proportion"
    }
   },
   {
@@ -462,15 +309,14 @@
     "units": "With a {F9} engine"
    },
    "stage": {
-    "state": "compact",
-    "pace": 0,
+    "time": 1979,
     "zoom": 1.2,
     "look": [
      -4,
      -6,
      0
     ],
-    "shows": "the hatchback pulls in at a fuel pump and fuel runs down the hose; the guide gives no top speed, so it doesn't race"
+    "shows": "it shrinks to a short hatchback and pulls in at a fuel pump, fuel running down the hose; the guide gives it no top speed"
    }
   },
   {
@@ -482,9 +328,9 @@
     "units": "Top speed {F6}; range is Arden's figure"
    },
    "stage": {
-    "state": "volt",
+    "time": 2024,
     "zoom": 1.05,
-    "shows": "the Volt pulls away from the pump at 170 km/h in proportion, the fastest in the video"
+    "shows": "it becomes the electric Volt and pulls away from the pump at 170 km/h in proportion, the fastest in the video"
    }
   },
   {
@@ -511,7 +357,7 @@
    },
    "stage": {
     "zoom": 0.9,
-    "shows": "the Volt keeps its pace; the cost is a value, in the card's bars"
+    "shows": "the Volt keeps its pace; what a car costs in work hours has no consequence on this road, so it is in the card's bars"
    }
   },
   {
@@ -523,14 +369,9 @@
     "units": "A plan, not a measurement"
    },
    "stage": {
-    "pace": 0,
     "zoom": 1.25,
-    "look": [
-     8,
-     -6,
-     0
-    ],
-    "shows": "the Volt pulls in at a charging post; its meter fills toward the planned 80%, hatched because it is a plan"
+    "focus": "charger",
+    "shows": "the Volt pulls in at a charging post and its meter fills toward the planned 80%, hatched because it is a plan"
    }
   },
   {
@@ -538,6 +379,7 @@
    "type": "source-card",
    "stage": {
     "zoom": 0.85,
+    "focus": "car",
     "shows": "the Volt pulls away again"
    }
   }
@@ -3075,26 +2917,43 @@
 /*!
  * motion-lib/stage.js — the living stage under the card layer.
  *
- *   spec.stage: { "shape": "transformation", "subject": "car", "size": [w, d, h], … }
- *   scene.stage: { "state": "saloon", "zoom": 1.3, "look": [x, y, z] }
- *   Motion.things.car = { draw(V, s, api) { … } }      // the page's own painter
+ *   spec.stage: { "shape": "transformation", "world": "town", "size": [w, d, h] }
+ *   scene.stage: { "shows": "…", "time": 1958, "focus": "car", "zoom": 1.2, "look": [x, y, z], "wait": 1.4 }
+ *   Motion.things.town = { marks(w) { … }, draw(w, api) { … } }      // the page's own world
  *
- * A diorama world seen from one isometric angle for the whole video. The
- * card layer (core.js, beat.js) owns the top of the frame (a wide frame's
- * left column) and never moves; the stage owns the room it leaves, down to
- * the footer, and dissolves into the paper at its inner edges, so the card's
- * words never sit on it.
+ * The world is the video's own. The page writes one painter that draws the
+ * whole stage as a pure function of what the story has done so far, and
+ * each beat's insight is something that painter makes happen. The engine
+ * decides nothing about what happens on the stage; it gives the painter the
+ * means to make the story happen, and keeps it honest and in view:
  *
- * The story's shape (shapes/*.js) is a grammar: it reads each beat's `stage`
- * directions, lays out the world, and says, at any t, where the camera looks
- * and what is drawn. It has no content in it. Every thing on the stage is a
- * painter the page registers on Motion.things, drawn from the story's own
- * nouns with the iso kit.
+ *   - time: `w.t` (seconds), `w.beat` (the beat the frame is in: id, index,
+ *     `lt` seconds into its words, `p` its action's progress), and
+ *     `w.progress(id)` for any beat, 0 before its action, 1 after, and
+ *     `w.since(id)`, seconds since its action finished;
+ *   - story time: each beat may set `time` (a year, an hour, an age, a floor,
+ *     any number or a claim), and `w.time` eases from one beat's to the
+ *     next's over the action, so anything the story says changes with time
+ *     is a function of `w.time`;
+ *   - accumulation: `w.accumulate(key, rate)` is the exact running total of
+ *     a rate the painter gives per beat (distance from a speed, water from a
+ *     flow, people from an arrival rate, money from a wage), easing from one
+ *     beat's rate to the next's;
+ *   - the claims: `w.value(id)`, `w.display(id)`, and `w.share(id, of)` for
+ *     an amount drawn in proportion from zero;
+ *   - the camera: one isometric angle for the whole video. Each beat frames
+ *     a point (`focus`: a mark the painter names in `marks(w)`, which may
+ *     move, or [x, y, z]) at its `zoom`; between beats the camera pans and
+ *     zooms on the world only. The card never moves.
  *
- * The camera: one angle, always. Between beats it pans and zooms on the
- * world only (eased on glide, over the words' swap and a little past it);
- * during a beat it follows the shape's subject. The scale is fitted to the
- * stage box per beat and multiplied by the beat's `zoom`.
+ * A beat's action runs from the moment the previous beat's words leave
+ * until the middle of its own read; `wait` holds the words' swap longer
+ * when the action needs the stage to itself (by default 1.4 s when story
+ * time changes, else the plain swap).
+ *
+ * The shape (`stage.shape`) names the story's structure; it guides how the
+ * world is laid out and framed (references/story.md) and sets the longest
+ * length, but it does not decide what happens.
  *
  * Everything is a pure function of t.
  */
@@ -3108,14 +2967,8 @@
   const FADE = 90;           // the stage's soft inner edges, frame px
   const SETTLE = 0.5;        // the camera keeps easing this long into the next beat's words
   const INTRO = 0.6;         // the stage arrives over the first beat's first 0.6 s
-
-  // ── shapes ───────────────────────────────────────────────────────────
-  const SHAPES = {};
+  const WAIT = 1.4;          // the swap's quiet stretch when story time changes
   const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
-  function registerShape(def) {
-    if (!def || !def.name || typeof def.plan !== 'function' || typeof def.paint !== 'function') throw new Error('stage.registerShape: need { name, plan, finish, frame, paint }');
-    SHAPES[def.name] = def;
-  }
 
   // ── the stage's room, per beat ───────────────────────────────────────
   // A tall or square frame: under the card's words, the whole frame width,
@@ -3142,37 +2995,118 @@
   // ── compile: the plan, before timing ─────────────────────────────────
   function plan(o) {
     const st = o.spec.stage;
-    if (!st || typeof st !== 'object') throw new Error('spec.stage is missing: the stage\'s shape, subject and size (references/stage.md)');
+    if (!st || typeof st !== 'object') throw new Error('spec.stage is missing: the story\'s shape, its world and its size (references/stage.md)');
     if (NAMES.indexOf(st.shape) < 0) throw new Error('stage.shape must be one of ' + NAMES.join(', '));
-    const shape = SHAPES[st.shape];
-    if (!shape) throw new Error('stage.shape "' + st.shape + '" is not built yet in this version: the built shapes are ' + Object.keys(SHAPES).join(', '));
+    if (!st.world) throw new Error('stage.world: the name of the page\'s painter for the whole stage (Motion.things.<name>)');
+    if (!Array.isArray(st.size) || st.size.length !== 3 || st.size.some(v => !(v > 0))) throw new Error('stage.size: the extent [w, d, h] a beat frames at zoom 1, in the world\'s units');
+    const R = o.R;
+    const num = (v, where) => {
+      if (typeof v === 'number') return v;
+      const c = R.claims[String(v).replace(/[{}]/g, '')];
+      if (!c) throw new Error(where + ': "' + v + '" is not a number or a claim');
+      return +c.value;
+    };
     const bx = boxes(o.list, o.fr, o.zone);
-    const S = { shape, st, fr: o.fr, zone: o.zone, design: o.design, spec: o.spec, R: o.R, boxes: bx, seed: o.spec.meta.seed || 0 };
-    S.plan = shape.plan(S, o.list);
-    // The camera's own directions, read the same way for every shape.
-    S.cams = o.list.map((it, i) => {
+    let time = st.time != null ? num(st.time, 'stage.time') : 0, focus = null;
+    const beats = o.list.map((it, i) => {
       const dir = (it.spec && it.spec.stage) || {};
+      const where = 'scene "' + it.id + '"';
+      const prev = time;
+      if (dir.time != null) time = num(dir.time, where + ': stage.time');
       const zoom = dir.zoom == null ? 1 : +dir.zoom;
-      if (!(zoom >= 0.5 && zoom <= 3)) throw new Error('scene "' + it.id + '": stage.zoom must be between 0.5 and 3');
+      if (!(zoom >= 0.5 && zoom <= 3)) throw new Error(where + ': stage.zoom must be between 0.5 and 3');
       const look = Array.isArray(dir.look) ? dir.look.map(Number) : [0, 0, 0];
-      if (look.length !== 3 || look.some(v => !isFinite(v))) throw new Error('scene "' + it.id + '": stage.look is [x, y, z]');
-      return { zoom, look, box: bx[i] };
+      if (look.length !== 3 || look.some(v => !isFinite(v))) throw new Error(where + ': stage.look is [x, y, z]');
+      if (dir.focus != null) {
+        if (!(typeof dir.focus === 'string' || (Array.isArray(dir.focus) && dir.focus.length === 3))) throw new Error(where + ': stage.focus is a mark\'s name or [x, y, z]');
+        focus = dir.focus;
+      }
+      const wait = dir.wait != null ? +dir.wait : (i > 0 && time !== prev ? WAIT : 0);
+      if (!(wait >= 0 && wait <= 3)) throw new Error(where + ': stage.wait must be between 0 and 3 seconds');
+      return { id: it.id, index: i, time, zoom, look, focus, wait: i ? wait : 0, box: bx[i], dir };
     });
-    return S;
+    return { st, fr: o.fr, zone: o.zone, design: o.design, spec: o.spec, R, boxes: bx, beats, seed: o.spec.meta.seed || 0, override: null, cache: {} };
   }
 
-  // How long the words' swap into beat i waits for the stage: 0 is the
-  // plain swap.
-  function travel(S, i) { return S.plan.beats[i] ? S.plan.beats[i].travel || 0 : 0; }
+  // How long the words' swap into beat i waits for the stage: 0 is the swap.
+  function travel(S, i) { return S.beats[i] ? S.beats[i].wait : 0; }
 
   // ── once the timing is known ─────────────────────────────────────────
   function finish(S, scenes) {
     S.scenes = scenes;
+    const mid = sc => (sc.enterEnd + sc.exitStart) / 2;
     // The camera eases into beat i from the moment beat i-1's words leave
     // until a little after beat i's words arrive.
-    S.windows = scenes.map((sc, i) => (i === 0 ? null : [scenes[i - 1].exitStart, Math.min(sc.cStart + SETTLE, (sc.enterEnd + sc.exitStart) / 2)]));
-    S.shape.finish(S, scenes);
+    S.windows = scenes.map((sc, i) => (i === 0 ? null : [scenes[i - 1].exitStart, Math.min(sc.cStart + SETTLE, mid(sc))]));
+    // A beat's action: from the previous words leaving to the middle of its
+    // own read. The first beat acts from the stage's arrival.
+    S.beats.forEach((b, i) => {
+      b.mid = mid(scenes[i]);
+      b.act = i === 0 ? [INTRO * 0.5, b.mid] : [scenes[i - 1].exitStart, b.mid];
+      b.t0 = scenes[i].t0; b.t1 = scenes[i].t1; b.cStart = scenes[i].cStart;
+    });
     scenes.forEach((sc, i) => { sc.stageBox = S.boxes[i]; });
+    S.cache = {};
+  }
+
+  // A beat as the world sees it: under an override (the audit asking "what
+  // if this beat's insight hadn't happened?") it is the beat before.
+  const eff = (S, j) => (S.override === j && j > 0 ? S.beats[j - 1] : S.beats[j]);
+
+  // The action's progress of beat j at t, 0..1 (linear: the painter eases).
+  function progress(S, j, t) {
+    if (S.override === j) return 0;
+    const a = S.beats[j].act;
+    return clamp((t - a[0]) / Math.max(1e-6, a[1] - a[0]));
+  }
+
+  // Story time at t: each beat's, eased (glide) over its action.
+  function timeAt(S, t) {
+    const B = S.beats;
+    let v = eff(S, 0).time;
+    for (let j = 1; j < B.length; j++) {
+      const a = B[j].act;
+      if (t < a[0]) break;
+      const from = v, to = eff(S, j).time;
+      if (t < a[1]) return lerp(from, to, M.ease.glide(clamp((t - a[0]) / (a[1] - a[0]))));
+      v = to;
+    }
+    return v;
+  }
+
+  // The running total of a rate the painter gives per beat, exact: the rate
+  // holds through a beat and ramps to the next beat's over its action.
+  function accumulate(S, key, rateFn, t) {
+    const ck = key + '|' + S.override;
+    let pw = S.cache[ck];
+    if (!pw) {
+      const B = S.beats;
+      const r = B.map((b, j) => {
+        const v = +rateFn(eff(S, j));
+        if (!isFinite(v)) throw new Error('accumulate("' + key + '"): the rate for beat "' + b.id + '" is not a number');
+        return v;
+      });
+      // Pieces: [t0, t1, r0, r1], a steady rate or a ramp.
+      const pieces = [];
+      let at = -Infinity;
+      for (let j = 1; j < B.length; j++) {
+        const a = B[j].act;
+        pieces.push([at, a[0], r[j - 1], r[j - 1]]);
+        pieces.push([a[0], a[1], r[j - 1], r[j]]);
+        at = a[1];
+      }
+      pieces.push([at, Infinity, r[B.length - 1], r[B.length - 1]]);
+      pw = S.cache[ck] = pieces;
+    }
+    // Total from t = 0.
+    let sum = 0;
+    for (const [a, b, r0, r1] of pw) {
+      const lo = Math.max(a, 0), hi = Math.min(b, t);
+      if (hi <= lo) { if (a >= t) break; continue; }
+      const span = b - a, k0 = isFinite(span) ? (lo - a) / span : 0, k1 = isFinite(span) ? (hi - a) / span : 0;
+      sum += (hi - lo) * (lerp(r0, r1, k0) + lerp(r0, r1, k1)) / 2;
+    }
+    return sum;
   }
 
   // Which beat the camera belongs to at t, and how far into its window.
@@ -3184,70 +3118,113 @@
       if (!w || t < w[0]) { i = j; break; }
       if (t < w[1]) { i = j + 1; break; }
     }
-    const a = S.cams[Math.max(0, i - 1)], b = S.cams[i], w = S.windows[i];
+    const a = S.beats[Math.max(0, i - 1)], b = S.beats[i], w = S.windows[i];
     const k = w ? M.ease.glide(clamp((t - w[0]) / (w[1] - w[0]))) : 1;
     const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner });
-    return { index: i, k, zoom: lerp(a.zoom, b.zoom, k), look: a.look.map((v, n) => lerp(v, b.look[n], k)), box: mixBox(a.box, b.box) };
+    return { index: i, k, from: a, to: b, zoom: lerp(a.zoom, b.zoom, k), look: a.look.map((v, n) => lerp(v, b.look[n], k)), box: mixBox(a.box, b.box) };
   }
 
-  // The scale at which a subject of extent [w, d, h] fills its share of a box.
+  // The scale at which an extent [w, d, h] fills its share of a box.
   function fit(box, ext) {
     const [w, d, h] = ext;
     return Math.min(0.58 * box.w / ((w + d) * M.iso.COS), 0.6 * box.h / ((w + d) / 2 + h));
   }
 
+  // A painter the page registered, or a clear error naming it.
+  function thing(name, where) {
+    const p = M.things[name];
+    if (!p || typeof p.draw !== 'function') throw new Error(where + ': no painter Motion.things.' + name + ' with a draw(w, api) function');
+    return p;
+  }
+
+  // What the world painter gets at t.
+  function worldAt(S, t) {
+    const B = S.beats, R = S.R;
+    const found = S.scenes.findIndex(sc => t >= sc.t0 && t < sc.t1), bi = found < 0 ? B.length - 1 : found;
+    const claim = id => { const c = R.claims[String(id).replace(/[{}]/g, '')]; if (!c) throw new Error('stage world: unknown claim "' + id + '"'); return c; };
+    const idx = id => { const j = B.findIndex(b => b.id === id); if (j < 0) throw new Error('stage world: no beat "' + id + '" in this cut'); return j; };
+    const has = id => B.some(b => b.id === id);
+    return {
+      t, time: timeAt(S, t),
+      beat: { id: B[bi].id, index: bi, lt: t - B[bi].cStart, p: progress(S, bi, t), dir: eff(S, bi).dir },
+      beats: B.map(b => ({ id: b.id, index: b.index, time: b.time, mid: b.mid, act: b.act.slice() })),
+      has, progress: id => (has(id) ? progress(S, idx(id), t) : 0),
+      // Seconds since a beat's action finished (0 until then, and under the
+      // audit's "what if it never happened"): a consequence that plays on
+      // through the beat's hold, or after it.
+      since: id => { if (!has(id)) return 0; const j = idx(id); return S.override === j ? 0 : Math.max(0, t - B[j].act[1]); },
+      timeAt: tt => timeAt(S, tt),
+      accumulate: (key, rate, tt) => accumulate(S, key, rate, tt == null ? t : tt),
+      value: id => +claim(id).value,
+      display: id => { const c = claim(id); return c.display != null ? String(c.display) : String(c.value); },
+      // An amount drawn in proportion, from zero: this claim against another
+      // (or a number) as the whole.
+      share: (id, of) => { const v = +claim(id).value, m = typeof of === 'number' ? of : +claim(of).value; if (!(m > 0) || v < 0) throw new Error('stage world: share needs values of zero or more'); return v / m; },
+      blend: blendForm
+    };
+  }
+
   // ── paint ────────────────────────────────────────────────────────────
   function paint(ctx, C, t, sceneId) {
     const S = C.stage;
+    const world = thing(S.st.world, 'stage.world');
+    const w = worldAt(S, t);
     const cam = cameraAt(S, t);
-    const fr = S.shape.frame(S, t);          // { focus: [x, y, z], extent: [w, d, h] }
-    const s = fit(cam.box, fr.extent) * cam.zoom;
-    const F = fr.focus.map((v, n) => v + cam.look[n]);
+    const marks = typeof world.marks === 'function' ? world.marks(w) || {} : {};
+    const point = f => {
+      if (Array.isArray(f)) return f.map(Number);
+      if (typeof f === 'string') { if (!marks[f]) throw new Error('stage.focus "' + f + '": the world names no such mark (marks: ' + Object.keys(marks).join(', ') + ')'); return marks[f]; }
+      const first = Object.values(marks)[0];
+      return first ? first.slice() : [0, 0, 0];
+    };
+    const fa = point(cam.from.focus), fb = point(cam.to.focus);
+    const s = fit(cam.box, S.st.size) * cam.zoom;
+    const F = fa.map((v, n) => lerp(v, fb[n], cam.k) + cam.look[n]);
     const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
     const mat = S.mat || (S.mat = M.iso.materials(S.design));
     M.debug.scene = sceneId;
-    const view = (owner, origin) => M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font }, owner);
-    // Screen point -> the world x on the ground line y = yLine (for ranges).
-    const worldX = (sx, yLine) => (sx - ax + cx) / (M.iso.COS * s) + (yLine || 0);
+    // A view named after the mark this beat frames draws the beat's subject:
+    // the audit keeps it inside the stage's room while the words hold.
+    const framed = typeof cam.to.focus === 'string' ? cam.to.focus : null;
+    const view = (owner, origin) => M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font }, owner && (owner === framed || owner === 'subject') ? 'subject' : owner || 'world');
+    const worldX = sx => (sx - ax + cx) / (M.iso.COS * s);
     const range = [worldX(cam.box.x) - cam.box.h / s * 1.2, worldX(cam.box.x + cam.box.w) + cam.box.h / s * 1.2];
     const labelSize = Math.max(M.layout.MIN_TEXT + 2, M.layout.typeFor(C).units.size * 0.85);
-    const kit = {
-      view, mat, s, cam, range, t, avoid: [],
+    const avoid = [];
+    const api = {
+      ctx, view, mat, design: S.design, ease: M.ease, iso: M.iso, sstep, lerp, clamp, range, s,
+      rng: (...keys) => M.rng(S.seed, 'stage', ...keys),
       // The screen rectangle of a box in the world, for labels to give way to.
-      rect(x, y, z, w, d, h) {
-        const V = M.iso.view(ctx, { ax, ay, cx, cy, s }, 'probe');
-        const pts = [];
-        [x, x + w].forEach(px => [y, y + d].forEach(py => [z, z + h].forEach(pz => pts.push(V.P(px, py, pz)))));
+      rect(x, y, z, bw, bd, bh) {
+        const V = view('probe'), pts = [];
+        [x, x + bw].forEach(px => [y, y + bd].forEach(py => [z, z + bh].forEach(pz => pts.push(V.P(px, py, pz)))));
         return { x0: Math.min(...pts.map(p => p[0])), y0: Math.min(...pts.map(p => p[1])), x1: Math.max(...pts.map(p => p[0])), y1: Math.max(...pts.map(p => p[1])) };
       },
+      avoid: r => avoid.push(r),
       // Words on the stage are set at one size on screen, whatever the zoom:
       // the camera zooms the world, never the words.
       label(str, wx, wy, wz, o) {
         if (!str) return;
-        const [px, py] = M.iso.view(ctx, { ax, ay, cx, cy, s }, 'label').P(wx, wy, wz);
+        const [px, py] = view('label').P(wx, wy, wz);
         const f = M.text.font((o && o.weight) || 600, labelSize, S.design.font);
-        const w = M.text.measure(ctx, str, f), h = labelSize * 1.25;
-        const x = o && o.align === 'center' ? px - w / 2 : px, y = py + ((o && o.dy) || 0);
-        // Words fade out before they reach the stage's soft edges, and give
-        // way to the subject when it passes over them.
-        const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + w), y - B.y, B.y + B.h - (y + h));
+        const tw = M.text.measure(ctx, str, f), h = labelSize * 1.25;
+        const x = o && o.align === 'center' ? px - tw / 2 : px, y = py + ((o && o.dy) || 0);
+        // Words fade out before the stage's soft edges, and give way to
+        // whatever the painter asked them to avoid.
+        const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + tw), y - B.y, B.y + B.h - (y + h));
         let a = clamp(edge / FADE) * ((o && o.alpha) == null ? 1 : o.alpha);
-        (kit.avoid || []).forEach(r => {
-          const gx = Math.max(r.x0 - (x + w), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
+        avoid.forEach(r => {
+          const gx = Math.max(r.x0 - (x + tw), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
         if (a <= 0.01) return;
-        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, h, w, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
-      },
-      api(extra) {
-        return Object.assign({ t, mat, design: S.design, ease: M.ease, iso: M.iso, sstep, lerp, clamp, range,
-          rng: (...keys) => M.rng(S.seed, 'stage', ...keys), label: kit.label }, extra);
+        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
       }
     };
     ctx.save();
     ctx.globalAlpha *= M.ease.outQuint(clamp(t / INTRO));
-    S.shape.paint(S, ctx, t, kit);
+    world.draw(w, api);
     ctx.restore();
     fade(ctx, C, cam.box);
   }
@@ -3267,7 +3244,7 @@
     const band = (x0, y0, x1, y1, rx, ry, rw, rh) => {
       if (!ctx.createLinearGradient) return;
       const g = ctx.createLinearGradient(x0, y0, x1, y1);
-      g.addColorStop(0, bg); g.addColorStop(1, M.design.mix(bg, bg, 0) + '00');
+      g.addColorStop(0, bg); g.addColorStop(1, bg + '00');
       ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh);
     };
     if (inner.top) band(0, B.y, 0, B.y + FADE, 0, B.y, W, FADE);
@@ -3293,304 +3270,8 @@
     return out;
   }
 
-  // A painter the page registered, or a clear error naming it.
-  function thing(name, where) {
-    const p = M.things[name];
-    if (!p || typeof p.draw !== 'function') throw new Error(where + ': no painter Motion.things.' + name + ' with a draw(V, s, api) function');
-    return p;
-  }
-
-  M.stage = { registerShape, shapes: SHAPES, NAMES, plan, travel, finish, paint, cameraAt, fit, boxes, blendForm, thing, sstep, clamp, lerp, FADE };
+  M.stage = { NAMES, plan, travel, finish, paint, cameraAt, fit, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.stage;
-})(typeof window !== 'undefined' ? window : globalThis);
-</script>
-<script>
-/*!
- * shapes/transformation.js — one subject, its states.
- *
- *   "stage": { "shape": "transformation", "subject": "car", "size": [46, 20, 18],
- *              "states": [ { "id": "tourer", "label": "1912", "form": { … } },
- *                          { "id": "saloon", "label": "1934", "form": { … } }, … ],
- *              "trail": "none", "scenery": "town", "ground": "road", "topPace": 2 }
- *   state: { "id": "saloon", "pace": "F4", … }       (a claim, or lengths per second)
- *   scene: "stage": { "state": "saloon", "pace": 0, "zoom": 1.2, "look": [10, 0, 4],
- *                     "shows": "the saloon pulls away faster than the tourer" }
- *
- * The grammar: the states stand in order along one path on a diorama base,
- * a stop for each. The subject travels the path at the pace the story gives
- * it, and the camera follows it, so the ground slides by. A pace is a claim
- * (a top speed, a walking rate): drawn proportional and from zero, the
- * story's largest such claim at `topPace` subject lengths per second; or a
- * plain number of lengths per second when the motion carries no figure; or
- * 0, and the subject halts. A beat takes its state's pace unless it sets its
- * own. During a beat the subject passes its point at the middle of the beat;
- * when a beat names a new state, it travels on and changes form in the quiet
- * stretch between the words, and the new state's stop is set where it
- * arrives, so the stops sit as far apart as the story's pace carries it.
- * A pace that changes without a new state (pulling in, pulling away) eases
- * over the same stretch. With no pace anywhere, a slow drift keeps the stage
- * alive; it is a fallback, never the story's motion. A state with a
- * `parent` other than the state before it starts a branch (a lineage): the
- * branch runs on its own lane behind the main line, and the subject crosses
- * to it. `trail: "keep"` leaves each state standing at its stop once the
- * subject moves on, so the lineage stays in view.
- *
- * The form: each state's `form` is the page's own description of the
- * subject in that state (numbers, number arrays, profiles). The subject's
- * painter gets the form blended between the two states as it changes,
- * `s.from`, `s.to` and `s.k` (0..1), the distance it has travelled
- * (`s.dist`, for wheels and feet), its speed in lengths per second
- * (`s.speed`), the beat it is in (`s.beat`) and the time. Painters also get
- * `api.beats` (where the subject is at each beat's middle, so a pump goes
- * where the story stops for fuel) and `api.value(id)` for claims. Nothing
- * here knows what the subject is.
- */
-(function (root) {
-  'use strict';
-  const M = root.Motion;
-  const ST = M.stage;
-  const IDLE = 0.15;         // the fallback drift, in subject lengths per second
-  const TOP = 2;             // the largest pace claim, in subject lengths per second
-  const ARRIVE = 0.45;       // the change runs this far into the next beat's words
-
-  function plan(S, list) {
-    const st = S.st;
-    if (!st.subject) throw new Error('stage.subject: the name of the page\'s painter for the subject (Motion.things.<name>)');
-    if (!Array.isArray(st.size) || st.size.length !== 3 || st.size.some(v => !(v > 0))) throw new Error('stage.size: the subject\'s largest extent [w, d, h] in its own units');
-    const states = st.states || [];
-    if (states.length < 2) throw new Error('stage.states: a transformation needs at least two states');
-    const byId = {};
-    states.forEach((x, i) => {
-      if (!x.id) throw new Error('stage.states[' + i + '] has no id');
-      if (byId[x.id]) throw new Error('stage.states: two states share the id "' + x.id + '"');
-      byId[x.id] = x;
-    });
-    // The tree: each state's parent is the state before it unless it names
-    // one. A branch is a child that isn't its parent's first.
-    const kids = {};
-    states.forEach((x, i) => {
-      const parent = x.parent !== undefined ? x.parent : (i ? states[i - 1].id : null);
-      if (parent != null && !byId[parent]) throw new Error('stage.states "' + x.id + '": parent "' + parent + '" is not a state');
-      x._parent = parent;
-      if (parent != null) (kids[parent] = kids[parent] || []).push(x.id);
-    });
-    const [w, d] = st.size;
-    const gap = Math.max(w, d) * (st.spacing || 2.6);
-    const lane = d * 3.2;
-    const width = d * 2.4;
-    let lanes = 0;
-    const node = {};
-    const place = (id, depth, ln) => {
-      node[id] = { id, x: depth * gap, y: -ln * lane, depth, lane: ln, state: byId[id] };
-      (kids[id] || []).forEach((k, j) => place(k, depth + 1, j === 0 ? ln : ++lanes));
-    };
-    states.filter(x => x._parent == null).forEach((root0, j) => place(root0.id, 0, j === 0 ? 0 : ++lanes));
-    const path = id => { const out = []; for (let n = id; n != null; n = byId[n]._parent) out.unshift(n); return out; };
-    const steps = (a, b) => { const pa = path(a), pb = path(b); let c = 0; while (c < pa.length && c < pb.length && pa[c] === pb[c]) c++; return pa.length - c + pb.length - c; };
-    // Paces: a claim is drawn proportional and from zero, the largest claim
-    // at `topPace` lengths per second; a number is lengths per second.
-    const len = w;
-    const cid = p => String(p).replace(/[{}]/g, '');
-    const claimed = [];
-    states.forEach(x => { if (typeof x.pace === 'string') claimed.push(x.pace); });
-    list.forEach(it => { const p = it.spec && it.spec.stage && it.spec.stage.pace; if (typeof p === 'string') claimed.push(p); });
-    const valueOf = (p, where) => {
-      const c = S.R.claims[cid(p)];
-      if (!c) throw new Error(where + ': pace "' + p + '" is not a claim');
-      if (!(+c.value >= 0)) throw new Error(where + ': pace claim ' + c.id + ' must be zero or more');
-      return +c.value;
-    };
-    const maxV = Math.max(1e-9, ...claimed.map(p => valueOf(p, 'stage')));
-    const top = (st.topPace || TOP) * len;
-    const pace = (p, where) => {
-      if (p == null) return null;
-      if (typeof p === 'number') { if (!(p >= 0)) throw new Error(where + ': pace must be zero or more'); return p * len; }
-      return valueOf(p, where) / maxV * top;
-    };
-    const idle = (st.idlePace != null ? st.idlePace : IDLE) * len;
-    let prev = null;
-    const beats = list.map((it, i) => {
-      const dir = (it.spec && it.spec.stage) || {};
-      if (dir.state != null && !byId[dir.state]) throw new Error('scene "' + it.id + '": stage.state "' + dir.state + '" is not one of ' + states.map(x => x.id).join(', '));
-      const key = dir.state || prev || states[0].id;
-      const change = i > 0 && key !== prev;
-      const n = change ? steps(prev, key) : 0;
-      const own = pace(dir.pace, 'scene "' + it.id + '"');
-      const fromState = pace(byId[key].pace, 'stage.states "' + key + '"');
-      const v = own != null ? own : fromState != null ? fromState : idle;
-      const paceClaim = typeof dir.pace === 'string' ? cid(dir.pace) : dir.pace == null && typeof byId[key].pace === 'string' ? cid(byId[key].pace) : null;
-      const b = { scene: it.id, state: key, change, v, paceClaim, travel: change ? Math.min(2.2, 1.0 + 0.4 * n) : 0 };
-      prev = key;
-      return b;
-    });
-    return { states, byId, node, gap, lane, width, beats, kids, len, size: st.size, trail: st.trail === 'keep' };
-  }
-
-  // A cubic from 0 to L over T seconds that leaves at speed va and arrives at vb.
-  const hermite = (L, T, va, vb, u) => L * (3 * u * u - 2 * u * u * u) + va * T * (u - 2 * u * u + u * u * u) + vb * T * (u * u * u - u * u);
-
-  // The route between two points on the base: along the line, with a lane
-  // change made square at the middle, as a base's paths are.
-  function route(p, q) {
-    if (Math.abs(p[1] - q[1]) < 1e-6) return [p, q];
-    const xm = (p[0] + q[0]) / 2;
-    return [p, [xm, p[1]], [xm, q[1]], q];
-  }
-  function along(pts, s) {
-    for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      if (s <= L || i === pts.length - 1) { const k = L ? Math.min(1, s / L) : 1; return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, b[0] - a[0], b[1] - a[1]]; }
-      s -= L;
-    }
-    return [pts[0][0], pts[0][1], 1, 0];
-  }
-  const length = pts => pts.slice(1).reduce((s, b, i) => s + Math.hypot(b[0] - pts[i][0], b[1] - pts[i][1]), 0);
-
-  // The subject's journey: runs at a steady pace, and changes (of state, of
-  // pace or both) between beats, end to end. A new state's stop is set
-  // where the subject arrives at the pace it travels, so a fast story
-  // spreads its stops out and a halt lands on its stop.
-  function finish(S, scenes) {
-    const P = S.plan;
-    const mid = sc => (sc.enterEnd + sc.exitStart) / 2;
-    const placed = new Set();
-    const pieces = [];
-    const b0 = P.beats[0];
-    const n0 = P.node[b0.state];
-    n0.x = 0; placed.add(b0.state);
-    let v = b0.v, t = 0, x = -v * mid(scenes[0]), y = n0.y, dist = 0, state = b0.state;
-    for (let j = 1; j < scenes.length; j++) {
-      const b = P.beats[j];
-      if (!b.change && Math.abs(b.v - v) < 1e-9) continue;
-      const w0 = scenes[j - 1].exitStart, w1 = Math.min(scenes[j].cStart + ARRIVE, mid(scenes[j]) - 0.05), T = w1 - w0;
-      pieces.push({ kind: 'run', t0: t, t1: w0, x, y, v, dist, state });
-      const x0 = x + v * (w0 - t);
-      dist += v * (w0 - t);
-      let q;
-      if (b.change) {
-        const nd = P.node[b.state];
-        if (!placed.has(b.state)) {
-          nd.x = x0 + Math.max((v + b.v) / 2 * T, P.len * 1.4) + b.v * (mid(scenes[j]) - w1);
-          placed.add(b.state);
-        }
-        q = [nd.x - b.v * (mid(scenes[j]) - w1), nd.y];
-      } else q = [x0 + (v + b.v) / 2 * T, y];
-      const pts = route([x0, y], q), L = length(pts) * (q[0] < x0 ? -1 : 1);
-      pieces.push({ kind: 'change', t0: w0, t1: w1, pts, L, va: v, vb: b.v, dist, from: state, to: b.state });
-      dist += Math.abs(L); x = q[0]; y = q[1]; t = w1; v = b.v; state = b.state;
-    }
-    pieces.push({ kind: 'run', t0: t, t1: Infinity, x, y, v, dist, state });
-    // States no beat reaches stand on beyond the last stop.
-    let far = Math.max(...[...placed].map(id => P.node[id].x));
-    P.states.forEach(st => { if (!placed.has(st.id)) { far += P.len * 2; P.node[st.id].x = far; } });
-    P.pieces = pieces;
-    // Where the subject is at each beat's middle: a thing the story puts at
-    // a beat (a pump where it stops for fuel) stands there.
-    P.at = scenes.map((sc, i) => { const a = subjectAt(S, mid(sc)); return { id: sc.id, index: i, state: P.beats[i].state, x: a.x, y: a.y, pace: P.beats[i].v / P.len }; });
-  }
-
-  // Where the subject is at t, its form and how far it has gone.
-  function subjectAt(S, t) {
-    const P = S.plan;
-    const pc = P.pieces.find(x => t < x.t1) || P.pieces[P.pieces.length - 1];
-    if (pc.kind === 'run') {
-      const dt = Math.max(0, t - pc.t0);
-      return { x: pc.x + pc.v * dt, y: pc.y, heading: [1, 0], dist: pc.dist + pc.v * dt, speed: pc.v / P.len, from: pc.state, to: pc.state, k: 1, state: pc.state };
-    }
-    const T = pc.t1 - pc.t0, u = ST.clamp((t - pc.t0) / T);
-    const sgn = pc.L < 0 ? -1 : 1, Lm = Math.abs(pc.L);
-    const h = uu => hermite(Lm, T, pc.va * sgn, pc.vb * sgn, uu);
-    const sAlong = h(u);
-    const e = 1e-3, ds = (h(Math.min(1, u + e)) - h(Math.max(0, u - e))) / (2 * e * T);
-    const [x, y, hx, hy] = along(pc.pts, sAlong);
-    const hl = Math.hypot(hx, hy) || 1;
-    const k = pc.from === pc.to ? 1 : ST.sstep(0.15, 0.85, u);
-    return { x, y, heading: [hx / hl, hy / hl], dist: pc.dist + Math.abs(sAlong), speed: Math.abs(ds) / P.len, from: pc.from, to: pc.to, k, state: u < 0.5 ? pc.from : pc.to };
-  }
-
-  function frame(S, t) {
-    const a = subjectAt(S, t), h = S.plan.size[2];
-    return { focus: [a.x, a.y, h * 0.42], extent: S.plan.size };
-  }
-
-  // ── painting ─────────────────────────────────────────────────────────
-  // The base: a chunky slab under the main line, one for each branch's lane,
-  // a lighter stop for each state with its label at the front edge, and quiet
-  // ticks along the front edge that slide by as the subject moves.
-  function paintBase(S, kit) {
-    const P = S.plan, m = kit.mat, V = kit.view('ground');
-    const W = P.width, slab = P.size[2] * 0.3, gap = P.len * 2.6;
-    // The board: a mid tone, so the paper around it and the things on it
-    // both read; each stop a lighter panel let into it.
-    const board = { top: m.N2.top, left: m.N3.left, right: m.N3.right };
-    const xs = Object.values(P.node).map(n => n.x);
-    const x0 = Math.min(...xs) - gap * 3, x1 = Math.max(...xs) + gap * 4;
-    const lo = Math.max(x0, kit.range[0]), hi = Math.min(x1, kit.range[1]);
-    // Branch lanes first: they sit behind the main line.
-    Object.values(P.node).filter(n => n.lane > 0 && P.byId[n.id]._parent != null && P.node[P.byId[n.id]._parent].lane !== n.lane)
-      .sort((a, b) => b.lane - a.lane)
-      .forEach(n => {
-        const par = P.node[P.byId[n.id]._parent], xm = (par.x + n.x) / 2;
-        const last = Math.max(n.x, ...Object.values(P.node).filter(k => k.lane === n.lane).map(k => k.x)) + gap * 1.2;
-        V.block(xm - W / 2, n.y - W / 2, 0, last - xm + W / 2, W, slab, board, { r: W * 0.12, b: slab * 0.4 });
-        V.block(xm - W / 2, n.y + W / 2, 0, W, par.y - n.y - W, slab, board, { r: 0, b: slab * 0.4 });
-      });
-    if (hi > lo) V.block(lo, -W / 2, 0, hi - lo, W, slab, board, { r: W * 0.12, b: slab * 0.4 });
-    // The stops.
-    const pad = Math.min(gap * 0.36, W * 1.1);
-    Object.values(P.node).forEach(n => {
-      if (n.x + pad < kit.range[0] || n.x - pad > kit.range[1]) return;
-      const c = pad * 0.12, x0 = n.x - pad / 2, x1 = n.x + pad / 2, y0 = n.y - W * 0.42, y1 = n.y + W * 0.42, z = slab + 0.02;
-      V.face(M.iso.soften([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], c).map(p => [p[0], p[1], z]), m.N.top);
-    });
-    // Ticks along the front edge, a sixth of a gap apart.
-    const step = P.len * 0.45, tz = slab * 0.62;
-    for (let x = Math.ceil(lo / step) * step; x < hi; x += step) {
-      V.face([[x - step * 0.05, W / 2, tz], [x + step * 0.05, W / 2, tz], [x + step * 0.05, W / 2, tz - slab * 0.35], [x - step * 0.05, W / 2, tz - slab * 0.35]], m.line);
-    }
-    return slab;
-  }
-
-  function paint(S, ctx, t, kit) {
-    const P = S.plan, st = S.st;
-    const a = subjectAt(S, t);
-    const slab = paintBase(S, kit);
-    const top = slab;
-    const ground = st.ground ? ST.thing(st.ground, 'stage.ground') : null;
-    const scenery = st.scenery ? ST.thing(st.scenery, 'stage.scenery') : null;
-    const subj = ST.thing(st.subject, 'stage.subject');
-    const nodes = Object.values(P.node).map(n => ({ id: n.id, x: n.x, y: n.y, label: n.state.label || '', form: n.state.form || {} }));
-    const R = S.R, claim = id => { const c = R.claims[String(id).replace(/[{}]/g, '')]; if (!c) throw new Error('stage painter: unknown claim "' + id + '"'); return c; };
-    const info = extra => kit.api(Object.assign({ nodes, beats: P.at, width: P.width, top, len: P.len, subject: { x: a.x, y: a.y, state: a.state },
-      value: id => +claim(id).value, display: id => { const c = claim(id); return c.display != null ? String(c.display) : String(c.value); } }, extra));
-    // The beat the frame is in, and how far into its words.
-    const scs = S.scenes, found = scs.findIndex(sc => t >= sc.t0 && t < sc.t1), bi = found < 0 ? scs.length - 1 : found;
-    const beat = { id: scs[bi].id, index: bi, lt: t - scs[bi].cStart, dir: (scs[bi].spec && scs[bi].spec.stage) || {} };
-    if (ground) ground.draw(kit.view('ground', [0, 0, top]), { t, beat, from: kit.range[0], to: kit.range[1] }, info());
-    if (scenery) scenery.draw(kit.view('scenery', [0, 0, top]), { t, beat, layer: 'back' }, info({ layer: 'back' }));
-    // What stays behind at each stop it has left, in depth order.
-    if (P.trail) {
-      const left = new Set();
-      P.pieces.filter(pc => pc.kind === 'change' && pc.t0 <= t).forEach(pc => left.add(pc.from));
-      left.delete(a.from); left.delete(a.to);
-      [...left].map(id => P.node[id]).sort((p, q) => (p.x + p.y) - (q.x + q.y)).forEach(n => {
-        const pc = P.pieces.find(x => x.kind === 'change' && x.from === n.id && x.t0 <= t);
-        ctx.save(); ctx.globalAlpha *= ST.clamp((t - pc.t0) / 0.5);
-        subj.draw(kit.view('trail', [n.x, n.y, top]), { form: n.state.form || {}, from: n.id, to: n.id, k: 1, state: n.id, dist: 0, speed: 0, heading: [1, 0], t, beat, still: true }, info({ still: true }));
-        ctx.restore();
-      });
-    }
-    const form = ST.blendForm((P.byId[a.from] || {}).form || {}, (P.byId[a.to] || {}).form || {}, a.k);
-    subj.draw(kit.view('subject', [a.x, a.y, top]), { form, from: a.from, to: a.to, k: a.k, state: a.state, dist: a.dist, speed: a.speed, heading: a.heading, t, beat, still: false }, info());
-    if (scenery) scenery.draw(kit.view('scenery', [0, 0, top]), { t, beat, layer: 'front' }, info({ layer: 'front' }));
-    // Each stop's label, at the front edge of the base, one size on screen;
-    // it gives way to the subject as it passes.
-    const [w, d, h] = P.size;
-    kit.avoid = [kit.rect(a.x - w / 2, a.y - d / 2, top, w, d, h)];
-    nodes.forEach(n => { if (n.label) kit.label(n.label, n.x - P.width * 0.2, n.y + P.width / 2, 0, { dy: 10 }); });
-  }
-
-  ST.registerShape({ name: 'transformation', plan, finish, frame, paint, subjectAt, IDLE, TOP });
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
@@ -4920,16 +4601,12 @@
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
-/* The Arden family car, one painter for all five eras. Its form is the
-   state's numbers from the spec (stage.states[].form), blended as it
-   changes: length, wheel size, belt line, cabin, the open Tourer's screen,
-   seats and folded hood, the Starliner's fins and chrome, the Volt's light
-   bar. Drawn along +x, the near side (+y) toward the viewer. */
-Motion.things.car = { draw(V, s, api) {
-  const f = s.form, m = api.mat, iso = api.iso;
+/* The car's look: one function for every era, from its form. */
+function drawCar(V, f, dist, api) {
+  const m = api.mat, iso = api.iso;
   const L = f.len, hw = f.width / 2, r = f.wheel, zb = r * 0.55;
   const ax = [-L / 2 + f.axle[0], L / 2 - f.axle[1]];
-  const ww = f.width * 0.2, rot = s.dist / r;
+  const ww = f.width * 0.2, rot = dist / r;
   const body = m.N3;
   V.shadow(-L / 2 + 1, -hw, L - 1, hw * 2, f.roof * 0.5, m.shadow);
   const wheel = (x, y0, y1, near) => {
@@ -5001,68 +4678,113 @@ Motion.things.car = { draw(V, s, api) {
   });
   // Near wheels last, in front of the body.
   wheel(ax[0], hw - ww, hw, true); wheel(ax[1], hw - ww, hw, true);
-} };
+}
 
-/* The base under it, as a road: lane edges along the car's lane. */
-Motion.things.road = { draw(V, g, api) {
-  const step = 9, y = api.width * 0.29;
-  for (let x = Math.ceil(g.from / step) * step; x < g.to; x += step) {
-    [-y, y].forEach(yy => V.face([[x, yy - 0.5, 0.02], [x + step * 0.55, yy - 0.5, 0.02], [x + step * 0.55, yy + 0.5, 0.02], [x, yy + 0.5, 0.02]], api.mat.line));
-  }
-} };
+/* The Arden family car's world: one car on a museum base, driving through a
+   century. Each insight is something that happens to it:
+   - its form follows the story's clock (the year): the guide's five eras
+     blend into each other as the clock moves between beats;
+   - how far it has gone is the running total of each beat's speed, the
+     era's top speed from the guide in proportion (w.share), so it drives
+     faster as top speed rises; the guide gives the 1979 car no top speed,
+     so that beat pulls in for fuel instead (its fuel-use figure);
+   - fuel runs down a pump's hose while the fuel beat acts; the charging
+     post's meter fills toward the planned 80% (hatched: a plan) while the
+     charging beat acts. Everything is driven by progress, time or rate. */
+const ERAS = [
+  { year: 1912, label: '1912', speed: 'F1', form: { len: 38, width: 18, wheel: 5.2, axle: [6, 6.5], belt: 11, nose: 9.5, hood: 13, deck: 6, tail: 10, cf: 6, rf: 6, rr: -6, cr: -8, roof: 11, open: 1, spokes: 1, fin: 0, chrome: 0, soft: 0.8, bar: 0 } },
+  { year: 1934, label: '1934', speed: 'F4', form: { len: 40, width: 19, wheel: 4.4, axle: [6.5, 7], belt: 10, nose: 9, hood: 12, deck: 6, tail: 8.5, cf: 8, rf: 4.5, rr: -9, cr: -13, roof: 17, open: 0, spokes: 0, fin: 0, chrome: 0.5, soft: 1.2, bar: 0 } },
+  { year: 1958, label: '1958', speed: 'F7', form: { len: 46, width: 20, wheel: 3.8, axle: [8, 8], belt: 8.5, nose: 7.5, hood: 15, deck: 11, tail: 8.5, cf: 8, rf: 2, rr: -6, cr: -12, roof: 13.5, open: 0, spokes: 0, fin: 4.5, chrome: 1, soft: 1.5, bar: 0 } },
+  { year: 1979, label: '1979', speed: null, form: { len: 34, width: 18.5, wheel: 3.4, axle: [5.5, 5.5], belt: 8.5, nose: 7, hood: 9, deck: 1.5, tail: 9, cf: 8, rf: 2, rr: -13, cr: -16, roof: 15.5, open: 0, spokes: 0, fin: 0, chrome: 0.2, soft: 1.2, bar: 0 } },
+  { year: 2024, label: '2024', speed: 'F6', form: { len: 42, width: 19.5, wheel: 4, axle: [7, 7], belt: 8.5, nose: 6.5, hood: 10, deck: 3, tail: 9, cf: 11, rf: -1, rr: -10, cr: -18, roof: 14, open: 0, spokes: 0, fin: 0, chrome: 0, soft: 2.5, bar: 1 } }
+];
+const LEN = 42, TOP = 2.2 * LEN;      // the fastest era drives 2.2 car lengths a second
+const eraAt = year => ERAS.reduce((best, e) => (Math.abs(e.year - year) < Math.abs(best.year - year) ? e : best), ERAS[0]);
+// The form at any point on the clock: the two eras either side, blended.
+function formAt(w, year) {
+  let i = ERAS.findIndex(e => e.year >= year);
+  if (i <= 0) return ERAS[i < 0 ? ERAS.length - 1 : 0].form;
+  const a = ERAS[i - 1], b = ERAS[i];
+  return w.blend(a.form, b.form, (year - a.year) / (b.year - a.year));
+}
 
-/* Where the story stops: the Compact pulls in for fuel (the guide gives
-   its fuel use, and no top speed), and the Volt pulls in to charge (Arden's
-   2030 plan). Each stands where its beat happens (api.beats) and acts
-   during that beat: fuel runs down the hose; the charge meter fills toward
-   the planned 80%, hatched because it is a plan. */
-Motion.things.stops = { draw(V, g, api) {
-  if (g.layer !== 'back') return;
-  const m = api.mat, at = id => api.beats.find(b => b.id === id);
-  const y = -api.width * 0.42, lw = Math.max(1.5, V.s * 0.5);
-  const flow = (pts, t, on) => {
-    if (on <= 0.01) return;
-    V.ctx.save(); V.ctx.globalAlpha *= on;
-    V.path(pts, m.DARK.left, lw);
-    // Pulses travelling along the line: something is flowing.
-    const seg = pts.length - 1;
-    for (let i = 0; i < 4; i++) {
-      const u = ((t * 0.9 + i / 4) % 1) * seg, k = Math.floor(u), f = u - k;
-      const a = pts[k], b = pts[Math.min(seg, k + 1)];
-      const p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
-      V.line(p, [p[0] + 0.01, p[1], p[2]], m.PAPER.top, lw * 1.8);
+Motion.things.museum = {
+  speedOf(w) {
+    // A beat's speed: its era's top speed in proportion, or a stop where
+    // the story stops (fuel; charging).
+    return b => {
+      if (b.id === 'compact' || b.id === 'next') return 0;
+      const e = eraAt(b.time);
+      return e.speed ? w.share(e.speed, 'F6') * TOP : 0;
+    };
+  },
+  marks(w) {
+    const x = w.accumulate('road', this.speedOf(w));
+    return { car: [x, 0, 8], charger: [x + 6, -8, 8] };
+  },
+  draw(w, api) {
+    const m = api.mat, speed = this.speedOf(w);
+    const x = w.accumulate('road', speed);
+    const at = id => (w.has(id) ? w.accumulate('road', speed, w.beats.find(b => b.id === id).mid) : null);
+    const W = 48, slab = 5.4;
+    // The base and the road on it.
+    const G = api.view('ground');
+    const lo = api.range[0], hi = api.range[1];
+    G.block(lo, -W / 2, 0, hi - lo, W, slab, { top: m.N2.top, left: m.N3.left, right: m.N3.right }, { r: 0, b: slab * 0.4 });
+    const step = 9, ly = W * 0.29;
+    for (let s = Math.floor(lo / step) * step; s < hi; s += step) {
+      [-ly, ly].forEach(yy => G.face([[s, yy - 0.5, slab + 0.02], [s + step * 0.55, yy - 0.5, slab + 0.02], [s + step * 0.55, yy + 0.5, slab + 0.02], [s, yy + 0.5, slab + 0.02]], m.line));
     }
-    V.ctx.restore();
-  };
-  const fuel = at('compact');
-  if (fuel) {
-    const x = fuel.x - 7;
-    V.shadow(x, y, 6, 5, 12, m.shadow);
-    V.block(x, y, 0, 6, 5, 12, m.N3, { r: 0.8, b: 0.8 });
-    V.face([[x + 0.8, y + 5.02, 5.5], [x + 5.2, y + 5.02, 5.5], [x + 5.2, y + 5.02, 10], [x + 0.8, y + 5.02, 10]], m.PAPER.left);
-    V.block(x - 0.5, y - 0.5, 12, 7, 6, 1.4, m.N2, { r: 0.6, b: 0.5 });
-    const on = g.beat.id === 'compact' ? api.clamp((g.beat.lt - 0.2) / 0.5) : 0;
-    flow([[x + 6, y + 3, 7], [x + 8, y + 7, 5], [fuel.x - 9, -api.width * 0.18, 6]], g.t, on);
-  }
-  const charge = at('next');
-  if (charge) {
-    const x = charge.x + 14;
-    V.shadow(x, y, 3.4, 3.4, 13, m.shadow);
-    V.block(x, y, 0, 3.4, 3.4, 13, m.N3, { r: 0.6, b: 0.6 });
-    // The meter on the post's face: empty glass, then the planned charge,
-    // hatched, filling over the beat.
-    const z0 = 2.5, z1 = 11.5, x0 = x + 0.7, x1 = x + 2.7, fy = y + 3.43;
-    V.face([[x0, fy, z0], [x1, fy, z0], [x1, fy, z1], [x0, fy, z1]], m.glass.left);
-    const on = g.beat.id === 'next' ? 1 : 0;
-    const fill = on * api.ease.outQuint(api.clamp((g.beat.lt - 0.4) / 2.2)) * api.value('F13') / 100;
-    const top = z0 + (z1 - z0) * fill;
-    for (let z = z0; z < top - 0.05; z += 0.9) {
-      const zz = Math.min(top, z + 0.5);
-      V.face([[x0, fy + 0.01, z], [x1, fy + 0.01, z], [x1, fy + 0.01, zz], [x0, fy + 0.01, zz]], m.A.left);
+    const S = api.view('scenery', [0, 0, slab]), y = -W * 0.42, lw = Math.max(1.5, S.s * 0.5);
+    const flow = (pts, on) => {
+      if (on <= 0.01) return;
+      S.ctx.save(); S.ctx.globalAlpha *= on;
+      S.path(pts, m.DARK.left, lw);
+      const seg = pts.length - 1;
+      for (let i = 0; i < 4; i++) {                           // fuel or current moving along the line
+        const u = ((w.t * 0.9 + i / 4) % 1) * seg, k = Math.floor(u), f = u - k;
+        const a = pts[k], b = pts[Math.min(seg, k + 1)];
+        const p = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+        S.line(p, [p[0] + 0.01, p[1], p[2]], m.PAPER.top, lw * 1.8);
+      }
+      S.ctx.restore();
+    };
+    const after = id => (w.has(id) ? w.progress(id) : 0);
+    // The pump where the 1979 car stops for fuel.
+    const px = at('compact');
+    if (px != null) {
+      const bx = px - 7;
+      S.shadow(bx, y, 6, 5, 12, m.shadow);
+      S.block(bx, y, 0, 6, 5, 12, m.N3, { r: 0.8, b: 0.8 });
+      S.face([[bx + 0.8, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 10], [bx + 0.8, y + 5.02, 10]], m.PAPER.left);
+      S.block(bx - 0.5, y - 0.5, 12, 7, 6, 1.4, m.N2, { r: 0.6, b: 0.5 });
+      const on = api.clamp((w.progress('compact') - 0.6) * 4) * (1 - api.clamp(after('volt') * 3));
+      flow([[bx + 6, y + 3, 7], [bx + 8, y + 7, 5], [px - 9, -W * 0.18, 6]], on);
     }
-    flow([[x, y + 2, 6], [x - 3, y + 6, 3], [charge.x + 15, -api.width * 0.18, 5]], g.t, g.beat.id === 'next' ? api.clamp((g.beat.lt - 0.1) / 0.4) : 0);
+    // The charging post where the Volt stops, and its meter.
+    const cx0 = at('next');
+    if (cx0 != null) {
+      const bx = cx0 + 12;
+      S.shadow(bx, y, 6, 5, 20, m.shadow);
+      S.block(bx, y, 0, 6, 5, 20, m.N3, { r: 0.8, b: 0.8 });
+      const z0 = 3, z1 = 17.5, x0 = bx + 1, x1 = bx + 5, fy = y + 5.03;
+      S.face([[x0, fy, z0], [x1, fy, z0], [x1, fy, z1], [x0, fy, z1]], m.glass.left);
+      // The meter fills toward the planned charge as the car comes to rest.
+      const p = w.progress('next'), top = z0 + (z1 - z0) * api.ease.outQuint(api.clamp((p - 0.5) / 0.5)) * w.share('F13', 100);
+      for (let z = z0; z < top - 0.05; z += 0.9) S.face([[x0, fy + 0.01, z], [x1, fy + 0.01, z], [x1, fy + 0.01, Math.min(top, z + 0.55)], [x0, fy + 0.01, Math.min(top, z + 0.55)]], m.A.left);
+      flow([[bx, y + 3, 8], [bx - 3, y + 7, 3], [cx0 + 15, -W * 0.18, 5]], api.clamp((p - 0.6) * 4) * (1 - api.clamp(after('src') * 3)));
+    }
+    // The car, in the form the clock gives it.
+    drawCar(api.view('car', [x, 0, slab]), formAt(w, w.time), x, api);
+    // Each era's year on the base where its beat happened, giving way to the car.
+    api.avoid(api.rect(x - 23, -10, slab, 46, 20, 18));
+    ERAS.forEach((e, i) => {
+      const beat = w.beats.find(b => b.time === e.year);
+      if (!beat) return;
+      api.label(e.label, w.accumulate('road', speed, beat.mid) - 10, W / 2, 0, { dy: 10 });
+    });
   }
-} };
+};
 
 (async function () {
   const el = document.getElementById('player');

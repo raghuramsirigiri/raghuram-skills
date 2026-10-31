@@ -15,8 +15,9 @@ catch the mistake:
    until it has no FAIL. It compiles every cut in seconds, so wrong ids,
    typed figures, dropped hedges, copy limits, an unknown state, a missing
    painter and timing surface here.
-2. **The subject first, then each other thing.** Register the subject's
-   painter, serve the folder (§ 7.2), and look at one beat per state:
+2. **The world, a beat at a time.** Register the world with the hook's
+   action, serve the folder (§ 7.2), and look at that beat; then add the
+   next beat's action and look again:
 
    ```js
    const r = await VideoAudit.run({ cut: 'main', scenes: ['e2'] });
@@ -24,10 +25,9 @@ catch the mistake:
    r.stills()[0].png      // the beat at the middle of its hold
    ```
 
-   Then look at a frame in the middle of a change (`videoPlayer.seek(t)`
-   between two beats): the form must read at every point between the
-   states, not only at the ends. Then the ground and scenery. Rerun only
-   the beat you changed to check a fix.
+   Look at a frame in the middle of each action too (`videoPlayer.seek(t)`
+   between two beats): it must read at every point, not only at the ends.
+   Rerun only the beat you changed to check a fix.
 3. **The whole video, once.** When every beat has passed on its own, run
    § 7.2 in full: it adds the checks that need the whole cut (the hook by
    0.5 s, pops, frozen stretches, the export probe).
@@ -80,14 +80,17 @@ seconds, and **fails** on:
 - a layer not held still long enough to read;
 - nothing readable by 0.5 s;
 - the export probe not round-tripping;
-- `stage`: the subject, while a beat holds, leaving its stage room (into
-  the card's words, past the footer, off the frame), or a stage label
-  touching the subject.
+- `stage`: what the world draws under the beat's focus mark, while it holds,
+  leaving its stage room (into the card's words, past the footer, off the
+  frame), or a stage label touching it.
 
 Stage labels ride the world, so they are judged for size, contrast and the
 subject, not for holding still. It **warns** on single-frame pops, a stage
-that stops for longer than a beat's read (`frozen`), and a beat whose hold
-frame
+that stops for longer than a beat's read (`frozen`), a beat whose world
+looks the same as if its insight had never happened (`action`: it repaints
+the beat with its time, progress and rates taken from the beat before;
+redirect the beat, or say in `shows` why its value lives in the card),
+and a beat whose hold frame
 covers less than 60% of the safe area (`formats.md` § Layout per format;
 `stats.fill` lists every beat's figure). Fix the spec, never the
 check: shorten copy, change the zoom or the look, lengthen `dur`. Rerun until

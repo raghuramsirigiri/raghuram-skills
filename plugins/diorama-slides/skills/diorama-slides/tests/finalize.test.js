@@ -36,7 +36,7 @@ test('--stage copies theme.js and motion-lib (with audit.js) beside the page', (
   assert.ok(fs.existsSync(path.join(dir, 'motion-lib', 'core.js')));
   assert.ok(fs.existsSync(path.join(dir, 'motion-lib', 'audit.js')));
   assert.ok(fs.existsSync(path.join(dir, 'motion-lib', 'scenes', 'beat.js')));
-  assert.ok(fs.existsSync(path.join(dir, 'motion-lib', 'shapes', 'transformation.js')));
+
 });
 
 test('finalize inlines in load order, leaves out audit.js, removes the staged copies, exits 0', () => {
@@ -47,7 +47,7 @@ test('finalize inlines in load order, leaves out audit.js, removes the staged co
   const html = fs.readFileSync(f, 'utf8');
   assert.ok(!/src="(charts-lib|motion-lib)\//.test(html));
   assert.ok(!/root\.VideoAudit\s*=/.test(html), 'audit.js not inlined');
-  const order = ['window.Charts = window.Charts || {}', 'motion-lib/core.js —', 'motion-lib/ease.js —', 'motion-lib/design.js —', 'motion-lib/stage.js —', 'shapes/transformation.js —', 'scenes/beat.js —', 'motion-lib/export.js —', 'motion-lib/player.js —'];
+  const order = ['window.Charts = window.Charts || {}', 'motion-lib/core.js —', 'motion-lib/ease.js —', 'motion-lib/design.js —', 'motion-lib/stage.js —', 'scenes/beat.js —', 'motion-lib/export.js —', 'motion-lib/player.js —'];
   const at = order.map(s => html.indexOf(s));
   at.forEach((p, i) => assert.ok(p >= 0, order[i] + ' is in the page'));
   for (let i = 1; i < at.length; i++) assert.ok(at[i] > at[i - 1], order[i] + ' after ' + order[i - 1]);
