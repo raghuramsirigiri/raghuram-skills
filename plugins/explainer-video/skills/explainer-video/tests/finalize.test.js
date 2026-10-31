@@ -12,7 +12,10 @@ const { spawnSync } = require('child_process');
 
 const SKILL = path.join(__dirname, '..');
 const FIN = path.join(SKILL, 'scripts', 'finalize.js');
-const TEMPLATE = fs.readFileSync(path.join(SKILL, 'templates', 'video.html'), 'utf8');
+// The template with its heading filled in, as a real build writes it.
+const TEMPLATE = fs.readFileSync(path.join(SKILL, 'templates', 'video.html'), 'utf8')
+  .replace('<title>TITLE', '<title>Valley water').replace('<h1>TITLE</h1>', '<h1>Valley water</h1>')
+  .replace('ONE LINE: what the video shows and where its figures come from.', 'What the valley used, from the water board.');
 
 const spec = {
   meta: { title: 'T', locale: 'en-GB', preset: 'default', fps: 30, seed: 1, audio: { score: 'off' } },

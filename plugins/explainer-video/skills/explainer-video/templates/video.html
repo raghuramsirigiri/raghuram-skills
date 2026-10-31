@@ -78,6 +78,16 @@
 <script src="motion-lib/design.js"></script>
 <script src="motion-lib/transitions.js"></script>
 <script src="motion-lib/art.js"></script>
+<script src="motion-lib/iso.js"></script>
+<script src="motion-lib/world.js"></script>
+<script src="motion-lib/pictures/blocks.js"></script>
+<script src="motion-lib/pictures/building.js"></script>
+<script src="motion-lib/pictures/columns.js"></script>
+<script src="motion-lib/pictures/desk.js"></script>
+<script src="motion-lib/pictures/device.js"></script>
+<script src="motion-lib/pictures/people.js"></script>
+<script src="motion-lib/pictures/plinth.js"></script>
+<script src="motion-lib/pictures/ribbon.js"></script>
 <script src="motion-lib/scenes/hook-headline.js"></script>
 <script src="motion-lib/scenes/big-number.js"></script>
 <script src="motion-lib/scenes/kicker-title.js"></script>
@@ -100,9 +110,12 @@
 <script src="motion-lib/export.js"></script>
 <script src="motion-lib/player.js"></script>
 <script>
-/* A custom scene's painter goes HERE, only when no catalog scene fits
-   (references/motion.md § Custom scenes). Pure function of lt: no
-   Math.random, Date.now, timers or state kept between calls.
+/* Custom painters go HERE: one for each finding that is a real thing
+   (references/pictures.md § Drawing the finding's own thing; contract in
+   references/motion.md § Custom scenes). Write and audit
+   them one at a time. Figures come from api.value(id) for the scene's
+   "claims", never typed. Pure function of lt: no Math.random, Date.now,
+   timers or state kept between calls.
 
 Motion.custom.name = { enter: 1, read: 2, draw(ctx, lt, api) { … } };
 */

@@ -11,7 +11,10 @@ const { spawnSync } = require('child_process');
 
 const SKILL = path.join(__dirname, '..');
 const CHECK = path.join(SKILL, 'scripts', 'check-video.js');
-const TEMPLATE = fs.readFileSync(path.join(SKILL, 'templates', 'video.html'), 'utf8');
+// The template with its heading filled in, as a real build writes it.
+const TEMPLATE = fs.readFileSync(path.join(SKILL, 'templates', 'video.html'), 'utf8')
+  .replace('<title>TITLE', '<title>Valley water').replace('<h1>TITLE</h1>', '<h1>Valley water</h1>')
+  .replace('ONE LINE: what the video shows and where its figures come from.', 'What the valley used, from the water board.');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'check-video-'));
 
 function good() {
@@ -95,6 +98,25 @@ test('timing: a transitionIn in the spec warns that it is ignored', () => {
   assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
   assert.ok(r.rows.some(x => x.level === 'WARN' && /transitionIn/.test(x.detail)), JSON.stringify(r.rows.filter(x => x.level === 'WARN')));
 });
+// The continuous style: the good page as one world.
+function continuous(s) {
+  s.meta.style = 'continuous';
+  s.scenes[0].picture = { kind: 'blocks', skin: 'plain', of: 'households' };
+  return s;
+}
+test('shape: a style other than continuous or slides fails', () => failsWith(s => { s.meta.style = 'cinematic'; }, 'shape', /meta\.style must be "continuous" or "slides"/));
+// The world's data pictures are 3D charts and unit grids, retired: a 10 x 10
+// block grid for a share of anything was the feedback the skill kept repeating.
+test('pictures: a retired 3D data picture fails, naming the scene', () => failsWith(s => { continuous(s); }, 'pictures', /scene "hook": the "blocks" picture is retired/));
+test('pictures: slides is the default, so a picture left in a spec without a style draws nothing in 3D', () => {
+  const s = good();
+  s.scenes[0].picture = { kind: 'blocks', skin: 'plain', of: 'households' };
+  const r = check(page(s));
+  assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
+});
+test('pictures: a picture that cannot show its scene fails, naming the scene', () => failsWith(s => { continuous(s); s.scenes[2].picture = { kind: 'blocks', of: 'households' }; }, 'timing', /scene "e2" picture: "blocks" shows a share in %/));
+test('numbers: a typed figure in the words of a picture fails', () => failsWith(s => { continuous(s); s.scenes[0].picture.of = '300 households'; }, 'numbers', /picture\.of/));
+
 test('copy: over the word limit fails', () => failsWith(s => { s.scenes[0].copy.line = 'much less water was used across the whole valley this winter'; }, 'copy', /limit 8/));
 test('copy: a V handle in the caption fails', () => failsWith(s => { s.caption += ' (see V2.1)'; }, 'copy', /handle/));
 test('determinism: Math.random in the page fails', () => failsWith(() => {}, 'determinism', /Math\.random/,
@@ -106,3 +128,5 @@ test('--final: an unstaged page fails the final check', () => {
   assert.strictEqual(r.code, 1);
   assert.ok(r.fails.some(x => x.name === 'final' && /motion-lib/.test(x.detail)));
 });
+test('page: the template heading left as a placeholder fails', () => failsWith(() => {}, 'page', /placeholder/,
+  h => h.replace('</body>', '<h1>TITLE</h1></body>')));

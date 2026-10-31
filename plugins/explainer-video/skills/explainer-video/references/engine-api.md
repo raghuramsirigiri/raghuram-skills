@@ -14,6 +14,7 @@ validates exactly this shape.
     "preset": "default",
     "palette": null,
     "brand": null,
+    "style": "slides",
     "art": "halftone",
     "fonts": [],
     "fps": 30,
@@ -47,7 +48,8 @@ validates exactly this shape.
       "copy": { "kicker": "Annual report", "title": "The busiest year on the water since 2011", "sub": "Year to September 2026" } },
     { "id": "e1", "type": "compare-bars",
       "copy": { "kicker": "Trips per year", "title": "Trips rose from {F3} to {F2}", "units": "Million trips, year to September" },
-      "bars": [ { "label": "2025", "value": "F3" }, { "label": "2026", "value": "F2", "emph": true } ] },
+      "bars": [ { "label": "2025", "value": "F3" }, { "label": "2026", "value": "F2", "emph": true } ],
+      "picture": { "kind": "columns" } },
     { "id": "e3", "type": "big-number",
       "copy": { "kicker": "The authority estimates", "value": "F4", "line": "trips a year could follow by 2028", "units": "A forecast, not a measurement" } },
     { "id": "src", "type": "source-card" }
@@ -66,6 +68,7 @@ validates exactly this shape.
 | `preset` | a charts-lib preset (`design.md`), default `default` |
 | `palette` | brand palette overrides from `generate-theme.js` / `extract-theme.js`, or `null` |
 | `brand` | `{ "name", "logo": "data:image/…" }`, only what the user supplied |
+| `style` | `"slides"` (the default): scene after scene, flat charts; `"continuous"`: one 2.5D world the camera pans across, only when the user asks (`continuous.md`, frozen, its data pictures retired) |
 | `art` | `"halftone"` (default): a halftone texture from two corners of the frame, around the content (`design.md` § Artwork); `"off"` for a plain frame |
 | `fonts` | `[{ "family", "src": "data:font/…", "weight" }]`, only fonts the user supplied |
 | `fps` | 30 (default), 60, 24 or 25 |
@@ -77,7 +80,9 @@ validates exactly this shape.
 ### Scenes
 
 `{ "id", "type", "copy": { … }, "dur": "auto" | seconds }`,
-plus the type's data keys (`bars`, `rows`, `parts`, `series`, `events`,
+plus, in the continuous style, `picture` (`pictures.md`: `kind`, `of`,
+`skin`, `props`, `at`, `from`, `whole`, `per`, `due`, `icons`), and
+the type's data keys (`bars`, `rows`, `parts`, `series`, `events`,
 `steps`, `points`, `before`/`after`, `draw`). The slots and data per type
 are in `scenes.md` and `assets/motion-lib/motion.manifest.json`.
 
@@ -99,7 +104,7 @@ copy fail the lint, except years and day-month dates.
 ## The JS API
 
 The page loads, in this order (theme first, always): `charts-lib/theme.js`
-→ `core → ease → text → paint → layout → design → transitions → art → scenes/* →
+→ `core → ease → text → paint → layout → design → transitions → art → iso → world → pictures/* → scenes/* →
 audio → mux-mp4 → mux-webm → export → player`. The template already has
 the tags; `finalize.js` inlines them in that order.
 
@@ -111,7 +116,8 @@ the tags; `finalize.js` inlines them in that order.
 | `Motion.exportVideo({ cut, onProgress, signal })` | encodes; returns `{ ok, blob, path, message, roundTrip }` |
 | `Motion.player.start(el)` | mounts the player (the template does this) |
 | `Motion.player.contactSheet(C)` / `poster(C)` | PNG data URLs |
-| `Motion.custom.<name> = { enter, read, draw(ctx, lt, api) }` | a custom painter (`motion.md` § Custom scenes) |
+| `Motion.custom.<name> = { enter, read, draw(ctx, lt, api) }` | a custom painter (`motion.md` § Custom scenes); `api.iso(scale)` and `api.mat` give it the 2.5D kit (`pictures.md` § A custom picture) |
+| `Motion.pictures.list` | the continuous style's pictures, by kind (`pictures.md`) |
 | `VideoAudit.run({ cut, exportProbe })` | the browser audit (`verify-and-ship.md`); staged only |
 
 `window.videoPlayer` is the mounted player: `videoPlayer.seek(t)`,

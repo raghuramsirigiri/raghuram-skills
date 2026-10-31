@@ -1,0 +1,337 @@
+{
+ "meta": {
+  "title": "Business Banking digital sales",
+  "locale": "en-GB",
+  "preset": "default",
+  "palette": null,
+  "brand": null,
+  "fonts": [],
+  "fps": 30,
+  "seed": 1,
+  "audio": {
+   "score": "off"
+  },
+  "art": "halftone",
+  "style": "continuous"
+ },
+ "cuts": {
+  "main": {
+   "format": "9:16",
+   "scenes": [
+    "hook",
+    "ctx",
+    "conv",
+    "funnel",
+    "quarters",
+    "device",
+    "products",
+    "src"
+   ]
+  }
+ },
+ "sources": [],
+ "claims": [
+  {
+   "id": "F1",
+   "value": 46,
+   "unit": "%",
+   "display": "46%",
+   "kind": "illustrative",
+   "text": "Share of new business accounts opened online, Q3 2026"
+  },
+  {
+   "id": "F2",
+   "value": 412000,
+   "unit": "visits",
+   "display": "412,000",
+   "kind": "illustrative",
+   "text": "Visits to business product pages, Q3 2026"
+  },
+  {
+   "id": "F3",
+   "value": 1.5,
+   "unit": "%",
+   "display": "1.5%",
+   "kind": "illustrative",
+   "text": "Product page visits that ended in an opened account (6.1k / 412k)"
+  },
+  {
+   "id": "F4",
+   "value": 18.6,
+   "unit": "thousand applications",
+   "display": "18.6k",
+   "kind": "illustrative",
+   "text": "Applications started online, Q3 2026"
+  },
+  {
+   "id": "F5",
+   "value": 9.2,
+   "unit": "thousand applications",
+   "display": "9.2k",
+   "kind": "illustrative",
+   "text": "Applications submitted online, Q3 2026"
+  },
+  {
+   "id": "F6",
+   "value": 6.1,
+   "unit": "thousand accounts",
+   "display": "6.1k",
+   "kind": "illustrative",
+   "text": "Accounts opened online, Q3 2026"
+  },
+  {
+   "id": "F7",
+   "value": 51,
+   "unit": "%",
+   "display": "51%",
+   "kind": "illustrative",
+   "text": "Started applications never submitted (1 - 9.2 / 18.6)"
+  },
+  {
+   "id": "F8",
+   "value": 4.2,
+   "unit": "thousand accounts",
+   "display": "4.2k",
+   "kind": "illustrative",
+   "text": "Accounts opened online, Q4 2025"
+  },
+  {
+   "id": "F9",
+   "value": 4.8,
+   "unit": "thousand accounts",
+   "display": "4.8k",
+   "kind": "illustrative",
+   "text": "Accounts opened online, Q1 2026"
+  },
+  {
+   "id": "F10",
+   "value": 5.5,
+   "unit": "thousand accounts",
+   "display": "5.5k",
+   "kind": "illustrative",
+   "text": "Accounts opened online, Q2 2026"
+  },
+  {
+   "id": "F11",
+   "value": 58,
+   "unit": "%",
+   "display": "58%",
+   "kind": "illustrative",
+   "text": "Product page visits from mobile, Q3 2026"
+  },
+  {
+   "id": "F12",
+   "value": 42,
+   "unit": "%",
+   "display": "42%",
+   "kind": "illustrative",
+   "text": "Product page visits from desktop and tablet, Q3 2026"
+  },
+  {
+   "id": "F13",
+   "value": 3400,
+   "unit": "sales",
+   "display": "3,400",
+   "kind": "illustrative",
+   "text": "Business current accounts sold online, Q3 2026"
+  },
+  {
+   "id": "F14",
+   "value": 1300,
+   "unit": "sales",
+   "display": "1,300",
+   "kind": "illustrative",
+   "text": "Business credit cards sold online, Q3 2026"
+  },
+  {
+   "id": "F15",
+   "value": 820,
+   "unit": "sales",
+   "display": "820",
+   "kind": "illustrative",
+   "text": "Merchant services sold online, Q3 2026"
+  },
+  {
+   "id": "F16",
+   "value": 580,
+   "unit": "sales",
+   "display": "580",
+   "kind": "illustrative",
+   "text": "Business loans sold online, Q3 2026"
+  }
+ ],
+ "data": [],
+ "scenes": [
+  {
+   "id": "hook",
+   "type": "big-number",
+   "copy": {
+    "kicker": "Business Banking",
+    "value": "F1",
+    "line": "of new business accounts were opened online",
+    "units": "Share of new accounts, Q3 2026"
+   },
+   "picture": {
+    "kind": "blocks",
+    "skin": "card",
+    "of": "new business accounts",
+    "props": [
+     "branch"
+    ]
+   }
+  },
+  {
+   "id": "ctx",
+   "type": "kicker-title",
+   "copy": {
+    "kicker": "Website analytics",
+    "title": "From product page to opened account",
+    "sub": "Business Banking digital sales, July to September 2026"
+   }
+  },
+  {
+   "id": "conv",
+   "type": "big-number",
+   "copy": {
+    "kicker": "Website conversion",
+    "value": "F3",
+    "line": "of product page visits ended in an account",
+    "units": "Out of {F2} visits, Q3 2026"
+   },
+   "picture": {
+    "kind": "dots",
+    "of": "product page visits",
+    "props": [
+     "laptop"
+    ]
+   }
+  },
+  {
+   "id": "funnel",
+   "type": "compare-bars",
+   "copy": {
+    "kicker": "Online applications",
+    "title": "{F7} of started applications were never submitted",
+    "units": "Applications, thousands, Q3 2026"
+   },
+   "bars": [
+    {
+     "label": "Started",
+     "value": "F4"
+    },
+    {
+     "label": "Submitted",
+     "value": "F5"
+    },
+    {
+     "label": "Opened",
+     "value": "F6",
+     "emph": true
+    }
+   ],
+   "picture": {
+    "kind": "funnel",
+    "from": "conv"
+   }
+  },
+  {
+   "id": "quarters",
+   "type": "compare-bars",
+   "copy": {
+    "kicker": "Digital sales",
+    "title": "Online account openings rose every quarter to {F6}",
+    "units": "Accounts opened online, thousands per quarter"
+   },
+   "bars": [
+    {
+     "label": "Q4 2025",
+     "value": "F8"
+    },
+    {
+     "label": "Q1 2026",
+     "value": "F9"
+    },
+    {
+     "label": "Q2 2026",
+     "value": "F10"
+    },
+    {
+     "label": "Q3 2026",
+     "value": "F6",
+     "emph": true
+    }
+   ],
+   "picture": {
+    "kind": "columns"
+   }
+  },
+  {
+   "id": "device",
+   "type": "share-split",
+   "copy": {
+    "kicker": "Website traffic",
+    "title": "{F11} of product page visits came from mobile",
+    "units": "Share of product page visits, Q3 2026"
+   },
+   "parts": [
+    {
+     "label": "Mobile",
+     "value": "F11",
+     "emph": true
+    },
+    {
+     "label": "Desktop and tablet",
+     "value": "F12"
+    }
+   ],
+   "picture": {
+    "kind": "split",
+    "of": "product page visits",
+    "props": [
+     "phone",
+     "laptop"
+    ]
+   }
+  },
+  {
+   "id": "products",
+   "type": "ranked-list",
+   "copy": {
+    "kicker": "Digital sales",
+    "title": "Business current accounts led online sales",
+    "units": "Products sold online, Q3 2026"
+   },
+   "rows": [
+    {
+     "label": "Business current account",
+     "value": "F13",
+     "emph": true
+    },
+    {
+     "label": "Business credit card",
+     "value": "F14"
+    },
+    {
+     "label": "Merchant services",
+     "value": "F15"
+    },
+    {
+     "label": "Business loan",
+     "value": "F16"
+    }
+   ],
+   "picture": {
+    "kind": "podium"
+   }
+  },
+  {
+   "id": "src",
+   "type": "source-card",
+   "copy": {
+    "note": "Test data for Business Banking digital sales, not online banking"
+   }
+  }
+ ],
+ "caption": "Business Banking digital sales and website analytics, Q3 2026, with illustrative test figures: 46% of new business accounts were opened online, 1.5% of 412,000 product page visits ended in an opened account, 51% of started applications were never submitted, and online openings rose every quarter to 6.1k. Illustrative figures, not measurements.",
+ "alt": "An explainer video in one continuous illustrated world with illustrative figures. It opens on 46% of new business accounts opened online in Q3 2026, then shows that 1.5% of 412,000 product page visits ended in an account, that 51% of started applications were never submitted, that online openings rose every quarter to 6.1k, that 58% of visits came from mobile, and that business current accounts led online sales with 3,400. It ends on a card saying every figure is illustrative."
+}

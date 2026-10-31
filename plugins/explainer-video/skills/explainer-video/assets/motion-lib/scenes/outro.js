@@ -30,10 +30,12 @@
         const nameLines = T.balance(ctx, name, nameF, W);
         const ctaLines = cta ? T.balance(ctx, cta, ctaF, W) : [];
         const h = logoH + (logo ? 14 * K * f : 0) + nameLines.length * hl + (cta ? gap + ctaLines.length * ul : 0);
-        return { hs, hl, us, ul, gap, nameF, ctaF, logoH, nameLines, ctaLines, h, f };
+        // A word can't wrap: the widest line says whether this size fits across.
+        const wide = Math.max(...nameLines.map(l => T.measure(ctx, l, nameF)), ...ctaLines.map(l => T.measure(ctx, l, ctaF)));
+        return { hs, hl, us, ul, gap, nameF, ctaF, logoH, nameLines, ctaLines, h, f, wide };
       }
       let Lo = layout(1);
-      for (let f = 3; f > 1.001; f -= 0.1) { const t = layout(f); if (t.h <= S.h * 0.6) { Lo = t; break; } }
+      for (let f = 3; f > 1.001; f -= 0.1) { const t = layout(f); if (t.h <= S.h * 0.6 && t.wide <= W) { Lo = t; break; } }
       const { nameF, ctaF, logoH, nameLines, ctaLines, h } = Lo;
       let y = S.y + Math.max(0, (S.h - h) * 0.45);
       const x = S.x + (S.w - W) / 2;

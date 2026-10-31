@@ -29,7 +29,8 @@ test('every scene after the first arrives by the one transition, whatever the sp
   s.scenes[1].transitionIn = 'morph-bar';
   s.scenes[2].transitionIn = 'flood';
   const { C, M } = compile(s, 'main');
-  assert.deepStrictEqual(Object.keys(M.transitions.list).sort(), ['cut', 'swap']);
+  // `pan` belongs to the continuous style (world.test.js); a slide video only swaps.
+  assert.deepStrictEqual(Object.keys(M.transitions.list).sort(), ['cut', 'pan', 'swap']);
   assert.strictEqual(C.scenes[0].trIn.name, 'cut');
   for (const sc of C.scenes.slice(1)) {
     assert.strictEqual(sc.trIn.name, 'swap', sc.id);

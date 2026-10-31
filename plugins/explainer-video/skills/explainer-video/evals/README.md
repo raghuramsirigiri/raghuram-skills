@@ -20,6 +20,12 @@
   and a fall in the last two months. Graded by `clinic-waits.KEY.md` (eval 3).
 - `brand-logo.svg`: a fictional company's logo for eval 8. Its secondary colour fails
   contrast as text on light paper.
+- `business-banking-web.md`: a bank's internal note on digital sales and website analytics,
+  for eval 9 (thing or flat chart). Every finding is a value, a share or a series (a
+  share of accounts, a share under 2%, a funnel, a quarterly series, a device split, a
+  product ranking), drawn flat; none counts people, and none may become a grid of units. It plants a 5-point change that is tempting to draw
+  as blocks, a hedged "roughly 1.5%", and a form redesign in its own paragraph with **no
+  causal link stated**. Graded by `business-banking-web.KEY.md`.
 
 All names, places and figures are invented. None of them appear in `SKILL.md` or
 `references/`, whose examples use their own invented story (`skill-md.test.js` checks the

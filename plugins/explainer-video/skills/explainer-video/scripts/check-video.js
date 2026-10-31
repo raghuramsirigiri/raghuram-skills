@@ -80,6 +80,7 @@ if (score && ['off', 'pulse', 'ambient'].indexOf(score) < 0) shape.push('meta.au
   if (sc.transitionIn != null) warn('timing', 'scene "' + sc.id + '": transitionIn "' + sc.transitionIn + '" is ignored — every scene arrives by the one transition (motion.md § Transitions); delete it');
 });
 if (meta.art != null && ['off', 'halftone'].indexOf(meta.art) < 0) shape.push('meta.art must be "off" or "halftone" (references/design.md § Artwork)');
+if (meta.style != null && ['continuous', 'slides'].indexOf(meta.style) < 0) shape.push('meta.style must be "continuous" or "slides" (references/continuous.md)');
 const scenes = spec.scenes || [];
 const byId = {};
 scenes.forEach(s => { if (byId[s.id]) shape.push('two scenes share the id "' + s.id + '"'); byId[s.id] = s; });
@@ -125,6 +126,7 @@ shape.length ? shape.forEach(x => fail('shape', x)) : pass('shape', scenes.lengt
 
 // ── 2. timing: compile every cut with the real engine ────────────────
 const compiled = {};
+const RETIRED = ['people', 'dots', 'blocks', 'split', 'columns', 'funnel', 'podium', 'ribbon'];
 try {
   const sb = loadEngine();
   for (const name of Object.keys(cuts)) {
@@ -132,12 +134,27 @@ try {
       const C = sb.Motion.compile(spec, name, { measure: mockCtx() });
       compiled[name] = C;
       const n = C.scenes.length;
-      const lo = Math.max(2, Math.floor(C.duration / 5)), hi = Math.ceil(C.duration / 3) + 1;
+      // A continuous video's beats run longer: the camera travels between them.
+      const per = C.style === 'continuous' ? [4, 7] : [3, 5];
+      const lo = Math.max(2, Math.floor(C.duration / per[1])), hi = Math.ceil(C.duration / per[0]) + 1;
       const first = C.scenes[0];
       const firstText = first.layers.filter(l => l.kind === 'text' || l.kind === 'counter').reduce((a, l) => Math.min(a, l.at || 0), Infinity);
       if (firstText > 0.5) fail('timing', 'cut "' + name + '": nothing readable by 0.5 s (first text at ' + firstText.toFixed(2) + ' s)');
       if (n < lo || n > hi) warn('timing', 'cut "' + name + '": ' + n + ' scenes in ' + C.duration.toFixed(1) + ' s (budget about ' + lo + '–' + hi + ', one per 3–5 s)');
       if (C.duration > 60.5) warn('timing', 'cut "' + name + '" runs ' + C.duration.toFixed(1) + ' s — longer than 60 s; say so, and suggest two shorter videos');
+      // The world's data pictures are 3D charts and unit grids, retired: a
+      // finding that is a real thing is a custom painter, a value a flat chart (slides).
+      if (C.world) {
+        // Name the scene that asked for the picture, not an opening shot resting on it.
+        const asked = id => { const sc = scenes.find(x => x.id === id); return !!(sc && sc.picture); };
+        const places = new Map();
+        C.world.beats.filter(b => b.place && RETIRED.indexOf(b.place.kind) >= 0).forEach(b => {
+          if (!places.has(b.place) || (!asked(places.get(b.place)) && asked(b.scene))) places.set(b.place, b.scene);
+        });
+        places.forEach((scene, place) =>
+          fail('pictures', 'cut "' + name + '" scene "' + scene + '": the "' + place.kind + '" picture is retired (a 3D chart or a grid of units) — draw the finding\'s own thing with a custom painter, or use "meta.style": "slides" for a flat chart (references/pictures.md)'));
+      }
+      if (C.world) C.world.beats.filter(b => b.fallback).forEach(b => warn('pictures', 'cut "' + name + '" scene "' + b.scene + '": shows ' + b.fallback.join(', ') + ' with no picture of its own, so it rests on the place before it — give it the catalogue picture that is its thing, or draw the thing with a custom painter (references/pictures.md § Drawing the finding\'s own thing), never the nearest picture'));
       pass('timing', 'cut "' + name + '" · ' + C.format + ' · ' + C.duration.toFixed(2) + ' s = ' + C.frames + ' frames at ' + C.fps + ' fps · ' +
         C.scenes.map((s, i) => 'V' + (i + 1) + ' ' + s.id + ' ' + s.dur.toFixed(1) + 's').join(', '));
     } catch (e) { fail('timing', 'cut "' + name + '": ' + e.message); }
@@ -199,6 +216,8 @@ function paintedStrings(s) {
   (s.events || []).forEach((e, i) => out.push({ where: 'events[' + i + '].text', text: e.text || '', list: 'events' }));
   (s.steps || []).forEach((t, i) => out.push({ where: 'steps[' + i + ']', text: t, list: 'steps' }));
   (s.points || []).forEach((t, i) => out.push({ where: 'points[' + i + ']', text: t, list: 'points' }));
+  // A picture's own words (its key's "of", a calendar's month) are painted too.
+  ['of', 'due'].forEach(k => { if (s.picture && typeof s.picture[k] === 'string') out.push({ where: 'picture.' + k, text: s.picture[k], list: 'picture' }); });
   return out;
 }
 const stripIds = str => String(str).replace(/\{[A-Za-z][\w.-]*\}/g, ' ');
@@ -327,6 +346,11 @@ if (/<link[^>]+rel=["']?stylesheet/i.test(html)) offFails.push('an external <lin
 if (/\bfetch\s*\(|XMLHttpRequest|import\s*\(/.test(own.join('\n'))) offFails.push('the page\'s own script reaches the network (fetch / XHR / import())');
 offFails.length ? offFails.forEach(x => fail('offline', x)) : pass('offline', 'no network references');
 
+// The page around the player: the template's heading and lede are filled in.
+const leftover = [[/<title>\s*TITLE\b/, '<title>'], [/<h1>\s*TITLE\s*<\/h1>/, 'the page heading'], [/ONE LINE: what the video shows/, 'the lede under the heading'], [/"title"\s*:\s*"TITLE"/, 'meta.title']]
+  .filter(([re]) => re.test(html)).map(([, where]) => where);
+leftover.length ? fail('page', 'the template placeholder is still in ' + leftover.join(', ') + ': write the video\'s title and one line on what it shows and where its figures come from') : pass('page', 'title, heading and lede are filled in');
+
 // ── 9. --final: one standalone file ──────────────────────────────────
 if (final) {
   const fin = [];
@@ -336,7 +360,8 @@ if (final) {
   if (!/M\.player = \{/.test(html)) fin.push('player.js is not inlined');
   const engineKB = Math.round(Buffer.byteLength(html.replace(/data:[^"')\s]*/g, '')) / 1024);
   const totalMB = Buffer.byteLength(html) / 1048576;
-  if (engineKB > 300) warn('final', 'page without its data URIs is ' + engineKB + ' KB (engine budget about 250 KB)');
+  // The engine with the continuous style's world and pictures inlined is about 330 KB.
+  if (engineKB > 400) warn('final', 'page without its data URIs is ' + engineKB + ' KB (engine budget about 350 KB)');
   if (totalMB > 15) warn('final', 'page is ' + totalMB.toFixed(1) + ' MB including assets; above 15 MB some browsers struggle');
   fin.length ? fin.forEach(x => fail('final', x)) : pass('final', 'one standalone file, ' + Math.round(Buffer.byteLength(html) / 1024) + ' KB');
 }
@@ -350,8 +375,8 @@ function loadEngine() {
   vm.createContext(sb);
   const runF = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sb, { filename: f });
   runF(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
-  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art'].forEach(n => runF(path.join(MLIB, n + '.js')));
-  fs.readdirSync(path.join(MLIB, 'scenes')).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, 'scenes', f)));
+  ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world'].forEach(n => runF(path.join(MLIB, n + '.js')));
+  ['pictures', 'scenes'].forEach(d => fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).forEach(f => runF(path.join(MLIB, d, f))));
   // Custom painters live in the page; stand in for them so timing compiles.
   scenes.filter(s => s.type === 'custom' && s.draw).forEach(s => {
     const mt = new RegExp('Motion\\.custom\\.' + s.draw + '\\s*=\\s*\\{[^}]*?enter\\s*:\\s*([\\d.]+)[^}]*?read\\s*:\\s*([\\d.]+)').exec(html);
