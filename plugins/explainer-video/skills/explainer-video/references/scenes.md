@@ -210,10 +210,10 @@ is `meta.brand.logo`, a data URI the user supplied.
 
 ## custom
 
-**Job:** a finding's own thing, drawn for this video (`pictures.md` § A
-finding the catalogue doesn't draw), or a scene no other type can show.
-**Not for:** a series or a comparison of values (their chart scenes), or a
-thing a catalogue picture already is.
+**Job:** a finding's own thing, drawn for this video (`pictures.md` §
+Drawing the finding's own thing), or a scene no other type can show.
+**Not for:** a value, a rate, a series or a comparison of values (their
+flat chart scenes), and never a grid of boxes or dots for a share.
 **Data:** `draw` names a painter the page registers on `Motion.custom`. The
 contract is in `motion.md` § Custom scenes. The card's kicker, headline,
 units and source line come for free.

@@ -343,6 +343,7 @@
   BANDS['custom'] = (s, api) => {
     const painter = M.custom[s.draw];
     if (!painter || typeof painter.draw !== 'function') throw new Error('no painter Motion.custom.' + s.draw + ' with a draw(ctx, lt, api) function');
+    const claims = M.painterClaims(s, api);
     const b = titled(s, api, [], 0);
     const box = stageBox(api, b.B);
     api.reserved.push(box);
@@ -353,6 +354,7 @@
         box, design: a.design, paint: M.paint, ease: M.ease, mat: M.iso.materials(a.design),
         at: (start, dur, ease) => M.ease.get(ease || 'outQuint')(M.ease.clamp01((lt - start) / (dur || 1e-6))),
         rng: (...keys) => M.rng(seed, s.id, ...keys),
+        value: claims.value, display: claims.display,
         // A 2.5D view centred in the box: world (0, 0, 0) sits a little below its middle.
         iso: k => M.iso.view(cx, { ax: box.x + box.w / 2, ay: box.y + box.h * 0.62, cx: 0, cy: 0, s: k || 1, font: a.design.font }, 'custom:' + s.id),
         text: (str, x, y, o) => {

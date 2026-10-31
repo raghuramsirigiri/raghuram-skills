@@ -81,8 +81,8 @@ from two corners of the frame, around the content and never on it.
 
 ## Custom scenes
 
-For a finding whose thing the catalogue doesn't draw (`pictures.md` § A
-finding the catalogue doesn't draw), or a scene no catalog type can show.
+For a finding that is a real thing (`pictures.md` § Drawing the finding's
+own thing), or a scene no catalog type can show.
 The page registers a painter, and the spec names it (`"type": "custom",
 "draw": "name"`, with `"claims"` listing the figures it draws):
 

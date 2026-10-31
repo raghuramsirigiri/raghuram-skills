@@ -97,10 +97,10 @@
     const ctx = opts.measure || M.measureContext();
     const byId = {};
     (spec.scenes || []).forEach(s => { byId[s.id] = s; });
-    // The style: continuous (one 2.5D world the camera travels across,
-    // world.js) or slides (scene after scene). A spec that doesn't say gets
-    // the world when it gives its scenes pictures, slides when it gives none.
-    const style = spec.meta.style || ((spec.scenes || []).some(s => s.picture) ? 'continuous' : 'slides');
+    // The style: slides (scene after scene, flat charts), the default; or
+    // continuous (one 2.5D world the camera travels across, world.js), only
+    // when the spec asks for it.
+    const style = spec.meta.style || 'slides';
     if (style !== 'slides' && style !== 'continuous') throw new Error('meta.style must be "continuous" or "slides"');
     if (style === 'continuous' && !M.world) throw new Error('meta.style "continuous" needs motion-lib/world.js and pictures/');
 

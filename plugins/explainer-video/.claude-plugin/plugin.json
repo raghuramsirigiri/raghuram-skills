@@ -1,6 +1,6 @@
 {
   "name": "explainer-video",
-  "description": "Turn an article, news story, report findings or a table into a short explainer video: one continuous 2.5D world the camera pans across, each finding drawn as a picture that carries its figure (or classic slides), rendered in JavaScript and exported as MP4 in your browser. 15–60 s in 9:16 (Reels, Shorts, TikTok), 1:1, 4:5 or 16:9, in the same design system as chart-dashboard and social-post. Every figure comes from your source with its hedges kept, and the video ends on a dated source card. One standalone HTML file: no other apps, no CDN, works offline; never posts.",
+  "description": "Turn an article, news story, report findings or a table into a short explainer video: scene after scene with flat charts, and each finding that counts a real thing drawn as that thing for this video (cars, shops, people), never a grid of boxes. Rendered in JavaScript and exported as MP4 in your browser. 15–60 s in 9:16 (Reels, Shorts, TikTok), 1:1, 4:5 or 16:9, in the same design system as chart-dashboard and social-post. Every figure comes from your source with its hedges kept, and the video ends on a dated source card. One standalone HTML file: no other apps, no CDN, works offline; never posts.",
   "version": "1.1.0",
   "author": {
     "name": "Raghuram Sirigiri"

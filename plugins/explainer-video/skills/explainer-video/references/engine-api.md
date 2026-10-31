@@ -14,7 +14,7 @@ validates exactly this shape.
     "preset": "default",
     "palette": null,
     "brand": null,
-    "style": "continuous",
+    "style": "slides",
     "art": "halftone",
     "fonts": [],
     "fps": 30,
@@ -68,7 +68,7 @@ validates exactly this shape.
 | `preset` | a charts-lib preset (`design.md`), default `default` |
 | `palette` | brand palette overrides from `generate-theme.js` / `extract-theme.js`, or `null` |
 | `brand` | `{ "name", "logo": "data:image/…" }`, only what the user supplied |
-| `style` | `"continuous"`: one 2.5D world the camera pans across (`continuous.md`); `"slides"`: scene after scene. Unset, a spec with pictures gets the world and one without gets slides |
+| `style` | `"slides"` (the default): scene after scene, flat charts; `"continuous"`: one 2.5D world the camera pans across, only when the user asks (`continuous.md`, frozen, its data pictures retired) |
 | `art` | `"halftone"` (default): a halftone texture from two corners of the frame, around the content (`design.md` § Artwork); `"off"` for a plain frame |
 | `fonts` | `[{ "family", "src": "data:font/…", "weight" }]`, only fonts the user supplied |
 | `fps` | 30 (default), 60, 24 or 25 |

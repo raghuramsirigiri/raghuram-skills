@@ -126,6 +126,7 @@ shape.length ? shape.forEach(x => fail('shape', x)) : pass('shape', scenes.lengt
 
 // ── 2. timing: compile every cut with the real engine ────────────────
 const compiled = {};
+const RETIRED = ['people', 'dots', 'blocks', 'split', 'columns', 'funnel', 'podium', 'ribbon'];
 try {
   const sb = loadEngine();
   for (const name of Object.keys(cuts)) {
@@ -141,7 +142,19 @@ try {
       if (firstText > 0.5) fail('timing', 'cut "' + name + '": nothing readable by 0.5 s (first text at ' + firstText.toFixed(2) + ' s)');
       if (n < lo || n > hi) warn('timing', 'cut "' + name + '": ' + n + ' scenes in ' + C.duration.toFixed(1) + ' s (budget about ' + lo + '–' + hi + ', one per 3–5 s)');
       if (C.duration > 60.5) warn('timing', 'cut "' + name + '" runs ' + C.duration.toFixed(1) + ' s — longer than 60 s; say so, and suggest two shorter videos');
-      if (C.world) C.world.beats.filter(b => b.fallback).forEach(b => warn('pictures', 'cut "' + name + '" scene "' + b.scene + '": shows ' + b.fallback.join(', ') + ' with no picture of its own, so it rests on the place before it — give it the catalogue picture that is its thing, or draw the thing with a custom painter (references/pictures.md § A finding the catalogue doesn\'t draw), never the nearest picture'));
+      // The world's data pictures are 3D charts and unit grids, retired: a
+      // finding that is a real thing is a custom painter, a value a flat chart (slides).
+      if (C.world) {
+        // Name the scene that asked for the picture, not an opening shot resting on it.
+        const asked = id => { const sc = scenes.find(x => x.id === id); return !!(sc && sc.picture); };
+        const places = new Map();
+        C.world.beats.filter(b => b.place && RETIRED.indexOf(b.place.kind) >= 0).forEach(b => {
+          if (!places.has(b.place) || (!asked(places.get(b.place)) && asked(b.scene))) places.set(b.place, b.scene);
+        });
+        places.forEach((scene, place) =>
+          fail('pictures', 'cut "' + name + '" scene "' + scene + '": the "' + place.kind + '" picture is retired (a 3D chart or a grid of units) — draw the finding\'s own thing with a custom painter, or use "meta.style": "slides" for a flat chart (references/pictures.md)'));
+      }
+      if (C.world) C.world.beats.filter(b => b.fallback).forEach(b => warn('pictures', 'cut "' + name + '" scene "' + b.scene + '": shows ' + b.fallback.join(', ') + ' with no picture of its own, so it rests on the place before it — give it the catalogue picture that is its thing, or draw the thing with a custom painter (references/pictures.md § Drawing the finding\'s own thing), never the nearest picture'));
       pass('timing', 'cut "' + name + '" · ' + C.format + ' · ' + C.duration.toFixed(2) + ' s = ' + C.frames + ' frames at ' + C.fps + ' fps · ' +
         C.scenes.map((s, i) => 'V' + (i + 1) + ' ' + s.id + ' ' + s.dur.toFixed(1) + 's').join(', '));
     } catch (e) { fail('timing', 'cut "' + name + '": ' + e.message); }
@@ -332,6 +345,11 @@ if (/@import/i.test(styles)) offFails.push('@import in a style sheet');
 if (/<link[^>]+rel=["']?stylesheet/i.test(html)) offFails.push('an external <link rel="stylesheet">');
 if (/\bfetch\s*\(|XMLHttpRequest|import\s*\(/.test(own.join('\n'))) offFails.push('the page\'s own script reaches the network (fetch / XHR / import())');
 offFails.length ? offFails.forEach(x => fail('offline', x)) : pass('offline', 'no network references');
+
+// The page around the player: the template's heading and lede are filled in.
+const leftover = [[/<title>\s*TITLE\b/, '<title>'], [/<h1>\s*TITLE\s*<\/h1>/, 'the page heading'], [/ONE LINE: what the video shows/, 'the lede under the heading'], [/"title"\s*:\s*"TITLE"/, 'meta.title']]
+  .filter(([re]) => re.test(html)).map(([, where]) => where);
+leftover.length ? fail('page', 'the template placeholder is still in ' + leftover.join(', ') + ': write the video\'s title and one line on what it shows and where its figures come from') : pass('page', 'title, heading and lede are filled in');
 
 // ── 9. --final: one standalone file ──────────────────────────────────
 if (final) {

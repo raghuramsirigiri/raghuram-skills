@@ -24,6 +24,17 @@
 (function (root) {
   'use strict';
   const M = root.Motion;
+  // The figures a painter draws, in either style (world.js calls this too):
+  // cites them for the source line, and reads only the ones the scene lists.
+  M.painterClaims = (s, api) => {
+    const own = {};
+    (s.claims || []).forEach(id => { own[id] = api.claim(id); });
+    const pick = id => { if (!own[id]) throw new Error('scene "' + s.id + '": the painter reads claim "' + id + '", which is not in its "claims"'); return own[id]; };
+    return {
+      value: id => +pick(id).value,
+      display: id => { const k = pick(id); return k.display != null ? String(k.display) : String(k.value); }
+    };
+  };
   M.registerScene({
     type: 'custom',
     slots: { kicker: { words: 4 }, title: { words: 10 }, units: { words: 8 } },
@@ -31,12 +42,9 @@
     build(s, api) {
       const painter = M.custom[s.draw];
       if (!painter || typeof painter.draw !== 'function') throw new Error('no painter Motion.custom.' + s.draw + ' with a draw(ctx, lt, api) function');
-      (s.claims || []).forEach(id => api.claim(id));
+      const claims = M.painterClaims(s, api);
       const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), units: api.copy('units'), chart: true, sourceIds: api.used() });
       const box = c.chart;
-      const own = {};
-      (s.claims || []).forEach(id => { own[id] = api.claim(id); });
-      const pick = id => { if (!own[id]) throw new Error('scene "' + s.id + '": the painter reads claim "' + id + '", which is not in its "claims"'); return own[id]; };
       api.reserved.push(box);   // the painter may draw anywhere in it
       const enter = +painter.enter || 1;
       const seed = api.spec.meta.seed || 0;
@@ -47,8 +55,7 @@
           box, design: a.design, paint: M.paint, ease: M.ease,
           at: (start, dur, ease) => M.ease.get(ease || 'outQuint')(M.ease.clamp01((lt - start) / (dur || 1e-6))),
           rng: (...keys) => M.rng(seed, s.id, ...keys),
-          value: id => +pick(id).value,
-          display: id => { const k = pick(id); return k.display != null ? String(k.display) : String(k.value); },
+          value: claims.value, display: claims.display,
           // The 2.5D kit, as the continuous style's painters get it: a view
           // centred in the box (world 0,0,0 a little below its middle) and the tints.
           mat: M.iso ? M.iso.materials(a.design) : null,

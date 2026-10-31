@@ -17,7 +17,7 @@ const { SKILL } = require('./harness');
 
 const LIB = path.join(SKILL, 'assets', 'motion-lib');
 const FROZEN = {
-  'world.js': 'e6a3cfcd40ac1c40',
+  'world.js': 'a4c4d104cc8300dd',   // ee704e0+1: custom painters get api.value/api.display in the world too
   'iso.js': 'daa897d8c984a4b6',
   'pictures/blocks.js': '61529ef122e97e55',
   'pictures/building.js': '6d64a1b1fbde866f',

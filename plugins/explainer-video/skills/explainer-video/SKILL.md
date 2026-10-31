@@ -1,6 +1,6 @@
 ---
 name: explainer-video
-description: Turn an article, news story, report findings, insights, notes or a table into a short explainer video — one continuous 2.5D world the camera pans across (or slides), each finding a picture that carries its figure, 15–60 s, 9:16 for Reels/Shorts/TikTok, 1:1, 4:5 or 16:9 — rendered entirely in JavaScript in the same design system as chart-dashboard and social-post, as one standalone HTML file that plays the video and exports it as MP4 in the browser, with every figure and hedge faithful to the source and a dated source card. Use for "make a video / reel / short / animated explainer / motion graphic from this". Not for still social cards (social-post) or slide decks. No other apps, no CDN, works offline; never posts.
+description: Turn an article, news story, report findings, insights, notes or a table into a short explainer video — scene after scene with flat charts, each finding that counts a real thing drawn as that thing for this video (cars, shops, people), 15–60 s, 9:16 for Reels/Shorts/TikTok, 1:1, 4:5 or 16:9 — rendered entirely in JavaScript in the same design system as chart-dashboard and social-post, as one standalone HTML file that plays the video and exports it as MP4 in the browser, with every figure and hedge faithful to the source and a dated source card. Use for "make a video / reel / short / animated explainer / motion graphic from this". Not for still social cards (social-post) or slide decks. No other apps, no CDN, works offline; never posts.
 ---
 
 # Explainer video
@@ -73,17 +73,18 @@ has it.
 
 4. **Choose each scene's type, draw each finding's own thing, and the
    look.** Read `references/scenes.md` and `references/video-charts.md`
-   (data shape → scene, honest motion). Every video is one continuous 2.5D
-   world the camera travels across, unless the user asks for slides: read
-   `references/continuous.md`. Then name the thing each finding counts (its
-   noun) and read `references/pictures.md`. A catalogue picture is used only
-   when its job *is* that thing (`people` for people, `parcel` blocks for
-   parcels); a series or a comparison of values takes its flat chart. Any
-   other noun (cars, cups, panels, meals) you draw yourself for this video,
-   as a custom painter (`pictures.md` § A finding the catalogue doesn't
-   draw, under its contract in `references/motion.md` § Custom scenes). Never give it the nearest picture, plain blocks, or a chart
-   because the drawing is harder. The catalogue is closed: never add a
-   picture, prop or layout rule to the skill to fit one story. Read
+   (data shape → scene, honest motion). Every video is slides, scene after
+   scene with flat charts; the continuous 2.5D world
+   (`references/continuous.md`) only when the user asks for it. Then read
+   `references/pictures.md` and sort each finding by what it is. A count or
+   share of a **real thing** (people, cars, shops, cups) you draw yourself
+   for this video, as a custom painter (`pictures.md` § Drawing the
+   finding's own thing, under its contract in `references/motion.md` §
+   Custom scenes). A value, a rate or a share with no thing of its own (a
+   margin, a ratio, a mix) is the figure or its **flat** chart. Never draw a
+   chart in 3D, never draw a share with no thing as a grid of boxes or dots,
+   and never swap a drawing for a chart because the drawing is harder. Never
+   add a picture, prop or layout rule to the skill to fit one story. Read
    `references/design.md` for the preset, and for a brand recolour when the
    user gave brand colours, a site or a logo (run `scripts/generate-theme.js`
    or `extract-theme.js`; the palette goes in `meta.palette`).
@@ -92,10 +93,11 @@ has it.
    `<skill-dir>/templates/video.html` to `./<slug>.html` (or where the user
    asked) and leave its `charts-lib/…` and `motion-lib/…` script tags exactly
    as written; step 8 folds them in. Read `references/engine-api.md` and write
-   the whole spec: `meta.style` (`"continuous"`, or `"slides"` when asked)
-   and a `picture` on each finding; every figure in copy is a claim id
+   the whole spec: `meta.style` (`"slides"`, or `"continuous"` only when
+   asked), and a `custom` scene with its painter for each finding that is a
+   real thing; every figure in copy is a claim id
    (`"F1"` or `{F1}`), never typed digits. Fill the caption and the alt
-   text.
+   text, and the page's `<title>`, heading and lede around the player.
 
    Then build it in stages, cheapest check first, so a mistake costs one
    scene and not a re-render: stage (`finalize.js --stage`) and run

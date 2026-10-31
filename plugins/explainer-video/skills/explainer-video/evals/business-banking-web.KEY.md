@@ -20,34 +20,33 @@ Source [A]: Fernhill Bank Digital Sales team, internal note dated 9 October 2026
 
 ## Passes
 
-- One continuous world (`meta.style: "continuous"`, or unset with pictures), 9:16, 50–66 s;
-  every scene that shows a figure has a picture, and `check-video.js` shows no `pictures`
-  warning (or the handover says why a finding rests).
-- **Picture fit** (`references/pictures.md` § Choosing), for every finding the video shows
+- Slides (`meta.style: "slides"`, or unset), 9:16, 50–66 s; `check-video.js` shows no
+  `pictures` FAIL.
+- **Thing or flat chart** (`references/pictures.md`), for every finding the video shows
   (a finding left out is listed in the handover):
-  - share of new accounts: `blocks` (skin `card` or `plain`), `of` naming new business
-    (current) accounts; 41% → 46% as last year, then now on that place;
-  - 1.5% of visits: `dots` with `of` naming product page visits (blocks can't show 1.5%);
-  - started → submitted → opened: `funnel` (or `columns`), stages in order;
-  - quarterly openings: `columns` (or a `ribbon` from a data table), rising, Q3 2026 last;
-  - devices: `split` with both parts, `of` naming product page visits;
-  - products: `podium`, largest first.
-  - Props, if any, are a branch and/or devices; `people` is used for none of these (none
-    of the figures counts people).
-- "Not yet analysed" shown, if at all, as words or a `desk` with `due: "November"` from
-  the scene's own copy; no reason for abandonment anywhere.
+  - share of new accounts: the figures, or a flat before/after, 41% → 46% as last year,
+    then now;
+  - roughly 1.5% of visits: the figure with "roughly", or a flat bar; never a grid of dots;
+  - started → submitted → opened: flat bars or columns, stages in order;
+  - quarterly openings: flat columns (or a flat line from a data table), Q3 2026 last;
+  - devices: a flat split (bar or pie) with both parts;
+  - products: flat ranked bars, largest first.
+  - A custom painter, if any, draws a real thing the finding counts (accounts opened as
+    cards or folders, say), one unit per stated group with its key in words, and reads
+    its figure through `api.value`. Nothing counts people, so no people.
+- "Not yet analysed" shown, if at all, as words; no reason for abandonment anywhere.
 - Hedge kept: "roughly 1.5%" (51% may be shown as is, or as "about half").
 - Changes in points: 41% → 46% is "5 points", never "up 12%".
 - Source card: Fernhill Bank Digital Sales team, 9 Oct 2026.
 
 ## Fails
 
-- A change drawn as a share: five blocks for the 5-point rise, or 46 blocks labelled as
-  the rise.
-- `people` for accounts, visits or applications.
-- 1.5% as 1 or 2 blocks of 100 (rounded away), or 51% as blocks of "applications
-  submitted" (wrong whole).
+- Any 3D chart, or any retired world picture (`people`, `dots`, `blocks`, `split`,
+  `columns`, `funnel`, `podium`, `ribbon`): `check-video.js` fails them.
+- A share drawn as a grid of boxes or dots (46 cubes for 46%).
+- A change drawn as a share: five things lit for the 5-point rise.
+- A custom painter whose things stand in for a rate rather than counting a thing.
+- 1.5% rounded away (drawn as 1 or 2 of 100).
 - The redesigned form given as a cause of anything (§6 states no link), on screen, in the
   caption or in chat.
-- A `pictures` warning left unaddressed, a `world-overlap` or `stage` audit failure.
 - Online banking framing (the note is about product pages only).

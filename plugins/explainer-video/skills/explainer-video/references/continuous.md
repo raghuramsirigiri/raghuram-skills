@@ -1,11 +1,17 @@
 # The continuous style: one world
 
 `meta.style: "continuous"` turns the spec into one 2.5D world the camera
-travels across, instead of scenes that replace each other. It is the style
-for every video unless the user asks for slides. The words keep a band of
-the frame to themselves; the findings are drawn as **places** in the world,
-each a picture that carries its figure (`pictures.md`). The spec stays the
-same: claims, copy and scene types, plus a `picture` on each finding.
+travels across, instead of scenes that replace each other. **Use it only
+when the user asks for it**; slides are the default. It is frozen at 1.1.0,
+and its data pictures (`people`, `dots`, `blocks`, `split`, `columns`,
+`funnel`, `podium`, `ribbon`) are retired: they draw charts in 3D and
+shares as grids of units, and `check-video.js` fails them (`pictures.md` §
+Retired). In the world, a finding that is a real thing is a custom painter,
+which takes the stage for its beat; its own places are the desk and a
+device. A finding that is a value needs a flat chart, so a story built on
+values belongs in slides: say so if the user asked for the world.
+
+The rest of this page describes the frozen engine as it is.
 
 ## How a video becomes a world
 
@@ -68,14 +74,12 @@ Beats at the same place keep the camera still; only the words change.
 
 ## Writing the spec
 
-1. Set `meta.style: "continuous"` (or `"slides"` when the user asks for
-   slides). A spec that sets neither gets the world when its scenes have
-   pictures, slides when none do.
-2. Give each finding a `picture` from `pictures.md` § Choosing when one
-   *is* the thing it counts: `of` names what one unit is a share of; `props`
-   set the scene (`["branch"]`, `["laptop"]`). Any other thing is a
-   `custom` scene that draws it (`pictures.md` § A finding the catalogue
-   doesn't draw); it takes the stage for its beat.
+1. Set `meta.style: "continuous"`, only when the user asked for the world.
+   A spec that sets no style gets slides.
+2. Draw each finding that is a real thing as a `custom` scene
+   (`pictures.md` § Drawing the finding's own thing); it takes the stage
+   for its beat. Give the world one place of its own to stand on, a `desk`
+   or a `device`. Never a retired data picture.
 3. Point a later scene back at an earlier place with `at` when it is about
    the same thing (a verdict, last year's figure). A claim the place already
    shows brings the camera back by itself.
@@ -83,8 +87,8 @@ Beats at the same place keep the camera still; only the words change.
 5. Give the summary's points their places' icons: `"picture": { "icons":
    ["hook", "e3", "why"] }`, one scene id per point.
 
-**Done when** every scene that shows a figure has a picture (or a revisit),
-`check-video.js` reports no `pictures` warning, and the audit is `ok` on
+**Done when** `check-video.js` reports no `pictures` FAIL or warning, and
+the audit is `ok` on
 every cut, including its two world checks (`verify-and-ship.md` § 7.2):
 `world-overlap` (no word touches a shape) and `stage` (the place in view
 sits inside the frame, clear of its words, above the footer).

@@ -147,14 +147,17 @@ topic with figures in it.
   fails on drift. Everything else in it (`assets/motion-lib/`, `references/`)
   is its own. Its output is JavaScript only: Canvas 2D plus the browser's
   WebCodecs and Web Audio. Never add ffmpeg, Remotion, a render pipeline, TTS
-  or a CDN animation library. Its default style is one continuous 2.5D world
-  (`references/continuous.md`). **That style is frozen at 1.1.0**: never add
-  a picture, prop, skin or `things/` library, and never grow its layout
-  (`world.js`, `iso.js`, `pictures/`). Each round that did fixed the story
-  being worked on and nothing else, and new topics fell back to the nearest
-  picture or to plain boxes. A finding the catalogue doesn't draw is drawn by
-  that video's own custom painter (`references/pictures.md` § A finding the
-  catalogue doesn't draw), and a video is built scene by scene
+  or a CDN animation library. Its default style is slides, with flat charts.
+  The continuous 2.5D world (`references/continuous.md`) is used only when
+  the user asks for it, and **is frozen at 1.1.0**: never add a picture,
+  prop, skin or `things/` library, and never grow its layout (`world.js`,
+  `iso.js`, `pictures/`). Each round that did fixed the story being worked
+  on and nothing else, and new topics fell back to the nearest picture or to
+  plain boxes. Its data pictures (`people`, `dots`, `blocks`, `split`,
+  `columns`, `funnel`, `podium`, `ribbon`) are 3D charts and unit grids, and
+  `check-video.js` fails them. A finding that is a real thing is drawn by
+  that video's own custom painter (`references/pictures.md` § Drawing the
+  finding's own thing); a value is a flat chart. A video is built scene by scene
   (`references/verify-and-ship.md` § Build in stages). `node --test
   plugins/explainer-video/skills/explainer-video/tests/freeze.test.js` fails
   on any change to the frozen files; a real bug fix there updates its hash

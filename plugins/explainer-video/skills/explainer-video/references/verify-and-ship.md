@@ -32,7 +32,7 @@ catch the mistake:
    0.5 s, pops, frozen holds, the export probe).
 
 A scene that fails the same check twice gets simpler, the way
-`pictures.md` § A finding the catalogue doesn't draw says. It never gets
+`pictures.md` § Drawing the finding's own thing says. It never gets
 swapped for a chart or the nearest picture.
 
 ## Step 7 — verify
@@ -50,10 +50,10 @@ shape, timing, numbers, hedges and upgrade words, quotes, copy limits,
 determinism and offline-ness. Read every row; fix every FAIL in the spec,
 then run it again. A WARN is a judgement call: read it, act on it or say
 why not. The `timing` rows print each scene's handle and length: that is
-the scene list for the handover. In the continuous style a `pictures` WARN
-names a finding with no picture of its own: give it the catalogue picture
-that is its thing, or draw the thing with a custom painter (`pictures.md` §
-A finding the catalogue doesn't draw), never the nearest picture.
+the scene list for the handover. A `pictures` FAIL names a retired 3D
+picture (a chart or a grid of units): draw the finding's thing with a custom
+painter (`pictures.md` § Drawing the finding's own thing), or give it its
+flat chart in the slides style.
 
 ### 7.2 Run the audit in a browser
 
