@@ -7,6 +7,33 @@ source is about as a whole, and only then cut it into beats. Then make the
 three edit choices: which finding opens it, one idea per beat with time to
 read it, and what gets left out.
 
+## The point, and what the stage must show
+
+Before the shape, write two sentences:
+
+1. **The point**: what the video is about, in the source's terms, with its
+   main figure. "A family car went from about 60 to 170 km/h in a century."
+2. **What the viewer must see**: the verb and the measure the stage acts
+   out, so the point lands with the sound off. "The car gets visibly faster
+   with each era."
+
+The stage exists to show that. A story about speed is told by how fast the
+subject moves; a story about size by how big things stand beside each other;
+a story about building by the parts going on; a story about a route by the
+route being travelled. A world that follows the engine's defaults instead
+(the same slow drift for a race car and a glacier) ignores the video's
+purpose, however well each thing is drawn.
+
+Then, for **every beat**, write what the stage does in it that shows its
+finding, in the spec as `stage.shows`: "the saloon pulls away faster than
+the tourer did", "the hatchback pulls in at a fuel pump", "the electric car
+stops at a charging post and its meter fills toward 80%". Take it from the
+finding's own verb and number, not from what the shape does anyway. A beat
+whose finding has nothing to act out (a price, a share) says so ("the car
+keeps its pace; the value is in the card's chart"), and its figure goes in
+the card. When a figure is acted out (a pace, a size), it is drawn in
+proportion, from zero, and the card states it on the beat it first appears.
+
 ## The shape
 
 Read the source and ask what changes over the video. The answer names the

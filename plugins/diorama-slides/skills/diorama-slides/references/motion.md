@@ -53,9 +53,11 @@ or crossfades the frame.
 - **A thing's change** (one form to the next) runs through the middle of
   the travel on a smoothstep, so it starts and ends at rest while the
   thing is already moving.
-- **The subject keeps going** through a beat, slowly, and its parts move
-  with it (wheels turn with the distance travelled). The stage arrives
-  over the first 0.6 s.
+- **The subject moves at the story's pace** (`stage.md` § The stage acts
+  out the story): a speed in the source is a speed on screen, in
+  proportion; a stop in the source is a halt. Pace changes ease over the
+  words' swap, so nothing jerks; parts move with the subject (wheels turn
+  with the distance travelled). The stage arrives over the first 0.6 s.
 - **Never static**: the audit warns (`frozen`) when nothing moves for longer
   than the beat's read.
 

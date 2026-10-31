@@ -32,10 +32,10 @@ invented.
   "scenes": [
     { "id": "hook", "type": "beat",
       "copy": { "kicker": "1920 · Brass", "title": "The first Kestrel took a {F1} bulb", "units": "A brass stem and a cloth shade" },
-      "stage": { "state": "brass" } },
+      "stage": { "state": "brass", "shows": "the brass lamp lights" } },
     { "id": "angle", "type": "beat",
       "copy": { "kicker": "1956 · Angle", "title": "A sprung arm let the shade move" },
-      "stage": { "state": "angle", "zoom": 1.3, "look": [0, 0, 8] } },
+      "stage": { "state": "angle", "zoom": 1.3, "look": [0, 0, 8], "shows": "the arm swings the shade down" } },
     { "id": "src", "type": "source-card", "stage": { "zoom": 0.85 } }
   ],
   "caption": "…",
@@ -64,9 +64,10 @@ There is no `meta.style`: this skill has one mode.
 ### `stage`
 
 The story's shape and what the stage needs (`stage.md`): `shape`, and for
-a transformation `subject`, `size`, `states`, and optionally `ground`,
-`scenery`, `trail` and `spacing` (stops apart, in subject lengths; 2.6 by
-default).
+a transformation `subject`, `size`, `states` (each with `id`, `label`,
+`form`, optional `pace` and `parent`), and optionally `ground`, `scenery`,
+`trail`, `topPace` (lengths per second for the largest pace claim, 2) and
+`idlePace` (the fallback drift, 0.15).
 
 ### Scenes (beats)
 
@@ -79,7 +80,8 @@ Two types:
   `chart`: `{ "kind": "bars", "bars": [{ "label", "value": "F2", "emph" }] }`
   (two to six) or `{ "kind": "line", "series": "D1", "end": "F5" }`
   (`video-charts.md`); and `stage`, the shape's directions (`state`,
-  `zoom`, `look`).
+  `pace`, `zoom`, `look`) and `shows`, one line on what the stage does in
+  this beat to show its finding (`story.md` § The point).
 - **`source-card`**: every source and its date, optional `note` (≤ 12
   words); it takes `stage` directions too, so the stage can pull back.
 

@@ -36,13 +36,31 @@ fifth of the frame's height.
   fails a beat whose subject leaves its room while the words hold, so a
   close zoom needs a look that keeps the subject in.
 
-## Never static
+## The stage acts out the story
 
-Something on the stage is always progressing: the subject creeps through
-its stop and the ground slides by, wheels and feet turn with the distance
-travelled, a part goes on. The audit's `frozen` warning catches a stage that
-stops. Motion comes from the story's verbs (a car drives, a crane lifts, a
-column marches), never from decoration added to fill a hold.
+Every beat's `stage.shows` (`story.md` § The point) says what the stage does
+to show that beat's finding, and the directions make it happen. The shape
+gives the grammar; the story gives the motion:
+
+- **Pace.** How fast the subject moves is the story's when the story has a
+  rate: a state's `pace` (or a beat's) is a claim id, drawn in proportion
+  and from zero, the largest pace claim at `topPace` subject lengths per
+  second (2 by default). A top speed of 60 then 170 km/h is a car that
+  visibly triples its speed. A plain number is lengths per second for
+  motion that carries no figure. `0` halts the subject.
+- **Halts and stops.** The subject halts where the story stops: for fuel,
+  to charge, to unload. A beat with `pace: 0` eases to a stop over the
+  words' swap; the next pace pulls it away.
+- **Things where beats happen.** `api.beats` gives where the subject is at
+  each beat's middle, so a pump stands where the story stops for fuel and
+  a charging post where it charges. A thing can act during its beat
+  (`s.beat.id`, `s.beat.lt`): a meter fills to a claim's value, a crane
+  lifts, a door opens.
+- **Never static, never generic.** With no pace anywhere the subject drifts
+  slowly so the stage never freezes; that drift is a fallback, never the
+  story's motion. Motion comes from the finding's verb (a car speeds up, a
+  tower rises, a column marches), never from decoration added to fill a
+  hold. The audit's `frozen` warning catches a stage that stops.
 
 ## Transformation
 
@@ -59,7 +77,8 @@ One subject, its states, on one path.
 }
 ```
 
-and on each beat, `"stage": { "state": "closed", "zoom": 1.2, "look": [-6, 0, 0] }`.
+and on each beat, `"stage": { "state": "closed", "zoom": 1.2, "look": [-6, 0, 0], "shows": "the closed car pulls away faster" }`.
+A state or a beat may also set `"pace"` (§ The stage acts out the story).
 
 - **`subject`** names the painter (`Motion.things.car`); **`size`** is its
   largest extent [length, depth, height] in its own units, which sets the
@@ -75,11 +94,13 @@ and on each beat, `"stage": { "state": "closed", "zoom": 1.2, "look": [-6, 0, 0]
   joined square to it, and the subject crosses to it. **`trail: "keep"`**
   leaves each state standing at its stop once the subject moves on, so a
   lineage stays in view.
-- **The grammar**: during a beat the subject creeps forward through its
-  stop, passing it at the middle of the beat, and the camera follows, so
-  the base slides by. A beat that names a new state holds the words' swap
-  for 1–2 s while the subject travels to the next stop and changes form,
-  then the next words rise in. A beat with no `state` keeps the one before.
+- **The grammar**: during a beat the subject travels at its pace, passing
+  its point at the middle of the beat, and the camera follows, so the base
+  slides by as fast as the subject goes. A beat that names a new state holds
+  the words' swap for 1–2 s while the subject travels on and changes form,
+  and the new state's stop is set where it arrives. A pace change with no
+  new state (pulling in, pulling away) eases over the same stretch. A beat
+  with no `state` keeps the one before.
 - **`ground`** (optional) is a painter that dresses the base for this story
   (a road, a riverbank, rock strata); **`scenery`** (optional) draws things
   beside the path, called twice per frame with `layer: 'back'` and
@@ -145,11 +166,15 @@ Motion.things.car = { draw(V, s, api) {
   the base: x along the path (the direction of travel), y across it (+y
   toward the viewer), z up. Draw far parts first, near parts last.
 - **s**: `form` (blended), `from`, `to`, `k` (0..1 through the change),
-  `state`, `dist` (distance travelled), `speed` (1 while creeping),
-  `heading`, `t`, `still` (a trail copy standing at its stop).
+  `state`, `dist` (distance travelled), `speed` (subject lengths per
+  second), `heading`, `beat` (`{ id, index, lt, dir }`, the beat the frame
+  is in and seconds into its words), `t`, `still` (a trail copy at its stop).
 - **api**: `mat` (the tints), `iso` (`soften`, `inset`, `ngon`, `blend`,
   `shade`), `rng(...keys)` (seeded), `ease`, `sstep`, `lerp`, `clamp`,
-  `label`, and for ground and scenery `nodes`, `range`, `width`, `layer`.
+  `label`, `value(id)` and `display(id)` for claims, `beats` (where the
+  subject is at each beat's middle), `nodes`, `range`, `width`, `len`, and
+  for scenery `layer`. A figure drawn on the stage (a meter's fill) is read
+  with `api.value`, never typed, and the card states it.
 - **A pure function of its inputs.** No `Math.random`, `Date.now`, timers,
   `requestAnimationFrame`, or state kept between calls; no `fillText`
   (`check-video.js` fails each).

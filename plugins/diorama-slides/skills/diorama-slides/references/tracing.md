@@ -104,7 +104,8 @@ changes.
 **What I chose without the source**
 The arm's proportions and the base's shape: the source gives no
 dimensions, so they are drawn to read as a lamp at phone size, in the toy
-style. No colour, maker's mark or real lamp's likeness.
+style. No colour, maker's mark or real lamp's likeness. Its motion: it
+swings because ¶5 says the shade "could be moved"; how far is chosen.
 
 **What would change it**
 A photo or a description from you or the source (the arm's length, a
@@ -150,6 +151,11 @@ sales rose"*:
 - **"Make the drop look bigger" / "zoom in on the number."** Bars start at
   zero, and the camera never zooms the card. Offer a beat that states the
   change in words.
+- **"Why does it move so slowly / so fast?"** Answer from the beat's
+  `stage.shows` and its pace: a pace bound to a claim is that claim in
+  proportion (quote it); a halt is where the source stops. If the stage's
+  motion doesn't act out the finding, that's a fault in the video: fix the
+  pace or the action, not the words.
 - **"It's 44 W, not 40."** Re-read the source. If it says 40 W, quote it
   and hold. If it says 44 W, correct every cut and say so. Pushback alone
   moves nothing.

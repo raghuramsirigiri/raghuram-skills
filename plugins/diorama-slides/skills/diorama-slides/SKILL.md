@@ -84,17 +84,22 @@ own nouns.
    strong and the user picked neither). Defaults: 9:16, about 30–45 s,
    preset `default`. Never ask about style, colour, fonts or transitions.
 
-3. **Decide the story's shape, then the beats.** Read `references/story.md`.
-   The shape comes first, from what the source is about, not from its
-   findings one by one: **transformation** (one subject, its states),
+3. **Name the point, decide the shape, then the beats.** Read
+   `references/story.md`. First write the video's point with its main
+   figure, and what the viewer must *see* happen on the stage to get it
+   with the sound off (a speed story: the subject visibly gets faster). The
+   shape comes next, from what the source is about, not from its findings
+   one by one: **transformation** (one subject, its states),
    **lineup** (a cast on one stage, rearranged per measure), **assembly**
    (a thing built step by step), **episodes** (a place per item) or
    **journey** (a route on a schematic map). Then the beats on the spine
    (hook → states or measures or steps or places → so what → source card),
-   about one beat per 3–6 s, and what you leave out.
+   about one beat per 3–6 s, and what you leave out. For every beat, write
+   `stage.shows`: what the stage does in it that acts out its finding.
 
 4. **Plan the stage and draw its things.** Read `references/stage.md` for
-   the shape's grammar, the camera and the kit, and `references/design.md`
+   the shape's grammar, how the story drives the stage (pace from claims,
+   halts, things where beats happen), the camera and the kit, and `references/design.md`
    for the look, and `references/motion.md` for how the card and the
    stage each move. Name each thing the stage needs from the source's nouns,
    and its forms (a state's numbers: a length, a wheel, a roof line). A

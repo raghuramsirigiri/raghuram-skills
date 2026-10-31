@@ -162,6 +162,21 @@ try {
         const B = sc.stageBox;
         if (B && B.h < C.H * 0.22) warn('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': the stage has ' + Math.round(B.h) + ' px of height under the card — shorten the words, or give the chart a beat of its own');
       });
+      // The stage acts out the story: a pace that carries a figure has that
+      // figure in the card somewhere in the cut, and every beat says what
+      // its stage shows.
+      const onScreen = new Set();
+      C.scenes.forEach(sc => sc.used.forEach(id => onScreen.add(id)));
+      const beats = (C.stage.plan && C.stage.plan.beats) || [];
+      [...new Set(beats.map(b => b.paceClaim).filter(Boolean))].forEach(id => {
+        if (!onScreen.has(id)) fail('stage', 'cut "' + name + '": the stage moves at the pace of ' + id + ', which no beat in the cut states — put its figure in the card where it first shows');
+      });
+      if (beats.length && !beats.some(b => b.paceClaim) && !(spec.stage.states || []).some(x => x.pace != null) && !scenes.some(x => x.stage && x.stage.pace != null)) {
+        warn('stage', 'cut "' + name + '": no state or beat sets a pace, so the subject only drifts at the fallback pace — does the story have a rate or a stop the stage should act out? (references/story.md § The point)');
+      }
+      C.scenes.forEach((sc, i) => {
+        if (sc.type === 'beat' && !(sc.spec.stage && sc.spec.stage.shows)) warn('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': no stage.shows — write what the stage does in this beat to act out its finding');
+      });
       pass('timing', 'cut "' + name + '" · ' + C.format + ' · ' + C.shape + ' · ' + C.duration.toFixed(2) + ' s = ' + C.frames + ' frames at ' + C.fps + ' fps · ' +
         C.scenes.map((s, i) => 'V' + (i + 1) + ' ' + s.id + ' ' + s.dur.toFixed(1) + 's').join(', '));
     } catch (e) { fail('timing', 'cut "' + name + '": ' + e.message); }
