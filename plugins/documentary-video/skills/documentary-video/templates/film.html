@@ -47,7 +47,9 @@
   (async () => {
     // a finalized film carries these inline; while it's being made they load from film/
     if (!window.buildShots) { await load('cast.js'); await load('world.js'); await load('shots.js'); }
-    const meta = window.FILM_META || {};
+    const meta = Object.assign({}, window.FILM_META);
+    const qc = new URLSearchParams(location.search).get('color');
+    if (qc != null) meta.color = qc === '1' || qc === 'true';   // ?color=1 / ?color=0 to compare
     const W = buildWorld();
     const player = Film.film(document.getElementById('stage'), Object.assign({ world: W.root, beats: buildShots(W) }, meta));
     window.player = player;

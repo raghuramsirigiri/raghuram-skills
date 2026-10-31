@@ -20,6 +20,34 @@
   const ROLES = { ground: 'n0', hl: 's2', hl2: 's4', hlSoft: 's6' };
   const FIXED = { paper: '#fbfbf9' };
 
+  // Material roles: what a thing is made of, for the things that have a
+  // natural colour. The film is monotone unless it asks for colour
+  // (Film.worldColor(true), or FILM_META.color): in monotone each role is a
+  // theme neutral, so a cast written with roles looks exactly like one written
+  // with greys; in colour the same roles are muted, light hues that sit
+  // together like an illustrated diorama. The highlights (hl, hl2, hlSoft)
+  // are the theme's in both, so what a claim counts still stands out.
+  // A brand can set any role's colour as Charts.palette['w-<role>'].
+  const MATERIALS = {
+    //            monotone   colour
+    leaf:       ['n2a', '#9db98b'], leafDark: ['n2', '#7f9f72'], leafLight: ['n1', '#bcd2a7'],
+    trunk:      ['n3', '#8b7259'], grass: ['n0a', '#cfdcb5'], earth: ['n0a', '#e6dbc6'],
+    sand:       ['n0a', '#eee3cb'], rock: ['n2', '#b3ada3'], snow: ['paper', '#f7f9fa'],
+    water:      ['n1', '#a7c8c2'], ice: ['n0a', '#dce9ec'],
+    wall:       ['paper', '#f6f1e8'], concrete: ['n1', '#d8d5ce'], brick: ['n1', '#cba18b'],
+    roof:       ['n2', '#c58e74'], roofDark: ['n3', '#a6725c'], wood: ['n2a', '#bb9670'],
+    metal:      ['n2a', '#a2a9b0'], glass: ['n5', '#66798a'], tyre: ['n7', '#4a4744'],
+    skin1:      ['n2a', '#e4c3a8'], skin2: ['n2a', '#c79a7a'], skin3: ['n2a', '#94705a'],
+    hair:       ['n5', '#53443b'], hairLight: ['n4', '#a5876a'],
+    clothA:     ['n1', '#93a6bf'], clothB: ['n2a', '#d9bb72'], clothC: ['n0a', '#c08e86'],
+    clothD:     ['n2', '#88a594'], clothE: ['n3', '#6f6a80'], clothLight: ['n0a', '#ece6da']
+  };
+  let colourWorld = false;
+  // Switch the world's palette: false (the default) monotone, true colour.
+  // Resolved when drawn, so one built world renders either way.
+  Film.worldColor = function (on) { if (on !== undefined) colourWorld = !!on; return colourWorld; };
+  Film.materials = Object.keys(MATERIALS);
+
   function palette() {
     return (root.Charts && root.Charts.palette) || {};
   }
@@ -39,6 +67,10 @@
     check('color', typeof c === 'string', 'expected a theme token or #hex, got ' + JSON.stringify(c));
     if (c[0] === '#') return hexToRgb(c);
     if (FIXED[c]) return hexToRgb(FIXED[c]);
+    if (MATERIALS[c]) {
+      const brand = palette()['w-' + c];
+      return colourWorld ? hexToRgb(brand || MATERIALS[c][1]) : color(MATERIALS[c][0]);
+    }
     const p = palette(), key = ROLES[c] || c;
     check('color', p[key], 'unknown colour token "' + c + '" (is theme.js loaded before film-lib?)');
     return hexToRgb(p[key]);
@@ -194,11 +226,11 @@
     // o.key: decals with the same key and size share one picture (window
     // bands on a hundred buildings are one texture, not a hundred)
     const tk = o.key && 'tex|' + o.key + '|' + pw + 'x' + ph;
+    // the picture is painted the first time the renderer needs it, not here,
+    // so building a world costs no canvas work (and runs without a canvas)
     if (tk && cache.has(tk)) o.tex = cache.get(tk);
     else {
-      const cv = makeCanvas(pw, ph), ctx = cv.getContext('2d');
-      draw(ctx, pw, ph);
-      o.tex = { canvas: cv };
+      o.tex = { draw, pw, ph, canvas: null };
       if (tk) cache.set(tk, o.tex);
     }
     return addMesh(this, cached('pl' + [w, h], () => G.plane(w, h)), o);
@@ -245,8 +277,16 @@
     return g;
   };
   // Recolour every mesh (optionally only those whose name matches).
+  // Every part, hidden or not: a thing painted while hidden shows its colour
+  // when it appears (walk() skips hidden parts, so paint doesn't use it).
   Group.prototype.paint = function (c, match) {
-    this.walk(m => { if (!match || m.name === match) m.paint(c); });
+    Film.color(c);
+    (function visit(n) {
+      for (const k of n.children) {
+        if (k.children) visit(k);
+        else if (!match || k.name === match) k.paint(c);
+      }
+    })(this);
     return this;
   };
   Group.prototype.find = function (name) {

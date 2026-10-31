@@ -12,7 +12,8 @@ browser while the film is made:
 node <skill>/scripts/finalize.js <folder> --stage
 ```
 
-It copies `film-lib/`, `film.html` and `sheet.html` into `<folder>`. The
+It copies `film-lib/`, `film.html`, `sheet.html` and `compare.html` (the film
+in monotone and colour side by side) into `<folder>`. The
 steps write their files into `<folder>/film/`. Open `sheet.html` (step 4) and
 `film.html` (steps 5-6) from a local web server or the browser pane; both
 load `film/` fresh on every reload.
@@ -25,7 +26,8 @@ node <skill>/scripts/finalize.js <folder> --name <file-name>
 
 It re-runs the screenplay and bible checks, then folds `film.html`, the
 film-lib scripts and `film/cast.js`, `world.js` and `shots.js` into
-`<folder>/<file-name>.html`. That file stands alone: it opens offline by
+`<folder>/<file-name>.html`, and the comparison into
+`<folder>/<file-name>-compare.html`. Each file stands alone: it opens offline by
 double-click, plays, and has an **Export MP4** button. It exits non-zero and
 writes nothing if a check fails or a script would still load from a file.
 

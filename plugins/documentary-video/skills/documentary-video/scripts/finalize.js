@@ -31,7 +31,9 @@ if (argv.includes('--stage')) {
   fs.mkdirSync(path.join(dir, 'film-lib'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'film'), { recursive: true });
   for (const f of fs.readdirSync(LIB)) fs.copyFileSync(path.join(LIB, f), path.join(dir, 'film-lib', f));
-  for (const f of ['film.html', 'sheet.html']) fs.copyFileSync(path.join(TEMPLATES, f), path.join(dir, f));
+  for (const f of ['film.html', 'sheet.html', 'compare.html']) fs.copyFileSync(path.join(TEMPLATES, f), path.join(dir, f));
+  fs.mkdirSync(path.join(dir, 'samples'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(TEMPLATES, 'samples'))) fs.copyFileSync(path.join(TEMPLATES, 'samples', f), path.join(dir, 'samples', f));
   console.log('staged film-lib/, film.html and sheet.html in ' + dir + '; write the steps\' files in ' + path.join(dir, 'film'));
   process.exit(0);
 }
@@ -50,25 +52,32 @@ const page = path.join(dir, 'film.html');
 if (!fs.existsSync(page)) { console.log('missing film.html (run with --stage first)'); failed = true; }
 if (failed) { console.log('finalize: fix the above first'); process.exit(1); }
 
-// 2. fold everything into one page
-const safe = js => js.replace(/<\/script/gi, '<\\/script');
-let html = D.read(page);
-html = html.replace(/<script src="film-lib\/([\w.-]+)"><\/script>/g, (m, f) => {
-  const p = path.join(dir, 'film-lib', f);
-  if (!fs.existsSync(p)) { console.log('missing film-lib/' + f); process.exit(1); }
-  return '<script>/* film-lib/' + f + ' */\n' + safe(D.read(p)) + '\n</script>';
-});
+// 2. fold everything into one page (and, when it's there, the comparison
+// page: the same film in monotone and colour side by side)
+const safe = js => js.replace(/<\/script/gi, '<\/script');
 const filmScripts = ['cast.js', 'world.js', 'shots.js'].map(f => '<script>/* film/' + f + ' */\n' + safe(D.read(F(f))) + '\n</script>').join('\n');
-// the film's own scripts go just before the page's main script, which then finds them already loaded
-const mainAt = html.lastIndexOf('<script>\n  const load');
-if (mainAt < 0) { console.log('film.html does not look like the template (no loader script)'); process.exit(1); }
-html = html.slice(0, mainAt) + filmScripts + '\n' + html.slice(mainAt);
-html = html.replace(/<!--[\s\S]*?The film, while it is being made[\s\S]*?-->\n?/, '');
+function fold(src) {
+  let html = D.read(src);
+  html = html.replace(/<script src="film-lib\/([\w.-]+)"><\/script>/g, (m, f) => {
+    const p = path.join(dir, 'film-lib', f);
+    if (!fs.existsSync(p)) { console.log('missing film-lib/' + f); process.exit(1); }
+    return '<script>/* film-lib/' + f + ' */\n' + safe(D.read(p)) + '\n</script>';
+  });
+  // the film's own scripts go just before the page's main script, which then finds them already loaded
+  const mainAt = html.lastIndexOf('<script>\n  const load');
+  if (mainAt < 0) { console.log(path.basename(src) + ' does not look like the template (no loader script)'); process.exit(1); }
+  html = html.slice(0, mainAt) + filmScripts + '\n' + html.slice(mainAt);
+  return html.replace(/<!--[\s\S]*?(?:The film, while it is being made|The same film in both palettes)[\s\S]*?-->\n?/, '');
+}
 
 const meta = (D.read(F('shots.js')).match(/name:\s*'([^']+)'/) || [])[1];
 const name = (nameAt >= 0 ? argv[nameAt + 1] : meta || 'film').replace(/\.html$/, '');
-const out = path.join(dir, name + '.html');
-fs.writeFileSync(out, html);
-const left = (html.match(/<script src=/g) || []).length;
-if (left) { console.log('finalize: ' + left + ' script(s) still load from a file; the page would not stand alone'); process.exit(1); }
-console.log('finalize: wrote ' + out + ' (' + (fs.statSync(out).size / 1024).toFixed(0) + ' KB), one file, no external scripts');
+const outs = [[page, path.join(dir, name + '.html')]];
+if (fs.existsSync(path.join(dir, 'compare.html'))) outs.push([path.join(dir, 'compare.html'), path.join(dir, name + '-compare.html')]);
+for (const [src, out] of outs) {
+  const html = fold(src);
+  const left = (html.match(/<script src=/g) || []).length;
+  if (left) { console.log('finalize: ' + left + ' script(s) in ' + path.basename(src) + ' still load from a file; the page would not stand alone'); process.exit(1); }
+  fs.writeFileSync(out, html);
+  console.log('finalize: wrote ' + out + ' (' + (fs.statSync(out).size / 1024).toFixed(0) + ' KB), one file, no external scripts');
+}

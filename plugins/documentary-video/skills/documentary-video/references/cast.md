@@ -12,6 +12,7 @@ film, from what the document says it is.
 ## Contents
 - The look
 - Designing an item
+- How much detail: the tier
 - The API
 - Figures
 - The cast file and the sheet
@@ -37,6 +38,8 @@ made thing a bevelled block, a person a few rounded parts.
 - **Form comes from light.** Flat shading, soft shadows, no outlines: a
   bevelled edge catches a line of light, a facet turns its own tone, a gap
   casts a shadow. That's most of the detail an item needs.
+- **Colour is an option, never the default** (§ Colour, below): the same
+  cast renders monotone or in colour when its parts name material roles.
 - **Sizes are real metres.** A person is 1.6-1.85 m, a door 2.1 m, a bus
   12 m. Simple shapes at true scale sit together believably, and the camera
   can go anywhere.
@@ -86,6 +89,81 @@ lumpy animals), `rounded` for soft made things (sacks, cushions, car bodies),
 `cylinder`/`cone` with a low `seg` (6-8) for faceted trunks, poles and
 cone trees, `extrude` for silhouettes (roofs, saw-tooth sheds, vehicles in
 profile).
+
+## Colour
+
+The film is monotone unless the user asks for colour. Write the cast so it
+can be either: wherever the real thing has a natural colour, name its
+**material role** instead of a grey, and the palette decides what it looks
+like.
+
+| Role | For | Monotone | Colour |
+| --- | --- | --- | --- |
+| `leaf`, `leafDark`, `leafLight` | foliage, hedges, grass in volume | n2a, n2, n1 | sage greens |
+| `trunk`, `wood` | bark, timber, furniture | n3, n2a | warm browns |
+| `grass`, `earth`, `sand`, `rock`, `snow`, `ice` | ground and terrain | light neutrals | soft green, beige, sand, grey, white, pale blue |
+| `water` | rivers, lakes, sea | n1 | muted teal |
+| `wall`, `concrete`, `brick` | buildings and paving | paper, n1, n1 | warm white, stone, clay |
+| `roof`, `roofDark` | roofs, doors | n2, n3 | terracotta |
+| `metal`, `glass`, `tyre` | machines, windows, wheels | n2a, n5, n7 | grey, slate, near black |
+| `skin1` … `skin3`, `hair`, `hairLight` | people | n2a, n5, n4 | three skin tones, dark and light hair |
+| `clothA` … `clothE`, `clothLight` | clothes, awnings, fabric | neutrals | slate, mustard, rose, sage, plum, cream |
+
+- In colour every hue is muted and light, so the world reads as an
+  illustrated diorama and the **highlight still stands out**: `hl`, `hl2` and
+  `hlSoft` are the theme's in both palettes. Don't use a role for what a claim
+  counts; that is what `hl` is for.
+- Things with no natural colour (a generic block, a crate, a coin's face) can
+  keep plain neutrals; they stay grey in colour too, which is right.
+- A brand can set any role's colour in its palette as `w-<role>` (for
+  example `w-roof`), through the theme scripts like any other colour.
+- `sheet.html?color=1` shows the cast in colour; `film.html?color=1` and
+  `?color=0` switch the player; `compare.html` plays both side by side.
+
+## How much detail: the tier
+
+The bible gives every item a tier, read off the camera: how close the film
+ever sees it. The tier, not the importance of the thing, decides how much
+care it gets. Open the samples to see the difference:
+`sheet.html?cast=samples/tiers.js` shows a person, a crate, a tree and a
+building at each tier, and two faults.
+
+- **Background**: only ever part of a crowd, a street, a forest, a map. The
+  simplest form that keeps the silhouette: one bevelled block, a trunk and one
+  lump, the plain body in a few tones. Identical copies are right here; the
+  eye reads the mass, not the members.
+- **Supporting**: seen at mid distance, one of a few. The background form
+  plus the one or two telling details from the bible (a hard hat, an
+  entrance canopy, a hand axe), each built properly, not drawn on.
+- **Hero**: seen close, so every part is on show. Build it the way a careful
+  illustrator would:
+  - **Parts meet.** Nothing floats, nothing pokes through: a jacket sits over
+    the torso a few millimetres proud, a held thing is in the hand (`reach`,
+    `locate`), a lid sits on its box. Check from behind (the inset).
+  - **One bevel size per item**, about 3-5% of its smallest side, on every
+    block. A mix of sharp and soft corners on one thing looks unfinished.
+  - **Smooth what is round.** Turned and round parts get enough segments to
+    read as round at that size (`seg` 24-32); facets are for natural lumps,
+    with low jitter (about 0.05) and `detail: 1`.
+  - **Structure where the real thing has it**: posts and slats, a dark
+    inside, layers of clothing, hands and shoes when they're seen.
+  - **Two or three tones** of the item's neutrals, so its parts separate.
+  - **A pose with life** for people: a small weight shift, a head turned,
+    not standing to attention.
+
+Faults to avoid, all of which look amateur on screen:
+- **Features stuck on a plain round head** (a brow, a jaw, eyes as blocks):
+  they read as goggles or a visor, not a face. Tell people apart by build,
+  posture, hair and clothes; leave the face plain unless the story is about
+  a face.
+- **Jagged facets close up**: a high-jitter, low-detail lump seen near looks
+  broken, not stylised.
+- **Things that float**: a figure whose pose lifts it off the ground, a prop
+  hovering over a table. Figures plant themselves (§ Figures); props sit on
+  their surface.
+- **Uneven corners**: blocks with different bevels, or none, side by side.
+- **Detail spent where the camera never goes**: a hero-level crowd member,
+  a background building with door handles.
 
 ## The API
 
@@ -184,13 +262,26 @@ figure stands in, solving the arm and keeping the rest of the pose; reach
 with both hands to hold a shovel, a stretcher or a steering wheel, then place
 the tool between `fig.locate('handL')` and `fig.locate('handR')`.
 
+Every figure **plants itself**: after any pose its lowest point rests on the
+ground, so a stride never sinks a foot and a figure sitting on the ground
+sits on it. For a chair or a bench, pose with `seat: <height in metres>` and
+the pelvis rests on it. A soft contact spot under each figure grounds it the
+way illustration does (`skip: ['spot']` for a figure that isn't on the
+ground, such as one lying on a bed).
+
 `fig.pose({...})` (also `spec.pose`), degrees, every field optional:
 `spine` (lean forward), `twist`, `head: [nod, turn]`, `armL/armR: [forward,
 out]`, `elbowL/R`, `legL/legR: [forward, out]`, `kneeL/R`, `crouch` (metres,
 bend the knees to match). The figure's left is `+x`.
 
-Sitting: `legL/legR: [90, 0]`, `kneeL/R: 90`, `crouch` about the thigh
-length, and place the figure so its pelvis is on the seat. Lying down: build
+Sitting on the ground: `pose({ sit: 'ground' })`: knees up above the hips,
+seat and feet both down, hands forward (any field you add still overrides
+it). Sitting on a chair or bench: `seat: 0.45, legL: [90, 0], legR: [90, 0],
+kneeL: 90, kneeR: 90`, with the seat built under it. Thighs level and shins
+hanging down with no `seat` is a chair pose with no chair: the figure sits on
+air, and the player lists it as a warning. Planting counts only the body,
+never what the hands hold, so a spear or a stick doesn't lift the feet; make
+a held pole long enough to reach the ground, not through it. Lying down: build
 the figure standing, then turn the whole figure (`rot: [-90, 0, 0]` puts it on
 its back with its head to `+y`) and lift it onto the bed.
 

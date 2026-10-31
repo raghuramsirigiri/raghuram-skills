@@ -67,6 +67,11 @@ Ask at most two, and only when the answer changes the film:
   (`references/cast.md` § The look).
 - **The highlight carries the claim.** One theme colour (`hl`) marks what the
   current figure counts; everything else stays neutral.
+- **Monotone by default; colour on request.** The world is greys unless the
+  user asks for colour. Casts name material roles (`leaf`, `roof`, `water`,
+  `wall`, `clothA`…) for things with a natural colour, so the same film
+  renders either way; `FILM_META.color = true` turns colour on, and
+  `compare.html` shows both side by side (`references/cast.md` § Colour).
 - **A film, not slides.** One continuous world the camera travels through,
   one transition for the whole film, captions and titles on a fixed layer
   that never zooms (the world may).
