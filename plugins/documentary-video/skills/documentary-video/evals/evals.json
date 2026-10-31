@@ -1,0 +1,59 @@
+{
+  "skill_name": "documentary-video",
+  "evals": [
+    {
+      "id": 1,
+      "name": "ride-dashboard-film",
+      "prompt": "Turn this quarterly operations dashboard into a short documentary-style video for our leadership team, about a minute long.",
+      "files": [
+        "fixtures/ride-dashboard.md"
+      ],
+      "expected_output": "A one-file film page with an MP4 export, built through brief, screenplay, bible, cast, world and shots; every on-screen number traces to a quoted claim; the report lists beats with handles and ends with the tracing closing line.",
+      "expectations": [
+        "film/brief.md passes check-brief.js against the document",
+        "film/screenplay.md and film/bible.md pass their checks",
+        "Every callout and caption number appears in a claim the beat cites",
+        "No cast item is a ready-made library object; each traces to a brief noun",
+        "The finished page loads no external script and plays with no camera warnings",
+        "The report ends with: Ask where any number came from, or why something looks the way it does."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "trace-on-request",
+      "prompt": "Turn this quarterly operations dashboard into a short documentary-style video for our leadership team, about a minute long.",
+      "files": [
+        "fixtures/ride-dashboard.md"
+      ],
+      "turns": [
+        "Where does the 38% on the airport rank come from?",
+        "Why are there only 100 cars? We have thousands of drivers.",
+        "We never said the airport causes long waits. Why does the film say that?",
+        "Can you add a shot showing Q4 waits falling below 5 minutes?"
+      ],
+      "expected_output": "Turn 1 gives B -> C -> quote for 38%; turn 2 explains the key (1 car = 1% of online drivers); turn 3 shows the cited claims word for word and corrects any beat or caption that implies a cause; turn 4 refuses to show Q4 falling because C15 is a goal, not a result, and offers what the document does say.",
+      "expectations": [
+        "The 38% trace quotes the document sentence and names its handle",
+        "The answer about 100 cars cites the key and the claim, not a guess",
+        "The causation pushback is checked against the claims, and the film is corrected if it implied a cause",
+        "The request to show Q4 waits falling is declined as not in the document"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "human-evolution-film",
+      "prompt": "Can you turn this article into a short documentary-style video? Around a minute and a bit, for a general audience.",
+      "files": [
+        "fixtures/human-evolution.md"
+      ],
+      "expected_output": "A one-file film page with an MP4 export; each species built as its own build of the plain body (stoop, proportions, brow), trees told apart by silhouette by region, abstract figures shown as concrete things from the period (pebbles, beads, a path), and every date on screen quoted from the article with its 'about'.",
+      "expectations": [
+        "Every date and figure on screen appears in a brief claim quoted from the article",
+        "Approximate dates keep their 'about' or 'roughly' where the article has it",
+        "Nothing implies who made the oldest stone tools, since the article does not say",
+        "Species are told apart by build, not by labels on their bodies",
+        "The finished page loads no external script and plays with no camera warnings"
+      ]
+    }
+  ]
+}

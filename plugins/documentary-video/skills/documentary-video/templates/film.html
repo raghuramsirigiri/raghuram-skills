@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Film</title>
+<style>
+  html, body { margin: 0; background: #e6e5e1; font: 13px "Segoe UI", sans-serif; color: #333; }
+  #stage { display: block; width: 100%; max-width: 1280px; aspect-ratio: 16 / 9; margin: 0 auto; background: #f4f4f0; }
+  #bar { max-width: 1280px; margin: 8px auto; display: flex; gap: 10px; align-items: center; padding: 0 8px; box-sizing: border-box; }
+  #seek { flex: 1; }
+  #warn { max-width: 1280px; margin: 0 auto; color: #b31b38; white-space: pre-line; padding: 0 8px; }
+  #strip { display: none; width: 100%; }
+  body.strip #stage, body.strip #bar { display: none; }
+  body.strip #strip { display: block; }
+  button { font: inherit; padding: 4px 12px; }
+</style>
+</head>
+<body>
+<!--
+  The film, while it is being made (step 6). Sits beside film/ and film-lib/:
+    film.html            this page
+    film-lib/            copied from the skill's assets/film-lib/
+    film/cast.js         window.Cast builders (step 4)
+    film/world.js        window.buildWorld() (step 5)
+    film/shots.js        window.buildShots(W) and window.FILM_META = { source } (step 6)
+  ?t=<seconds> opens at a moment; ?strip shows the key-frame strip instead.
+-->
+<canvas id="stage"></canvas>
+<div id="bar"><button id="play">Play</button><input id="seek" type="range" min="0" max="1000" value="0"><span id="info"></span><button id="export">Export MP4</button></div>
+<div id="warn"></div>
+<canvas id="strip"></canvas>
+<script src="film-lib/theme.js"></script>
+<script src="film-lib/geom.js"></script>
+<script src="film-lib/scene.js"></script>
+<script src="film-lib/render.js"></script>
+<script src="film-lib/rig.js"></script>
+<script src="film-lib/film.js"></script>
+<script src="film-lib/mux-mp4.js"></script>
+<script src="film-lib/mux-webm.js"></script>
+<script src="film-lib/export.js"></script>
+<script>
+  const load = f => new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = 'film/' + f + '?t=' + Date.now();
+    s.onload = ok; s.onerror = () => no(new Error('film/' + f + ' failed to load')); document.body.appendChild(s);
+  });
+  (async () => {
+    // a finalized film carries these inline; while it's being made they load from film/
+    if (!window.buildShots) { await load('cast.js'); await load('world.js'); await load('shots.js'); }
+    const meta = window.FILM_META || {};
+    const W = buildWorld();
+    const player = Film.film(document.getElementById('stage'), Object.assign({ world: W.root, beats: buildShots(W) }, meta));
+    window.player = player;
+    const q = new URLSearchParams(location.search);
+    document.getElementById('warn').textContent = player.warnings.join('\n');
+    if (q.has('strip')) {
+      document.body.classList.add('strip');
+      player.strip(document.getElementById('strip'));
+      document.title = 'Strip: ' + player.beats.length + ' beats, ' + player.warnings.length + ' warnings';
+      return;
+    }
+    const seek = document.getElementById('seek'), info = document.getElementById('info'), btn = document.getElementById('play');
+    player.onTick((T, i) => { seek.value = Math.round(T / player.duration * 1000); info.textContent = i.beat + ' · ' + T.toFixed(1) + ' / ' + player.duration + ' s'; });
+    seek.oninput = () => player.seek(seek.value / 1000 * player.duration);
+    btn.onclick = () => { player.playing ? player.pause() : player.play(); btn.textContent = player.playing ? 'Pause' : 'Play'; };
+    document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); btn.click(); } });
+    const ex = document.getElementById('export');
+    ex.onclick = async () => {
+      ex.disabled = true; player.pause(); btn.textContent = 'Play';
+      try {
+        const r = await Film.exportFilm(player, { onProgress: p => { ex.textContent = 'Exporting ' + Math.round(p * 100) + '%'; } });
+        Film.saveFile(r.blob, (meta.name || 'film') + '.' + r.ext);
+        ex.textContent = 'Saved ' + r.ext.toUpperCase() + ' (' + (r.blob.size / 1e6).toFixed(1) + ' MB)';
+      } catch (e) { ex.textContent = 'Export failed: ' + e.message; }
+      ex.disabled = false;
+    };
+    player.seek(+q.get('t') || 0.5);
+    document.title = 'Film: ' + player.duration + ' s, ' + player.warnings.length + ' warnings';
+  })().catch(e => { document.title = 'Film error: ' + e.message; document.getElementById('warn').textContent = e.stack || e.message; console.error(e); });
+</script>
+</body>
+</html>

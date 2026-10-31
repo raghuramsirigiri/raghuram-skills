@@ -162,6 +162,14 @@ topic with figures in it.
   plugins/explainer-video/skills/explainer-video/tests/freeze.test.js` fails
   on any change to the frozen files; a real bug fix there updates its hash
   in the same commit and says why.
+- `plugins/documentary-video/` films a document in its own WebGL2 world
+  (`assets/film-lib/`), in charts-lib's design system, so it carries a
+  **copy** of `assets/charts-lib/theme.js` (identical to chart-dashboard's)
+  and of explainer-video's `mux-mp4.js` and `mux-webm.js`. A change to any of
+  them goes into every plugin that carries it, in one commit; `node --test
+  plugins/documentary-video/skills/documentary-video/tests/shared-files.test.js`
+  fails on drift. It ships primitives, never ready-made things: every cast
+  item is built for its film from the document's nouns.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
