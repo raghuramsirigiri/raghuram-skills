@@ -64,7 +64,9 @@ guides layout and framing), `world` (the page's painter,
 `Motion.things.<name>`), `setting` (where the story naturally happens),
 `look` (the world as an illustrator would describe it: its ground or sky,
 its colours, the hero shots), `size` (the extent a beat frames at zoom 1)
-and optionally `time` (where the story's clock starts).
+and optionally `time` (where the story's clock starts) and `room`
+(`"below"`, the default, or `"behind"` for a stage that runs up behind
+the card).
 
 ### Scenes (beats)
 

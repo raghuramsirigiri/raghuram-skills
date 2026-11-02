@@ -18,6 +18,13 @@ stage the room under it, and the camera reframes to fit.
 `check-video.js` warns when a beat leaves the stage less than about a
 fifth of the frame's height.
 
+A story whose subject is tall (a tower, a tree, a rocket) or whose sky
+matters can set `stage.room: "behind"`: the stage then fills the whole
+frame down to the footer, and the card's words sit on a paper veil that
+thins out below them, so the subject rises behind the headline the way a
+magazine cover lets it. Keep the framed subject clear of the words' own
+lines; let only its upper reaches pass behind the veil.
+
 ## The camera
 
 - **One angle for the whole video**: an isometric view from the front

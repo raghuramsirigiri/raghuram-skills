@@ -245,7 +245,7 @@
       const x0 = Math.min(...subj.map(r => r.bbox[0])), y0 = Math.min(...subj.map(r => r.bbox[1]));
       const x1 = Math.max(...subj.map(r => r.bbox[0] + r.bbox[2])), y1 = Math.max(...subj.map(r => r.bbox[1] + r.bbox[3]));
       const F = M.stage.FADE * 0.5;
-      const inner = B.inner || {};
+      const inner = B.inner || {};   // a stage behind the card has no inner top edge
       const out = (inner.top && y0 < B.y + F) || (inner.left && x0 < B.x + F) || (inner.bottom && y1 > B.y + B.h - F) || x0 < -1 || x1 > C.W + 1 || y0 < -1;
       if (out) once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the subject spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside its stage room (' + [B.x, B.y, B.x + B.w, B.y + B.h].map(Math.round).join(',') + '), clear of the soft edges, while the beat holds — lower its zoom or its look' });
     }

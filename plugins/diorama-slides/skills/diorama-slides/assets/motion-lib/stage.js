@@ -54,6 +54,7 @@
   const SETTLE = 0.5;        // the camera keeps easing this long into the next beat's words
   const INTRO = 0.6;         // the stage arrives over the first beat's first 0.6 s
   const WAIT = 1.4;          // the swap's quiet stretch when story time changes
+  const VEIL = 0.86;         // how much paper sits behind the words when the stage runs behind the card
   const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
 
   // ── the stage's room, per beat ───────────────────────────────────────
@@ -62,9 +63,17 @@
   // lowest their words reach), so the stage holds still from beat to beat;
   // a beat with one gives the stage the room under it, and the camera
   // reframes. A wide frame: the room right of the words' column.
-  function boxes(list, fr, zone) {
+  //
+  // `stage.room: "behind"` lets the stage run up behind the card instead
+  // (a tall subject, a sky): the room is the whole frame down to the footer,
+  // and the words sit on a paper veil that thins out below them (`under`).
+  function boxes(list, fr, zone, room) {
     const S = fr.safe, K = M.layout.K;
     const bottom = zone.ruleY - 8 * K;
+    if (room === 'behind') {
+      const card = it => it.built.card || { bottom: zone.top };
+      return list.map(it => ({ x: 0, y: 0, w: fr.W, h: bottom, inner: { bottom: true }, under: card(it).bottom + 6 * K }));
+    }
     if (fr.cls === 'wide') {
       const colW = Math.round(S.w * M.layout.PROFILE.wide.col);
       const x = S.x + colW + 20 * K;
@@ -92,7 +101,8 @@
       if (!c) throw new Error(where + ': "' + v + '" is not a number or a claim');
       return +c.value;
     };
-    const bx = boxes(o.list, o.fr, o.zone);
+    if (st.room != null && st.room !== 'below' && st.room !== 'behind') throw new Error('stage.room must be "below" (the default) or "behind"');
+    const bx = boxes(o.list, o.fr, o.zone, st.room);
     let time = st.time != null ? num(st.time, 'stage.time') : 0, focus = null;
     const beats = o.list.map((it, i) => {
       const dir = (it.spec && it.spec.stage) || {};
@@ -206,7 +216,7 @@
     }
     const a = S.beats[Math.max(0, i - 1)], b = S.beats[i], w = S.windows[i];
     const k = w ? M.ease.glide(clamp((t - w[0]) / (w[1] - w[0]))) : 1;
-    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner });
+    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner, under: q.under == null ? null : lerp(p.under == null ? q.under : p.under, q.under, k) });
     return { index: i, k, from: a, to: b, zoom: lerp(a.zoom, b.zoom, k), look: a.look.map((v, n) => lerp(v, b.look[n], k)), box: mixBox(a.box, b.box) };
   }
 
@@ -341,6 +351,14 @@
     if (inner.top) band(0, B.y, 0, B.y + FADE, 0, B.y, W, FADE);
     if (inner.left) band(B.x, 0, B.x + FADE, 0, B.x, 0, FADE, H);
     if (inner.bottom) band(0, B.y + B.h, 0, B.y + B.h - FADE, 0, B.y + B.h - FADE, W, FADE);
+    // Behind the card: a paper veil under the words, thinning out below them,
+    // so the headline reads while the world rises behind it.
+    if (B.under != null) {
+      ctx.globalAlpha = VEIL;
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, B.under);
+      band(0, B.under, 0, B.under + FADE * 1.8, 0, B.under, W, FADE * 1.8);
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 

@@ -175,6 +175,18 @@ test('the kit lofts bodies with volume and draws their facets back to front', ()
   assert.ok(m.nature.water && m.nature.foliage && m.nature.night);
 });
 
+test('a stage behind the card fills the frame, with a veil under the words', () => {
+  const s = FIXTURE_SPEC(); s.stage.room = 'behind';
+  const { C } = compile(s);
+  C.scenes.forEach(sc => {
+    assert.strictEqual(sc.stageBox.y, 0);
+    assert.ok(sc.stageBox.under > 0, 'the veil reaches below the words');
+    assert.ok(!sc.stageBox.inner.top);
+  });
+  const bad = FIXTURE_SPEC(); bad.stage.room = 'above';
+  assert.throws(() => compile(bad), /stage\.room must be/);
+});
+
 test('the stage keeps clear of the card in every format', () => {
   for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const s = FIXTURE_SPEC(); s.cuts.main.format = format;
