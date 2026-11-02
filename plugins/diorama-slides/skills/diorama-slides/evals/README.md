@@ -15,7 +15,7 @@ worked on doesn't go into the skill; the unseen topic is how that is caught.
 | Shape | Acceptance topic | Unseen topic (never tuned on) | Status |
 | --- | --- | --- | --- |
 | transformation | cars evolving (`family-car-eras.md`) | the camera, box camera to phone | acceptance video passes |
-| lineup | dinosaurs and their cousins (`dinosaur-diversity.md`, the user's notes plus cited Wikipedia lengths) | the planets compared | acceptance video built and audited (size beat reworked as a reveal); awaiting review |
+| lineup | dinosaurs and their cousins (`dinosaur-diversity.md`, the user's notes plus cited Wikipedia lengths) | the planets compared (NASA Planetary Fact Sheet; run once, untuned: it needed only a ball in the kit, and the audit's action check caught one weak beat, fixed in the video) | acceptance video built and audited (size beat reworked as a reveal); awaiting review |
 | assembly | Burj Khalifa construction | how a suspension bridge is built | buildable; acceptance video not made yet |
 | episodes | WW2 tactics, a campaign per place (neutral, non-graphic) | five cities' flood defences | buildable; acceptance video not made yet |
 | journey | a migration route on a schematic map | a trade route across a continent | buildable; acceptance video not made yet |

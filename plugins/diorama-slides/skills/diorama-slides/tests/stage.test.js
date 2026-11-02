@@ -145,6 +145,18 @@ test('a mark\u2019s fourth number scales the zoom, so a world can reveal during 
   assert.ok(run(far, 2) > run(near, 1) * 1.8, 'twice the zoom draws the subject about twice as wide');
 });
 
+test('the kit draws a ball as one lit disc, recorded for the audit', () => {
+  const w = load();
+  const ctx = mockCtx();
+  w.Motion.debug.record = [];
+  const V = w.Motion.iso.view(ctx, { ax: 100, ay: 100, cx: 0, cy: 0, s: 2 }, 'subject');
+  V.ball(0, 0, 0, 10, { top: '#eeeeee', left: '#cccccc', right: '#999999' });
+  const r = w.Motion.debug.record;
+  w.Motion.debug.record = null;
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(JSON.stringify(r[0].bbox.map(Math.round)), '[80,80,40,40]');
+});
+
 test('the stage keeps clear of the card in every format', () => {
   for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const s = FIXTURE_SPEC(); s.cuts.main.format = format;

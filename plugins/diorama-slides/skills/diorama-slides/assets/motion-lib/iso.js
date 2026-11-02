@@ -8,6 +8,7 @@
  *   V.prism(footprint, z, h, mat.N, b)        any convex footprint, bevelled on top
  *   V.extrude(profile, 'y', y0, y1, mat.N)    a side profile pushed across its depth
  *   V.cone(x, y, z, r, h, mat.N, n)           a faceted cone (a tree, a roof, a horn)
+ *   V.ball(x, y, z, r, mat.N)                 a ball, lit from the top left (a head, a fruit, a planet)
  *   V.shadow(x, y, w, d, h)   V.P(x, y, z) -> [sx, sy]
  *
  * One isometric view (30 degrees) for the whole video: world point (x, y, z)
@@ -217,6 +218,22 @@
         facets.push({ depth: pa[0] + pa[1] + pb[0] + pb[1], pts: [pa, pb, [x, y, z + h]], fill: shade(t, nx / L, ny / L, nz / L) });
       }
       facets.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill));
+    };
+
+    // A ball of radius r centred at (x, y, z): one disc on screen, lit like
+    // every other surface (the light from the top left, the right side in
+    // shade), in a few flat bands rather than a gradient.
+    V.ball = (x, y, z, r, t) => {
+      const [cx, cy] = P(x, y, z), R = r * s;
+      if (R < 0.3) return;
+      const disc = (ox, oy, rr, fill) => { ctx.beginPath(); ctx.arc(cx + ox * R, cy + oy * R, rr * R, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); };
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+      disc(0, 0, 1, t.right);
+      disc(-0.16, -0.12, 0.9, t.left);
+      disc(-0.3, -0.28, 0.62, t.top);
+      ctx.restore();
+      note([[cx - R, cy - R], [cx + R, cy + R]]);
     };
 
     // A soft contact shadow on the ground, cast toward the front right.

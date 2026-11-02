@@ -139,7 +139,7 @@ the world needs, for this video:
 `V.box`, `V.block(x, y, z, w, d, h, tint, { r, b })` (corners cut by r, top
 bevelled by b), `V.prism(footprint, z, h, tint, b)`, `V.extrude(profile,
 axis, a0, a1, tint)` (axis `'y'`: a side view; `'x'`: a front view; `'z'`:
-a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.face(points3d, colour)`,
+a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.ball(x, y, z, r, tint)`, `V.face(points3d, colour)`,
 `V.line`, `V.path`, `V.shadow`, and `V.P(x, y, z)` for a screen point.
 Slanted faces are shaded from the one light by their normal, so a bevel, a
 windscreen or a cone's facets read without outlines. Depth order is yours:
