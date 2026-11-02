@@ -3014,7 +3014,7 @@
       const prev = time;
       if (dir.time != null) time = num(dir.time, where + ': stage.time');
       const zoom = dir.zoom == null ? 1 : +dir.zoom;
-      if (!(zoom >= 0.5 && zoom <= 3)) throw new Error(where + ': stage.zoom must be between 0.5 and 3');
+      if (!(zoom >= 0.1 && zoom <= 80)) throw new Error(where + ': stage.zoom must be between 0.1 and 80');
       const look = Array.isArray(dir.look) ? dir.look.map(Number) : [0, 0, 0];
       if (look.length !== 3 || look.some(v => !isFinite(v))) throw new Error(where + ': stage.look is [x, y, z]');
       if (dir.focus != null) {

@@ -26,7 +26,7 @@ fifth of the frame's height.
 - **Each beat frames a point**: `stage.focus` names a mark your world
   returns from `marks(w)` (a mark may move, and the camera follows it) or
   gives [x, y, z]; a beat without one keeps the one before. `stage.zoom`
-  (0.5–3) multiplies the scale that fits `stage.size` in the room;
+  (0.1–80: a cast drawn to scale may span a 30 m giant and a 50 cm glider, and each must be framed big enough to read) multiplies the scale that fits `stage.size` in the room;
   `stage.look` nudges the framing by [x, y, z].
 - **Pan and zoom on the world only.** Between beats the camera eases (on
   `glide`) over the words' swap and half a second into the next words. The
@@ -35,7 +35,11 @@ fifth of the frame's height.
 - **Frame what the beat acts on.** Pick the focus and zoom so the thing that
   changes reads at phone size: a loaf, a face, a gauge. When the audit's
   `action` check says a beat changes little, look first at whether its
-  change is just too small to see; zoom in before adding anything.
+  change is just too small to see; zoom in before adding anything. A cast
+  drawn to scale over a wide range (a giant and a glider) needs both: the
+  beat whose insight *is* the comparison pulls back to take in the whole
+  cast, and every other beat frames its own actor close enough to read,
+  following it (a mark that moves) when it moves.
 - **Stage labels** go through `api.label`: one size on screen whatever the
   zoom, fading before the stage's edges, giving way to anything you pass to
   `api.avoid`. A label is a name or a year, never a figure.

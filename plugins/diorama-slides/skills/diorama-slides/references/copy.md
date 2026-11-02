@@ -28,6 +28,12 @@ per figure or quote that could appear on screen, in the spec's `claims`:
   `slide 6`. Count paragraphs from the first paragraph of body text.
 - **`verbatim`**: the source sentence or cell, copied character for
   character. The hedge and upgrade-word lints read it.
+- **Statements**: a sentence a beat asserts with no figure ("the first
+  vertebrates to achieve powered flight", "not actually dinosaurs") is a
+  claim too, `S1, S2…`, with `"statement": true`, its `verbatim` and its
+  `locator`. It is how an upgrade word (*first*, *largest*) the source
+  really uses passes the lint, and how a trace finds the sentence a beat
+  rests on.
 - **`kind`**:
   - `copied`: the figure appears in the source as written (a reformat
     like "2.4 million" → `2.4m` is still copied).

@@ -54,9 +54,12 @@
   // longer than its read a still stretch may run (a reveal's last, slowest
   // frames read as still too) before it counts as frozen.
   const FROZEN = 0.05, FROZEN_SLACK = 0.75;
-  // Mean luminance change (0-255, on a 64 px thumbnail of the stage's room)
-  // below which a beat's action counts as changing nothing.
-  const ACTION = 1.5;
+  // A beat's action counts as changing the world when at least this share
+  // of the stage's room (in %, on a 240 px wide sample) visibly differs from
+  // the beat never having happened, in how it looks or how it moves. A
+  // share, not a mean: a small thing that clearly appears (a flock, a lamp
+  // lighting) is a real change, and a mean over the whole room hides it.
+  const ACTION = 0.3, ACTION_W = 240, ACTION_DIFF = 18;
   function fillOf(C, ctx, t) {
     const S = C.safe, R = M.layout.RULE;
     // Measured without the art: decoration doesn't stand in for layout.
@@ -320,23 +323,29 @@
       // Two frames, 0.4 s apart: what the world looks like, and how it is
       // moving (a stop or a change of pace shows only in motion when the
       // camera follows the thing).
-      const grab = at => {
+      const aw = ACTION_W, ah = Math.max(1, Math.round(ACTION_W * B.h / B.w));
+      if (!grab.cv) { grab.cv = document.createElement('canvas'); }
+      grab.cv.width = aw; grab.cv.height = ah;
+      const actx = grab.cv.getContext('2d', { willReadFrequently: true });
+      function grab(at) {
         M.seek(ctx, C, at, { frameT: at });
-        tctx.clearRect(0, 0, tw, th);
-        tctx.drawImage(canvas, B.x, B.y, B.w, B.h, 0, 0, tw, th);
-        const px = tctx.getImageData(0, 0, tw, th).data, out = new Float32Array(tw * th);
+        actx.clearRect(0, 0, aw, ah);
+        actx.drawImage(canvas, B.x, B.y, B.w, B.h, 0, 0, aw, ah);
+        const px = actx.getImageData(0, 0, aw, ah).data, out = new Float32Array(aw * ah);
         for (let i = 0; i < out.length; i++) out[i] = 0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2];
         return out;
-      };
+      }
       const t2 = Math.min(sc.exitStart - 0.01, t + 0.4);
       const art = C.art; C.art = null;
       let a1, a2, b1, b2;
       try { a1 = grab(t); a2 = grab(t2); C.stage.override = j; b1 = grab(t); b2 = grab(t2); } finally { C.stage.override = null; C.art = art; }
-      let look = 0, motion = 0;
-      for (let i = 0; i < a1.length; i++) { look += Math.abs(a1[i] - b1[i]); motion += Math.abs(Math.abs(a1[i] - a2[i]) - Math.abs(b1[i] - b2[i])); }
-      const d = (look + motion) / a1.length;
+      let changed = 0;
+      for (let i = 0; i < a1.length; i++) {
+        if (Math.abs(a1[i] - b1[i]) > ACTION_DIFF || Math.abs(Math.abs(a1[i] - a2[i]) - Math.abs(b1[i] - b2[i])) > ACTION_DIFF) changed++;
+      }
+      const d = changed / a1.length * 100;
       actions.push({ handle: hd(sc.id), change: +d.toFixed(2) });
-      if (d < ACTION) warns.push({ check: 'action', scene: hd(sc.id), msg: 'the stage looks the same as if this beat\'s insight had never happened (change ' + d.toFixed(2) + ') — make the world do what stage.shows says (references/story.md § Direct each insight)' });
+      if (d < ACTION) warns.push({ check: 'action', scene: hd(sc.id), msg: 'the stage looks the same as if this beat\'s insight had never happened (' + d.toFixed(2) + '% of the stage changes) — make the world do what stage.shows says (references/story.md § Direct each insight)' });
     });
 
     const fill = fills(C, ctx).filter(f => !only || only.some(s => s.id === f.id));

@@ -88,7 +88,9 @@ Stage labels ride the world, so they are judged for size, contrast and the
 subject, not for holding still. It **warns** on single-frame pops, a stage
 that stops for longer than a beat's read (`frozen`), a beat whose world
 looks the same as if its insight had never happened (`action`: it repaints
-the beat with its time, progress and rates taken from the beat before;
+the beat with its time, progress and rates taken from the beat before, and
+measures what share of the stage visibly differs in look or motion, so a
+small thing that clearly appears counts and a camera that only drifts doesn't;
 redirect the beat, or say in `shows` why its value lives in the card),
 and a beat whose hold frame
 covers less than 60% of the safe area (`formats.md` § Layout per format;

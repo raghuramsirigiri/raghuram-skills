@@ -123,8 +123,8 @@ test('the camera frames each beat\'s focus at its zoom, and the card never moves
   assert.strictEqual(cb.stage.beats[1].zoom, 2);
   const at = C => JSON.stringify(C.scenes[1].layers.map(l => l.lines && l.lines.map(x => [x.x, x.y])));
   assert.strictEqual(at(cb), at(ca));
-  const s = FIXTURE_SPEC(); s.scenes[1].stage.zoom = 5;
-  assert.throws(() => compile(s), /stage\.zoom must be between 0\.5 and 3/);
+  const s = FIXTURE_SPEC(); s.scenes[1].stage.zoom = 120;
+  assert.throws(() => compile(s), /stage.zoom must be between 0.1 and 80/);
   const f = FIXTURE_SPEC(); f.scenes[1].stage.focus = 'nowhere';
   const { C, M } = compile(f);
   assert.throws(() => M.seek(mockCtx(), C, mid(C.scenes[1])), /the world names no such mark/);
