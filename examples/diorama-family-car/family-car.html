@@ -78,8 +78,8 @@
    18
   ],
   "time": 1912,
-  "setting": "room 4 of a motor museum, where the five cars stand in the order they were made, as one car driving through its century",
-  "look": "a museum floor with a long display base and a road on it; the car in each era's form; a fuel pump and a charging post where the story stops. Hero shots: each era's car at speed, the hatchback at the pump, the electric car at the post"
+  "setting": "a country road that runs through the car's century, from a dirt lane in 1912 to tarmac with lane lines",
+  "look": "green verges and round trees behind the road; the road ageing from brown dirt to grey tarmac with white lines; the car in each era's form and a period colour (bottle green, black, turquoise, orange, white); a red fuel pump and a green charging post on the verge where the story stops. Hero shots: each era's car at speed, the hatchback at the pump, the electric car at the post"
  },
  "cuts": {
   "main": {
@@ -4709,17 +4709,16 @@
 </script>
 <script>
 /* The car's look: one function for every era, from its form. */
-function drawCar(V, f, dist, api) {
+function drawCar(V, f, dist, api, paint) {
   const m = api.mat, iso = api.iso;
   const L = f.len, hw = f.width / 2, r = f.wheel, zb = r * 0.55;
   const ax = [-L / 2 + f.axle[0], L / 2 - f.axle[1]];
   const ww = f.width * 0.2, rot = dist / r;
-  const body = m.N3;
-  V.shadow(-L / 2 + 1, -hw, L - 1, hw * 2, f.roof * 0.5, m.shadow);
+  const body = paint || m.N3, glass = m.tone('#6e8aa1'), tyre = m.tone('#2b2b2e');
   const wheel = (x, y0, y1, near) => {
-    V.extrude(iso.ngon(x, r, r, 12, rot), 'y', y0, y1, m.DARK);
+    V.extrude(iso.ngon(x, r, r, 12, rot), 'y', y0, y1, tyre);
     if (!near) return;
-    V.face(iso.ngon(x, r, r * (f.spokes > 0.5 ? 0.82 : 0.5), 12, rot).map(p => [p[0], y1 + 0.02, p[1]]), m.N3.left);
+    V.face(iso.ngon(x, r, r * (f.spokes > 0.5 ? 0.82 : 0.5), 12, rot).map(p => [p[0], y1 + 0.02, p[1]]), m.tone(f.spokes > 0.5 ? '#c9b98f' : '#9aa1a8').left);
     if (f.spokes > 0.02) {
       for (let i = 0; i < 6; i++) {
         const a = rot + i * Math.PI / 3;
@@ -4738,7 +4737,7 @@ function drawCar(V, f, dist, api) {
     const o = f.open;
     V.block(-L / 2 + f.deck + 1, -hw * 0.6, f.belt - 2, 4, hw * 1.2, 2 + 4 * o, m.DARK, { r: 0.6, b: 0.6 });
     V.block(-2, -hw * 0.6, f.belt - 2, 3.5, hw * 1.2, 2 + 3.5 * o, m.DARK, { r: 0.6, b: 0.6 });
-    V.block(-L / 2 + 0.5, -hw * 0.75, f.belt - 1, 5, hw * 1.5, 1 + 2.6 * o, m.N3, { r: 1.2, b: 1 });
+    V.block(-L / 2 + 0.5, -hw * 0.75, f.belt - 1, 5, hw * 1.5, 1 + 2.6 * o, m.tone('#4b4136'), { r: 1.2, b: 1 });
   }
   // The far fin, then the cabin, then the near fin.
   const fin = y0 => V.extrude([[-L / 2 + 0.5, f.belt - 0.5], [-L / 2 + 13, f.belt - 0.5], [-L / 2 + 0.5, f.belt + f.fin]], 'y', y0, y0 + 1.4, body);
@@ -4752,12 +4751,12 @@ function drawCar(V, f, dist, api) {
     if (a > 0.01) {
       const win = iso.inset(cab, 1.3);
       V.ctx.save(); V.ctx.globalAlpha *= a;
-      V.face(win.map(p => [p[0], ch + 0.03, p[1]]), m.glass.left);
+      V.face(win.map(p => [p[0], ch + 0.03, p[1]]), glass.left);
       // The windscreen, across the front of the cabin.
       const k = 0.15;
       const p0 = [f.cf + (f.rf - f.cf) * k, f.belt + cabinH * k], p1 = [f.cf + (f.rf - f.cf) * (1 - k), f.belt + cabinH * (1 - k)];
       const nx = cabinH, nz = f.cf - f.rf, nl = Math.hypot(nx, nz) || 1;
-      V.face([[p0[0], -ch * 0.82, p0[1]], [p0[0], ch * 0.82, p0[1]], [p1[0], ch * 0.82, p1[1]], [p1[0], -ch * 0.82, p1[1]]], iso.shade(m.glass, nx / nl, 0, nz / nl));
+      V.face([[p0[0], -ch * 0.82, p0[1]], [p0[0], ch * 0.82, p0[1]], [p1[0], ch * 0.82, p1[1]], [p1[0], -ch * 0.82, p1[1]]], iso.shade(glass, nx / nl, 0, nz / nl));
       // A pillar between front and rear windows.
       const mx = (f.rf + f.rr) / 2;
       V.face([[mx - 0.5, ch + 0.05, f.belt + 1.2], [mx + 0.5, ch + 0.05, f.belt + 1.2], [mx + 0.5, ch + 0.05, f.roof - 1.2], [mx - 0.5, ch + 0.05, f.roof - 1.2]], body.left);
@@ -4767,7 +4766,7 @@ function drawCar(V, f, dist, api) {
   // The open Tourer's upright windscreen.
   if (f.open > 0.02) {
     const o = f.open, x = f.cf - 0.3;
-    V.face([[x, -hw * 0.66, f.belt], [x, hw * 0.66, f.belt], [x, hw * 0.66, f.belt + 5 * o], [x, -hw * 0.66, f.belt + 5 * o]], m.glass.right);
+    V.face([[x, -hw * 0.66, f.belt], [x, hw * 0.66, f.belt], [x, hw * 0.66, f.belt + 5 * o], [x, -hw * 0.66, f.belt + 5 * o]], glass.right);
   }
   if (f.fin > 0.3) fin(hw * 0.9 - 1.4);
   // Chrome: a strip along the side and the bumpers.
@@ -4787,8 +4786,10 @@ function drawCar(V, f, dist, api) {
   wheel(ax[0], hw - ww, hw, true); wheel(ax[1], hw - ww, hw, true);
 }
 
-/* The Arden family car's world: one car on a museum base, driving through a
-   century. Each insight is something that happens to it:
+/* The Arden family car's world: one car on a country road that runs
+   through its century. The road ages with the story's clock (a dirt lane
+   in 1912, tarmac with lines by the later eras), between grass verges and
+   trees. Each insight is something that happens to the car:
    - its form follows the story's clock (the year): the guide's five eras
      blend into each other as the clock moves between beats;
    - how far it has gone is the running total of each beat's speed, the
@@ -4799,11 +4800,11 @@ function drawCar(V, f, dist, api) {
      post's meter fills toward the planned 80% (hatched: a plan) while the
      charging beat acts. Everything is driven by progress, time or rate. */
 const ERAS = [
-  { year: 1912, label: '1912', speed: 'F1', form: { len: 38, width: 18, wheel: 5.2, axle: [6, 6.5], belt: 11, nose: 9.5, hood: 13, deck: 6, tail: 10, cf: 6, rf: 6, rr: -6, cr: -8, roof: 11, open: 1, spokes: 1, fin: 0, chrome: 0, soft: 0.8, bar: 0 } },
-  { year: 1934, label: '1934', speed: 'F4', form: { len: 40, width: 19, wheel: 4.4, axle: [6.5, 7], belt: 10, nose: 9, hood: 12, deck: 6, tail: 8.5, cf: 8, rf: 4.5, rr: -9, cr: -13, roof: 17, open: 0, spokes: 0, fin: 0, chrome: 0.5, soft: 1.2, bar: 0 } },
-  { year: 1958, label: '1958', speed: 'F7', form: { len: 46, width: 20, wheel: 3.8, axle: [8, 8], belt: 8.5, nose: 7.5, hood: 15, deck: 11, tail: 8.5, cf: 8, rf: 2, rr: -6, cr: -12, roof: 13.5, open: 0, spokes: 0, fin: 4.5, chrome: 1, soft: 1.5, bar: 0 } },
-  { year: 1979, label: '1979', speed: null, form: { len: 34, width: 18.5, wheel: 3.4, axle: [5.5, 5.5], belt: 8.5, nose: 7, hood: 9, deck: 1.5, tail: 9, cf: 8, rf: 2, rr: -13, cr: -16, roof: 15.5, open: 0, spokes: 0, fin: 0, chrome: 0.2, soft: 1.2, bar: 0 } },
-  { year: 2024, label: '2024', speed: 'F6', form: { len: 42, width: 19.5, wheel: 4, axle: [7, 7], belt: 8.5, nose: 6.5, hood: 10, deck: 3, tail: 9, cf: 11, rf: -1, rr: -10, cr: -18, roof: 14, open: 0, spokes: 0, fin: 0, chrome: 0, soft: 2.5, bar: 1 } }
+  { year: 1912, label: '1912', speed: 'F1', paint: '#2f4b3b', form: { len: 38, width: 18, wheel: 5.2, axle: [6, 6.5], belt: 11, nose: 9.5, hood: 13, deck: 6, tail: 10, cf: 6, rf: 6, rr: -6, cr: -8, roof: 11, open: 1, spokes: 1, fin: 0, chrome: 0, soft: 0.8, bar: 0 } },
+  { year: 1934, label: '1934', speed: 'F4', paint: '#2b2c33', form: { len: 40, width: 19, wheel: 4.4, axle: [6.5, 7], belt: 10, nose: 9, hood: 12, deck: 6, tail: 8.5, cf: 8, rf: 4.5, rr: -9, cr: -13, roof: 17, open: 0, spokes: 0, fin: 0, chrome: 0.5, soft: 1.2, bar: 0 } },
+  { year: 1958, label: '1958', speed: 'F7', paint: '#79b8ae', form: { len: 46, width: 20, wheel: 3.8, axle: [8, 8], belt: 8.5, nose: 7.5, hood: 15, deck: 11, tail: 8.5, cf: 8, rf: 2, rr: -6, cr: -12, roof: 13.5, open: 0, spokes: 0, fin: 4.5, chrome: 1, soft: 1.5, bar: 0 } },
+  { year: 1979, label: '1979', speed: null, paint: '#cc7631', form: { len: 34, width: 18.5, wheel: 3.4, axle: [5.5, 5.5], belt: 8.5, nose: 7, hood: 9, deck: 1.5, tail: 9, cf: 8, rf: 2, rr: -13, cr: -16, roof: 15.5, open: 0, spokes: 0, fin: 0, chrome: 0.2, soft: 1.2, bar: 0 } },
+  { year: 2024, label: '2024', speed: 'F6', paint: '#e4e7ea', form: { len: 42, width: 19.5, wheel: 4, axle: [7, 7], belt: 8.5, nose: 6.5, hood: 10, deck: 3, tail: 9, cf: 11, rf: -1, rr: -10, cr: -18, roof: 14, open: 0, spokes: 0, fin: 0, chrome: 0, soft: 2.5, bar: 1 } }
 ];
 const LEN = 42, TOP = 2.2 * LEN;      // the fastest era drives 2.2 car lengths a second
 const eraAt = year => ERAS.reduce((best, e) => (Math.abs(e.year - year) < Math.abs(best.year - year) ? e : best), ERAS[0]);
@@ -4814,6 +4815,16 @@ function formAt(w, year) {
   const a = ERAS[i - 1], b = ERAS[i];
   return w.blend(a.form, b.form, (year - a.year) / (b.year - a.year));
 }
+
+// Period colours (illustration: the guide gives none), blended like the form.
+const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(j => parseInt(h.slice(j, j + 2), 16)); const x = p(a), y = p(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+function paintAt(year) {
+  let i = ERAS.findIndex(e => e.year >= year);
+  if (i <= 0) return ERAS[i < 0 ? ERAS.length - 1 : 0].paint;
+  const a = ERAS[i - 1], b = ERAS[i], k = (year - a.year) / (b.year - a.year);
+  return hexMix(a.paint, b.paint, Math.max(0, Math.min(1, (k - 0.25) / 0.5)));
+}
+const GRASS = '#8b9d5c';
 
 Motion.things.museum = {
   speedOf(w) {
@@ -4833,14 +4844,27 @@ Motion.things.museum = {
     const m = api.mat, speed = this.speedOf(w);
     const x = w.accumulate('road', speed);
     const at = id => (w.has(id) ? w.accumulate('road', speed, w.beats.find(b => b.id === id).mid) : null);
-    const W = 48, slab = 5.4;
-    // The base and the road on it.
+    const W = 48, slab = 0.02, lo = api.range[0] - 30, hi = api.range[1] + 30;
     const G = api.view('ground');
-    const lo = api.range[0], hi = api.range[1];
-    G.block(lo, -W / 2, 0, hi - lo, W, slab, { top: m.N2.top, left: m.N3.left, right: m.N3.right }, { r: 0, b: slab * 0.4 });
-    const step = 9, ly = W * 0.29;
-    for (let s = Math.floor(lo / step) * step; s < hi; s += step) {
-      [-ly, ly].forEach(yy => G.face([[s, yy - 0.5, slab + 0.02], [s + step * 0.55, yy - 0.5, slab + 0.02], [s + step * 0.55, yy + 0.5, slab + 0.02], [s, yy + 0.5, slab + 0.02]], m.line));
+    // Grass to the horizon on both sides, then the road, aged by the clock:
+    // a dirt lane that becomes tarmac, its lines arriving with the later eras.
+    G.block(lo, -160, -3, hi - lo, 320, 3, m.tone(GRASS), { r: 0, b: 0 });
+    const tar = api.clamp((w.time - 1920) / 40);
+    const road = hexMix('#a88c62', '#5b5e64', tar);
+    G.face([[lo, -13, 0.01], [hi, -13, 0.01], [hi, 13, 0.01], [lo, 13, 0.01]], m.tone(road).top);
+    const step = 9;
+    if (tar > 0.3) {
+      G.ctx.save(); G.ctx.globalAlpha *= api.clamp((tar - 0.3) * 2);
+      for (let s = Math.floor(lo / step) * step; s < hi; s += step) G.face([[s, -0.5, 0.02], [s + step * 0.55, -0.5, 0.02], [s + step * 0.55, 0.5, 0.02], [s, 0.5, 0.02]], m.tone('#e6dfb8').top);
+      [-12, 12].forEach(yy => G.face([[lo, yy - 0.4, 0.02], [hi, yy - 0.4, 0.02], [hi, yy + 0.4, 0.02], [lo, yy + 0.4, 0.02]], m.tone('#e9e9e4').top));
+      G.ctx.restore();
+    }
+    // Trees behind the road, low hedges in front, so nothing hides the car.
+    const T = api.view('trees');
+    for (let k = Math.floor(lo / 22); k * 22 < hi; k++) {
+      const R = api.rng('tree', k), tx = k * 22 + R() * 10, ty = -26 - R() * 30, h = 12 + R() * 10;
+      T.tube([tx, ty, 0], [tx, ty, h * 0.4], 0.6, 0.45, m.nature.bark, 5);
+      T.ball(tx, ty, h * 0.62, 3.6 + R() * 2.2, m.tone(R() > 0.5 ? '#557a3f' : '#4a6b38'));
     }
     const S = api.view('scenery', [0, 0, slab]), y = -W * 0.42, lw = Math.max(1.5, S.s * 0.5);
     const flow = (pts, on) => {
@@ -4861,10 +4885,10 @@ Motion.things.museum = {
     const px = at('compact');
     if (px != null) {
       const bx = px - 7;
-      S.shadow(bx, y, 6, 5, 12, m.shadow);
-      S.block(bx, y, 0, 6, 5, 12, m.N3, { r: 0.8, b: 0.8 });
-      S.face([[bx + 0.8, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 10], [bx + 0.8, y + 5.02, 10]], m.PAPER.left);
-      S.block(bx - 0.5, y - 0.5, 12, 7, 6, 1.4, m.N2, { r: 0.6, b: 0.5 });
+      S.shade(bx + 3, y + 2.5, 4.5, 3.5, '#1f2a18', 0.25);
+      S.block(bx, y, 0, 6, 5, 12, m.tone('#b3392d'), { r: 0.8, b: 0.8 });
+      S.face([[bx + 0.8, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 5.5], [bx + 5.2, y + 5.02, 10], [bx + 0.8, y + 5.02, 10]], m.tone('#f1ede2').left);
+      S.block(bx - 0.5, y - 0.5, 12, 7, 6, 1.4, m.tone('#e9e4d6'), { r: 0.6, b: 0.5 });
       const on = api.clamp((w.progress('compact') - 0.6) * 4) * (1 - api.clamp(after('volt') * 3));
       flow([[bx + 6, y + 3, 7], [bx + 8, y + 7, 5], [px - 9, -W * 0.18, 6]], on);
     }
@@ -4872,23 +4896,25 @@ Motion.things.museum = {
     const cx0 = at('next');
     if (cx0 != null) {
       const bx = cx0 + 12;
-      S.shadow(bx, y, 6, 5, 20, m.shadow);
-      S.block(bx, y, 0, 6, 5, 20, m.N3, { r: 0.8, b: 0.8 });
+      S.shade(bx + 3, y + 2.5, 4.5, 3.5, '#1f2a18', 0.25);
+      S.block(bx, y, 0, 6, 5, 20, m.tone('#3e8a5c'), { r: 0.8, b: 0.8 });
       const z0 = 3, z1 = 17.5, x0 = bx + 1, x1 = bx + 5, fy = y + 5.03;
-      S.face([[x0, fy, z0], [x1, fy, z0], [x1, fy, z1], [x0, fy, z1]], m.glass.left);
+      S.face([[x0, fy, z0], [x1, fy, z0], [x1, fy, z1], [x0, fy, z1]], m.tone('#28323a').left);
       // The meter fills toward the planned charge as the car comes to rest.
       const p = w.progress('next'), top = z0 + (z1 - z0) * api.ease.outQuint(api.clamp((p - 0.5) / 0.5)) * w.share('F13', 100);
       for (let z = z0; z < top - 0.05; z += 0.9) S.face([[x0, fy + 0.01, z], [x1, fy + 0.01, z], [x1, fy + 0.01, Math.min(top, z + 0.55)], [x0, fy + 0.01, Math.min(top, z + 0.55)]], m.A.left);
       flow([[bx, y + 3, 8], [bx - 3, y + 7, 3], [cx0 + 15, -W * 0.18, 5]], api.clamp((p - 0.6) * 4) * (1 - api.clamp(after('src') * 3)));
     }
     // The car, in the form the clock gives it.
-    drawCar(api.view('car', [x, 0, slab]), formAt(w, w.time), x, api);
+    const carPaint = m.tone(paintAt(w.time));
+    api.view('car', [x, 0, slab]).shade(0, 0, 22, 10, '#1b1f17', 0.22);
+    drawCar(api.view('car', [x, 0, slab]), formAt(w, w.time), x, api, carPaint);
     // Each era's year on the base where its beat happened, giving way to the car.
     api.avoid(api.rect(x - 23, -10, slab, 46, 20, 18));
     ERAS.forEach((e, i) => {
       const beat = w.beats.find(b => b.time === e.year);
       if (!beat) return;
-      api.label(e.label, w.accumulate('road', speed, beat.mid) - 10, W / 2, 0, { dy: 10 });
+      api.label(e.label, w.accumulate('road', speed, beat.mid) - 10, 15, 0, { dy: 10, color: '#1a2410', on: GRASS });
     });
   }
 };

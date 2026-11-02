@@ -79,7 +79,7 @@
   ],
   "time": "F5",
   "setting": "inside Corran Street Bakery on a Saturday, from before dawn to closing",
-  "look": "a cutaway bakery: pale walls, two dark ovens whose doors light up, racks of loaves, a counter, the door to the street; customers in a line; the wall clock always in view. Hero shots: the ovens lighting, full racks, the queue at the counter, the empty half marked, the crate carried out"
+  "look": "a warm cutaway bakery: a honey wooden floor, cream walls, two brick ovens whose doors glow orange when lit, wooden racks of golden loaves, a wooden counter with a pale top, a green door to the street, customers in everyday colours; the wall clock always in view. Hero shots: the ovens lighting, full racks, the queue at the counter, the empty half marked, the crate carried out"
  },
  "cuts": {
   "main": {
@@ -4626,31 +4626,31 @@ Motion.things.bakery = {
   draw(w, api) {
     const m = api.mat, G = api.view('ground'), R = api.view('racks'), P = api.view('queue'), O = api.view('ovens'), K = api.view('counter');
     // The room: floor, the far walls (a cutaway, as a model shop is).
-    G.block(-48, -36, -2, 98, 66, 2, { top: m.N2.top, left: m.N3.left, right: m.N3.right }, { r: 0, b: 0.6 });
-    G.box(-50, -38, 0, 2, 68, 26, m.N);
-    G.box(-48, -38, 0, 98, 2, 26, m.N);
+    G.block(-48, -36, -2, 98, 66, 2, m.tone('#a8774b'), { r: 0, b: 0.6 });
+    G.box(-50, -38, 0, 2, 68, 26, m.tone('#e7d6b6'));
+    G.box(-48, -38, 0, 98, 2, 26, m.tone('#ecdcbf'));
     // The wall clock: the story's hour.
     const cxk = 2, czk = 22, rk = 2.6, yk = -35.95;
-    G.face(api.iso.ngon(cxk, czk, rk, 16).map(p => [p[0], yk, p[1]]), m.PAPER.left);
+    G.face(api.iso.ngon(cxk, czk, rk, 16).map(p => [p[0], yk, p[1]]), m.tone('#f8f5ec', 0).top);
     const hr = w.time % 12, ha = Math.PI / 2 - hr / 12 * Math.PI * 2, ma = Math.PI / 2 - (w.time % 1) * Math.PI * 2;
     G.line([cxk, yk + 0.05, czk], [cxk + Math.cos(ha) * rk * 0.55, yk + 0.05, czk + Math.sin(ha) * rk * 0.55], m.DARK.left, Math.max(2, G.s * 0.45));
     G.line([cxk, yk + 0.05, czk], [cxk + Math.cos(ma) * rk * 0.85, yk + 0.05, czk + Math.sin(ma) * rk * 0.85], m.DARK.left, Math.max(1.5, G.s * 0.3));
     // The two ovens, lit one after the other.
     [-44, -28].forEach((x, i) => {
-      O.block(x, -35, 0, 14, 9, 16, m.N3, { r: 1, b: 1 });
+      O.block(x, -35, 0, 14, 9, 16, m.tone('#9c4f34'), { r: 1, b: 1 });
       const lit = api.clamp((w.progress('ovens') - 0.35 - 0.3 * i) / 0.2);
       const door = [[x + 2, -25.95, 4], [x + 12, -25.95, 4], [x + 12, -25.95, 11], [x + 2, -25.95, 11]];
-      O.face(door, m.DARK.left);
-      if (lit > 0) { O.ctx.save(); O.ctx.globalAlpha *= lit; O.face(door, m.PAPER.top); O.ctx.restore(); }
+      O.face(door, m.tone('#2a1e18').left);
+      if (lit > 0) { O.ctx.save(); O.ctx.globalAlpha *= lit; O.face(door, m.tone('#f0a64f', 0).top); O.ctx.restore(); }
     });
     // The racks and their loaves.
     const st = this.stock(w, api);
     const nNow = Math.round(SLOTS * st.now), nFull = Math.round(SLOTS * st.full);
     RACKS.forEach(x => {
-      [[x, -34], [x + 12.4, -34], [x, -28.6], [x + 12.4, -28.6]].forEach(([px, py]) => R.box(px, py, 0, 0.6, 0.6, 22, m.DARK));
-      for (let s = 0; s < SHELVES; s++) R.box(x, -34, 1.4 + s * 5, 13, 6, 0.6, m.DARK);
+      [[x, -34], [x + 12.4, -34], [x, -28.6], [x + 12.4, -28.6]].forEach(([px, py]) => R.box(px, py, 0, 0.6, 0.6, 22, m.tone('#6e4a2c')));
+      for (let s = 0; s < SHELVES; s++) R.box(x, -34, 1.4 + s * 5, 13, 6, 0.6, m.tone('#7a5434'));
     });
-    for (let i = 0; i < nNow; i++) { const [x, y, z] = slot(i); R.block(x, y, z, 1.8, 4.4, 1.8, m.N2, { r: 0.5, b: 0.5 }); }
+    for (let i = 0; i < nNow; i++) { const [x, y, z] = slot(i); R.block(x, y, z, 1.8, 4.4, 1.8, m.tone('#c98d48'), { r: 0.5, b: 0.5 }); }
     // The taken half, marked where those loaves stood.
     const mark = w.progress('half'), closing = w.has('foodbank') && w.progress('foodbank') > 0;
     if (mark > 0 && !closing) {
@@ -4662,20 +4662,21 @@ Motion.things.bakery = {
       R.ctx.restore();
     }
     // The counter.
-    K.block(6, 3, 0, 26, 8, 10, m.N3, { r: 0.8, b: 0.8 });
+    K.block(6, 3, 0, 26, 8, 10, m.tone('#8a5b36'), { r: 0.8, b: 0.8 });
+    K.block(5.6, 2.6, 10, 26.8, 8.8, 0.8, m.tone('#d9cdb4'), { r: 0.3, b: 0.2 });
     // The food bank's crate: packed on the counter, then carried out.
     if (w.has('foodbank') && w.progress('foodbank') > 0.55) {
       // Packed as the day closes, then carried out through the hold.
       const pf = w.progress('foodbank'), go = ease(api, (w.since('foodbank') - 0.4) / 2.2);
       const cx = 22 + go * 34, a = 1 - api.clamp((go - 0.85) / 0.15);
       G.ctx.save(); G.ctx.globalAlpha *= a * api.clamp((pf - 0.55) / 0.1);
-      G.block(cx, 4, 10, 8, 6, 3, m.DARK, { r: 0.4, b: 0.4 });
+      G.block(cx, 4, 10.8, 8, 6, 3, m.tone('#6b4a2e'), { r: 0.4, b: 0.4 });
       const nCrate = Math.round(SLOTS * st.left * st.crated);
-      for (let i = 0; i < nCrate; i++) G.block(cx + 0.8 + i * 2.2, 4.8, 13, 1.8, 4.4, 1.8, m.N2, { r: 0.5, b: 0.5 });
+      for (let i = 0; i < nCrate; i++) G.block(cx + 0.8 + i * 2.2, 4.8, 13.8, 1.8, 4.4, 1.8, m.tone('#c98d48'), { r: 0.5, b: 0.5 });
       G.ctx.restore();
     }
     // The door, at the near right.
-    G.box(46, 10, 0, 1.4, 1.4, 18, m.DARK); G.box(46, 26, 0, 1.4, 1.4, 18, m.DARK); G.box(46, 10, 18, 1.4, 17.4, 1.4, m.DARK);
+    const frame = m.tone('#2f5d4a'); G.box(46, 10, 0, 1.4, 1.4, 18, frame); G.box(46, 26, 0, 1.4, 1.4, 18, frame); G.box(46, 10, 18, 1.4, 17.4, 1.4, frame);
     // Customers: arrivals at a rate the hour sets; each walks in to the
     // counter, buys, and walks out with a loaf.
     const rate = b => (b.time >= w.value('F6') && b.time < w.value('F8') ? (b.time >= w.value('F7') && b.id === 'queue' ? 2.2 : 0.7) : 0);
@@ -4689,14 +4690,15 @@ Motion.things.bakery = {
       if (u < 0.45) { const k = u / 0.45; x = api.lerp(62, 26 + (i % 3) * 2, k); y = api.lerp(17, 16, k); }
       else if (u < 0.6) { x = 26 + (i % 3) * 2; y = 16; }
       else { const k = (u - 0.6) / 0.4; x = api.lerp(26, 64, k); y = api.lerp(16, 23, k); }
-      people.push({ x, y, carry: u >= 0.55, tint: [m.N2, m.N3, m.DARK][Math.floor(api.rng('who', i)() * 3)] });
+      const who = api.rng('who', i);
+      people.push({ x, y, carry: u >= 0.55, tint: m.tone(['#4f6d8a', '#9a4b3f', '#5e7a4f', '#c2a14e', '#6b5b7a'][Math.floor(who() * 5)]), skin: m.tone(['#e0b48f', '#b07a52', '#8a5a3b'][Math.floor(who() * 3)]) });
     }
     people.sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach(p => {
       P.ctx.save(); P.ctx.globalAlpha *= 1 - gone;
-      P.shadow(p.x - 1.5, p.y - 1.5, 3, 3, 8, m.shadow);
+      P.shade(p.x, p.y, 2, 1.6, '#3a2616', 0.25);
       P.block(p.x - 1.5, p.y - 1.2, 0, 3, 2.4, 6.5, p.tint, { r: 0.7, b: 0.6 });
-      P.block(p.x - 1, p.y - 1, 6.8, 2, 2, 2, m.N, { r: 0.5, b: 0.5 });
-      if (p.carry) P.block(p.x - 0.4, p.y + 1.2, 3.2, 2.2, 1.2, 1.2, m.PAPER, { r: 0.4, b: 0.3 });
+      P.block(p.x - 1, p.y - 1, 6.8, 2, 2, 2, p.skin, { r: 0.5, b: 0.5 });
+      if (p.carry) P.block(p.x - 0.4, p.y + 1.2, 3.2, 2.2, 1.2, 1.2, m.tone('#c98d48'), { r: 0.4, b: 0.3 });
       P.ctx.restore();
     });
   }
