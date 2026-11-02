@@ -88,8 +88,8 @@
     "river",
     "cousins",
     "speed",
-    "giants",
     "tiny",
+    "giants",
     "src"
    ]
   }
@@ -364,21 +364,6 @@
    }
   },
   {
-   "id": "giants",
-   "type": "beat",
-   "copy": {
-    "kicker": "The largest",
-    "title": "Argentinosaurus: over {F3} long, up to {F4}",
-    "units": "Everyone drawn to scale, from estimated lengths"
-   },
-   "stage": {
-    "focus": "line",
-    "zoom": 0.95,
-    "wait": 1.8,
-    "shows": "the whole cast lines up nose to tail by length, at true scale, and the camera pulls back to take in the giant"
-   }
-  },
-  {
    "id": "tiny",
    "type": "beat",
    "copy": {
@@ -389,7 +374,23 @@
    "stage": {
     "focus": "micro",
     "zoom": 30,
-    "shows": "the camera drops to the small end of the line, where Microraptor flaps its four wings beside Archaeopteryx, the rest of the line rising behind"
+    "wait": 1.8,
+    "shows": "while the camera stays close on Microraptor flapping its four wings, the rest of the cast files into one row behind it, smallest first"
+   }
+  },
+  {
+   "id": "giants",
+   "type": "beat",
+   "copy": {
+    "kicker": "The largest",
+    "title": "Argentinosaurus: over {F3} long, up to {F4}",
+    "units": "Drawn to scale; ticks every five metres"
+   },
+   "stage": {
+    "focus": "reveal",
+    "zoom": 0.95,
+    "wait": 1.8,
+    "shows": "the camera pulls back along the row, past each bigger animal, until Argentinosaurus fills the end of the frame"
    }
   },
   {
@@ -2961,8 +2962,10 @@
  *     an amount drawn in proportion from zero;
  *   - the camera: one isometric angle for the whole video. Each beat frames
  *     a point (`focus`: a mark the painter names in `marks(w)`, which may
- *     move, or [x, y, z]) at its `zoom`; between beats the camera pans and
- *     zooms on the world only. The card never moves.
+ *     move, or [x, y, z]) at its `zoom`; a mark's optional fourth number
+ *     scales that zoom, so the world can pull the camera back to reveal
+ *     something during a beat. Between beats the camera pans and zooms on
+ *     the world only. The card never moves.
  *
  * A beat's action runs from the moment the previous beat's words leave
  * until the middle of its own read; `wait` holds the words' swap longer
@@ -3196,8 +3199,11 @@
       return first ? first.slice() : [0, 0, 0];
     };
     const fa = point(cam.from.focus), fb = point(cam.to.focus);
-    const s = fit(cam.box, S.st.size) * cam.zoom;
-    const F = fa.map((v, n) => lerp(v, fb[n], cam.k) + cam.look[n]);
+    // A mark's optional fourth number scales the zoom: the world can move
+    // the camera in or out during a beat (a reveal), still on the world only.
+    const zm = lerp(fa[3] > 0 ? fa[3] : 1, fb[3] > 0 ? fb[3] : 1, cam.k);
+    const s = fit(cam.box, S.st.size) * cam.zoom * zm;
+    const F = [0, 1, 2].map(n => lerp(fa[n], fb[n], cam.k) + cam.look[n]);
     const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
     const mat = S.mat || (S.mat = M.iso.materials(S.design));
@@ -4743,12 +4749,13 @@ Motion.things.eras = {
     // The cousins move to the left of the line; the dinosaurs to the right.
     const split = g(api, w.progress('cousins'));
     CAST.forEach(c => { P[c.id] = mix(P[c.id], [c.group === 'cousin' ? P[c.id][0] - 22 : P[c.id][0] + 10, P[c.id][1], P[c.id][2]], split); });
-    // The line-up: by length, nose to tail, in each one's medium.
+    // The line-up: one row along the shore, smallest first, nose to tail;
+    // swimmers just offshore, the flyer over its place.
     const sorted = CAST.slice().sort((a, b) => L[a.id] - L[b.id]);
     let cursor = -44;
     const lineAt = {};
-    sorted.forEach(c => { const len = L[c.id]; lineAt[c.id] = [cursor + len / 2, c.medium === 'water' ? -20 : 4, c.medium === 'water' ? WATER : 0]; cursor += len + 1.5; });
-    const line = g(api, w.progress('giants'));
+    sorted.forEach(c => { const len = L[c.id]; lineAt[c.id] = [cursor + len / 2, c.medium === 'water' ? -18 : -8, c.medium === 'water' ? WATER : 0]; cursor += len + 1.2; });
+    const line = g(api, w.progress('tiny'));
     CAST.forEach(c => { P[c.id] = mix(P[c.id], lineAt[c.id], line); });
     return { P, L, lineAt, line, split };
   },
@@ -4766,12 +4773,16 @@ Motion.things.eras = {
     const api = { ease: Motion.ease, clamp: v => Math.max(0, Math.min(1, v)), lerp: (a, b, k) => a + (b - a) * k };
     const { P, L, lineAt, split, line } = this.place(w, api);
     const fl = this.flight(w, api, P, split, line), lp = this.lap(w, api, P);
-    const lineMid = (Math.min(...Object.values(lineAt).map(p => p[0])) + Math.max(...Object.values(lineAt).map(p => p[0]))) / 2;
+    // The reveal: from Microraptor's end of the row, back along it, until the
+    // whole row and the giant at its end are in view.
+    const r = g(api, w.progress('giants'));
+    const xs = Object.values(lineAt).map(p => p[0]), lineMid = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const reveal = [api.lerp(P.micro[0] + 0.3, lineMid + 6, r), api.lerp(P.micro[1], -11, r), api.lerp(0.4, 7, r), api.lerp(14, 1, r)];
     return {
       herd: [-12, -4, 4], sky: [-16, -6, 12], board: [-6, -6, 4], track: [-6, 4, 2],
       archae: [P.archae[0] + 1.5, P.archae[1], 0.4 + g(api, w.progress('birds')) * (1 - line) * 3], spino: [P.spino[0], P.spino[1], 4],
-      line: [lineMid, -8, 6], micro: [P.micro[0] + 0.3, P.micro[1], 0.4],
-      quetz: [fl.x, fl.y, 4 + fl.fly * 9], galli: [lp.x, lp.y, 1.5]
+      line: [lineMid, -11, 6], micro: [P.micro[0] + 0.3, P.micro[1], 0.4],
+      quetz: [fl.x, fl.y, 4 + fl.fly * 9], galli: [lp.x, lp.y, 1.5], reveal
     };
   },
   draw(w, api) {
@@ -4788,6 +4799,12 @@ Motion.things.eras = {
       G.ctx.restore();
       api.label('Close cousins', -46, 16, 0, { dy: 8, alpha: dl });
       api.label('Dinosaurs', -10, 16, 0, { dy: 8, alpha: dl });
+    }
+    if (line > 0.01) {
+      G.ctx.save(); G.ctx.globalAlpha *= line;
+      G.face([[-46, -3.2, 0.02], [46, -3.2, 0.02], [46, -2.8, 0.02], [-46, -2.8, 0.02]], m.DARK.top);
+      for (let x = -45; x <= 45; x += 5) G.face([[x - 0.15, -3.2, 0.03], [x + 0.15, -3.2, 0.03], [x + 0.15, -1.6, 0.03], [x - 0.15, -1.6, 0.03]], m.DARK.top);
+      G.ctx.restore();
     }
     const air = g(api, w.progress('air')), up = g(api, w.progress('birds'));
     // The step of each walker: how far it has moved, plus the sprint.
@@ -4830,7 +4847,8 @@ Motion.things.eras = {
     });
     // In the line-up, the giant and the smallest are named.
     if (line > 0.9) {
-      api.label('Argentinosaurus', P.argentino[0] - 6, 6, 0, { dy: 10, alpha: (line - 0.9) * 10 });
+      const rv = g(api, w.progress('giants'));
+      if (rv > 0.6) api.label('Argentinosaurus', P.argentino[0] - 6, -3, 0, { dy: 14, alpha: (rv - 0.6) * 2.5 });
       if (w.progress('tiny') > 0) {
         api.avoid(api.rect(P.micro[0] - 0.5, P.micro[1] - 0.6, 0, 1, 1.2, 0.6));
         api.label('Microraptor', P.micro[0] - 0.2, P.micro[1] + 1.6, 0, { dy: 12, alpha: g(api, w.progress('tiny')) });

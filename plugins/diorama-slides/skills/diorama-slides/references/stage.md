@@ -27,7 +27,10 @@ fifth of the frame's height.
   returns from `marks(w)` (a mark may move, and the camera follows it) or
   gives [x, y, z]; a beat without one keeps the one before. `stage.zoom`
   (0.1–80: a cast drawn to scale may span a 30 m giant and a 50 cm glider, and each must be framed big enough to read) multiplies the scale that fits `stage.size` in the room;
-  `stage.look` nudges the framing by [x, y, z].
+  `stage.look` nudges the framing by [x, y, z]. A mark may carry a fourth
+  number that scales the zoom, so the world can move the camera in or out
+  during a beat: a reveal that starts close on one thing and pulls back
+  until the scale of the whole is clear.
 - **Pan and zoom on the world only.** Between beats the camera eases (on
   `glide`) over the words' swap and half a second into the next words. The
   card, the kicker, the footer and every word above or below the stage

@@ -130,6 +130,21 @@ test('the camera frames each beat\'s focus at its zoom, and the card never moves
   assert.throws(() => M.seek(mockCtx(), C, mid(C.scenes[1])), /the world names no such mark/);
 });
 
+test('a mark\u2019s fourth number scales the zoom, so a world can reveal during a beat', () => {
+  const near = FIXTURE_SPEC(), far = FIXTURE_SPEC();
+  const run = (spec, mul) => {
+    const w = load();
+    w.Motion.things.works.marks = () => ({ tank: [0, 0, 6, mul], pumps: [30, 0, 2] });
+    const C = w.Motion.compile(spec, 'main', { measure: mockCtx() });
+    w.Motion.debug.record = [];
+    w.Motion.seek(mockCtx(), C, mid(C.scenes[0]));
+    const r = w.Motion.debug.record.filter(x => x.owner === 'subject');
+    w.Motion.debug.record = null;
+    return Math.max(...r.map(x => x.bbox[2]));
+  };
+  assert.ok(run(far, 2) > run(near, 1) * 1.8, 'twice the zoom draws the subject about twice as wide');
+});
+
 test('the stage keeps clear of the card in every format', () => {
   for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const s = FIXTURE_SPEC(); s.cuts.main.format = format;

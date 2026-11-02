@@ -27,8 +27,10 @@
  *     an amount drawn in proportion from zero;
  *   - the camera: one isometric angle for the whole video. Each beat frames
  *     a point (`focus`: a mark the painter names in `marks(w)`, which may
- *     move, or [x, y, z]) at its `zoom`; between beats the camera pans and
- *     zooms on the world only. The card never moves.
+ *     move, or [x, y, z]) at its `zoom`; a mark's optional fourth number
+ *     scales that zoom, so the world can pull the camera back to reveal
+ *     something during a beat. Between beats the camera pans and zooms on
+ *     the world only. The card never moves.
  *
  * A beat's action runs from the moment the previous beat's words leave
  * until the middle of its own read; `wait` holds the words' swap longer
@@ -262,8 +264,11 @@
       return first ? first.slice() : [0, 0, 0];
     };
     const fa = point(cam.from.focus), fb = point(cam.to.focus);
-    const s = fit(cam.box, S.st.size) * cam.zoom;
-    const F = fa.map((v, n) => lerp(v, fb[n], cam.k) + cam.look[n]);
+    // A mark's optional fourth number scales the zoom: the world can move
+    // the camera in or out during a beat (a reveal), still on the world only.
+    const zm = lerp(fa[3] > 0 ? fa[3] : 1, fb[3] > 0 ? fb[3] : 1, cam.k);
+    const s = fit(cam.box, S.st.size) * cam.zoom * zm;
+    const F = [0, 1, 2].map(n => lerp(fa[n], fb[n], cam.k) + cam.look[n]);
     const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
     const mat = S.mat || (S.mat = M.iso.materials(S.design));
