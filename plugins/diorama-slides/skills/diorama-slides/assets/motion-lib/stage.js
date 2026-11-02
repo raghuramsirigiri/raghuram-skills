@@ -283,6 +283,8 @@
     const avoid = [];
     const api = {
       ctx, view, mat, design: S.design, ease: M.ease, iso: M.iso, sstep, lerp, clamp, range, s,
+      // The stage's room on screen, for a sky or a backdrop to fill.
+      room: { x: cam.box.x, y: cam.box.y, w: cam.box.w, h: cam.box.h },
       rng: (...keys) => M.rng(S.seed, 'stage', ...keys),
       // The screen rectangle of a box in the world, for labels to give way to.
       rect(x, y, z, bw, bd, bh) {
@@ -308,7 +310,7 @@
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
         if (a <= 0.01) return;
-        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
+        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: (o && o.on) || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
       }
     };
     ctx.save();

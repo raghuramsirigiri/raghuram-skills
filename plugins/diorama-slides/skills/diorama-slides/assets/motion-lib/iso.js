@@ -13,7 +13,7 @@
  *   V.tube(a, b, ra, rb, tint, n)             a tapering limb, a trunk, a neck
  *   V.begin() … V.end()                       draw several bodies' facets back to front together
  *   mat.tone('#7a8f4e')                       any colour as a lit tint; mat.nature.foliage, .water, …
- *   V.shadow(x, y, w, d, h)   V.P(x, y, z) -> [sx, sy]
+ *   V.shadow(x, y, w, d, h)   V.shade(x, y, rw, rd, colour, alpha)   V.P(x, y, z) -> [sx, sy]
  *
  * One isometric view (30 degrees) for the whole video: world point (x, y, z)
  * lands at ax + (x - y) cos30 s - cx, ay + ((x + y) / 2 - z) s - cy. The
@@ -311,6 +311,17 @@
       const k = h * 0.55;
       ctx.save(); ctx.globalAlpha *= alpha == null ? 1 : alpha;
       const pts = [P(x, y, 0), P(x + w + k, y, 0), P(x + w + k, y + d + k * 0.4, 0), P(x, y + d + k * 0.4, 0)];
+      ctx.beginPath(); pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      note(pts, 'shadow');
+      ctx.restore();
+    };
+
+    // A soft oval shadow on the ground under (x, y): for animals, people,
+    // anything round. rw along x, rd along y.
+    V.shade = (x, y, rw, rd, color, alpha) => {
+      ctx.save(); ctx.globalAlpha *= alpha == null ? 0.2 : alpha;
+      const pts = [];
+      for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2; pts.push(P(x + Math.cos(a) * rw, y + Math.sin(a) * rd, 0)); }
       ctx.beginPath(); pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
       note(pts, 'shadow');
       ctx.restore();

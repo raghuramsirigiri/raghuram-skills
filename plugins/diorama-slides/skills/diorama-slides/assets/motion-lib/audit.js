@@ -199,8 +199,8 @@
           }
           if (r.size && r.size < M.layout.MIN_TEXT) once('size:' + key, fails, { check: 'size', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" is ' + r.size.toFixed(1) + 'px, below ' + M.layout.MIN_TEXT });
           const need = r.large ? 3 : 4.5;
-          const ratio = M.design.contrast(hex(rgbOf(r.color)), d.bg);
-          if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + d.bg + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
+          const ratio = M.design.contrast(hex(rgbOf(r.color)), r.bg || d.bg);   // a stage label says what it sits on
+          if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + (r.bg || d.bg) + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
         }
         // Read time: how long has this exact text sat fully revealed and still?
         // Words carried through a transition (a world label in a pan) aren't being read.

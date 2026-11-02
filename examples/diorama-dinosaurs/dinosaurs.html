@@ -42,8 +42,8 @@
 </head>
 <body>
 <main>
-  <h1>Dinosaurs and their cousins, from giants to gliders</h1>
-  <p class="lede">One board of prehistoric animals drawn to scale, re-sorted by where they lived, what they were, how fast and how big. Figures from the author's notes and Wikipedia (31 October 2026).</p>
+  <h1>Dinosaurs and their cousins on a Cretaceous coast</h1>
+  <p class="lede">Prehistoric animals drawn to scale in their own landscape, re-sorted by where they lived, what they were, how fast and how big. Figures from the author's notes and Wikipedia (31 October 2026); colours are illustration.</p>
   <div id="player"></div>
   <details><summary>Caption and alt text</summary><p id="caption-out"></p><p id="alt-out"></p></details>
 </main>
@@ -71,12 +71,14 @@
  },
  "stage": {
   "shape": "lineup",
-  "world": "eras",
+  "world": "coast",
   "size": [
    40,
    24,
    14
-  ]
+  ],
+  "setting": "a Cretaceous coast: a fern-and-conifer plain running down to a sandy shore and the sea",
+  "look": "a warm green plain with darker grass patches, stands of dark conifers and low ferns at its edges, a pale sandy shore and a blue sea behind; the animals in muted earth tones with real bodies (a grey-brown sauropod, an olive Spinosaurus with a rust sail, a sand-coloured Gallimimus, near-black Microraptor, brown Archaeopteryx, a pale pterosaur with dark wings, blue-grey sea reptiles). Hero shots: the herd arriving across the plain, the pterosaur circling over it, Spinosaurus wading in, Gallimimus mid-sprint, Microraptor close, the row by the sea with the giant at its end"
  },
  "cuts": {
   "main": {
@@ -346,7 +348,7 @@
    "stage": {
     "focus": "board",
     "zoom": 0.9,
-    "shows": "a line is drawn across the board and the cast splits: the cousins move to one side, the dinosaurs to the other"
+    "shows": "a line is drawn in the sand and the cast splits: the cousins move to one side, the dinosaurs to the other"
    }
   },
   {
@@ -359,7 +361,7 @@
    },
    "stage": {
     "focus": "galli",
-    "zoom": 2.4,
+    "zoom": 5.5,
     "shows": "Gallimimus breaks from the group and sprints a lap of the board, faster than anything else on it moves"
    }
   },
@@ -2006,7 +2008,7 @@
       if (bw > 0 && bh > 0) {
         rec.push({
           scene: M.debug.scene, phase: M.debug.phase, layer: o.layer || null, role: o.role || null, text: str,
-          bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha, size: o.size || 0, color: o.color, large: !!o.large
+          bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha, size: o.size || 0, color: o.color, bg: o.bg || null, large: !!o.large
         });
       }
     }
@@ -2689,7 +2691,12 @@
  *   V.prism(footprint, z, h, mat.N, b)        any convex footprint, bevelled on top
  *   V.extrude(profile, 'y', y0, y1, mat.N)    a side profile pushed across its depth
  *   V.cone(x, y, z, r, h, mat.N, n)           a faceted cone (a tree, a roof, a horn)
- *   V.shadow(x, y, w, d, h)   V.P(x, y, z) -> [sx, sy]
+ *   V.ball(x, y, z, r, mat.N)                 a ball, lit from the top left (a head, a fruit, a planet)
+ *   V.loft(rings, tint, n)                    a body with volume: rings of [centre, radius] along a spine
+ *   V.tube(a, b, ra, rb, tint, n)             a tapering limb, a trunk, a neck
+ *   V.begin() … V.end()                       draw several bodies' facets back to front together
+ *   mat.tone('#7a8f4e')                       any colour as a lit tint; mat.nature.foliage, .water, …
+ *   V.shadow(x, y, w, d, h)   V.shade(x, y, rw, rd, colour, alpha)   V.P(x, y, z) -> [sx, sy]
  *
  * One isometric view (30 degrees) for the whole video: world point (x, y, z)
  * lands at ax + (x - y) cos30 s - cx, ay + ((x + y) / 2 - z) s - cy. The
@@ -2697,13 +2704,14 @@
  * changes. The viewer looks along (-1, -1, -1): a face whose normal has
  * nx + ny + nz > 0 faces the viewer.
  *
- * The look is a toy diorama in charts-lib's colours: chunky masses with cut
- * corners and bevelled tops, a few low-poly facets, no outlines, and one light
- * from the top left (the top lightest, the +y face mid, the +x face darkest;
- * a slanted face mixes the three by its normal). Every colour is mixed from
- * the design's background, ink and accent; the accent is for data only.
- * These are primitives: a car, a tower or a creature is built from them by
- * the video's own painter, never shipped here.
+ * The look is toy-like and low-poly: softened masses, faceted bodies with
+ * real volume, no outlines, and one light from the top left (the top
+ * lightest, the +y face mid, the +x face darkest; a slanted facet mixes the
+ * three by its normal). Things take their natural colours (`mat.tone`,
+ * `mat.nature`), muted a little toward the page so they sit with the card;
+ * the accent is reserved for data. These are primitives: a car, a planet, a
+ * creature or a forest is built from them by the video's own painter, never
+ * shipped here.
  *
  * Every shape is a pure function of its inputs. When the audit records
  * (Motion.debug.record), each filled shape reports its screen box as
@@ -2725,8 +2733,20 @@
     const A = tint(mix(d.subject, d.bg, 0.12), d.subject, mix(d.subject, d.ink, 0.28));
     const PAPER = tint(mix(d.bg, '#ffffff', 0.7), mix(d.bg, d.ink, 0.08), mix(d.bg, d.ink, 0.15));
     const between = (a, b, k) => k <= 0 ? a : k >= 1 ? b : tint(mix(a.top, b.top, k), mix(a.left, b.left, k), mix(a.right, b.right, k));
+    // Any colour as a lit tint, muted a little toward the page (mute 0..1)
+    // so the world sits in the same family as the card.
+    const tone = (hex, mute) => {
+      const base = mix(hex, d.bg, mute == null ? 0.12 : mute);
+      return tint(mix(base, '#ffffff', 0.16), base, mix(base, '#000000', 0.22));
+    };
+    // Natural colours to start from; any other comes through tone().
+    const NATURE = { foliage: '#5d7d47', grass: '#8d9b5a', earth: '#86684a', sand: '#d2bb8c', stone: '#8d8a83',
+      bark: '#6a4e39', water: '#4d7f9b', deep: '#2e5670', sky: '#a8c7da', night: '#141b2b', snow: '#eef1f3',
+      clay: '#b0643f', skin: '#c99a78', metal: '#9aa1a8' };
+    const nature = {};
+    Object.keys(NATURE).forEach(k => { nature[k] = tone(NATURE[k]); });
     return {
-      N, N2, N3, DARK, A, PAPER, between, bg: d.bg,
+      N, N2, N3, DARK, A, PAPER, between, bg: d.bg, tone, nature,
       shadow: mix(d.bg, d.ink, 0.06),
       line: mix(d.bg, d.ink, 0.28),       // quiet details: seams, markings
       glass: tint(mix(d.bg, d.ink, 0.4), mix(d.bg, d.ink, 0.5), mix(d.bg, d.ink, 0.58)),
@@ -2900,11 +2920,91 @@
       facets.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill));
     };
 
+    // ── bodies with volume ─────────────────────────────────────────────
+    // Facets collect between begin() and end() and are drawn back to front
+    // together, so a leg in front of a body and a tail behind it come out
+    // right. Outside a batch, each body sorts its own facets.
+    let batch = null;
+    V.begin = () => { batch = []; };
+    V.end = () => { const b = batch || []; batch = null; b.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill)); };
+    const emit = (faces) => {
+      if (batch) { faces.forEach(f => batch.push(f)); return; }
+      faces.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill));
+    };
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const depthOf = pts => pts.reduce((s, p) => s + p[0] + p[1] + p[2], 0) / pts.length + (o[0] + o[1] + o[2]);
+    // A loft: rings [{ c: [x, y, z], r: radius | [across, up] }…] along a
+    // spine, joined by n facets each; the ends are capped. A torso that
+    // swells and tapers, a neck, a tail, a hull, a tree trunk.
+    V.loft = (rings, t, n) => {
+      n = n || 8;
+      const R = rings.map((rg, i) => {
+        const a = rings[Math.max(0, i - 1)].c, b = rings[Math.min(rings.length - 1, i + 1)].c;
+        const T = norm(sub(b, a));
+        let U = Math.abs(T[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+        const S = norm(cross(T, U)); U = norm(cross(S, T));
+        const rw = Array.isArray(rg.r) ? rg.r[0] : rg.r, rh = Array.isArray(rg.r) ? rg.r[1] : rg.r;
+        const pts = [];
+        for (let k = 0; k < n; k++) {
+          const ang = k / n * Math.PI * 2;
+          pts.push([0, 1, 2].map(j => rg.c[j] + S[j] * Math.cos(ang) * rw + U[j] * Math.sin(ang) * rh));
+        }
+        return { c: rg.c, pts, T };
+      });
+      const faces = [];
+      const add = (pts, inside) => {
+        let nrm = norm(cross(sub(pts[1], pts[0]), sub(pts[2], pts[0])));
+        const mid = pts.reduce((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length, s[2] + p[2] / pts.length], [0, 0, 0]);
+        const out = sub(mid, inside);
+        if (nrm[0] * out[0] + nrm[1] * out[1] + nrm[2] * out[2] < 0) nrm = [-nrm[0], -nrm[1], -nrm[2]];
+        if (nrm[0] + nrm[1] + nrm[2] <= 1e-6) return;
+        faces.push({ pts, fill: shade(t, nrm[0], nrm[1], nrm[2]), depth: depthOf(pts) });
+      };
+      for (let i = 0; i + 1 < R.length; i++) {
+        const A = R[i], B = R[i + 1], inside = [(A.c[0] + B.c[0]) / 2, (A.c[1] + B.c[1]) / 2, (A.c[2] + B.c[2]) / 2];
+        for (let k = 0; k < n; k++) add([A.pts[k], A.pts[(k + 1) % n], B.pts[(k + 1) % n], B.pts[k]], inside);
+      }
+      const ends = [[R[0], -1], [R[R.length - 1], 1]];
+      ends.forEach(([E, sgn]) => add(E.pts.slice(), [E.c[0] - E.T[0] * sgn, E.c[1] - E.T[1] * sgn, E.c[2] - E.T[2] * sgn]));
+      emit(faces);
+    };
+    // A tapering tube from a to b: a limb, a neck, a trunk, a pipe.
+    V.tube = (a, b, ra, rb, t, n) => V.loft([{ c: a, r: ra }, { c: b, r: rb }], t, n || 6);
+
+    // A ball of radius r centred at (x, y, z): one disc on screen, lit like
+    // every other surface (the light from the top left, the right side in
+    // shade), in a few flat bands rather than a gradient.
+    V.ball = (x, y, z, r, t) => {
+      const [cx, cy] = P(x, y, z), R = r * s;
+      if (R < 0.3) return;
+      const disc = (ox, oy, rr, fill) => { ctx.beginPath(); ctx.arc(cx + ox * R, cy + oy * R, rr * R, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); };
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+      disc(0, 0, 1, t.right);
+      disc(-0.16, -0.12, 0.9, t.left);
+      disc(-0.3, -0.28, 0.62, t.top);
+      ctx.restore();
+      note([[cx - R, cy - R], [cx + R, cy + R]]);
+    };
+
     // A soft contact shadow on the ground, cast toward the front right.
     V.shadow = (x, y, w, d, h, color, alpha) => {
       const k = h * 0.55;
       ctx.save(); ctx.globalAlpha *= alpha == null ? 1 : alpha;
       const pts = [P(x, y, 0), P(x + w + k, y, 0), P(x + w + k, y + d + k * 0.4, 0), P(x, y + d + k * 0.4, 0)];
+      ctx.beginPath(); pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      note(pts, 'shadow');
+      ctx.restore();
+    };
+
+    // A soft oval shadow on the ground under (x, y): for animals, people,
+    // anything round. rw along x, rd along y.
+    V.shade = (x, y, rw, rd, color, alpha) => {
+      ctx.save(); ctx.globalAlpha *= alpha == null ? 0.2 : alpha;
+      const pts = [];
+      for (let k = 0; k < 18; k++) { const a = k / 18 * Math.PI * 2; pts.push(P(x + Math.cos(a) * rw, y + Math.sin(a) * rd, 0)); }
       ctx.beginPath(); pts.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
       note(pts, 'shadow');
       ctx.restore();
@@ -3218,6 +3318,8 @@
     const avoid = [];
     const api = {
       ctx, view, mat, design: S.design, ease: M.ease, iso: M.iso, sstep, lerp, clamp, range, s,
+      // The stage's room on screen, for a sky or a backdrop to fill.
+      room: { x: cam.box.x, y: cam.box.y, w: cam.box.w, h: cam.box.h },
       rng: (...keys) => M.rng(S.seed, 'stage', ...keys),
       // The screen rectangle of a box in the world, for labels to give way to.
       rect(x, y, z, bw, bd, bh) {
@@ -3243,7 +3345,7 @@
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
         if (a <= 0.01) return;
-        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
+        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: (o && o.on) || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
       }
     };
     ctx.save();
@@ -4625,132 +4727,136 @@
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script>
-/* Dinosaurs and their close cousins on one board, in metres, to scale.
-   Each beat re-sorts or sets something moving:
-   - arrive: the cast walks (and swims) onto the board;
-   - air: Quetzalcoatlus unfolds its wings and circles;
+/* A Cretaceous coast: a fern-and-conifer plain running down to a sandy
+   shore and the sea. Dinosaurs and their close cousins live in it, drawn
+   to scale (lengths from the ledger), with real bodies. What happens:
+   - arrive: the herd walks onto the plain; the sea reptiles swim in;
+   - air: Quetzalcoatlus spreads its wings and circles over the plain;
    - birds: Archaeopteryx flaps up and modern birds fly in beside it;
-   - river: Spinosaurus wades into the water, tail sweeping;
-   - cousins: a line splits the board, cousins to one side;
-   - speed: Gallimimus sprints laps of the board;
-   - giants: everyone lines up nose to tail by length (lengths from the
-     claims, so the line is the comparison);
-   - tiny: the camera drops to Microraptor, which flaps.
-   Sizes come from the ledger (w.value), never typed. */
+   - river: Spinosaurus walks down the shore into the shallows, tail sweeping;
+   - cousins: a line is drawn in the sand; the cousins move to one side;
+   - speed: Gallimimus sprints laps of the plain;
+   - tiny / giants: the herd files into one row along the shore, smallest
+     first, then the camera pulls back from Microraptor to Argentinosaurus.
+   Colours are illustration: the source gives none. */
 const CAST = [
-  { id: 'argentino', kind: 'sauropod', len: 'F10', home: [6, 2, 0], medium: 'land', group: 'dino' },
-  { id: 'spino', kind: 'spino', len: 'F11', home: [-18, 6, 0], medium: 'land', group: 'dino' },
-  { id: 'galli', kind: 'mimic', len: 'F12', home: [-30, 9, 0], medium: 'land', group: 'dino' },
-  { id: 'micro', kind: 'micro', len: 'F13', home: [-36, 11, 0], medium: 'land', group: 'dino' },
-  { id: 'archae', kind: 'archae', len: 'F14', home: [-38, 7, 0], medium: 'land', group: 'dino' },
-  { id: 'quetz', kind: 'pterosaur', len: 'F15', home: [-24, -6, 0], medium: 'air', group: 'cousin' },
-  { id: 'plesio', kind: 'plesio', len: 'F17', home: [-14, -26, -1.2], medium: 'water', group: 'cousin' },
-  { id: 'mosa', kind: 'mosa', len: 'F16', home: [14, -28, -1.2], medium: 'water', group: 'cousin' }
+  { id: 'argentino', kind: 'sauropod', len: 'F10', home: [6, 2, 0], medium: 'land', group: 'dino', col: '#7d7466' },
+  { id: 'spino', kind: 'spino', len: 'F11', home: [-18, 6, 0], medium: 'land', group: 'dino', col: '#6c7650', sail: '#a2573a' },
+  { id: 'galli', kind: 'mimic', len: 'F12', home: [-30, 9, 0], medium: 'land', group: 'dino', col: '#c2a678' },
+  { id: 'micro', kind: 'micro', len: 'F13', home: [-36, 11, 0], medium: 'land', group: 'dino', col: '#33333a' },
+  { id: 'archae', kind: 'archae', len: 'F14', home: [-38, 7, 0], medium: 'land', group: 'dino', col: '#5c4837' },
+  { id: 'quetz', kind: 'pterosaur', len: 'F15', home: [-24, -6, 0], medium: 'air', group: 'cousin', col: '#cfc9bd', wing: '#6c5a4b' },
+  { id: 'plesio', kind: 'plesio', len: 'F17', home: [-14, -26, -1.2], medium: 'water', group: 'cousin', col: '#55717f' },
+  { id: 'mosa', kind: 'mosa', len: 'F16', home: [14, -28, -1.2], medium: 'water', group: 'cousin', col: '#3f5a68' }
 ];
-const WATER = -1.2;
+const WATER = -1.2, SHORE = -12;
 const g = (api, v) => api.ease.glide(api.clamp(v));
 const mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
 
-// A body as a side profile from spine knots [x, z, r] (fractions of the
-// length), pushed across its width.
-function body(V, L, knots, width, tint, iso) {
-  const top = knots.map(([x, z, r]) => [x * L, (z + r) * L]);
-  const bot = knots.slice().reverse().map(([x, z, r]) => [x * L, (z - r) * L]);
-  V.extrude(iso.soften(top.concat(bot), L * 0.004), 'y', -width / 2, width / 2, tint);
-}
-function leg(V, x, y, len, thick, swing, tint) {
-  const dx = Math.sin(swing) * len * 0.35;
-  V.face([[x - thick / 2, y, len], [x + thick / 2, y, len], [x + thick / 2 + dx, y, 0], [x - thick / 2 + dx, y, 0]], tint.left);
-}
-// A flat wing in the horizontal plane, its tip lifted by flap.
-function wing(V, root, span, chord, side, flap, tint) {
+// A lofted body from spine knots [x, z, across, up] (fractions of L), at
+// lateral offset 0; a tube limb from hip through knee to foot.
+const body = (V, L, knots, t, n) => V.loft(knots.map(([x, z, a, u]) => ({ c: [x * L, 0, z * L], r: [a * L, u * L] })), t, n || 8);
+const legAt = (V, L, hip, len, thick, swing, side, t) => {
+  const [hx, hz] = hip, y = side * thick * 1.2 + side * 0.04 * L * 0;
+  const fx = hx + Math.sin(swing) * len * 0.35, lift = Math.max(0, Math.cos(swing)) * len * 0.12;
+  const knee = [hx + (fx - hx) * 0.5 + len * 0.08, y, hz - len * 0.5 + lift * 0.5];
+  V.tube([hx, y, hz], knee, thick, thick * 0.8, t, 6);
+  V.tube(knee, [fx, y, lift], thick * 0.8, thick * 0.6, t, 6);
+};
+const wing = (V, root, span, chord, side, flap, fill) => {
   const [x, y, z] = root, tip = z + Math.sin(flap) * span * 0.35;
-  V.face([[x + chord * 0.4, y, z], [x - chord * 0.6, y, z], [x - chord * 0.2, y + side * span, tip], [x + chord * 0.05, y + side * span, tip]], tint.top);
-}
+  V.face([[x + chord * 0.4, y, z], [x - chord * 0.6, y, z], [x - chord * 0.2, y + side * span, tip], [x + chord * 0.05, y + side * span, tip]], fill);
+};
 
 const DRAW = {
-  sauropod(V, L, s, m, iso) {
-    const w = L * 0.12, ph = s.step;
-    leg(V, L * 0.1, -w * 0.45, L * 0.17, L * 0.035, ph + Math.PI, m.N3);
-    leg(V, -L * 0.12, -w * 0.45, L * 0.17, L * 0.04, ph, m.N3);
-    body(V, L, [[-0.5, 0.2, 0.004], [-0.35, 0.22, 0.02], [-0.18, 0.24, 0.06], [0, 0.25, 0.085], [0.14, 0.25, 0.075], [0.24, 0.3, 0.04], [0.36, 0.42, 0.022], [0.46, 0.5 + Math.sin(s.t * 0.8) * 0.01, 0.02], [0.5, 0.5, 0.014]], w, m.N3, iso);
-    leg(V, L * 0.1, w * 0.45, L * 0.17, L * 0.035, ph, m.N3);
-    leg(V, -L * 0.12, w * 0.45, L * 0.17, L * 0.04, ph + Math.PI, m.N3);
+  sauropod(V, L, s, m, c) {
+    const t = m.tone(c.col), dark = m.tone('#5f574b'), ph = s.step, w = 0.05 * L, graze = Math.sin(s.t * 0.7) * 0.03;
+    V.begin();
+    legAt(V, L, [0.12 * L, 0.26 * L], 0.27 * L, 0.03 * L, ph + Math.PI, -1, dark);
+    legAt(V, L, [-0.12 * L, 0.25 * L], 0.26 * L, 0.035 * L, ph, -1, dark);
+    body(V, L, [[-0.5, 0.2, 0.006, 0.006], [-0.36, 0.24, 0.025, 0.028], [-0.2, 0.28, 0.06, 0.07], [0, 0.3, 0.085, 0.1], [0.14, 0.3, 0.075, 0.09],
+      [0.24, 0.34, 0.04, 0.045], [0.34, 0.44 + graze, 0.028, 0.03], [0.44, 0.53 + graze * 1.5, 0.022, 0.024], [0.49, 0.54 + graze * 1.6, 0.03, 0.022], [0.53, 0.53 + graze * 1.6, 0.012, 0.01]], t, 10);
+    legAt(V, L, [0.12 * L, 0.26 * L], 0.27 * L, 0.03 * L, ph, 1, t);
+    legAt(V, L, [-0.12 * L, 0.25 * L], 0.26 * L, 0.035 * L, ph + Math.PI, 1, t);
+    V.end();
   },
-  spino(V, L, s, m, iso) {
-    const w = L * 0.09, ph = s.step, sw = Math.sin(s.t * 3) * 0.04 * s.paddle;
-    leg(V, -L * 0.04, -w * 0.4, L * 0.2, L * 0.04, ph + Math.PI, m.DARK);
-    // The sail along the back.
-    V.extrude([[-0.16 * L, 0.3 * L], [0.12 * L, 0.32 * L], [0.04 * L, 0.52 * L], [-0.08 * L, 0.5 * L]], 'y', -w * 0.08, w * 0.08, m.N3);
-    body(V, L, [[-0.5, 0.2 + sw, 0.03], [-0.32, 0.22 + sw * 0.5, 0.055], [-0.12, 0.25, 0.075], [0.06, 0.27, 0.07], [0.2, 0.3, 0.04], [0.3, 0.33, 0.035], [0.42, 0.32, 0.018], [0.5, 0.3, 0.01]], w, m.N3, iso);
-    leg(V, -L * 0.04, w * 0.4, L * 0.2, L * 0.04, ph, m.DARK);
+  spino(V, L, s, m, c) {
+    const t = m.tone(c.col), ph = s.step, sw = Math.sin(s.t * 3) * 0.05 * s.paddle;
+    V.begin();
+    legAt(V, L, [-0.04 * L, 0.24 * L], 0.24 * L, 0.035 * L, ph + Math.PI, -1, m.tone('#57603f'));
+    body(V, L, [[-0.52, 0.2 + sw, 0.006, 0.03], [-0.36, 0.22 + sw * 0.6, 0.02, 0.05], [-0.2, 0.24, 0.04, 0.065], [-0.02, 0.27, 0.07, 0.085], [0.14, 0.29, 0.06, 0.07],
+      [0.24, 0.33, 0.035, 0.04], [0.32, 0.35, 0.03, 0.032], [0.42, 0.33, 0.018, 0.02], [0.52, 0.3, 0.008, 0.01]], t, 10);
+    legAt(V, L, [0.16 * L, 0.27 * L], 0.12 * L, 0.018 * L, ph, 1, t);
+    legAt(V, L, [-0.04 * L, 0.24 * L], 0.24 * L, 0.035 * L, ph, 1, t);
+    V.end();
+    // The sail along the back: thin, so drawn flat, after the body.
+    V.extrude([[-0.18 * L, 0.33 * L], [0.12 * L, 0.35 * L], [0.04 * L, 0.56 * L], [-0.1 * L, 0.54 * L]], 'y', -0.006 * L, 0.006 * L, m.tone(c.sail));
   },
-  mimic(V, L, s, m, iso) {
-    const w = L * 0.08, ph = s.step;
-    leg(V, -L * 0.02, -w * 0.4, L * 0.32, L * 0.03, ph + Math.PI, m.DARK);
-    body(V, L, [[-0.5, 0.36, 0.008], [-0.3, 0.37, 0.03], [-0.08, 0.37, 0.075], [0.08, 0.4, 0.06], [0.18, 0.52, 0.025], [0.28, 0.63, 0.02], [0.36, 0.64, 0.025], [0.46, 0.62, 0.01]], w, m.N3, iso);
-    leg(V, -L * 0.02, w * 0.4, L * 0.32, L * 0.03, ph, m.DARK);
+  mimic(V, L, s, m, c) {
+    const t = m.tone(c.col), ph = s.step;
+    V.begin();
+    legAt(V, L, [-0.02 * L, 0.38 * L], 0.38 * L, 0.03 * L, ph + Math.PI, -1, m.tone('#9c845d'));
+    body(V, L, [[-0.5, 0.36, 0.005, 0.006], [-0.3, 0.37, 0.02, 0.025], [-0.08, 0.38, 0.06, 0.075], [0.08, 0.42, 0.05, 0.06], [0.18, 0.52, 0.02, 0.02], [0.28, 0.63, 0.018, 0.018], [0.36, 0.65, 0.028, 0.024], [0.46, 0.63, 0.008, 0.008]], t, 8);
+    legAt(V, L, [-0.02 * L, 0.38 * L], 0.38 * L, 0.03 * L, ph, 1, t);
+    V.end();
   },
-  archae(V, L, s, m, iso) {
-    const w = L * 0.12, z0 = s.lift;
-    V.ctx.save();
-    if (s.wings > 0) wing(V, [0, -w / 2, z0 + 0.36 * L], L * 0.75, L * 0.35, -1, s.flap, m.DARK);
-    body(V, L, [[-0.5, 0.36, 0.01], [-0.25, 0.37, 0.025], [-0.05, 0.38, 0.08], [0.12, 0.42, 0.06], [0.24, 0.5, 0.03], [0.34, 0.52, 0.03], [0.44, 0.5, 0.012]].map(([x, z, r]) => [x, z + z0 / L, r]), w, m.N3, iso);
-    if (s.wings > 0) wing(V, [0, w / 2, z0 + 0.36 * L], L * 0.75, L * 0.35, 1, s.flap, m.DARK);
-    if (z0 < 0.01) { leg(V, 0, 0, L * 0.3, L * 0.03, s.step, m.DARK); }
-    V.ctx.restore();
+  archae(V, L, s, m, c) {
+    const t = m.tone(c.col), z0 = s.lift / L;
+    if (s.wings) wing(V, [0, -0.06 * L, s.lift + 0.38 * L], L * 0.75, L * 0.35, -1, s.flap, m.tone('#3f3227').right);
+    V.begin();
+    if (s.lift < 0.01) legAt(V, L, [0, 0.33 * L], 0.33 * L, 0.025 * L, s.step, 1, t);
+    body(V, L, [[-0.5, 0.36 + z0, 0.01, 0.01], [-0.25, 0.37 + z0, 0.03, 0.025], [-0.05, 0.38 + z0, 0.07, 0.08], [0.12, 0.42 + z0, 0.05, 0.05], [0.24, 0.5 + z0, 0.03, 0.03], [0.34, 0.52 + z0, 0.035, 0.03], [0.44, 0.5 + z0, 0.01, 0.01]], t, 8);
+    V.end();
+    if (s.wings) wing(V, [0, 0.06 * L, s.lift + 0.38 * L], L * 0.75, L * 0.35, 1, s.flap, m.tone('#3f3227').top);
   },
-  micro(V, L, s, m, iso) {
-    // Four wings: on the arms and on the legs.
-    const w = L * 0.1, z0 = s.lift, fl = s.flap;
-    wing(V, [0.05 * L, -w / 2, z0 + 0.36 * L], L * 0.55, L * 0.25, -1, fl, m.DARK);
-    wing(V, [-0.15 * L, -w / 2, z0 + 0.3 * L], L * 0.35, L * 0.2, -1, fl * 0.7, m.DARK);
-    body(V, L, [[-0.5, 0.32, 0.01], [-0.25, 0.33, 0.025], [-0.05, 0.35, 0.07], [0.12, 0.4, 0.055], [0.24, 0.47, 0.03], [0.34, 0.48, 0.03], [0.44, 0.46, 0.012]].map(([x, z, r]) => [x, z + z0 / L, r]), w, m.DARK, iso);
-    wing(V, [0.05 * L, w / 2, z0 + 0.36 * L], L * 0.55, L * 0.25, 1, fl, m.DARK);
-    wing(V, [-0.15 * L, w / 2, z0 + 0.3 * L], L * 0.35, L * 0.2, 1, fl * 0.7, m.DARK);
-    if (z0 < 0.01) leg(V, 0, 0, L * 0.3, L * 0.03, s.step, m.DARK);
+  micro(V, L, s, m, c) {
+    const t = m.tone(c.col), fl = s.flap, wt = m.tone('#24242a');
+    wing(V, [0.05 * L, -0.05 * L, 0.36 * L], L * 0.55, L * 0.25, -1, fl, wt.right);
+    wing(V, [-0.15 * L, -0.05 * L, 0.3 * L], L * 0.35, L * 0.2, -1, fl * 0.7, wt.right);
+    V.begin();
+    legAt(V, L, [0, 0.31 * L], 0.31 * L, 0.025 * L, s.step, 1, t);
+    body(V, L, [[-0.5, 0.32, 0.01, 0.01], [-0.25, 0.33, 0.025, 0.022], [-0.05, 0.35, 0.065, 0.07], [0.12, 0.4, 0.045, 0.045], [0.24, 0.47, 0.028, 0.028], [0.34, 0.48, 0.032, 0.028], [0.44, 0.46, 0.01, 0.01]], t, 8);
+    V.end();
+    wing(V, [0.05 * L, 0.05 * L, 0.36 * L], L * 0.55, L * 0.25, 1, fl, wt.top);
+    wing(V, [-0.15 * L, 0.05 * L, 0.3 * L], L * 0.35, L * 0.2, 1, fl * 0.7, wt.top);
   },
-  pterosaur(V, span, s, m, iso) {
-    // span is the wingspan; the body is a third of it.
-    const L = span * 0.33, w = L * 0.12, z0 = s.lift, open = s.open;
-    const sp = api_lerp(L * 0.25, span / 2, open);
-    wing(V, [0, -w / 2, z0 + 0.35 * L], sp, L * 0.5, -1, s.flap * open, m.DARK);
-    body(V, L, [[-0.5, 0.3, 0.01], [-0.25, 0.32, 0.04], [-0.05, 0.34, 0.07], [0.12, 0.4, 0.04], [0.26, 0.55, 0.02], [0.4, 0.62, 0.04], [0.5, 0.6, 0.01]].map(([x, z, r]) => [x, z + z0 / L, r]), w, m.N3, iso);
-    wing(V, [0, w / 2, z0 + 0.35 * L], sp, L * 0.5, 1, s.flap * open, m.DARK);
-    if (z0 < 0.01) { leg(V, -0.1 * L, 0, L * 0.3, L * 0.04, s.step, m.DARK); leg(V, 0.12 * L, 0, L * 0.35, L * 0.04, s.step + Math.PI, m.DARK); }
+  pterosaur(V, span, s, m, c) {
+    const L = span * 0.33, t = m.tone(c.col), wt = m.tone(c.wing), z0 = s.lift / L, open = s.open;
+    const sp = L * 0.25 + (span / 2 - L * 0.25) * open;
+    wing(V, [0, -0.04 * L, s.lift + 0.36 * L], sp, L * 0.5, -1, s.flap * open, wt.right);
+    V.begin();
+    body(V, L, [[-0.4, 0.32 + z0, 0.01, 0.01], [-0.2, 0.33 + z0, 0.05, 0.05], [0, 0.35 + z0, 0.07, 0.07], [0.14, 0.42 + z0, 0.03, 0.03], [0.28, 0.56 + z0, 0.02, 0.02], [0.38, 0.63 + z0, 0.05, 0.05], [0.56, 0.6 + z0, 0.01, 0.012]], t, 8);
+    if (s.lift < 0.01) { legAt(V, L, [-0.1 * L, 0.33 * L], 0.33 * L, 0.03 * L, s.step, 1, t); legAt(V, L, [0.12 * L, 0.36 * L], 0.36 * L, 0.03 * L, s.step + Math.PI, 1, t); }
+    V.end();
+    wing(V, [0, 0.04 * L, s.lift + 0.36 * L], sp, L * 0.5, 1, s.flap * open, wt.top);
   },
-  plesio(V, L, s, m, iso) {
-    const w = L * 0.3, f = Math.sin(s.t * 2.2);
-    [[0.12, -1], [-0.2, -1]].forEach(([x, sd]) => wing(V, [x * L, sd * w * 0.4, 0.02 * L], L * 0.28, L * 0.12, sd, f * 0.6, m.DARK));
-    body(V, L, [[-0.5, 0.02, 0.01], [-0.3, 0.02, 0.07], [-0.05, 0.03, 0.12], [0.15, 0.04, 0.07], [0.3, 0.12, 0.03], [0.44, 0.22, 0.025], [0.5, 0.22, 0.02]], w, m.N3, iso);
-    [[0.12, 1], [-0.2, 1]].forEach(([x, sd]) => wing(V, [x * L, sd * w * 0.4, 0.02 * L], L * 0.28, L * 0.12, sd, -f * 0.6, m.DARK));
+  plesio(V, L, s, m, c) {
+    const t = m.tone(c.col), f = Math.sin(s.t * 2.2), fl = m.tone('#40596a');
+    [[0.12, -1], [-0.2, -1]].forEach(([x, sd]) => wing(V, [x * L, sd * 0.08 * L, 0.02 * L], L * 0.26, L * 0.12, sd, f * 0.6, fl.right));
+    V.begin();
+    body(V, L, [[-0.5, 0.02, 0.01, 0.008], [-0.3, 0.03, 0.08, 0.05], [-0.05, 0.04, 0.12, 0.07], [0.15, 0.05, 0.07, 0.05], [0.3, 0.13, 0.03, 0.03], [0.44, 0.22, 0.025, 0.025], [0.5, 0.22, 0.03, 0.022], [0.55, 0.21, 0.01, 0.01]], t, 8);
+    V.end();
+    [[0.12, 1], [-0.2, 1]].forEach(([x, sd]) => wing(V, [x * L, sd * 0.08 * L, 0.02 * L], L * 0.26, L * 0.12, sd, -f * 0.6, fl.top));
   },
-  mosa(V, L, s, m, iso) {
-    const w = L * 0.11, sw = Math.sin(s.t * 1.6) * 0.03;
-    V.extrude([[-0.5 * L, 0.02 * L], [-0.42 * L, 0.03 * L], [-0.5 * L, 0.14 * L], [-0.56 * L, 0.1 * L]], 'y', -w * 0.06, w * 0.06, m.N3);
-    body(V, L, [[-0.5, 0.03 + sw, 0.02], [-0.3, 0.04, 0.05], [-0.05, 0.05, 0.08], [0.2, 0.05, 0.07], [0.4, 0.05, 0.045], [0.5, 0.04, 0.02]], w, m.DARK, iso);
-    wing(V, [0.2 * L, w / 2, 0.03 * L], L * 0.12, L * 0.08, 1, Math.sin(s.t * 1.6), m.DARK);
+  mosa(V, L, s, m, c) {
+    const t = m.tone(c.col), sw = Math.sin(s.t * 1.6) * 0.03;
+    V.extrude([[-0.5 * L, 0.02 * L], [-0.44 * L, 0.03 * L], [-0.52 * L, 0.14 * L], [-0.58 * L, 0.1 * L]], 'y', -0.006 * L, 0.006 * L, m.tone('#334a56'));
+    V.begin();
+    body(V, L, [[-0.5, 0.03 + sw, 0.015, 0.03], [-0.3, 0.04, 0.04, 0.05], [-0.05, 0.05, 0.07, 0.07], [0.2, 0.05, 0.06, 0.06], [0.38, 0.05, 0.04, 0.04], [0.5, 0.04, 0.012, 0.014]], t, 8);
+    V.end();
   }
 };
-function api_lerp(a, b, k) { return a + (b - a) * k; }
 
-Motion.things.eras = {
-  // Where each animal stands once the beats so far have played.
+Motion.things.coast = {
   place(w, api) {
     const P = {}, L = {};
     CAST.forEach(c => { L[c.id] = w.value(c.len); P[c.id] = c.home.slice(); });
-    const t = w.t, out = {};
-    // Arrival: from off the board on the left.
     const arrive = g(api, w.progress('hook'));
     CAST.forEach(c => { P[c.id] = mix([c.home[0] - 70, c.home[1], c.home[2]], c.home, arrive); });
-    // Spinosaurus wades into the water.
     const wade = g(api, w.progress('river'));
-    P.spino = mix(P.spino, [-12, -16, WATER * 0.6], wade);
-    // The cousins move to the left of the line; the dinosaurs to the right.
+    P.spino = mix(P.spino, [-12, -18, WATER * 0.6], wade);
     const split = g(api, w.progress('cousins'));
     CAST.forEach(c => { P[c.id] = mix(P[c.id], [c.group === 'cousin' ? P[c.id][0] - 22 : P[c.id][0] + 10, P[c.id][1], P[c.id][2]], split); });
-    // The line-up: one row along the shore, smallest first, nose to tail;
-    // swimmers just offshore, the flyer over its place.
     const sorted = CAST.slice().sort((a, b) => L[a.id] - L[b.id]);
     let cursor = -44;
     const lineAt = {};
@@ -4759,78 +4865,100 @@ Motion.things.eras = {
     CAST.forEach(c => { P[c.id] = mix(P[c.id], lineAt[c.id], line); });
     return { P, L, lineAt, line, split };
   },
-  // The flying pterosaur's path and the sprinter's lap, shared by marks and draw.
   flight(w, api, P, split, line) {
     const a = w.t * 0.45, fly = g(api, w.progress('air')) * (1 - line);
     return { fly, x: api.lerp(P.quetz[0], -14 + Math.cos(a) * 12 + split * -22, fly), y: api.lerp(P.quetz[1], -6 + Math.sin(a) * 7, fly) };
   },
   lap(w, api, P) {
-    const run = w.has('speed') ? api.clamp(w.progress('speed') * 3) * (1 - g(api, w.progress('giants'))) : 0;
+    const run = w.has('speed') ? api.clamp(w.progress('speed') * 3) * (1 - g(api, w.progress('tiny'))) : 0;
     const a = (w.progress('speed') * 2 + w.since('speed') * 0.9) * Math.PI * 2;
-    return { run, a, x: api.lerp(P.galli[0], -6 + Math.cos(a) * 14, run), y: api.lerp(P.galli[1], 2 + Math.sin(a) * 6, run) };
+    return { run, a, x: api.lerp(P.galli[0], -40 + Math.cos(a) * 12, run), y: api.lerp(P.galli[1], 6 + Math.sin(a) * 5, run) };
   },
   marks(w) {
     const api = { ease: Motion.ease, clamp: v => Math.max(0, Math.min(1, v)), lerp: (a, b, k) => a + (b - a) * k };
-    const { P, L, lineAt, split, line } = this.place(w, api);
+    const { P, lineAt, split, line } = this.place(w, api);
     const fl = this.flight(w, api, P, split, line), lp = this.lap(w, api, P);
-    // The reveal: from Microraptor's end of the row, back along it, until the
-    // whole row and the giant at its end are in view.
     const r = g(api, w.progress('giants'));
     const xs = Object.values(lineAt).map(p => p[0]), lineMid = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const reveal = [api.lerp(P.micro[0] + 0.3, lineMid + 6, r), api.lerp(P.micro[1], -11, r), api.lerp(0.4, 7, r), api.lerp(14, 1, r)];
     return {
-      herd: [-12, -4, 4], sky: [-16, -6, 12], board: [-6, -6, 4], track: [-6, 4, 2],
+      herd: [-12, -2, 4], board: [-6, -6, 4], line: [lineMid + 6, -11, 7],
       archae: [P.archae[0] + 1.5, P.archae[1], 0.4 + g(api, w.progress('birds')) * (1 - line) * 3], spino: [P.spino[0], P.spino[1], 4],
-      line: [lineMid, -11, 6], micro: [P.micro[0] + 0.3, P.micro[1], 0.4],
-      quetz: [fl.x, fl.y, 4 + fl.fly * 9], galli: [lp.x, lp.y, 1.5], reveal
+      micro: [P.micro[0] + 0.3, P.micro[1], 0.4],
+      quetz: [fl.x, fl.y, 4 + fl.fly * 9], galli: [lp.x, lp.y, 1.5],
+      reveal: [api.lerp(P.micro[0] + 0.3, lineMid + 6, r), api.lerp(P.micro[1], -11, r), api.lerp(0.4, 7, r), api.lerp(14, 1, r)]
     };
   },
+  ground(w, api) {
+    const m = api.mat, G = api.view('ground'), lo = api.range[0] - 40, hi = api.range[1] + 40;
+    // The sea behind, the sand, the plain in front.
+    G.block(lo, -120, -4, hi - lo, 108 + SHORE + 12, 2.8, m.nature.water, { r: 0, b: 0 });
+    G.block(lo, SHORE - 4, -4, hi - lo, 5, 4, m.nature.sand, { r: 0, b: 0.8 });
+    G.block(lo, SHORE, -4, hi - lo, 120, 4, m.tone('#87995a'), { r: 0, b: 0 });
+    // Patches of darker grass, scattered, so the plain isn't a flat sheet.
+    for (let k = 0; k < 40; k++) {
+      const R = api.rng('patch', k), x = -90 + R() * 200, y = SHORE + 3 + R() * 50, s = 2 + R() * 6;
+      if (x < lo || x > hi) continue;
+      G.face([[x, y, 0.01], [x + s, y, 0.01], [x + s, y + s * 0.6, 0.01], [x, y + s * 0.6, 0.01]], m.tone('#77894d').top);
+    }
+  },
+  trees(w, api, front) {
+    // Conifer stands at the edges of the plain, ferns scattered low.
+    const m = api.mat, T = api.view('trees'), foliage = m.tone('#4c6b3e'), dark = m.tone('#3d5733'), bark = m.nature.bark;
+    const stands = [[-78, -4], [-70, 6], [-84, 12], [-64, -8], [70, 0], [80, 10], [64, -6], [88, -2], [-58, 26], [52, 30]];
+    stands.forEach(([x0, y0], k) => {
+      if ((x0 + y0 > 0) !== front) return;
+      const R = api.rng('stand', k);
+      for (let j = 0; j < 4; j++) {
+        const x = x0 + (R() - 0.5) * 10, y = y0 + (R() - 0.5) * 10, h = 10 + R() * 9;
+        T.tube([x, y, 0], [x, y, h * 0.35], 0.5, 0.4, bark, 5);
+        T.cone(x, y, h * 0.25, 2.6 + R(), h * 0.55, j % 2 ? foliage : dark, 7);
+        T.cone(x, y, h * 0.55, 1.8 + R() * 0.6, h * 0.45, foliage, 7);
+      }
+    });
+    if (front) for (let k = 0; k < 30; k++) {
+      const R = api.rng('fern', k), x = -60 + R() * 130, y = SHORE + 20 + R() * 20;
+      T.cone(x, y, 0, 0.8 + R() * 0.8, 0.9 + R(), m.tone('#5d7d47'), 5);
+    }
+  },
   draw(w, api) {
-    const m = api.mat, G = api.view('ground'), t = w.t;
+    const m = api.mat, t = w.t;
     const { P, L, split, line } = this.place(w, api);
-    // The board: land in front, a channel of water behind.
-    G.block(-70, -40, -4, 150, 26, 2.8, { top: m.glass.top, left: m.N3.left, right: m.N3.right }, { r: 0, b: 0.5 });
-    G.block(-70, -14, -4, 150, 30, 4, { top: m.N.top, left: m.N2.left, right: m.N2.right }, { r: 0, b: 0.8 });
-    // The line between dinosaurs and cousins, drawn as the split plays.
+    this.ground(w, api);
+    this.trees(w, api, false);
+    const G = api.view('ground');
+    // The line drawn in the sand between dinosaurs and cousins.
     const dl = split * (1 - api.clamp(line * 4));
     if (dl > 0.01) {
       G.ctx.save(); G.ctx.globalAlpha *= dl;
-      G.face([[-25, -40, 0.03], [-24, -40, 0.03], [-24, 16, 0.03], [-25, 16, 0.03]], m.DARK.top);
+      G.face([[-25, -40, 0.03], [-24.4, -40, 0.03], [-24.4, 16, 0.03], [-25, 16, 0.03]], m.tone('#5b4a36').top);
       G.ctx.restore();
-      api.label('Close cousins', -46, 16, 0, { dy: 8, alpha: dl });
-      api.label('Dinosaurs', -10, 16, 0, { dy: 8, alpha: dl });
+      api.label('Close cousins', -46, 16, 0, { dy: 8, alpha: dl, color: '#161d0f', on: '#87995a' });
+      api.label('Dinosaurs', -10, 16, 0, { dy: 8, alpha: dl, color: '#161d0f', on: '#87995a' });
     }
+    // The measuring strip in the sand under the row, ticks every five metres.
     if (line > 0.01) {
       G.ctx.save(); G.ctx.globalAlpha *= line;
-      G.face([[-46, -3.2, 0.02], [46, -3.2, 0.02], [46, -2.8, 0.02], [-46, -2.8, 0.02]], m.DARK.top);
-      for (let x = -45; x <= 45; x += 5) G.face([[x - 0.15, -3.2, 0.03], [x + 0.15, -3.2, 0.03], [x + 0.15, -1.6, 0.03], [x - 0.15, -1.6, 0.03]], m.DARK.top);
+      G.face([[-46, -3.2, 0.02], [46, -3.2, 0.02], [46, -2.8, 0.02], [-46, -2.8, 0.02]], m.tone('#4a3c2c').top);
+      for (let x = -45; x <= 45; x += 5) G.face([[x - 0.15, -3.2, 0.03], [x + 0.15, -3.2, 0.03], [x + 0.15, -1.6, 0.03], [x - 0.15, -1.6, 0.03]], m.tone('#4a3c2c').top);
       G.ctx.restore();
     }
     const air = g(api, w.progress('air')), up = g(api, w.progress('birds'));
-    // The step of each walker: how far it has moved, plus the sprint.
-    const sprint = w.has('speed') ? api.clamp(w.progress('speed') * 3) * (1 - g(api, w.progress('giants'))) : 0;
+    const sprint = w.has('speed') ? api.clamp(w.progress('speed') * 3) * (1 - g(api, w.progress('tiny'))) : 0;
     const things = [];
     CAST.forEach(c => {
       let [x, y, z] = P[c.id];
-      const s = { t, step: (x * 0.9 + y * 0.4) / Math.max(1, L[c.id] * 0.15), flap: 0, lift: 0, wings: 0, open: 0, paddle: 0 };
+      const s = { t, step: (x * 0.9 + y * 0.4) / Math.max(0.3, L[c.id] * 0.12), flap: 0, lift: 0, wings: 0, open: 0, paddle: 0 };
       if (c.id === 'quetz') {
-        // Takes off and circles; lands again for the line-up.
         const fl = this.flight(w, api, P, split, line), fly = fl.fly;
-        x = fl.x; y = fl.y;
-        s.lift = fly * 13; s.open = Math.max(air, line * 0.0) > 0 ? Math.max(fly, 0.15) : 0.15; s.flap = Math.sin(t * 2.4) * fly;
+        x = fl.x; y = fl.y; s.lift = fly * 13; s.open = Math.max(fly, 0.15); s.flap = Math.sin(t * 2.4) * fly;
         if (line > 0) { s.open = api.lerp(s.open, 1, line); s.lift = api.lerp(s.lift, 6, line); s.flap = Math.sin(t * 2.4) * 0.6 * line + s.flap * (1 - line); }
       }
       if (c.id === 'archae') { s.wings = 1; s.lift = up * (1 - line) * (3 + Math.sin(t * 2) * 0.5); s.flap = Math.sin(t * 9) * (up > 0 ? 1 : 0.15); }
-      if (c.id === 'micro') { s.flap = Math.sin(t * 8) * (0.2 + 0.8 * g(api, w.progress('tiny'))); }
+      if (c.id === 'micro') s.flap = Math.sin(t * 8) * (0.2 + 0.8 * g(api, w.progress('tiny')));
       if (c.id === 'spino') s.paddle = g(api, w.progress('river'));
-      if (c.id === 'galli' && sprint > 0) {
-        // Laps of the board, fast, legs a blur of strides.
-        const lp = this.lap(w, api, P);
-        x = lp.x; y = lp.y; s.step = lp.a * 9;
-      }
+      if (c.id === 'galli' && sprint > 0) { const lp = this.lap(w, api, P); x = lp.x; y = lp.y; s.step = lp.a * 9; }
       things.push({ c, x, y, z, s });
     });
-    // Modern birds fly in beside Archaeopteryx and on past.
     if (w.has('birds') && w.progress('birds') > 0) {
       const k = w.progress('birds') + w.since('birds') * 0.15, ax = P.archae[0], ay = P.archae[1];
       for (let i = 0; i < 5; i++) {
@@ -4841,17 +4969,18 @@ Motion.things.eras = {
     things.sort((a, b) => (a.x + a.y) - (b.x + b.y));
     things.forEach(o => {
       const V = api.view(o.bird ? 'birds' : o.c.id, [o.x, o.y, o.z]);
-      if (o.bird) { V.ctx.save(); V.ctx.globalAlpha *= o.fade; DRAW.archae(V, 0.35, o.s, m, api.iso); V.ctx.restore(); return; }
-      V.shadow(-L[o.c.id] / 2, -L[o.c.id] * 0.06, L[o.c.id], L[o.c.id] * 0.12, 1, m.shadow, o.c.medium === 'water' ? 0 : 0.8);
-      DRAW[o.c.kind](V, L[o.c.id], o.s, m, api.iso);
+      if (o.bird) { V.ctx.save(); V.ctx.globalAlpha *= o.fade; DRAW.archae(V, 0.35, o.s, m, { col: '#45454a' }); V.ctx.restore(); return; }
+      const Ln = L[o.c.id];
+      if (o.c.medium !== 'water') V.shade(0, 0, Ln * 0.42, Ln * 0.09, '#1d2416', o.z > 0.5 || o.s.lift > 0.5 ? 0.08 : 0.2);
+      DRAW[o.c.kind](V, Ln, o.s, m, o.c);
     });
-    // In the line-up, the giant and the smallest are named.
+    this.trees(w, api, true);
     if (line > 0.9) {
       const rv = g(api, w.progress('giants'));
-      if (rv > 0.6) api.label('Argentinosaurus', P.argentino[0] - 6, -3, 0, { dy: 14, alpha: (rv - 0.6) * 2.5 });
+      if (rv > 0.6) api.label('Argentinosaurus', P.argentino[0] - 6, -3, 0, { dy: 14, alpha: (rv - 0.6) * 2.5, color: '#161d0f', on: '#87995a' });
       if (w.progress('tiny') > 0) {
         api.avoid(api.rect(P.micro[0] - 0.5, P.micro[1] - 0.6, 0, 1, 1.2, 0.6));
-        api.label('Microraptor', P.micro[0] - 0.2, P.micro[1] + 1.6, 0, { dy: 12, alpha: g(api, w.progress('tiny')) });
+        api.label('Microraptor', P.micro[0] - 0.2, P.micro[1] + 1.6, 0, { dy: 12, alpha: g(api, w.progress('tiny')), color: '#161d0f', on: '#87995a' });
       }
     }
   }

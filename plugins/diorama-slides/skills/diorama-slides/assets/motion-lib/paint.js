@@ -115,7 +115,7 @@
       if (bw > 0 && bh > 0) {
         rec.push({
           scene: M.debug.scene, phase: M.debug.phase, layer: o.layer || null, role: o.role || null, text: str,
-          bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha, size: o.size || 0, color: o.color, large: !!o.large
+          bbox: [bx, by, bw, bh], alpha: ctx.globalAlpha, size: o.size || 0, color: o.color, bg: o.bg || null, large: !!o.large
         });
       }
     }

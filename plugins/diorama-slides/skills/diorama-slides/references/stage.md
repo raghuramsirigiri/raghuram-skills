@@ -45,7 +45,10 @@ fifth of the frame's height.
   following it (a mark that moves) when it moves.
 - **Stage labels** go through `api.label`: one size on screen whatever the
   zoom, fading before the stage's edges, giving way to anything you pass to
-  `api.avoid`. A label is a name or a year, never a figure.
+  `api.avoid`. A label is a name or a year, never a figure. On a dark sky or
+  any ground that isn't the paper, give it a colour that reads there and
+  say what it sits on (`{ color, on: '#hex' }`), so the audit checks its
+  contrast against that and not against the paper.
 
 ## The world
 
@@ -89,7 +92,8 @@ painter needs comes in `w`:
 and in `api`: `view(owner, origin)` (an iso view; name it after the mark
 it draws, and whatever the current beat focuses on is that beat's subject,
 which the audit keeps inside the stage's room while the words hold), `mat`,
-`iso`, `label`, `avoid`, `rect`, `rng(...keys)` (seeded), `ease`, `sstep`,
+`iso`, `label`, `avoid`, `rect`, `room` (the stage's room on screen, for
+a sky or backdrop to fill), `rng(...keys)` (seeded), `ease`, `sstep`,
 `lerp`, `clamp`, `range` (the world's visible x range), `ctx`.
 
 **Drive each beat's action by its progress, its time or its rate**, never
@@ -147,7 +151,9 @@ a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.ball(x, y, z, r, tint)`,
 with volume along a spine), `V.tube(a, b, ra, rb, tint, n)` (a tapering
 limb), `V.begin()`/`V.end()` (draw several bodies' facets back to front
 together), `V.face(points3d, colour)`,
-`V.line`, `V.path`, `V.shadow`, and `V.P(x, y, z)` for a screen point.
+`V.line`, `V.path`, `V.shadow` (a box's contact shadow), `V.shade(x, y,
+rw, rd, colour, alpha)` (a soft oval shadow for anything round or alive),
+and `V.P(x, y, z)` for a screen point.
 Slanted faces are shaded from the one light by their normal, so a bevel, a
 windscreen or a cone's facets read without outlines. Depth order is yours:
 draw far things first (smaller x + y), near things last.
