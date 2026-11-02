@@ -157,6 +157,24 @@ test('the kit draws a ball as one lit disc, recorded for the audit', () => {
   assert.strictEqual(JSON.stringify(r[0].bbox.map(Math.round)), '[80,80,40,40]');
 });
 
+test('the kit lofts bodies with volume and draws their facets back to front', () => {
+  const w = load();
+  const log = [], ctx = mockCtx(log);
+  const V = w.Motion.iso.view(ctx, { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  w.Motion.debug.record = [];
+  V.begin();
+  V.loft([{ c: [-10, 0, 5], r: 1 }, { c: [0, 0, 6], r: [3, 4] }, { c: [10, 0, 7], r: 1.5 }], m.nature.foliage, 8);
+  V.tube([0, 0, 4], [1, 0, 0], 1, 0.6, m.nature.earth);
+  V.end();
+  const r = w.Motion.debug.record.filter(x => x.owner === 'creature');
+  w.Motion.debug.record = null;
+  assert.ok(r.length > 10, 'many facets');
+  assert.ok(r.length < 2 * 8 + 2 + 2 * 6 + 2, 'back-facing facets are culled');
+  assert.ok(m.tone('#3366aa').left !== m.tone('#aa6633').left);
+  assert.ok(m.nature.water && m.nature.foliage && m.nature.night);
+});
+
 test('the stage keeps clear of the card in every format', () => {
   for (const format of ['9:16', '4:5', '1:1', '16:9']) {
     const s = FIXTURE_SPEC(); s.cuts.main.format = format;

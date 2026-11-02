@@ -91,6 +91,10 @@ else {
   else if (!SHAPES[stg.shape].verified) warn('stage', 'stage.shape "' + stg.shape + '" has not been through its acceptance video yet: look at the contact sheet harder (verified: ' + Object.keys(SHAPES).filter(k => SHAPES[k].verified).join(', ') + ')');
   const registered = new Set([...html.matchAll(/Motion\.things\.([A-Za-z_$][\w$]*)\s*=/g)].map(x => x[1]));
   if (!stg.world) shape.push('stage.world: name the page\'s world painter (Motion.things.<name>)');
+  // The world is decided before it is drawn: where the story naturally
+  // happens, and how it should look (references/story.md § The world).
+  if (!String(stg.setting || '').trim()) shape.push('stage.setting: say where this story naturally happens (deep space round the Sun, a river delta, a bakery at dawn) before drawing anything (references/story.md § The world)');
+  if (!String(stg.look || '').trim()) shape.push('stage.look: describe the world as an illustrator would (its ground or sky, its natural colours, the hero shot) so the render can be judged against it (references/story.md § The world)');
   else if (!registered.has(stg.world)) shape.push('stage.world names "' + stg.world + '", but the page registers no Motion.things.' + stg.world);
 }
 const scenes = spec.scenes || [];

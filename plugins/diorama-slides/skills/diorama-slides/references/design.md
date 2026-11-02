@@ -34,8 +34,8 @@ Read at compile time from the loaded `theme.js`:
 
 Pick `default` unless the content's register clearly calls for another, or
 the user asks ("make it darker" → a dark preset). Never ask about style up
-front. On a dark preset the stage's neutrals invert with it: check the
-board still reads against the paper.
+front. On a dark preset, check the world's colours still read against the
+paper around the stage.
 
 ## Brand recolour
 
@@ -87,30 +87,36 @@ These are the card's sizes × 2.5 as a square frame sets them; a tall frame
 sets the kicker, headline and units 1.2× and a wide one 1.15×. The headline
 never grows or shrinks between beats: one size, one place.
 
-## The stage's look: a toy diorama
+## The stage's look: the story's own world, toy-like
 
-The stage is the world of a tabletop model, in the same family as the card:
+The stage is the story's own world (space round a sun, a forest by a
+river, a kitchen at dawn), drawn toy-like and low-poly, in the same family
+as the card. It is never a tabletop model unless the story is about one.
 
-- **Chunky, softened masses.** Corners cut, top edges bevelled, a few
-  low-poly facets (`V.block`, `V.prism`, `V.cone`). A car is a body
-  profile, a cabin and four discs, not a hundred parts. Detail only where
-  the story names it: the fins the source mentions, the glass it says went
-  all round.
-- **One light, no outlines.** Three tints per surface from a light at the
-  top left (the top lightest, the left face mid, the right face darkest);
-  a slanted face mixes them by its normal. A soft contact shadow toward the
-  front right.
-- **Neutrals for things, the accent for data.** Every tint is mixed from
-  the preset's background and ink (`iso.js` `materials`: `N`, `N2`, `N3`,
-  `DARK`, `PAPER`, `glass`), so a brand palette recolours the stage with
-  the card. The accent marks figures in the card, never a thing's paint.
-- **The board.** Things stand on a chunky base in a mid neutral, so the
-  paper around it and the things on it both read; its inner edges dissolve
-  into the paper toward the card and the footer, and it runs off the frame
-  at the sides.
-- **Value contrast.** A thing a step darker than the board, its glass and
-  tyres darker still. A stage that reads as pale grey on paper is too
-  light: move the subject to `N3` before adding any detail.
+- **Its own ground or sky.** Whatever the setting is made of fills the
+  stage room: a night sky with its stars, a grassland, a sea, a street, a
+  floor. There is no default base or board. A slab appears only when the
+  story really is about a model, a table or a plinth.
+- **Natural colours, the accent for data.** Things and places take the
+  colours they have (`mat.tone('#hex')` for any colour, `mat.nature` for
+  foliage, grass, earth, sand, stone, bark, water, deep water, sky, night,
+  snow, clay, skin and metal), muted a little toward the page so the world
+  sits with the card. Real things the source names keep their real
+  colours. The accent stays reserved for what a figure is about (a fill, a
+  marked share), so it still means "data" when it appears. A world in
+  greys has ignored where it is; the audit warns (`colour`).
+- **Volume where it lives.** Bodies, trunks, hulls and limbs are lofted
+  (`V.loft`, `V.tube`): a torso that swells and tapers, a neck, a tail,
+  legs with joints, drawn facet by facet back to front (`V.begin`/`V.end`).
+  Flat extruded profiles are for flat things (a sign, a wall, a car's
+  side), never for an animal or a person. Blocks, prisms and cones are for
+  buildings, rocks, roofs and trees.
+- **Low-poly, softened, one light, no outlines.** Few facets, each lit from
+  the top left by its normal; a soft contact shadow toward the front
+  right. Detail only where the story names it.
+- **Value and colour contrast.** The thing a beat is about stands out from
+  its ground in both value and hue: a dark animal on pale grass, a pale
+  planet on a night sky.
 
 ## Artwork
 

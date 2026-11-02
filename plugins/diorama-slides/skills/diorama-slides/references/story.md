@@ -5,9 +5,8 @@ own and decides nothing about what happens on the stage: you write the
 world, and every insight in the video is something you make happen in it.
 A video whose stage only does what is easy to animate (things gliding past,
 things growing, the same motion every beat) has ignored its source, however
-well each thing is drawn. So the order is: the point, then what each
-insight does to the world, then the shape that holds those together, then
-the edit.
+well each thing is drawn. So the order is: the point, then the world the story
+lives in, then what each insight does to that world, then the edit.
 
 ## The point
 
@@ -15,6 +14,29 @@ Write it in one sentence, in the source's terms, with its main figure: what
 the video is about. Then one more: what a viewer with the sound off must see
 happen to get it. That second sentence is the stage's job for the whole
 video, and every beat answers to it.
+
+## The world
+
+Before any beat, decide where the story naturally happens and how that
+place behaves, from the source, as an illustrator would:
+
+- **Where is it?** The place the source's things actually live: planets
+  in space round their star, animals in their landscape, a product on a
+  street or in a hand, a process in its building. Never a default board:
+  a tabletop is right only when the story is about a model or a table.
+- **How does it behave on its own?** The system the source describes, in
+  motion before any insight: planets orbit, rivers flow, a herd grazes, a
+  market opens and closes, a machine runs. The insights are then shown
+  *inside* that behaviour (a planet's year is its trip round the sun; a
+  predator's speed is a chase across its plain), not by taking things out
+  of their world to stand in a row.
+- **What does it look like?** Its ground or sky, its natural colours, its
+  light, and the hero shot of each beat.
+
+Write the first in the spec as `stage.setting` and the third as
+`stage.look` (`check-video.js` fails a spec without them), and build the
+world to match them. When you look at the renders (`verify-and-ship.md` §
+7.3), judge them against `stage.look`.
 
 ## Direct each insight
 
@@ -61,22 +83,21 @@ story, and explainer-video (slides with charts) is the better skill.
 
 ## The shape
 
-The shape is how the story is held together on one stage. It guides how
-you lay out the world and frame it; it does not decide what may happen in
-it, which is always the insights' business.
+The shape is a label for how the story hangs together, chosen after the
+world, never before it. It sets the longest length and gives the camera a
+habit; it never decides where things are or what they do. If a shape's
+habit would pull things out of their world (lining planets up in a row
+when they orbit), keep the world and drop the habit.
 
-| The source is about… | Shape | How the world is laid out | How the camera tends to move |
-| --- | --- | --- | --- |
-| one subject and how it changes | **transformation** | the subject at the centre of its own surroundings, which change with it | stays with the subject |
-| several things compared | **lineup** | the whole cast on one stage, room to rearrange | pulls back to take in the cast, in to one member |
-| one thing coming into being | **assembly** | the thing on its site, room for what it grows into | rises with it, in to a part |
-| separate cases, places or events | **episodes** | one board, a place per item | travels from place to place |
-| a route, a campaign, a migration | **journey** | a schematic map (land, water, route lines, plain labels; never the look of a real map product) | follows what travels |
+| The story… | Shape | The camera's habit |
+| --- | --- | --- |
+| follows one subject as it changes | **transformation** | stays with the subject |
+| compares several things | **lineup** | pulls back to take in all of them, in to one |
+| watches something come into being | **assembly** | rises with it, in to a part |
+| visits separate cases or places | **episodes** | travels from place to place |
+| follows a route, a campaign or a migration | **journey** | follows what travels, over a schematic map (never the look of a real map product) |
 
-How to tell them apart: one subject that changes, or many compared? Does
-the thing exist yet? Does place matter (episodes), or the path between
-places (journey)? When two fit, take the one that keeps a single world in
-view longest.
+When two fit, take the one that keeps the world whole longest.
 
 `transformation` has been through its acceptance video; the others build
 and run the same way, and `check-video.js` warns until theirs has, so look

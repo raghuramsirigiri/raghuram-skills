@@ -1,7 +1,7 @@
 # The stage: your world, its camera, its things
 
-The stage is the living half of the frame: a toy-like 2.5D diorama under
-the card, running without a break from the first frame to the last. It is
+The stage is the living half of the frame: the story's own world, toy-like
+and 2.5D, under the card, running without a break from the first frame to the last. It is
 **your world**: one painter the page registers draws all of it, and every
 insight in the video is something that painter makes happen
 (`story.md` § Direct each insight). The engine gives the painter time, the
@@ -60,7 +60,7 @@ Motion.things.mill = {
   marks(w) { return { wheel: [-20, 0, 12], store: [25, -5, 4] }; },
   draw(w, api) {
     const V = api.view('ground'), M = api.view('store'), m = api.mat;
-    V.block(-50, -30, 0, 110, 60, 4, m.N2);                           // the board
+    V.block(-50, -30, -4, 110, 60, 4, m.nature.grass);                  // the meadow round the mill
     const turned = w.accumulate('wheel', b => (w.has('dawn') && b.index >= 1 ? 1.2 : 0));
     // … the wheel drawn at angle `turned`, the mill house, the river …
     const sacks = Math.floor(w.share('F2', 'F2') * w.progress('dawn') * 12);   // 12 sacks = F2, key in the card
@@ -117,15 +117,18 @@ the world needs, for this video:
    words. Its look follows from the features the source names; its states
    are the numbers that change (a height, a fill, a count, a 0–1 for a
    part that comes and goes).
-2. **Draw a few chunky shapes that read as that thing at the size it's
-   drawn**, with the kit below. A side profile pushed across the thing's
-   depth (`V.extrude`) makes most vehicles, animals, people and buildings;
-   `V.block` or `V.prism` makes masses; `V.cone` makes trees, roofs and
-   horns. Recognisable beats detailed: detail only where the story names it.
-3. **Neutrals for things, the accent for data only.** A thing is drawn in
-   the materials' neutrals (`N`, `N2`, `N3`, `DARK`, `PAPER`, `glass`);
-   the accent marks what a figure is about (the part of a stock that is
-   gone, a meter's fill), never a thing's paint.
+2. **Give it the form it has, at the size it's drawn**, with the kit
+   below. Anything alive, or round and organic, is lofted with volume
+   (`V.loft` for a body along its spine, `V.tube` for each limb segment,
+   `V.ball` for a head or a planet), drawn inside `V.begin()`/`V.end()` so
+   its facets overlap correctly. Buildings and machines are blocks, prisms
+   and extrusions; trees and roofs are cones. Recognisable beats detailed,
+   but an animal must look like a living animal, not a cut-out: a body that
+   swells and tapers, legs that bend, a head with mass.
+3. **Its natural colours; the accent only for data.** Things take their
+   own colours (`mat.tone`, `mat.nature`); the accent marks what a figure is
+   about (the part of a stock that is gone, a meter's fill), never a
+   thing's paint.
 4. **Figures come from the claims**, through `w.value` / `w.share`, never
    typed, and the card states each figure the stage acts out. A count of
    real things is one per thing or per a stated group, with the key in the
@@ -139,7 +142,11 @@ the world needs, for this video:
 `V.box`, `V.block(x, y, z, w, d, h, tint, { r, b })` (corners cut by r, top
 bevelled by b), `V.prism(footprint, z, h, tint, b)`, `V.extrude(profile,
 axis, a0, a1, tint)` (axis `'y'`: a side view; `'x'`: a front view; `'z'`:
-a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.ball(x, y, z, r, tint)`, `V.face(points3d, colour)`,
+a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.ball(x, y, z, r, tint)`,
+`V.loft([{ c: [x, y, z], r: radius | [across, up] }…], tint, n)` (a body
+with volume along a spine), `V.tube(a, b, ra, rb, tint, n)` (a tapering
+limb), `V.begin()`/`V.end()` (draw several bodies' facets back to front
+together), `V.face(points3d, colour)`,
 `V.line`, `V.path`, `V.shadow`, and `V.P(x, y, z)` for a screen point.
 Slanted faces are shaded from the one light by their normal, so a bevel, a
 windscreen or a cone's facets read without outlines. Depth order is yours:
@@ -164,7 +171,7 @@ draw far things first (smaller x + y), near things last.
 
 War, disaster, crime, illness: neutral and non-graphic. Show what moved
 and how (formations, routes, supply lines, the shape of a manoeuvre) as
-plain blocks and arrows on the board; never casualties, wounds, weapons
+plain blocks and arrows on the land; never casualties, wounds, weapons
 firing, flags waved in triumph or any framing that glorifies a side. Words
 stay in the source's register, attributed. When a source dwells on harm,
 the stage shows places and movement, and the figures stay in the card,

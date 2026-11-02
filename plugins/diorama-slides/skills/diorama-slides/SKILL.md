@@ -86,7 +86,10 @@ own nouns.
 
 3. **Name the point, direct each insight, then the shape and the beats.**
    Read `references/story.md`. Write the video's point with its main figure,
-   and what a viewer must see happen to get it with the sound off. Then,
+   and what a viewer must see happen to get it with the sound off. Then
+   decide the world: where the story naturally happens, how that place
+   behaves on its own (planets orbit, a herd grazes, a shop opens), and how
+   it looks (`stage.setting`, `stage.look`). Never a default board. Then,
    for each insight, ask what it is a fact about and what you would see
    happen in the world if it happened in front of you; think of three
    actions and keep the one most specific to this source. That becomes the
@@ -102,8 +105,9 @@ own nouns.
    the engine gives it: each beat's progress, the story's clock, running
    totals, the claims, the camera), `references/design.md` for the look and
    `references/motion.md` for how the card and the stage each move. You draw
-   every thing from the source's nouns, and make each beat's `shows` happen
-   by its progress, its time or its rate. There is no library of things or
+   every thing from the source's nouns, in its natural colours and with real
+   volume (living things are lofted bodies, never cut-outs), and make each
+   beat's `shows` happen by its progress, its time or its rate. There is no library of things or
    behaviours, on purpose. A value with nothing to act out gets a flat chart
    in the card (`references/video-charts.md`) while the world keeps living.
 
@@ -128,7 +132,9 @@ own nouns.
 7. **Verify before reporting done.** Read `references/verify-and-ship.md`
    and follow it in full: `node <skill-dir>/scripts/check-video.js
    <slug>.html` with no FAIL; in a browser, `VideoAudit.run` on every cut
-   with `exportProbe: true` until each is `ok`; look at one contact sheet;
+   with `exportProbe: true` until each is `ok`; look at the contact sheet as
+   an illustrator would against `stage.look`, and keep going while it reads
+   as a board, cut-outs or greys;
    re-read every figure and hedge against the source. Without a browser,
    the static check and the re-read are the floor, and you say the frames
    weren't checked.

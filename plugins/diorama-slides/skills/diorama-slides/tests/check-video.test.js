@@ -55,6 +55,13 @@ test('a world the page doesn\'t register fails', () => {
   assert.ok(fails(check(s)).some(x => /registers no Motion\.things\.town/.test(x)));
 });
 
+test('a stage with no setting or look fails: the world is decided before it is drawn', () => {
+  const s = FIXTURE_SPEC(); delete s.stage.setting; delete s.stage.look;
+  const f = fails(check(s));
+  assert.ok(f.some(x => /stage\.setting/.test(x)));
+  assert.ok(f.some(x => /stage\.look/.test(x)));
+});
+
 test('a beat with no stage.shows fails: every beat directs the world', () => {
   const s = FIXTURE_SPEC(); delete s.scenes[1].stage.shows;
   assert.ok(fails(check(s)).some(x => /V2 mid: no stage\.shows/.test(x)));

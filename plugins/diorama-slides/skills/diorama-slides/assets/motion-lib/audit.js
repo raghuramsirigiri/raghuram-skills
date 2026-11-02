@@ -60,6 +60,9 @@
   // share, not a mean: a small thing that clearly appears (a flock, a lamp
   // lighting) is a real change, and a mean over the whole room hides it.
   const ACTION = 0.3, ACTION_W = 240, ACTION_DIFF = 18;
+  // Below this median colourfulness (0..1, HSV saturation over the stage
+  // room on hold frames) the world reads as grey.
+  const COLOUR = 0.06;
   function fillOf(C, ctx, t) {
     const S = C.safe, R = M.layout.RULE;
     // Measured without the art: decoration doesn't stand in for layout.
@@ -348,6 +351,22 @@
       if (d < ACTION) warns.push({ check: 'action', scene: hd(sc.id), msg: 'the stage looks the same as if this beat\'s insight had never happened (' + d.toFixed(2) + '% of the stage changes) — make the world do what stage.shows says (references/story.md § Direct each insight)' });
     });
 
+    // Colour: a world drawn all in greys has ignored where it is. Measure
+    // the stage room's colourfulness on each beat's hold frame.
+    const colours = [];
+    C.scenes.forEach(sc => {
+      if (only && !only.some(o => o.id === sc.id)) return;
+      const t = (sc.enterEnd + sc.exitStart) / 2, B = sc.stageBox;
+      const art = C.art; C.art = null;
+      try { M.seek(ctx, C, t, { frameT: t }); } finally { C.art = art; }
+      const px = ctx.getImageData(Math.round(B.x), Math.round(B.y), Math.max(1, Math.round(B.w)), Math.max(1, Math.round(B.h))).data;
+      let sat = 0, cnt = 0;
+      for (let i = 0; i < px.length; i += 4 * 37) { const mx = Math.max(px[i], px[i + 1], px[i + 2]), mn = Math.min(px[i], px[i + 1], px[i + 2]); sat += mx ? (mx - mn) / mx : 0; cnt++; }
+      colours.push(sat / Math.max(1, cnt));
+    });
+    const midSat = colours.slice().sort((a, b) => a - b)[Math.floor(colours.length / 2)] || 0;
+    if (colours.length && midSat < COLOUR) warns.push({ check: 'colour', msg: 'the world is almost all greys (colourfulness ' + midSat.toFixed(3) + '): give its ground, sky, water and things their natural colours (mat.tone, mat.nature), keeping the accent for data (references/design.md § The stage\'s look)' });
+
     const fill = fills(C, ctx).filter(f => !only || only.some(s => s.id === f.id));
     fill.forEach(f => {
       if (f.fill < FILL.target && FILL.exempt.indexOf(f.type) < 0) warns.push({ check: 'fill', scene: hd(f.id), msg: f.type + ' covers ' + Math.round(f.fill * 100) + '% of the safe area on its hold frame, under ' + Math.round(FILL.target * 100) + '% — lay it out for the ' + C.cls + ' frame (references/formats.md § Layout per format)' });
@@ -365,7 +384,7 @@
     const stats = {
       cut: cutName, format: C.format, frames: C.frames, duration: +C.duration.toFixed(3), fps: C.fps,
       msPerFrame: +(ms / C.frames).toFixed(2), fill: fill.map(f => ({ handle: hd(f.id), type: f.type, fill: f.fill })), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
-      exportPath: probe && probe.path, scope: only ? only.map(s => hd(s.id)) : 'all', actions
+      exportPath: probe && probe.path, scope: only ? only.map(s => hd(s.id)) : 'all', actions, colourfulness: +midSat.toFixed(3)
     };
     if (!only) stats.lag = { min: +Math.min(...lag).toFixed(3), median: +lag.filter(isFinite).sort((a, b) => a - b)[Math.floor(lag.filter(isFinite).length / 2)].toFixed(3) };
     return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C), stills: () => stills(C, only || C.scenes, hd) };

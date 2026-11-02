@@ -12,7 +12,9 @@ invented.
   "meta": { "title": "The Kestrel lamp, 1920 to now", "locale": "en-GB", "preset": "default",
             "art": "halftone", "fps": 30, "seed": 7, "audio": { "score": "off" },
             "motionBlur": { "subframes": 4, "shutter": 0.5 } },
-  "stage": { "shape": "transformation", "world": "desk", "size": [40, 30, 30], "time": 1920 },
+  "stage": { "shape": "transformation", "world": "desk", "size": [40, 30, 30], "time": 1920,
+             "setting": "a writer's desk by a window, evening",
+             "look": "warm wood desk, cream paper, a dark window; the lamp is the hero, its pool of light on the page" },
   "cuts": {
     "main":  { "format": "9:16", "scenes": ["hook", "angle", "src"] },
     "short": { "format": "1:1",  "scenes": ["hook", "src"] }
@@ -59,8 +61,10 @@ There is no `meta.style`: this skill has one mode.
 
 The story's shape and the world (`stage.md` § The world): `shape` (it
 guides layout and framing), `world` (the page's painter,
-`Motion.things.<name>`), `size` (the extent a beat frames at zoom 1) and
-optionally `time` (where the story's clock starts).
+`Motion.things.<name>`), `setting` (where the story naturally happens),
+`look` (the world as an illustrator would describe it: its ground or sky,
+its colours, the hero shots), `size` (the extent a beat frames at zoom 1)
+and optionally `time` (where the story's clock starts).
 
 ### Scenes (beats)
 

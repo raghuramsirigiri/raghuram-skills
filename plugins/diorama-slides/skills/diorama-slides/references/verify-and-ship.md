@@ -110,11 +110,21 @@ VideoAudit.run({ cut: 'main' }).then(r => r.contactSheet())
 
 returns a PNG data URL: one frame per beat hold and per transition (the
 middle of each change), labelled with `V` handles and timecodes outside
-the frames. Look at it. You are looking for what no check catches: a thing
-that doesn't read as what the source names, a change whose middle reads as
-neither state, a stage that looks like separate scenes instead of one
-world, a chart that doesn't say what its headline says, a hook that isn't
-the strongest true thing.
+the frames. Look at it as an illustrator would, against `stage.setting`
+and `stage.look`, before anything else. It is **not done** while any of
+these is true, whatever the checks say:
+
+- the world isn't where the story happens (a board, a blank floor, things
+  lifted out of their place to stand in a row);
+- things look like cut-outs or diagrams instead of what they are (an
+  animal without a body, a planet without its sky);
+- the world is mostly greys (the audit's `colour` warning);
+- a beat's frame isn't the hero shot `stage.look` describes.
+
+Then what else no check catches: a change whose middle reads as neither
+state, a chart that doesn't say what its headline says, a hook that isn't
+the strongest true thing. Your own notes that something "looks weak" are
+a reason to keep going, not a caveat for the handover.
 
 ### 7.4 Re-read every figure against the source
 

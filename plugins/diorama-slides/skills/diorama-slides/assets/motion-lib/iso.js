@@ -9,6 +9,10 @@
  *   V.extrude(profile, 'y', y0, y1, mat.N)    a side profile pushed across its depth
  *   V.cone(x, y, z, r, h, mat.N, n)           a faceted cone (a tree, a roof, a horn)
  *   V.ball(x, y, z, r, mat.N)                 a ball, lit from the top left (a head, a fruit, a planet)
+ *   V.loft(rings, tint, n)                    a body with volume: rings of [centre, radius] along a spine
+ *   V.tube(a, b, ra, rb, tint, n)             a tapering limb, a trunk, a neck
+ *   V.begin() … V.end()                       draw several bodies' facets back to front together
+ *   mat.tone('#7a8f4e')                       any colour as a lit tint; mat.nature.foliage, .water, …
  *   V.shadow(x, y, w, d, h)   V.P(x, y, z) -> [sx, sy]
  *
  * One isometric view (30 degrees) for the whole video: world point (x, y, z)
@@ -17,13 +21,14 @@
  * changes. The viewer looks along (-1, -1, -1): a face whose normal has
  * nx + ny + nz > 0 faces the viewer.
  *
- * The look is a toy diorama in charts-lib's colours: chunky masses with cut
- * corners and bevelled tops, a few low-poly facets, no outlines, and one light
- * from the top left (the top lightest, the +y face mid, the +x face darkest;
- * a slanted face mixes the three by its normal). Every colour is mixed from
- * the design's background, ink and accent; the accent is for data only.
- * These are primitives: a car, a tower or a creature is built from them by
- * the video's own painter, never shipped here.
+ * The look is toy-like and low-poly: softened masses, faceted bodies with
+ * real volume, no outlines, and one light from the top left (the top
+ * lightest, the +y face mid, the +x face darkest; a slanted facet mixes the
+ * three by its normal). Things take their natural colours (`mat.tone`,
+ * `mat.nature`), muted a little toward the page so they sit with the card;
+ * the accent is reserved for data. These are primitives: a car, a planet, a
+ * creature or a forest is built from them by the video's own painter, never
+ * shipped here.
  *
  * Every shape is a pure function of its inputs. When the audit records
  * (Motion.debug.record), each filled shape reports its screen box as
@@ -45,8 +50,20 @@
     const A = tint(mix(d.subject, d.bg, 0.12), d.subject, mix(d.subject, d.ink, 0.28));
     const PAPER = tint(mix(d.bg, '#ffffff', 0.7), mix(d.bg, d.ink, 0.08), mix(d.bg, d.ink, 0.15));
     const between = (a, b, k) => k <= 0 ? a : k >= 1 ? b : tint(mix(a.top, b.top, k), mix(a.left, b.left, k), mix(a.right, b.right, k));
+    // Any colour as a lit tint, muted a little toward the page (mute 0..1)
+    // so the world sits in the same family as the card.
+    const tone = (hex, mute) => {
+      const base = mix(hex, d.bg, mute == null ? 0.12 : mute);
+      return tint(mix(base, '#ffffff', 0.16), base, mix(base, '#000000', 0.22));
+    };
+    // Natural colours to start from; any other comes through tone().
+    const NATURE = { foliage: '#5d7d47', grass: '#8d9b5a', earth: '#86684a', sand: '#d2bb8c', stone: '#8d8a83',
+      bark: '#6a4e39', water: '#4d7f9b', deep: '#2e5670', sky: '#a8c7da', night: '#141b2b', snow: '#eef1f3',
+      clay: '#b0643f', skin: '#c99a78', metal: '#9aa1a8' };
+    const nature = {};
+    Object.keys(NATURE).forEach(k => { nature[k] = tone(NATURE[k]); });
     return {
-      N, N2, N3, DARK, A, PAPER, between, bg: d.bg,
+      N, N2, N3, DARK, A, PAPER, between, bg: d.bg, tone, nature,
       shadow: mix(d.bg, d.ink, 0.06),
       line: mix(d.bg, d.ink, 0.28),       // quiet details: seams, markings
       glass: tint(mix(d.bg, d.ink, 0.4), mix(d.bg, d.ink, 0.5), mix(d.bg, d.ink, 0.58)),
@@ -219,6 +236,59 @@
       }
       facets.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill));
     };
+
+    // ── bodies with volume ─────────────────────────────────────────────
+    // Facets collect between begin() and end() and are drawn back to front
+    // together, so a leg in front of a body and a tail behind it come out
+    // right. Outside a batch, each body sorts its own facets.
+    let batch = null;
+    V.begin = () => { batch = []; };
+    V.end = () => { const b = batch || []; batch = null; b.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill)); };
+    const emit = (faces) => {
+      if (batch) { faces.forEach(f => batch.push(f)); return; }
+      faces.sort((p, q) => p.depth - q.depth).forEach(f => V.face(f.pts, f.fill));
+    };
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const depthOf = pts => pts.reduce((s, p) => s + p[0] + p[1] + p[2], 0) / pts.length + (o[0] + o[1] + o[2]);
+    // A loft: rings [{ c: [x, y, z], r: radius | [across, up] }…] along a
+    // spine, joined by n facets each; the ends are capped. A torso that
+    // swells and tapers, a neck, a tail, a hull, a tree trunk.
+    V.loft = (rings, t, n) => {
+      n = n || 8;
+      const R = rings.map((rg, i) => {
+        const a = rings[Math.max(0, i - 1)].c, b = rings[Math.min(rings.length - 1, i + 1)].c;
+        const T = norm(sub(b, a));
+        let U = Math.abs(T[2]) > 0.9 ? [1, 0, 0] : [0, 0, 1];
+        const S = norm(cross(T, U)); U = norm(cross(S, T));
+        const rw = Array.isArray(rg.r) ? rg.r[0] : rg.r, rh = Array.isArray(rg.r) ? rg.r[1] : rg.r;
+        const pts = [];
+        for (let k = 0; k < n; k++) {
+          const ang = k / n * Math.PI * 2;
+          pts.push([0, 1, 2].map(j => rg.c[j] + S[j] * Math.cos(ang) * rw + U[j] * Math.sin(ang) * rh));
+        }
+        return { c: rg.c, pts, T };
+      });
+      const faces = [];
+      const add = (pts, inside) => {
+        let nrm = norm(cross(sub(pts[1], pts[0]), sub(pts[2], pts[0])));
+        const mid = pts.reduce((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length, s[2] + p[2] / pts.length], [0, 0, 0]);
+        const out = sub(mid, inside);
+        if (nrm[0] * out[0] + nrm[1] * out[1] + nrm[2] * out[2] < 0) nrm = [-nrm[0], -nrm[1], -nrm[2]];
+        if (nrm[0] + nrm[1] + nrm[2] <= 1e-6) return;
+        faces.push({ pts, fill: shade(t, nrm[0], nrm[1], nrm[2]), depth: depthOf(pts) });
+      };
+      for (let i = 0; i + 1 < R.length; i++) {
+        const A = R[i], B = R[i + 1], inside = [(A.c[0] + B.c[0]) / 2, (A.c[1] + B.c[1]) / 2, (A.c[2] + B.c[2]) / 2];
+        for (let k = 0; k < n; k++) add([A.pts[k], A.pts[(k + 1) % n], B.pts[(k + 1) % n], B.pts[k]], inside);
+      }
+      const ends = [[R[0], -1], [R[R.length - 1], 1]];
+      ends.forEach(([E, sgn]) => add(E.pts.slice(), [E.c[0] - E.T[0] * sgn, E.c[1] - E.T[1] * sgn, E.c[2] - E.T[2] * sgn]));
+      emit(faces);
+    };
+    // A tapering tube from a to b: a limb, a neck, a trunk, a pipe.
+    V.tube = (a, b, ra, rb, t, n) => V.loft([{ c: a, r: ra }, { c: b, r: rb }], t, n || 6);
 
     // A ball of radius r centred at (x, y, z): one disc on screen, lit like
     // every other surface (the light from the top left, the right side in

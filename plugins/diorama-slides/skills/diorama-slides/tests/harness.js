@@ -86,7 +86,8 @@ const PAINTER = `Motion.things.works = {
 
 const FIXTURE_SPEC = () => ({
   meta: { title: 'Test', locale: 'en-GB', preset: 'default', fps: 30, seed: 3, audio: { score: 'off' } },
-  stage: { shape: 'transformation', world: 'works', size: [40, 20, 20], time: 1990 },
+  stage: { shape: 'transformation', world: 'works', size: [40, 20, 20], time: 1990,
+    setting: 'a valley water works beside its reservoir', look: 'green valley floor, grey concrete tank, blue reservoir; the tank is the hero' },
   cuts: {
     main: { format: '9:16', scenes: ['hook', 'mid', 'big', 'src'] },
     short: { format: '1:1', scenes: ['hook', 'big', 'src'] }

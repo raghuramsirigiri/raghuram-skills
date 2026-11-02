@@ -38,7 +38,7 @@ under about a fifth of the frame's height.
 
 **Fill.** The audit measures how much of the safe area each beat's
 mid-hold frame covers and warns under 60%. The stage usually fills it; a
-warning means the stage's room is mostly empty board (zoom in, or give the
+warning means the stage's room is mostly empty ground or sky (zoom in, or give the
 subject a larger `size`), never a reason to add decoration.
 
 ## Frame rate
