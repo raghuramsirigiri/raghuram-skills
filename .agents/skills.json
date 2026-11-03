@@ -13,7 +13,13 @@
       "path": "../plugins/decisions-only/skills"
     },
     {
+      "path": "../plugins/documentary-video/skills"
+    },
+    {
       "path": "../plugins/exec-brief/skills"
+    },
+    {
+      "path": "../plugins/explainer-video/skills"
     },
     {
       "path": "../plugins/sanity-check/skills"

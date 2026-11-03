@@ -218,6 +218,8 @@ plugins/decisions-only/
 plugins/whats-changed/      same shape as decisions-only
 plugins/sanity-check/       same shape as decisions-only
 plugins/exec-brief/         same shape as decisions-only
+plugins/action-titles/      same shape as decisions-only
+plugins/chart-honesty/      same shape as decisions-only
 plugins/social-post/
   .claude-plugin/plugin.json
   skills/social-post/       SKILL.md, references/, templates/, assets/, scripts/, tests/, evals/
@@ -226,7 +228,11 @@ plugins/explainer-video/
   .claude-plugin/plugin.json
   skills/explainer-video/   SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
                             (assets/charts-lib/theme.js and the theme scripts are copies of chart-dashboard's)
-examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
+plugins/documentary-video/
+  .claude-plugin/plugin.json
+  skills/documentary-video/ SKILL.md, references/, templates/, assets/film-lib/, scripts/, tests/, evals/
+                            (assets/charts-lib/theme.js is chart-dashboard's; the muxers are explainer-video's)
+examples/                   seven finished outputs (two dashboards, deck, report, one-pager, email snapshot, social post)
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
 ```
