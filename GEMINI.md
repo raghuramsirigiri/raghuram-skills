@@ -4,9 +4,9 @@ This repository provides a reusable capability: **turn supplied data into a
 single self-contained HTML dashboard, report, slide deck or printable one-pager
 with interactive SVG charts** — no CDN, no npm install, no build step.
 
-The repository also holds nine other independent skills, each with its own
+The repository also holds ten other independent skills, each with its own
 `SKILL.md` under `plugins/<name>/skills/<name>/`: `social-post`,
-`explainer-video`, `documentary-video`, `decisions-only`, `exec-brief`,
+`explainer-video`, `documentary-video`, `diorama-slides`, `decisions-only`, `exec-brief`,
 `whats-changed`, `sanity-check`, `chart-honesty` and `action-titles`. When a
 request matches one of them, read and follow that skill's `SKILL.md`; the
 README lists what each one does.

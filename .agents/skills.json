@@ -13,6 +13,9 @@
       "path": "../plugins/decisions-only/skills"
     },
     {
+      "path": "../plugins/diorama-slides/skills"
+    },
+    {
       "path": "../plugins/documentary-video/skills"
     },
     {

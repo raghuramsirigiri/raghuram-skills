@@ -5,9 +5,9 @@ self-contained HTML dashboard, report, slide deck or printable one-pager with
 interactive SVG charts. No CDN, no npm install, no build step, no runtime
 dependencies.
 
-The repository also holds nine other independent skills, each with its own
+The repository also holds ten other independent skills, each with its own
 `SKILL.md` under `plugins/<name>/skills/<name>/`: `social-post`,
-`explainer-video`, `documentary-video`, `decisions-only`, `exec-brief`,
+`explainer-video`, `documentary-video`, `diorama-slides`, `decisions-only`, `exec-brief`,
 `whats-changed`, `sanity-check`, `chart-honesty` and `action-titles`. When a
 request matches one of them, follow that skill's `SKILL.md` instead.
 

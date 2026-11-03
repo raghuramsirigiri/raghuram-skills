@@ -2,19 +2,19 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Agent Skills](https://img.shields.io/badge/Claude-Agent%20Skills-8A63D2)](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
-[![Claude Code Plugins](https://img.shields.io/badge/Claude%20Code-10%20plugins-000000)](https://docs.claude.com/en/docs/claude-code/plugins)
+[![Claude Code Plugins](https://img.shields.io/badge/Claude%20Code-11%20plugins-000000)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#what-are-the-dependencies)
 [![Works offline](https://img.shields.io/badge/works-offline-success)](#does-it-work-offline)
 
-**raghuram-skills is a free, open-source marketplace of ten independent Claude Agent
-Skills for the work that fills a corporate week.** Four of them *make* something from
+**raghuram-skills is a free, open-source marketplace of eleven independent Claude Agent
+Skills for the work that fills a corporate week.** Five of them *make* something from
 your data — a dashboard, report, slide deck, one-pager, email or Teams snapshot, social
-post, explainer video or documentary film. Six of them *read* what you already have —
+post, explainer video, diorama video or documentary film. Six of them *read* what you already have —
 a meeting transcript, an email thread, two periods of a reporting pack, a spreadsheet,
 a deck — and hand back only the part that matters.
 
 Every skill installs on its own, works in **Claude Code**, **claude.ai**, **Claude
-Desktop** and the **Claude API**, and is plain Markdown (plus, for the four that make
+Desktop** and the **Claude API**, and is plain Markdown (plus, for the five that make
 things, a dependency-free JavaScript library), so it also runs in **Gemini CLI**,
 **OpenAI Codex**, **GitHub Copilot**, **Cursor** and any other agent that can read a file.
 
@@ -31,7 +31,7 @@ things, a dependency-free JavaScript library), so it also runs in **Gemini CLI**
 - [The skills at a glance](#the-skills-at-a-glance)
 - [Installation](#installation)
 - [Skills that make things](#skills-that-make-things)
-  - [chart-dashboard](#chart-dashboard) · [social-post](#social-post) · [explainer-video](#explainer-video) · [documentary-video](#documentary-video)
+  - [chart-dashboard](#chart-dashboard) · [social-post](#social-post) · [explainer-video](#explainer-video) · [diorama-slides](#diorama-slides) · [documentary-video](#documentary-video)
 - [Skills that read and condense](#skills-that-read-and-condense)
   - [decisions-only](#decisions-only) · [exec-brief](#exec-brief) · [whats-changed](#whats-changed)
 - [Skills that check before you send](#skills-that-check-before-you-send)
@@ -55,6 +55,7 @@ things, a dependency-free JavaScript library), so it also runs in **Gemini CLI**
 | [`chart-dashboard`](#chart-dashboard) | A table, CSV, pasted numbers, metrics or notes | One self-contained HTML dashboard, report, slide deck, printable one-pager, email snapshot, Teams post or social post, with interactive SVG charts | 1.14.0 |
 | [`social-post`](#social-post) | Data and the platforms you post on | One to three chart cards painted at each platform's picture size, plus the words to post for LinkedIn, X, Bluesky, Threads, Mastodon or Instagram | 1.0.0 |
 | [`explainer-video`](#explainer-video) | An article, news story, report findings or a table | A 15–60 s motion-graphics explainer with flat charts, exported as MP4 in your browser | 1.1.0 |
+| [`diorama-slides`](#diorama-slides) | An article, history, report or table where something visibly happens | A 15–60 s video: a still card of words over a living 2.5D toy-diorama world that acts out each insight, exported as MP4 | 0.1.0 |
 | [`documentary-video`](#documentary-video) | Any document — a sales summary, a history chapter, a science article | A documentary-style short film with a screenplay, cast and places designed from the document, in a toy-diorama 3D world, exported as MP4 | 1.0.0 |
 | **Read** | | | |
 | [`decisions-only`](#decisions-only) | A meeting transcript, recap or notes | The decisions and commitments — what was chosen, who owns what, by when — and nothing else | 1.2.0 |
@@ -89,7 +90,7 @@ Then install whichever skills you want. Installing one never pulls in the others
 
 The same pattern works for every skill: `/plugin install <name>@raghuram-skills`, where
 `<name>` is any of `chart-dashboard`, `social-post`, `explainer-video`,
-`documentary-video`, `decisions-only`, `exec-brief`, `whats-changed`, `sanity-check`,
+`diorama-slides`, `documentary-video`, `decisions-only`, `exec-brief`, `whats-changed`, `sanity-check`,
 `chart-honesty` or `action-titles`.
 
 ### Claude Code — manual install
@@ -120,7 +121,7 @@ Swap `chart-dashboard` for any other skill's name to package that one.
 ### Gemini CLI, OpenAI Codex, GitHub Copilot, Cursor, and other AI tools
 
 Nothing in any skill is Claude-specific. Any agent that can read files can run the
-read-and-check skills; the four that make things also need to write an HTML file and,
+read-and-check skills; the five that make things also need to write an HTML file and,
 for the final checks, run Node.
 
 **1. Copy the skill into your project:**
@@ -163,7 +164,7 @@ current docs; the block itself is the only thing that matters.
 
 ## Skills that make things
 
-The four making skills share one design system — the bundled `charts-lib` palette, type
+The five making skills share one design system — the bundled `charts-lib` palette, type
 scale and chart rules — so a dashboard, a social card and a video built from the same
 data look like one family. Each ships **one standalone HTML file**: no CDN, no npm
 install, no build step, and it opens offline. None of them ever posts or publishes for
@@ -226,6 +227,37 @@ that thing for this video. 15–60 seconds in **9:16** (Reels, Shorts, TikTok), 
 - Every figure on screen is a claim with a source and a locator, hedges like *up to*
   and *estimated* survive the edit, and every cut **ends on a dated source card**.
 - It works muted: there is no voiceover, so the on-screen text is the script.
+
+### diorama-slides
+
+Sits between slides and a film. A **card layer** holds still for the whole video — the
+headline with its figure, the units, the dated source — while beneath it a **living 2.5D
+toy-diorama stage** acts out each insight: one thing changing over time, a cast
+compared, a thing being built, a place per episode, or a route on a schematic map.
+15–60 s (lineups and journeys up to 90 s) in **9:16**, **4:5**, **1:1** or **16:9**.
+
+> Make a short video of how the family car changed from the 1950s to today.
+
+> Show the Golden Gate Bridge being built, one stage per beat.
+
+- **Everything on the stage is drawn for this video** from the source's own nouns —
+  there is no library of ready-made props. One fixed camera angle pans and zooms on the
+  world only; the card never moves.
+- Real things appear only when the source names them; real people are generic figures,
+  never likenesses; sensitive topics stay neutral and non-graphic.
+- Same rules as `explainer-video`: every figure is a sourced claim with its hedges
+  kept, values are flat charts (never 3D), and the video works muted and ends on a
+  dated source card.
+- Canvas 2D, WebCodecs and Web Audio only — **exports MP4** in the browser, no WebGL,
+  ffmpeg or render server.
+
+Six finished videos are in [`examples/`](examples/): `diorama-bakery-morning`,
+`diorama-burj-khalifa`, `diorama-dinosaurs`, `diorama-family-car`,
+`diorama-golden-gate` and `diorama-planets`.
+
+**Which video skill?** `explainer-video` for chart-led motion graphics;
+`diorama-slides` when the story is something visibly happening; `documentary-video`
+for a cinematic film with a cast and a moving camera.
 
 ### documentary-video
 
@@ -686,7 +718,7 @@ written to avoid.
 
 #### What are the dependencies?
 
-None. The read-and-check skills are Markdown instructions only. The four making skills
+None. The read-and-check skills are Markdown instructions only. The five making skills
 inline their libraries into the page as the last build step — for `chart-dashboard`,
 `charts.js`, `theme.js` and `charts.css`, about 760 KB unminified (~210 KB gzipped) —
 so you get one standalone HTML file with no sibling folder. There is no npm install, no
@@ -698,7 +730,7 @@ checks and `finalize.js` while the file is being built.
 Yes. A finished page makes no network requests at all — no CDN, no web font. It names
 Inter first in its font stack and falls back to Segoe UI or Helvetica, and each making
 skill's checker (`scripts/check-page.js --final`, or `finalize.js` for the videos) fails
-any page that reaches for the network. The two video skills export MP4 with the
+any page that reaches for the network. The three video skills export MP4 with the
 browser's own encoder, offline.
 
 #### Is my data sent anywhere?
@@ -756,6 +788,7 @@ plugins/
 │       └── tests/
 ├── social-post/          data → chart cards and post text (carries its own copy of charts-lib)
 ├── explainer-video/      article or table → motion-graphics explainer (assets/motion-lib/)
+├── diorama-slides/       story → word card over a living 2.5D diorama stage (assets/motion-lib/)
 ├── documentary-video/    document → documentary film in a 3D diorama world (assets/film-lib/)
 ├── decisions-only/       transcript → decisions and commitments
 ├── exec-brief/           thread or document → BLUF, three points, one ask
@@ -764,7 +797,7 @@ plugins/
 ├── chart-honesty/        deck → charts that mislead, and the fix for each
 └── action-titles/        deck → slide titles as the claim each slide proves
 examples/                 finished outputs: two dashboards, a deck, a report, a one-pager,
-                          an email snapshot and a social post
+                          an email snapshot, a social post and six diorama-slides videos
 docs/                     GitHub Pages landing page, and the sources of the README images
 .claude-plugin/           the marketplace manifest listing every plugin
 ```
@@ -786,7 +819,7 @@ plugin. Open any example's `index.html` directly in a browser; no server needed.
 - **A picture carries no data.** `chart-honesty`, `whats-changed` and `action-titles`
   read native chart data, tables and text; a chart pasted as an image is reported as
   not checkable rather than estimated from pixels.
-- **Videos have no voiceover.** Both video skills are designed to be watched muted; the
+- **Videos have no voiceover.** All three video skills are designed to be watched muted; the
   on-screen text is the script.
 
 ## Maintainer
@@ -824,5 +857,5 @@ familiarity, but no third-party charting source is included or derived.
 **Related topics:** Claude Agent Skills · Claude Code plugins · AI dashboard
 generator · HTML dashboard template · SVG chart library · AI slide deck generator ·
 social media chart generator · text-to-video explainer · meeting decisions extractor ·
-executive summary · variance analysis · spreadsheet error check · misleading chart review ·
+diorama video · executive summary · variance analysis · spreadsheet error check · misleading chart review ·
 action titles
