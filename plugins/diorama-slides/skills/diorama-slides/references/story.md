@@ -99,9 +99,10 @@ when they orbit), keep the world and drop the habit.
 
 When two fit, take the one that keeps the world whole longest.
 
-`transformation` has been through its acceptance video; the others build
-and run the same way, and `check-video.js` warns until theirs has, so look
-at their contact sheets harder.
+`transformation` has been through its acceptance video; lineup, assembly,
+episodes and journey each have one built and audited, awaiting review, and
+`check-video.js` warns until a shape is marked verified, so look at their
+contact sheets harder.
 
 ## The spine
 

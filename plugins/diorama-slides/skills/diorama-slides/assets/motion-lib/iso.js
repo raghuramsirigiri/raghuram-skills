@@ -142,7 +142,7 @@
     // kind 'line' marks a stroke; kind 'shadow' is ground tint, not an object.
     function note(pts, kind) {
       const rec = M.debug.record;
-      if (!rec) return;
+      if (!rec && !cam.track) return;
       const m = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       for (const [x, y] of pts) {
@@ -150,7 +150,10 @@
         if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y;
       }
       if (x1 - x0 <= 0 && y1 - y0 <= 0) return;
-      rec.push({ scene: M.debug.scene, phase: M.debug.phase, layer: 'stage:' + V.owner, role: 'shape', owner: V.owner, kind: kind || 'fill', text: '', bbox: [x0, y0, x1 - x0, y1 - y0], alpha: ctx.globalAlpha });
+      // the stage keeps the extent of what a beat's subject draws, so its
+      // labels can give way to it
+      if (cam.track && kind !== 'shadow') cam.track(x0, y0, x1, y1);
+      if (rec) rec.push({ scene: M.debug.scene, phase: M.debug.phase, layer: 'stage:' + V.owner, role: 'shape', owner: V.owner, kind: kind || 'fill', text: '', bbox: [x0, y0, x1 - x0, y1 - y0], alpha: ctx.globalAlpha });
     }
     V.note = note;
 

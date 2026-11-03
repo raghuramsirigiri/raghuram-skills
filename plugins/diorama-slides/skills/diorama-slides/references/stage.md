@@ -57,7 +57,8 @@ lines; let only its upper reaches pass behind the veil.
   following it (a mark that moves) when it moves.
 - **Stage labels** go through `api.label`: one size on screen whatever the
   zoom, fading before the stage's edges, giving way to anything you pass to
-  `api.avoid`. A label is a name or a year, never a figure. On a dark sky or
+  `api.avoid`, and on their own to whatever the beat's subject view has
+  drawn by then (so set labels last). A label is a name or a year, never a figure. On a dark sky or
   any ground that isn't the paper, give it a colour that reads there and
   say what it sits on (`{ color, on: '#hex' }`), so the audit checks its
   contrast against that and not against the paper.
@@ -136,6 +137,34 @@ An episodes story visits separate places, one beat each. They are still
   into sight; the source card returns to it.
 - **Frame each place at its own zoom**: a convoy and a forest want
   different ones. The camera's travel between them is the engine's.
+
+## A route on a schematic map (journey)
+
+A journey follows something that travels: a migration, a campaign, a
+route. Its world is a **schematic map**, drawn by you, never in the look of
+a real map product (no graticule, no road-map palette, no pins, no tiles,
+no product's styling or marks):
+
+- **Write the coastlines yourself**, a handful of longitude and latitude
+  points per coast, simplified until they read as shapes, as low land
+  slabs in their natural colours on a living sea. A world turned 45 degrees
+  to the iso axes lies square in the frame, north away from the camera and
+  east to the right.
+- **The route is the one accent line**, growing behind the traveller as
+  far as it has gone; a faint preview of the whole route may draw itself in
+  the hook. Earlier legs stay drawn.
+- **The traveller is drawn at a size that reads at the frame's scale**
+  (`api.s`), far larger than the map's own scale: say so in the source
+  card's `note`. Things at each stop (a flock on a mudflat, a camp) are
+  drawn the same way.
+- **The camera follows the traveller's mark**, and a leg that crosses
+  much of the map lifts it: the mark's fourth number dips mid-leg so the
+  whole leg is in view and returns as the traveller arrives.
+- **Stops live**: where the traveller rests, its world keeps going (a
+  tide, a crowd, the days passing at a rate, `w.accumulate`).
+- **Labels give way to the traveller on their own** when it is drawn in
+  the view named for the beat's mark; anything else they must clear goes
+  to `api.avoid`.
 
 ## Never static, never generic
 

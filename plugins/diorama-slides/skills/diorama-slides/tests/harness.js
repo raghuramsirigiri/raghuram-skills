@@ -80,7 +80,7 @@ const PAINTER = `Motion.things.works = {
     T.block(-8, -8, 2, 16, 16, h, m.N3);
     const turned = w.accumulate('pump', b => (b.id === 'big' ? 2 : 0.5));
     T.block(26, -3, 2, 6, 6, 3 + Math.sin(turned) * 0.5, m.N);
-    api.label('Works', -8, 10, 0, { dy: 8 });
+    api.label('Works', 20, -30, 0, { dy: 8 });
   }
 };`;
 

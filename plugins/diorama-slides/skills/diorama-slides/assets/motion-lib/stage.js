@@ -304,7 +304,14 @@
     // A view named after the mark this beat frames draws the beat's subject:
     // the audit keeps it inside the stage's room while the words hold.
     const framed = typeof cam.to.focus === 'string' ? cam.to.focus : null;
-    const view = (owner, origin) => M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font }, owner && (owner === framed || owner === 'subject') ? 'subject' : owner || 'world');
+    // Whatever the subject draws is tracked on screen, and every stage label
+    // gives way to it without the page having to say where it is.
+    const subj = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    const track = (x0, y0, x1, y1) => { subj.x0 = Math.min(subj.x0, x0); subj.y0 = Math.min(subj.y0, y0); subj.x1 = Math.max(subj.x1, x1); subj.y1 = Math.max(subj.y1, y1); };
+    const view = (owner, origin) => {
+      const role = owner && (owner === framed || owner === 'subject') ? 'subject' : owner || 'world';
+      return M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font, track: role === 'subject' ? track : null }, role);
+    };
     const worldX = sx => (sx - ax + cx) / (M.iso.COS * s);
     const range = [worldX(cam.box.x) - cam.box.h / s * 1.2, worldX(cam.box.x + cam.box.w) + cam.box.h / s * 1.2];
     const labelSize = Math.max(M.layout.MIN_TEXT + 2, M.layout.typeFor(C).units.size * 0.85);
@@ -333,7 +340,7 @@
         // whatever the painter asked them to avoid.
         const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + tw), y - B.y, B.y + B.h - (y + h));
         let a = clamp(edge / FADE) * ((o && o.alpha) == null ? 1 : o.alpha);
-        avoid.forEach(r => {
+        avoid.concat(subj.x1 > subj.x0 ? [subj] : []).forEach(r => {
           const gx = Math.max(r.x0 - (x + tw), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
