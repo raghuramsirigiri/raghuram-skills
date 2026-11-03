@@ -42,6 +42,11 @@ lines; let only its upper reaches pass behind the veil.
   `glide`) over the words' swap and half a second into the next words. The
   card, the kicker, the footer and every word above or below the stage
   never zoom or move.
+- **A long move climbs.** When the camera travels between two framings
+  further than its room can show at their scale, the engine raises it
+  mid-move (the zoom dips until both ends nearly fit) and brings it down
+  at the far end, so the viewer sees where it is going rather than a blur
+  of whatever lies between. Nothing to set; short moves are untouched.
 - **Frame what the beat acts on.** Pick the focus and zoom so the thing that
   changes reads at phone size: a loaf, a face, a gauge. When the audit's
   `action` check says a beat changes little, look first at whether its
@@ -98,7 +103,7 @@ painter needs comes in `w`:
 
 and in `api`: `view(owner, origin)` (an iso view; name it after the mark
 it draws, and whatever the current beat focuses on is that beat's subject,
-which the audit keeps inside the stage's room while the words hold), `mat`,
+which the audit keeps inside the stage's room while the words hold; draw in it only what stays at that place while the beat holds, and put traffic that passes through, boats or cars, in another view), `mat`,
 `iso`, `label`, `avoid`, `rect`, `room` (the stage's room on screen, for
 a sky or backdrop to fill), `rng(...keys)` (seeded), `ease`, `sstep`,
 `lerp`, `clamp`, `range` (the world's visible x range), `ctx`.
@@ -109,6 +114,28 @@ stay where the story left it after the beat ends, and the audit's `action`
 check asks "what if this beat had never happened?" by taking those away.
 A beat's `wait` (seconds) holds the words' swap while a long action plays;
 by default 1.4 s when the story's clock moves, else the plain swap.
+
+## Several places in one world (episodes)
+
+An episodes story visits separate places, one beat each. They are still
+**one world**, never a set of boards:
+
+- **Lay the places out in their real relation**, compressed: a coast with
+  its estuaries in order along it, a sea between two shores, a far ocean
+  beyond a near one. Say in `stage.setting` and in the source card's
+  `note` that the world is schematic and not to scale.
+- **Turn the world to fit the frame.** Run the line the places lie along
+  across the room's longer side (a world can lay its own axes at an
+  angle to the iso ones with a small helper), so the opening view holds
+  every place at a size that reads.
+- **Every place lives from the first frame**, and its beat's action happens
+  there when the camera arrives; what the action left behind stays (or
+  passes on by its own logic, `w.since`) while the camera is elsewhere.
+- **The hook can be the whole world** (a mark whose fourth number pulls
+  back from the first place), each place named by a label as it comes
+  into sight; the source card returns to it.
+- **Frame each place at its own zoom**: a convoy and a forest want
+  different ones. The camera's travel between them is the engine's.
 
 ## Never static, never generic
 

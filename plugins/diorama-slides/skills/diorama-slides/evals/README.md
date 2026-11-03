@@ -17,7 +17,7 @@ worked on doesn't go into the skill; the unseen topic is how that is caught.
 | transformation | cars evolving (`family-car-eras.md`) | the camera, box camera to phone | acceptance video passes |
 | lineup | dinosaurs and their cousins (`dinosaur-diversity.md`, the user's notes plus cited Wikipedia lengths) | the planets compared (NASA Planetary Fact Sheet; run once, untuned: it needed only a ball in the kit, and the audit's action check caught one weak beat, fixed in the video) | acceptance video built and audited (size beat reworked as a reveal); awaiting review |
 | assembly | Burj Khalifa construction (Wikipedia, "Burj Khalifa"; `examples/diorama-burj-khalifa/`) | how a suspension bridge is built: the Golden Gate Bridge (Wikipedia, "Golden Gate Bridge"; `examples/diorama-golden-gate/`; run once on the shipped engine with no engine change, audit clean after reframing its own world) | acceptance video built and audited clean (a tall subject: it set `stage.room: "behind"`); awaiting review |
-| episodes | WW2 tactics, a campaign per place (neutral, non-graphic) | five cities' flood defences | buildable; acceptance video not made yet |
+| episodes | WW2 tactics, a place per tactic (`ww2-tactics.md`, excerpts from four Wikipedia articles; `examples/diorama-ww2-tactics/`) | four cities' storm surge barriers (Wikipedia, "Thames Barrier", "Maeslantkering", "Saint Petersburg Dam", "MOSE"; `examples/diorama-flood-barriers/`; run once on the shipped engine: it exposed that check-video.js never parsed the page's own script, now a FAIL, and that traffic drawn in a beat's subject view sails out of its room, now in `stage.md`) | acceptance video built and audited clean; awaiting review |
 | journey | a migration route on a schematic map | a trade route across a continent | buildable; acceptance video not made yet |
 
 **A generality probe** (`bakery-morning.md`, invented): after the engine
@@ -37,6 +37,11 @@ source.
 
 ## Fixtures
 
+- `ww2-tactics.md`: verbatim excerpts from four Wikipedia articles (Battle
+  of the Atlantic, Battle of France, Operation Cartwheel, Mulberry
+  harbours) with section locators. It plants a range (30 to 70 ships),
+  "more than" and "over" hedges, and a bypassed base the excerpts never
+  say withered. A war topic: graded for neutral, non-graphic staging (eval 4).
 - `bakery-morning.md`: an invented neighbourhood note about one bakery's
   Saturday; hedges "about", "estimates", "usually"; clock times as claims.
   The generality probe above; no key.

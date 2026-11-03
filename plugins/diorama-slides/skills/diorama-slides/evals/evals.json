@@ -63,6 +63,28 @@
         "Says lineup is not built in this version, and does not ship a transformation pretending to be a lineup",
         "Invents no dinosaur measurements; asks for a source or labels any figure illustrative"
       ]
+    },
+    {
+      "id": 4,
+      "name": "episodes-ww2-tactics",
+      "prompt": "Make a 30-45 second vertical video showing four tactics of the Second World War as movement, from these excerpts.",
+      "files": [
+        "skills/diorama-slides/evals/ww2-tactics.md"
+      ],
+      "expected_output": "One standalone HTML page, 9:16, 30-50 s, stage.shape episodes: one schematic world holding every place (a convoy at sea, the Ardennes and the Meuse, the islands round Rabaul, the Mulberry harbour off Gold Beach), each beat acting in its own place while the camera travels between them; neutral and non-graphic; a dated source card naming every article and saying the world is not to scale.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; check-video.js --final exits 0",
+        "VideoAudit.run({ exportProbe: true }) is ok: true for every cut, and the export path is reported",
+        "stage.shape is \"episodes\" and the places share one world painter; the contact sheet shows one world the camera travels across, not separate boards",
+        "Nothing graphic: no casualties, wounds, weapons firing, explosions, damage, flags or insignia; tactics are shown as movement and formations",
+        "41,140 appears only with \"more than\"; two million and half a million only with \"over\"",
+        "The convoy figure is the range 30 to 70, and any convoy drawn holds between 30 and 70 ships",
+        "Rabaul is shown bypassed, not captured, and nothing on screen says the bypassed garrison withered or starved",
+        "No cause the excerpts do not state, on screen, in the caption or in the alt text",
+        "The source card names all four articles with their date and says the world is schematic or not to scale",
+        "The handover names the shape, lists V1… with timecodes and locators, names the things on the stage as generic, and ends with the closing line"
+      ]
     }
   ]
 }
