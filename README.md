@@ -251,9 +251,11 @@ compared, a thing being built, a place per episode, or a route on a schematic ma
 - Canvas 2D, WebCodecs and Web Audio only — **exports MP4** in the browser, no WebGL,
   ffmpeg or render server.
 
-Six finished videos are in [`examples/`](examples/): `diorama-bakery-morning`,
-`diorama-burj-khalifa`, `diorama-dinosaurs`, `diorama-family-car`,
-`diorama-golden-gate` and `diorama-planets`.
+Ten finished videos are in [`examples/`](examples/), one or more per story shape:
+`diorama-bakery-morning`, `diorama-burj-khalifa`, `diorama-dinosaurs`,
+`diorama-family-car`, `diorama-flood-barriers`, `diorama-godwit`,
+`diorama-golden-gate`, `diorama-planets`, `diorama-trans-siberian` and
+`diorama-ww2-tactics`.
 
 **Which video skill?** `explainer-video` for chart-led motion graphics;
 `diorama-slides` when the story is something visibly happening; `documentary-video`
@@ -797,7 +799,7 @@ plugins/
 ├── chart-honesty/        deck → charts that mislead, and the fix for each
 └── action-titles/        deck → slide titles as the claim each slide proves
 examples/                 finished outputs: two dashboards, a deck, a report, a one-pager,
-                          an email snapshot, a social post and six diorama-slides videos
+                          an email snapshot, a social post and ten diorama-slides videos
 docs/                     GitHub Pages landing page, and the sources of the README images
 .claude-plugin/           the marketplace manifest listing every plugin
 ```

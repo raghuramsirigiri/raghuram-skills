@@ -250,7 +250,7 @@ plugins/diorama-slides/
   skills/diorama-slides/    SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
                             (theme.js, the theme scripts and the muxers are copies)
 examples/                   finished outputs: two dashboards, deck, report, one-pager, email snapshot,
-                            social post, and six diorama-slides videos
+                            social post, and ten diorama-slides videos
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
 ```
