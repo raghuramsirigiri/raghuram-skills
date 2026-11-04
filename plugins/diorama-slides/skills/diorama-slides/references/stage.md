@@ -192,17 +192,52 @@ the world needs, for this video:
    and extrusions; trees and roofs are cones. Recognisable beats detailed,
    but an animal must look like a living animal, not a cut-out: a body that
    swells and tapers, legs that bend, a head with mass.
-3. **Its natural colours; the accent only for data.** Things take their
+3. **Draw it so it can't be mistaken.** Name the thing it is most
+   easily taken for (an An-124 for an An-225, a heron for a shoebill, a
+   generic tower for a named church) and the two or three features that
+   tell them apart: six engines and twin fins; a broad clog of a bill
+   held down against the neck; wings of columns falling in a curve. Draw
+   those features about half as big again as life, and turn the thing in
+   the world so they face the one camera, which sees the top, the +x and
+   the +y faces: a droop, a profile or a bill drawn edge-on to it isn't
+   there on screen. Everything else stays plain. Joints are where real
+   things go wrong in the kit: a bill, a limb, an engine starts inside the
+   body it hangs from, never floating beside it or stuck flat on it.
+4. **Its natural colours; the accent only for data.** Things take their
    own colours (`mat.tone`, `mat.nature`); the accent marks what a figure is
    about (the part of a stock that is gone, a meter's fill), never a
    thing's paint.
-4. **Figures come from the claims**, through `w.value` / `w.share`, never
+5. **Figures come from the claims**, through `w.value` / `w.share`, never
    typed, and the card states each figure the stage acts out. A count of
    real things is one per thing or per a stated group, with the key in the
    card's words.
-5. **A pure function of `w`.** No `Math.random`, `Date.now`, timers,
+6. **A pure function of `w`.** No `Math.random`, `Date.now`, timers,
    `requestAnimationFrame`, state kept between calls, or `fillText`
    (`check-video.js` fails each).
+
+### The things the story is about, on their own
+
+Each thing the story is about (`S1`, `S2`…, `tracing.md`) is drawn by a
+function of its own in the world painter's `heroes`, at its own origin,
+and the world calls it where the thing stands:
+
+```js
+Motion.things.mill = {
+  heroes: {
+    S1: { name: 'the mill', draw(V, api, turned) { /* the house, the wheel at angle turned (0 when absent) */ } }
+  },
+  draw(w, api) {
+    // … the meadow, the river …
+    this.heroes.S1.draw(api.view('wheel', [-20, 0, 0]), api, w.accumulate('wheel', b => b.index >= 1 ? 1.2 : 0));
+  }
+};
+```
+
+`VideoAudit.things()` draws each one alone on the paper for the cold read
+(`verify-and-ship.md` § 7.3); called with no state, a hero draws the form
+the story is most about. Background things (trees, traffic, a crowd) stay
+in the world's own `draw`. `check-video.js` warns when a world lists no
+heroes.
 
 ### The kit
 

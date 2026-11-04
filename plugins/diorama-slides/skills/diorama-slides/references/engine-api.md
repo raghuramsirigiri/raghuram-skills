@@ -107,6 +107,7 @@ stage → scenes/* → audio → mux-mp4 → mux-webm → export → player`. Th
 | Call | Does |
 | --- | --- |
 | `Motion.things.<name> = { marks(w), draw(w, api) }` | the page's world (`stage.md` § The world) |
+| `heroes: { S1: { name, draw(V, api, state) } }` on the world | each thing the story is about, drawn at its own origin; `VideoAudit.things()` shows each alone (`stage.md` § The things the story is about) |
 | `Motion.compile(spec, cut)` | the timeline: `{ W, H, fps, frames, duration, shape, stage, scenes[…] }`; throws naming the beat |
 | `Motion.seek(ctx, C, t, { frameT })` | paints the frame at `t`, as a pure function of `t` |
 | `Motion.stage.worldAt(C.stage, t)` | what the world painter gets at `t` (to debug a beat) |

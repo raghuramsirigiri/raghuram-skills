@@ -8,6 +8,7 @@
  *   await VideoAudit.run({ cut: 'main', exportProbe: true })
  *   const r = await VideoAudit.run({ cut: 'main', scenes: ['e2'] });   // one scene, while drafting
  *   r.stills()                                           // [{ handle, id, png }] at each scene's hold
+ *   await VideoAudit.things()                            // [{ id, name, png }] each hero thing alone
  *
  * Fails: a scene throws; text outside the safe zone; two text layers
  * overlapping; text below the minimum size; contrast below 4.5 (3 for large
@@ -410,5 +411,42 @@
     return M.player.contactSheet(C);
   }
 
-  root.VideoAudit = { run, contactSheet, fills, FILL };
+  // Each thing the story is about, alone on the paper and fitted to a square,
+  // for a reader who hasn't been told the topic: the world painter lists them
+  // as heroes: { S1: { name, draw(V, api) } }, each drawn at its own origin.
+  async function things(opts) {
+    opts = opts || {};
+    const spec = opts.spec || M.readSpec();
+    const C = M.compile(spec, opts.cut || Object.keys(spec.cuts)[0]);
+    const world = M.things[spec.stage && spec.stage.world];
+    const heroes = (world && world.heroes) || {};
+    const size = opts.size || 800, d = C.design, mat = M.iso.materials(d);
+    const clamp = (v, a, b) => Math.max(a == null ? 0 : a, Math.min(b == null ? 1 : b, v));
+    return Object.keys(heroes).map(id => {
+      const h = heroes[id];
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      const ctx = cv.getContext('2d');
+      const draw = (cam) => {
+        const view = () => M.iso.view(ctx, cam, 'subject');
+        const api = { ctx, view, mat, design: d, ease: M.ease, iso: M.iso, s: cam.s, lerp: (a, b, k) => a + (b - a) * k, clamp,
+          sstep: (a, b, v) => { const k = clamp((v - a) / (b - a)); return k * k * (3 - 2 * k); },
+          rng: (...keys) => M.rng(spec.meta.seed || 0, 'thing', id, ...keys), label() {}, avoid() {}, rect: () => ({ x0: 0, y0: 0, x1: 0, y1: 0 }),
+          room: { x: 0, y: 0, w: size, h: size } };
+        h.draw(view(), api);
+      };
+      // Measure at a rough scale (line widths are in pixels, so not 1), then fit.
+      const S0 = h.scale || 100;
+      const b = [Infinity, Infinity, -Infinity, -Infinity];
+      draw({ ax: 0, ay: 0, cx: 0, cy: 0, s: S0, track: (x0, y0, x1, y1) => { b[0] = Math.min(b[0], x0); b[1] = Math.min(b[1], y0); b[2] = Math.max(b[2], x1); b[3] = Math.max(b[3], y1); } });
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = d.bg; ctx.fillRect(0, 0, size, size);
+      if (!(b[2] > b[0])) return { id, name: h.name || id, png: null, msg: 'drew nothing on screen' };
+      const s = S0 * size * 0.86 / Math.max(b[2] - b[0], b[3] - b[1]);
+      draw({ ax: size / 2 - (b[0] + b[2]) / 2 * s / S0, ay: size / 2 - (b[1] + b[3]) / 2 * s / S0, cx: 0, cy: 0, s });
+      return { id, name: h.name || id, png: cv.toDataURL('image/png') };
+    });
+  }
+
+  root.VideoAudit = { run, contactSheet, fills, things, FILL };
 })(typeof window !== 'undefined' ? window : globalThis);
