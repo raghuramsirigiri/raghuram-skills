@@ -6,7 +6,7 @@ description: Turn an article, report, history, notes or a table into a short vid
 # Diorama slides
 
 A short video in one mode: a **card layer** that holds still for the whole
-video (the accent bar, the kicker, the headline with its figure, the units,
+video (the kicker, the headline with its figure, the units,
 the source footer, words swapping from beat to beat), drawn over a living
 **stage**, a toy-like 2.5D diorama where the story's things change and move.
 It sits between slides and a film: the card reads like a slide, the stage

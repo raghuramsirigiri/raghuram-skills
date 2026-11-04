@@ -144,11 +144,10 @@
       const wait = M.stage.travel(stage, i);
       return wait > 0 ? Object.assign({}, M.transitions.get('travel'), { dur: wait }) : M.transitions.get('swap');
     };
-    // What a scene's chrome occupies, for the art to keep clear of: the bar,
-    // its kicker, the footer's hairline and its source line.
+    // What a scene's chrome occupies, for the art to keep clear of: the kicker, the footer's hairline and its source line.
     const chromeBoxes = ch => {
       if (!ch) return [];
-      const S = fr.safe, out = [{ x: S.x, y: S.y, w: M.layout.RULE.accentW, h: M.layout.RULE.accentH }];
+      const S = fr.safe, out = [];
       if (ch.kicker) out.push({ x: ch.kicker.x, y: ch.kicker.y, w: ch.kicker.w, h: ch.kicker.h });
       if (rows) out.push({ x: S.x, y: zone.ruleY - 2, w: S.w, h: 4 });
       if (ch.source) ch.source.runs.forEach(run => out.push({ x: run.x, y: run.y, w: run.w, h: run.h }));
@@ -218,6 +217,7 @@
       scenes.push({
         id: it.id, type: it.type, index: i, def: it.def, spec: it.spec, built: b,
         layers: b.layers, rule: b.rule || null, used: it.used, art: artAt, chrome, reserved: it.reserved,
+        cards: cardsFor(b, chrome, it.reserved, fr, ctx),
         t0, t1, cStart, enterEnd: cStart + enter, exitStart, cEnd, ovIn, ovOut,
         enter, read: holdFloor, exit, minDur, dur, trIn, trOut, last
       });
@@ -230,9 +230,73 @@
 
     return {
       cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, profile: fr.profile, safe: fr.safe, fps, frames, duration, stage, shape: stage.st.shape,
+      // The cards the words sit on over the coloured stage: white, or the
+      // paper itself on a dark preset (white would fail its light ink).
+      textBox: design.dark ? design.bg : '#ffffff',
       scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design), grid: artGrid }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
       images: opts.images || M.images || {}
     };
+  }
+
+  // The cards the words sit on over the coloured stage: one round the
+  // card's block (kicker, headline, units and the figure or chart under
+  // them) and one round the footer's source line. Each is the block's own
+  // extent plus even padding, so a short headline gets a short card.
+  const CARD = { px: 10, py: 8, r: 6 };   // card px; x K at frame scale
+  function cardsFor(b, chrome, reserved, fr, ctx) {
+    const K = M.layout.K;
+    const ext = () => ({ x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+    const add = (e, x, y, w, h) => { if (!(w > 0 && h > 0)) return; e.x0 = Math.min(e.x0, x); e.y0 = Math.min(e.y0, y); e.x1 = Math.max(e.x1, x + w); e.y1 = Math.max(e.y1, y + h); };
+    const pad = e => {
+      if (!(e.x1 > e.x0)) return null;
+      const px = CARD.px * K, py = CARD.py * K;
+      const x = Math.max(0, e.x0 - px), y = Math.max(0, e.y0 - py);
+      return { x, y, w: Math.min(fr.W, e.x1 + px) - x, h: Math.min(fr.H, e.y1 + py) - y };
+    };
+    const top = ext();
+    if (chrome && chrome.kicker) add(top, chrome.kicker.x, chrome.kicker.y, chrome.kicker.w, chrome.kicker.h);
+    b.layers.forEach(L => {
+      if (L.kind === 'text') L.lines.forEach(ln => add(top, ln.x, ln.y, ln.w, ln.h));
+      else if (L.kind === 'counter') { const w = M.text.tabular(ctx, L.display, L.font).w; add(top, L.align === 'center' ? L.x + (L.boxW - w) / 2 : L.x, L.y, w, L.h); }
+      else if (L.kind === 'rect' || L.kind === 'image') add(top, L.x, L.y, L.w, L.h);
+    });
+    // A drawn chart's plot area (a line chart) is in the scene's reserved
+    // boxes; the stage's own full-frame box is not.
+    (reserved || []).forEach(r => { if (r.w < fr.W * 0.95) add(top, r.x, r.y, r.w, r.h); });
+    const foot = ext();
+    if (chrome && chrome.source) chrome.source.runs.forEach(r => add(foot, r.x, r.y, r.w, r.h));
+    return { top: pad(top), foot: pad(foot) };
+  }
+
+  // A card at alpha, eased from box a toward box b by k.
+  function drawCard(ctx, C, a, b, k, alpha) {
+    if (!C.textBox || alpha <= 0.001 || (!a && !b)) return;
+    const A = a || b, B = b || a, l = (p, q) => p + (q - p) * k;
+    if (!a || !b) alpha *= a ? 1 - k : k;
+    const K = M.layout.K;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    M.paint.rect(ctx, l(A.x, B.x), l(A.y, B.y), l(A.w, B.w), l(A.h, B.h), C.textBox, CARD.r * K);
+    ctx.restore();
+  }
+
+  // Both of a scene's cards, still.
+  function cardsSteady(ctx, C, sc, t) {
+    const c = sc.cards;
+    if (!c) return;
+    const a = sc.chrome ? arrival(C, sc, t - sc.cStart) : null;
+    drawCard(ctx, C, c.top, c.top, 1, a ? a.kicker : 1);
+    drawCard(ctx, C, c.foot, c.foot, 1, a ? a.source : 1);
+  }
+
+  // The cards through the transition from A to B: they ease to B's size;
+  // across a long travel, where no words are on screen, they fade out and
+  // back in at the new size instead of standing empty.
+  function cardsBetween(ctx, C, A, B, p, g, dur) {
+    const a = A.cards || {}, b = B.cards || {};
+    const alpha = dur > 0.5 ? Math.pow(Math.abs(1 - 2 * M.ease.clamp01(p)), 2) : 1;
+    const k = dur > 0.5 ? (p < 0.5 ? 0 : 1) : g;
+    drawCard(ctx, C, a.top, b.top, k, alpha);
+    drawCard(ctx, C, a.foot, b.foot, k, alpha);
   }
 
   // A scene's kicker and source line, placed in the shared frame. `key` says
@@ -274,8 +338,8 @@
     if (M.debug.record && M.debug.phase !== 'transition') M.debug.phase = e > 0 ? 'exit' : raw < 1 ? 'enter' : 'hold';
     if (e > 0) { ctx.globalAlpha *= 1 - e; ctx.translate(0, -24 * e); }
 
-    if (L.kind === 'text') drawText(ctx, L, p, raw, lt);
-    else if (L.kind === 'counter') drawCounter(ctx, C, L, frameLt == null ? lt : frameLt);
+    if (L.kind === 'text') { drawText(ctx, Object.assign({}, L, { bg: C.textBox }), p, raw, lt); }
+    else if (L.kind === 'counter') drawCounter(ctx, C, Object.assign({}, L, { bg: C.textBox }), frameLt == null ? lt : frameLt);
     else if (L.kind === 'rect') {
       const g = L.grow || 'x';
       const w = g === 'x' ? L.w * p : L.w, h = g === 'y' ? L.h * p : L.h;
@@ -310,7 +374,7 @@
     const n = lines.length;
     lines.forEach((ln, i) => {
       if (style === 'fade') {
-        M.paint.text(ctx, ln.text, ln.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: p, layer: L.id, role: L.role, size: L.size, large: L.large });
+        M.paint.text(ctx, ln.text, ln.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: p, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
         return;
       }
       if (style === 'brighten') {
@@ -320,8 +384,8 @@
         words.forEach((w, j) => {
           const idx = (L.wordIndex ? L.wordIndex[i] : 0) + j;
           const q = M.ease.clamp01(raw * total - idx);
-          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: (1 - q) * shown, layer: L.id, role: L.role, size: L.size, large: L.large });
-          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: q, layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: (1 - q) * shown, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
+          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: q, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
         });
         return;
       }
@@ -336,7 +400,7 @@
           if (q <= 0) return;
           ctx.save();
           M.paint.clipRect(ctx, w.x - 4, ln.y - 2, w.w + 8, ln.h + 4);
-          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { clip: [w.x - 4, ln.y - 2, w.w + 8, ln.h + 4], font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { clip: [w.x - 4, ln.y - 2, w.w + 8, ln.h + 4], font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
           ctx.restore();
         });
         return;
@@ -352,7 +416,7 @@
       M.paint.clipRect(ctx, cl[0], cl[1], cl[2], cl[3]);
       const dx = style === 'mask-left' ? -(1 - q) * Math.min(ln.w, 200) : 0;
       const dy = style === 'mask-left' ? 0 : (1 - q) * ln.h;
-      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { clip: cl, font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large });
+      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { clip: cl, font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
       ctx.restore();
     });
   }
@@ -379,7 +443,7 @@
     const r0 = M.debug.record ? M.debug.record.length : 0;
     tab.parts.forEach(pt => {
       const cx = x + pt.x + (pt.w - M.text.measure(ctx, pt.ch, L.font)) / 2;
-      M.paint.text(ctx, pt.ch, cx, L.y, { font: L.font, color: L.color, h: L.h, w: pt.w, alpha, layer: L.id + '#' + pt.x, role: 'value-glyph', size: L.size, large: true });
+      M.paint.text(ctx, pt.ch, cx, L.y, { font: L.font, color: L.color, h: L.h, w: pt.w, alpha, layer: L.id + '#' + pt.x, role: 'value-glyph', size: L.size, large: true, bg: L.bg });
     });
     if (M.debug.record) {
       // One record for the whole number, for overlap/read checks.
@@ -387,7 +451,7 @@
       for (let i = r0; i < r.length; i++) r[i].skip = true;
       // In frame pixels, through any transform, like paint.text's records.
       const m = ctx.getTransform ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
-      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
+      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, bg: L.bg || null, large: true });
     }
     return x + tab.w;
   }
@@ -409,7 +473,7 @@
   }
 
   // ── chrome: the parts every scene shares ─────────────────────────────
-  // The accent bar (the through-line), the kicker line under it and the
+  // The kicker line at the top and the
   // footer (a hairline over the source line) sit in one place for the whole
   // video (C.zone), outside the scenes, and stay still through every
   // transition. Only their words change, and only when the next scene's
@@ -425,26 +489,7 @@
     const prev = C.scenes[sc.index - 1];
     if (prev && prev.chrome) return null;
     const q = (at, dur, e) => M.ease[e || 'outQuint'](M.ease.clamp01((lt - at) / dur));
-    return { bar: q(0, 0.5), kicker: q(0, 0.5), hair: q(0.7, 0.6, 'glide'), source: q(0.8, 0.5) };
-  }
-
-  // The bar, drawn in to `shown` (0..1) of its width, at `alpha`.
-  function drawBar(ctx, C, shown, alpha) {
-    const S = C.safe, R = M.layout.RULE;
-    const w = R.accentW * shown;
-    if (w <= 0.5 || alpha <= 0.001) return;
-    ctx.save(); ctx.globalAlpha *= alpha;
-    M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
-    ctx.restore();
-  }
-
-  // The footer's hairline, drawn in to `shown` of the safe width, at `alpha`.
-  function drawHair(ctx, C, shown, alpha) {
-    const Z = C.zone, S = C.safe;
-    if (!Z.rows || shown <= 0.001 || alpha <= 0.001) return;
-    ctx.save(); ctx.globalAlpha *= alpha;
-    M.paint.line(ctx, S.x, Z.ruleY, S.x + S.w * shown, Z.ruleY, C.design.hair, M.layout.RULE.hair);
-    ctx.restore();
+    return { kicker: q(0, 0.5), source: q(0.8, 0.5) };
   }
 
   // A kicker, shifted dy inside its own line's mask.
@@ -454,14 +499,14 @@
     const clip = [k.x - 6, k.y - 4, C.safe.w + 12, k.h + 8];
     ctx.save();
     M.paint.clipRect(ctx, clip[0], clip[1], clip[2], clip[3]);
-    M.paint.text(ctx, k.text, k.x, k.y + dy, { clip, font: k.font, color: k.color, h: k.h, w: k.w, alpha, layer: 'chrome-kicker', role: 'kicker', size: k.size });
+    M.paint.text(ctx, k.text, k.x, k.y + dy, { clip, font: k.font, color: k.color, h: k.h, w: k.w, alpha, layer: 'chrome-kicker', role: 'kicker', size: k.size, bg: C.textBox });
     ctx.restore();
   }
 
   function drawSource(ctx, C, sc, src, alpha) {
     if (!src || alpha <= 0.001) return;
     M.debug.scene = sc.id;
-    src.runs.forEach((r, i) => M.paint.text(ctx, r.text, r.x, r.y, { font: r.font, color: r.color, h: r.h, w: r.w, alpha, layer: 'chrome-source-' + i, role: 'source', size: src.size }));
+    src.runs.forEach((r, i) => M.paint.text(ctx, r.text, r.x, r.y, { font: r.font, color: r.color, h: r.h, w: r.w, alpha, layer: 'chrome-source-' + i, role: 'source', size: src.size, bg: C.textBox }));
   }
 
   // The chrome on a frame inside scene sc.
@@ -471,8 +516,6 @@
     const a = arrival(C, sc, t - sc.cStart);
     const phase = M.debug.phase;
     if (M.debug.record) M.debug.phase = a && a.source < 1 ? 'enter' : 'hold';
-    drawBar(ctx, C, a ? a.bar : 1, 1);
-    drawHair(ctx, C, a ? a.hair : 1, 1);
     if (ch.kicker) { const q = a ? a.kicker : 1; drawKicker(ctx, C, sc, ch.kicker, Math.min(1, q * 1.4), (1 - q) * ch.kicker.h); }
     drawSource(ctx, C, sc, ch.source, a ? a.source : 1);
     M.debug.phase = phase;
@@ -483,8 +526,6 @@
   function chromeBetween(ctx, C, A, B, p, g) {
     const a = A.chrome, b = B.chrome;
     if (!a) return;
-    drawBar(ctx, C, 1, b ? 1 : 1 - g);
-    drawHair(ctx, C, 1, b ? 1 : 1 - g);
     const ka = a.kicker, kb = b && b.kicker;
     if (ka && kb && ka.key === kb.key) drawKicker(ctx, C, A, ka, 1, 0);
     else {
@@ -525,6 +566,7 @@
       if (M.debug.record) M.debug.phase = 'transition';
       M.stage.paint(ctx, C, t, next.id);
       drawArt(ctx, C, sc.art, next.art, g);
+      cardsBetween(ctx, C, sc, next, p, g, tr.dur);
       // The chrome stays still over the transition; only its words change.
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, next.art, 1); } });
       chromeBetween(ctx, C, sc, next, p, g);
@@ -537,6 +579,7 @@
       // On the first scene the dots grow in; after that they hold.
       if (sc.index === 0) drawArt(ctx, C, null, sc.art, M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)));
       else drawArt(ctx, C, sc.art, sc.art, 1);
+      cardsSteady(ctx, C, sc, t);
       paintScene(ctx, C, sc, t, frameT);
       chromeSteady(ctx, C, sc, t);
     }

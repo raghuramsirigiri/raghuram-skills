@@ -34,8 +34,8 @@ Read at compile time from the loaded `theme.js`:
 
 Pick `default` unless the content's register clearly calls for another, or
 the user asks ("make it darker" → a dark preset). Never ask about style up
-front. On a dark preset, check the world's colours still read against the
-paper around the stage.
+front. On a dark preset, check the world's colours still read; the words'
+boxes take the dark paper instead of white.
 
 ## Brand recolour
 
@@ -68,16 +68,19 @@ the user's own. Offer a neutral preset instead.
 The card is a social card that never leaves the frame. Top to bottom (in a
 wide frame, down the left 40% column):
 
-1. **the through-line**, the short accent bar, at the top-left of the safe
-   area;
-2. **kicker**, muted, 27.5 px, on its own line under the bar;
-3. **headline**, stating the finding with its number: weight 700, ink,
+1. **kicker**, muted, 27.5 px, on its own line at the top-left of the
+   safe area (no accent bar: the words sit over a full-frame world);
+2. **headline**, stating the finding with its number: weight 700, ink,
    55 px, balanced lines, always starting at the same point;
-4. **units line**, muted, 30 px;
-5. **one figure or one flat chart**, when the beat has one;
-6. **the stage**, in the room left down to the footer (beside the column
-   in a wide frame);
-7. **source line** under a hairline, 25 px: *Source:* in muted, the source
+3. **units line**, muted, 30 px;
+4. **one figure or one flat chart**, when the beat has one;
+5. **the stage**, under all of it, filling the whole frame, its focus
+   centred. Items 1–4 sit together on **one white card** (rounded, even
+   padding, as wide as the block's longest line or its chart), and the
+   source line on a second small card: one card per block, never a box per
+   line. Between beats the cards ease to the next beat's size; across a
+   long camera travel they fade out and back in;
+6. **source line** on its own card at the foot, 25 px: *Source:* in muted, the source
    name in semibold ink, the date muted. Built from the claims the beat
    shows.
 

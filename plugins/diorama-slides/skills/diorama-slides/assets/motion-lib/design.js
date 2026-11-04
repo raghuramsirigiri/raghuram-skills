@@ -79,7 +79,7 @@
   }
 
   // ── the frame every scene shares ─────────────────────────────────────
-  // The accent bar, the kicker line under it and the footer (a hairline over
+  // The kicker line at the top of the safe area and the footer (a hairline over
   // the source line) sit in one place for the whole video, per format, and
   // stay still through every transition: core.js draws them outside the
   // scenes and changes only their words. `rows` is the video's footer height
@@ -89,7 +89,7 @@
   //   frameZone(frame, rows) -> { kickerY, kickerH, top, bottom, ruleY, rowsY, rows }
   function frameZone(F, rows) {
     const S = F.safe, K = M.layout.K, R = M.layout.RULE, TY = M.layout.typeFor(F);
-    const kickerY = S.y + R.accentH + 8 * K;
+    const kickerY = S.y;
     const ruleY = S.y + S.h - rows * TY.source.lh - TY.source.pad;
     return {
       kickerY, kickerH: TY.kicker.lh, top: kickerY + TY.kicker.lh + TY.kicker.gap,

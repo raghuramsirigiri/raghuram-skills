@@ -86,6 +86,19 @@
     ctx.restore();
   }
 
+  // The box a line of words sits on over the coloured stage: a rounded
+  // rectangle a little wider and taller than the line box (x, y, w, h).
+  // pad: [horizontal, top, bottom] in px; by default from the line height.
+  function textBox(ctx, x, y, w, h, color, alpha, pad) {
+    const a = alpha == null ? 1 : alpha;
+    if (!color || a <= 0.001 || w <= 0 || h <= 0) return;
+    const px = pad ? pad[0] : Math.round(h * 0.3), pt = pad ? pad[1] : Math.round(h * 0.08), pb = pad ? pad[2] : Math.round(h * 0.08);
+    ctx.save();
+    ctx.globalAlpha *= a;
+    rect(ctx, x - px, y - pt, w + 2 * px, h + pt + pb, color, Math.round(h * 0.14));
+    ctx.restore();
+  }
+
   // Text. Draws at line-box top `y` with height `h` (textBaseline middle).
   function text(ctx, str, x, y, o) {
     const a = o.alpha == null ? 1 : o.alpha;
@@ -138,6 +151,6 @@
 
   function clipRect(ctx, x, y, w, h) { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
 
-  M.paint = { rect, line, polyline, dot, hatch, text, grain, clipRect };
+  M.paint = { rect, line, polyline, dot, hatch, text, textBox, grain, clipRect };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.paint;
 })(typeof window !== 'undefined' ? window : globalThis);

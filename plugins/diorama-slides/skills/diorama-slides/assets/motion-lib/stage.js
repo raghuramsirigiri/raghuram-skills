@@ -54,36 +54,31 @@
   const SETTLE = 0.5;        // the camera keeps easing this long into the next beat's words
   const INTRO = 0.6;         // the stage arrives over the first beat's first 0.6 s
   const WAIT = 1.4;          // the swap's quiet stretch when story time changes
-  const VEIL = 0.86;         // how much paper sits behind the words when the stage runs behind the card
-  const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
+    const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
 
   // ── the stage's room, per beat ───────────────────────────────────────
-  // A tall or square frame: under the card's words, the whole frame width,
-  // down to the footer. Beats without a figure or chart share one top (the
-  // lowest their words reach), so the stage holds still from beat to beat;
-  // a beat with one gives the stage the room under it, and the camera
-  // reframes. A wide frame: the room right of the words' column.
+  // The stage fills the whole frame, edge to edge, in every format: the
+  // world is coloured, so it is the picture, not an inset. The card's words
+  // sit over it on white cards (core.js). The camera frames each beat's
+  // focus in `focus`, a centred rectangle, so the subject sits in the middle
+  // of the frame, mostly clear of the words above it and the footer below.
   //
-  // `stage.room: "behind"` lets the stage run up behind the card instead
-  // (a tall subject, a sky): the room is the whole frame down to the footer,
-  // and the words sit on a paper veil that thins out below them (`under`).
-  function boxes(list, fr, zone, room) {
+  // `words` and `foot` are the card's own rectangles on this beat (the
+  // headline down to its figure or chart, and the footer): stage labels give
+  // way to them. `stage.room` ("below" or "behind") is still accepted from
+  // older specs and means the same full frame.
+  const FOCUS = { tall: [0.84, 0.5], square: [0.76, 0.56], wide: [0.62, 0.62] };
+  function boxes(list, fr, zone) {
     const S = fr.safe, K = M.layout.K;
-    const bottom = zone.ruleY - 8 * K;
-    if (room === 'behind') {
-      const card = it => it.built.card || { bottom: zone.top };
-      return list.map(it => ({ x: 0, y: 0, w: fr.W, h: bottom, inner: { bottom: true }, under: card(it).bottom + 6 * K }));
-    }
-    if (fr.cls === 'wide') {
-      const colW = Math.round(S.w * M.layout.PROFILE.wide.col);
-      const x = S.x + colW + 20 * K;
-      return list.map(() => ({ x, y: 0, w: fr.W - x, h: bottom, inner: { left: true, bottom: true } }));
-    }
-    const card = it => it.built.card || { bottom: zone.top, extra: false };
-    const common = Math.max(zone.top, ...list.filter(it => !card(it).extra).map(it => card(it).bottom));
+    const [fw, fh] = FOCUS[fr.cls] || FOCUS.square;
+    const focus = { x: fr.W * (1 - fw) / 2, y: fr.H * (1 - fh) / 2, w: fr.W * fw, h: fr.H * fh };
+    const foot = { x0: 0, y0: zone.ruleY - 6 * K, x1: fr.W, y1: fr.H };
+    const card = it => it.built.card || { bottom: zone.top };
     return list.map(it => {
-      const top = (card(it).extra ? Math.max(common, card(it).bottom) : common) + 14 * K;
-      return { x: 0, y: top, w: fr.W, h: Math.max(40, bottom - top), inner: { top: true, bottom: true } };
+      const words = fr.cls === 'wide'
+        ? { x0: 0, y0: 0, x1: S.x + (card(it).colW || Math.round(S.w * M.layout.PROFILE.wide.col)) + 12 * K, y1: card(it).bottom + 12 * K }
+        : { x0: 0, y0: 0, x1: fr.W, y1: card(it).bottom + 12 * K };
+      return { x: 0, y: 0, w: fr.W, h: fr.H, inner: {}, focus, words, foot };
     });
   }
 
@@ -102,7 +97,7 @@
       return +c.value;
     };
     if (st.room != null && st.room !== 'below' && st.room !== 'behind') throw new Error('stage.room must be "below" (the default) or "behind"');
-    const bx = boxes(o.list, o.fr, o.zone, st.room);
+    const bx = boxes(o.list, o.fr, o.zone);
     let time = st.time != null ? num(st.time, 'stage.time') : 0, focus = null;
     const beats = o.list.map((it, i) => {
       const dir = (it.spec && it.spec.stage) || {};
@@ -216,7 +211,7 @@
     }
     const a = S.beats[Math.max(0, i - 1)], b = S.beats[i], w = S.windows[i];
     const k = w ? M.ease.glide(clamp((t - w[0]) / (w[1] - w[0]))) : 1;
-    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner, under: q.under == null ? null : lerp(p.under == null ? q.under : p.under, q.under, k) });
+    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner, focus: q.focus, words: k < 0.5 ? p.words : q.words, foot: q.foot });
     return { index: i, k, from: a, to: b, zoom: lerp(a.zoom, b.zoom, k), look: a.look.map((v, n) => lerp(v, b.look[n], k)), box: mixBox(a.box, b.box) };
   }
 
@@ -236,7 +231,7 @@
     if (!(cam.k > 0 && cam.k < 1)) return 1;
     const dx = fb[0] - fa[0], dy = fb[1] - fa[1], dz = fb[2] - fa[2];
     const dist = Math.hypot((dx - dy) * M.iso.COS, (dx + dy) / 2 - dz);
-    const room = Math.min(cam.box.w, cam.box.h);
+    const room = Math.min((cam.box.focus || cam.box).w, (cam.box.focus || cam.box).h);
     const sA = base * cam.from.zoom * (fa[3] > 0 ? fa[3] : 1), sB = base * cam.to.zoom * (fb[3] > 0 ? fb[3] : 1);
     if (!(dist * Math.min(sA, sB) > room)) return 1;
     const ratio = Math.min(1, (0.8 * room / dist) / lerp(sA, sB, cam.k));
@@ -294,10 +289,11 @@
     // A mark's optional fourth number scales the zoom: the world can move
     // the camera in or out during a beat (a reveal), still on the world only.
     const zm = lerp(fa[3] > 0 ? fa[3] : 1, fb[3] > 0 ? fb[3] : 1, cam.k);
-    const base = fit(cam.box, S.st.size);
+    const base = fit(cam.box.focus || cam.box, S.st.size);
     const s = base * cam.zoom * zm * climb(fa, fb, cam, base);
     const F = [0, 1, 2].map(n => lerp(fa[n], fb[n], cam.k) + cam.look[n]);
-    const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
+    const Fb = cam.box.focus || cam.box;
+    const ax = Fb.x + Fb.w / 2, ay = Fb.y + Fb.h / 2;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
     const mat = S.mat || (S.mat = M.iso.materials(S.design));
     M.debug.scene = sceneId;
@@ -340,50 +336,19 @@
         // whatever the painter asked them to avoid.
         const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + tw), y - B.y, B.y + B.h - (y + h));
         let a = clamp(edge / FADE) * ((o && o.alpha) == null ? 1 : o.alpha);
-        avoid.concat(subj.x1 > subj.x0 ? [subj] : []).forEach(r => {
+        avoid.concat(subj.x1 > subj.x0 ? [subj] : [], B.words ? [B.words] : [], B.foot ? [B.foot] : []).forEach(r => {
           const gx = Math.max(r.x0 - (x + tw), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
         if (a <= 0.01) return;
-        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: (o && o.on) || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
+        const on = (o && o.on) || C.textBox;
+        if (C.textBox && !(o && o.on)) M.paint.textBox(ctx, x, y, tw, h, C.textBox, a);
+        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: on || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
       }
     };
     ctx.save();
     ctx.globalAlpha *= M.ease.outQuint(clamp(t / INTRO));
     world.draw(w, api);
-    ctx.restore();
-    fade(ctx, C, cam.box);
-  }
-
-  // The stage dissolves into the paper at its inner edges (toward the card's
-  // words and the footer), and nothing of it shows beyond them. Frame edges
-  // are the stage's own: things run off them.
-  function fade(ctx, C, B) {
-    const bg = C.design.bg, W = C.W, H = C.H;
-    ctx.save();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = bg;
-    const inner = B.inner || {};
-    if (inner.top) ctx.fillRect(0, 0, W, Math.max(0, B.y));
-    if (inner.left) ctx.fillRect(0, 0, Math.max(0, B.x), H);
-    if (inner.bottom) ctx.fillRect(0, B.y + B.h, W, H - (B.y + B.h));
-    const band = (x0, y0, x1, y1, rx, ry, rw, rh) => {
-      if (!ctx.createLinearGradient) return;
-      const g = ctx.createLinearGradient(x0, y0, x1, y1);
-      g.addColorStop(0, bg); g.addColorStop(1, bg + '00');
-      ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh);
-    };
-    if (inner.top) band(0, B.y, 0, B.y + FADE, 0, B.y, W, FADE);
-    if (inner.left) band(B.x, 0, B.x + FADE, 0, B.x, 0, FADE, H);
-    if (inner.bottom) band(0, B.y + B.h, 0, B.y + B.h - FADE, 0, B.y + B.h - FADE, W, FADE);
-    // Behind the card: a paper veil under the words, thinning out below them,
-    // so the headline reads while the world rises behind it.
-    if (B.under != null) {
-      ctx.globalAlpha = VEIL;
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, B.under);
-      band(0, B.under, 0, B.under + FADE * 1.8, 0, B.under, W, FADE * 1.8);
-      ctx.globalAlpha = 1;
-    }
     ctx.restore();
   }
 
@@ -404,6 +369,6 @@
     return out;
   }
 
-  M.stage = { NAMES, plan, travel, finish, paint, cameraAt, fit, climb, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
+  M.stage = { NAMES, FOCUS, plan, travel, finish, paint, cameraAt, fit, climb, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.stage;
 })(typeof window !== 'undefined' ? window : globalThis);

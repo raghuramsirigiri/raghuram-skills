@@ -53,9 +53,7 @@ determinism (and that stage words go through `api.label`) and
 offline-ness. Read every row; fix every FAIL in the spec,
 then run it again. A WARN is a judgement call: read it, act on it or say
 why not. The `timing` rows print each beat's handle and length: that is
-the beat list for the handover. A `stage` WARN means a beat leaves the
-stage too little room: shorten its words, or give its chart a beat of its
-own.
+the beat list for the handover.
 
 ### 7.2 Run the audit in a browser
 
@@ -81,8 +79,7 @@ seconds, and **fails** on:
 - nothing readable by 0.5 s;
 - the export probe not round-tripping;
 - `stage`: what the world draws under the beat's focus mark, while it holds,
-  leaving its stage room (into the card's words, past the footer, off the
-  frame), or a stage label touching it.
+  leaving the frame, or a stage label touching it.
 
 Stage labels ride the world, so they are judged for size, contrast and the
 subject, not for holding still. It **warns** on single-frame pops, a stage
