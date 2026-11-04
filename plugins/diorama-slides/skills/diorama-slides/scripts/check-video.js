@@ -88,7 +88,10 @@ const SHAPES = manifest.shapes;
 if (!stg) shape.push('no "stage": every video is a card over a living stage (references/stage.md)');
 else {
   if (!SHAPES[stg.shape]) shape.push('stage.shape must be one of ' + Object.keys(SHAPES).join(', '));
-  else if (!SHAPES[stg.shape].verified) warn('stage', 'stage.shape "' + stg.shape + '" has not been through its acceptance video yet: look at the contact sheet harder (verified: ' + Object.keys(SHAPES).filter(k => SHAPES[k].verified).join(', ') + ')');
+  // A built shape whose acceptance video hasn't been signed off is a note,
+  // not a WARN: a warning that fires on most videos teaches the reader to
+  // skim warnings (references/story.md § The shape).
+  else if (!SHAPES[stg.shape].verified) pass('stage', 'stage.shape "' + stg.shape + '": built and audited, acceptance review pending; give its contact sheet an extra look (signed off: ' + Object.keys(SHAPES).filter(k => SHAPES[k].verified).join(', ') + ')');
   const registered = new Set([...html.matchAll(/Motion\.things\.([A-Za-z_$][\w$]*)\s*=/g)].map(x => x[1]));
   if (!stg.world) shape.push('stage.world: name the page\'s world painter (Motion.things.<name>)');
   // The world is decided before it is drawn: where the story naturally

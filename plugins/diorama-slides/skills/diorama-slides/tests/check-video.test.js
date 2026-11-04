@@ -43,11 +43,12 @@ test('meta.style fails: this skill has one mode', () => {
   assert.ok(fails(check(s)).some(x => /one mode/.test(x)));
 });
 
-test('a shape that hasn\'t been through its acceptance video warns, and still builds', () => {
+test('a shape awaiting its acceptance review is a note, not a warning, and still builds', () => {
   const s = FIXTURE_SPEC(); s.stage.shape = 'journey';
   const r = check(s);
   assert.deepStrictEqual(fails(r), []);
-  assert.ok(r.rows.some(x => x.level === 'WARN' && /"journey" has not been through its acceptance video/.test(x.detail)));
+  assert.ok(r.rows.some(x => x.level === 'PASS' && /"journey": built and audited, acceptance review pending/.test(x.detail)));
+  assert.ok(!r.rows.some(x => x.level === 'WARN' && /acceptance/.test(x.detail)));
 });
 
 test('a world that lists no heroes warns: its things can\'t be shown alone for the cold read', () => {

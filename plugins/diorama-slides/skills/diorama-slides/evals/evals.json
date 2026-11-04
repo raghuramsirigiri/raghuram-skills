@@ -22,6 +22,8 @@
         "No cause linking fuel prices to the Compact on screen, on the stage, in the caption, the alt text or the chat",
         "No 1979 top speed is shown; any top-speed chart is bars, never an evenly spaced line",
         "No real car brand, model or logo; the drawn features are the ones the guide names",
+        "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
         "The handover names the shape, lists V1… with timecodes and locators and S1 with its forms, and ends with the closing line"
       ]
     },
@@ -53,15 +55,26 @@
     },
     {
       "id": 3,
-      "name": "unbuilt-shape",
+      "name": "lineup-dinosaurs",
       "prompt": "Make a vertical video comparing five dinosaurs by size, then by what they ate, then by how they hunted. Use these notes.",
-      "files": [],
-      "expected_output": "Recognises a lineup; says this version builds only transformation and that lineup is not built yet; does not force the story into a transformation or invent figures; asks for or names a source for the dinosaur figures; offers to plan the lineup spec or wait for the shape.",
-      "runs": 1,
+      "files": [
+        "skills/diorama-slides/evals/dinosaur-diversity.md"
+      ],
+      "expected_output": "One standalone HTML page, 9:16, 30-90 s, stage.shape lineup: the cast living in their own places (land, river, sea, sky), pulled together only for the beat whose insight is the size comparison. Every size from the notes or the cited Wikipedia sentences with its hedge; pterosaurs and marine reptiles named as cousins, never dinosaurs; Quetzalcoatlus's figure a wingspan. The notes say little about diet or hunting, so the handover says what was left out rather than inventing it. A dated source card naming the notes and Wikipedia.",
+      "runs": 3,
       "assertions": [
-        "Names the shape as lineup",
-        "Says lineup is not built in this version, and does not ship a transformation pretending to be a lineup",
-        "Invents no dinosaur measurements; asks for a source or labels any figure illustrative"
+        "finalize.js exits 0; check-video.js --final exits 0",
+        "VideoAudit.run({ exportProbe: true }) is ok: true for every cut, and the export path is reported",
+        "stage.shape is \"lineup\"; the contact sheet shows the animals in the places the notes give them (land, river, sea, sky), not standing in a row on a board for every beat",
+        "Pterosaurs, Quetzalcoatlus, plesiosaurs, ichthyosaurs and mosasaurs are never called dinosaurs on screen, in the caption or in the alt text",
+        "Quetzalcoatlus's 10–11 m is given as a wingspan, with the source's 'estimates' wording, never as a length",
+        "The sprint speed appears only with 'likely' and 'up to'; Archaeopteryx's 50 cm only with 'about'; Mosasaurus's 12 m only with 'up to' or 'estimated'",
+        "Argentinosaurus's size is shown from one source with its locator, never 'over 100 feet' and 30–35 m mixed or converted without a working",
+        "No diet or hunting fact appears that the notes don't state, and the handover says which of the asked-for comparisons the notes don't cover",
+        "Each animal is drawn as a living animal (a lofted body that swells and tapers, legs that bend, a head with mass), not a cut-out",
+        "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover names the shape, lists V1… with timecodes and locators, says the video is long for a feed if it runs past 60 s, and ends with the closing line"
       ]
     },
     {
@@ -83,6 +96,8 @@
         "Rabaul is shown bypassed, not captured, and nothing on screen says the bypassed garrison withered or starved",
         "No cause the excerpts do not state, on screen, in the caption or in the alt text",
         "The source card names all four articles with their date and says the world is schematic or not to scale",
+        "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
         "The handover names the shape, lists V1… with timecodes and locators, names the things on the stage as generic, and ends with the closing line"
       ]
     },
@@ -103,7 +118,68 @@
         "11,026 km and nine days are given to \"one tracked bird\", never to E7; 41 days only with \"about\"; 7,000 km only with \"approximately\"",
         "29,280 km, 174 days, 20 days of flying and 11,680 km in eight days are E7's; \"record\" appears only as the source words it",
         "The godwit is drawn as a living wader (a body with volume, long legs, long upturned bill), red underparts only for breeding",
+        "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
         "The handover names the shape, lists V1… with timecodes and locators, and ends with the closing line"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "assembly-burj-khalifa",
+      "prompt": "Make a 30-45 second vertical video of how the Burj Khalifa was built, from these excerpts.",
+      "files": [
+        "skills/diorama-slides/evals/burj-construction.md"
+      ],
+      "expected_output": "One standalone HTML page, 9:16, 30-50 s, stage.shape assembly: one desert site where the foundation goes in and the tower rises step by step, the camera rising with it; every hedge kept; the 606 m pumping height a 'then' world record; the vanity-height view attributed; one spire figure with its own locator; a dated source card.",
+      "runs": 3,
+      "assertions": [
+        "finalize.js exits 0; check-video.js --final exits 0",
+        "VideoAudit.run({ exportProbe: true }) is ok: true for every cut, and the export path is reported",
+        "stage.shape is \"assembly\"; the contact sheet shows one tower rising on one site, not separate scenes",
+        "45,000 m3 appears only with 'over', 110,000 tonnes only with 'more than', 50 m deep only with 'more than'",
+        "The 606 m pumping height is called a 'then world record' wherever it is called a record; never a record without 'then'",
+        "'Vanity height' appears only attributed ('widely considered'), never as the video's own judgement",
+        "The spire is given one height with its own locator (242.6 m from the lead or 244 m from Architecture and design); the two are never shown as one figure without saying they differ",
+        "If the piles are counted on the stage, there are 192 of them, or a stated group per pile with the key in the card",
+        "No cause the excerpts do not state, on screen, on the stage, in the caption or in the alt text",
+        "Skidmore, Owings & Merrill, if named, is set as text, with no logo",
+        "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover names the shape, lists V1… with timecodes and locators and S1 with its forms, and ends with the closing line"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "values-source-routes-to-explainer",
+      "prompt": "Turn this annual summary into a 30 second vertical video for our socials.",
+      "files": [
+        "skills/diorama-slides/evals/ferry-annual-summary.md"
+      ],
+      "expected_output": "Recognises that almost every finding is a value (fares, shares, a survey, costs) with nothing that happens to a thing in the world, says so, and recommends explainer-video (slides with charts) before building. If the user's request or a stated reason leads it to build anyway, values are flat charts in the card while the stage keeps living; the satisfaction change keeps its margin-of-error caveat; no cause links fuel to the fare rise; the forecast keeps 'expect … could' and 'if current trends continue'.",
+      "runs": 2,
+      "assertions": [
+        "Says, before building, that most of the summary's findings are values with no consequence a viewer could see happen in the world",
+        "Recommends explainer-video for this source, and doesn't silently build a diorama of ferries acting out percentages",
+        "If a page is built, every value is a flat chart in the card or a figure in the copy, never a 3D chart or a grid of boxes",
+        "Nothing on screen, in the caption or in chat says satisfaction fell without the ¶4 caveat that the change is within the margin of error",
+        "No cause links fuel costs to the fare rise anywhere, quoting ¶6 if the link comes up",
+        "The 2028 commuter share appears only with 'expect', 'could' and 'if current trends continue'",
+        "Every figure shown reproduces from the summary with a ¶ locator"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "no-source-topic",
+      "prompt": "Make a 30 second vertical video showing how a honeybee colony builds its comb over a summer.",
+      "files": [],
+      "expected_output": "No source was given, so either asks for one (and offers to go ahead with illustrative figures) or builds with every figure labelled illustrative in the frame and on the source card, and says so in chat. Never fetches figures from the web without the user naming or accepting a source. If built: an assembly in a hive, bees drawn with volume.",
+      "runs": 1,
+      "assertions": [
+        "Fetches nothing from the web unless the user names or accepts a source",
+        "Either asks for a source before building, or builds and says in chat that every figure is illustrative",
+        "If a page is built, every figure is a ledger claim of kind illustrative, the frame says 'illustrative' wherever a figure appears, and the source card says so",
+        "No figure on screen, in the caption or in the alt text reads as a measurement of real bees without being labelled illustrative",
+        "If a page is built, stage.shape is \"assembly\" and the bees are drawn as living insects with volume, not dots or cut-outs"
       ]
     }
   ]
