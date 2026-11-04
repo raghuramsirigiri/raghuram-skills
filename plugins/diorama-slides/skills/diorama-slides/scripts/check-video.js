@@ -345,6 +345,12 @@ html.replace(/<script(?![^>]*\bsrc=)(?![^>]*application\/json)[^>]*>([\s\S]*?)<\
   own.push(code);
 });
 const detFails = [];
+// The page's own script must parse: a syntax error leaves no painter and a
+// blank player, which nothing else here would notice.
+own.forEach((code, i) => {
+  try { new vm.Script(code, { filename: 'page script ' + (i + 1) }); }
+  catch (e) { fail('page', 'the page\'s own script ' + (i + 1) + ' does not parse: ' + e.message); }
+});
 own.forEach(code => {
   const body = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   [['Math.random', /Math\.random\s*\(/], ['Date.now', /Date\.now\s*\(/], ['performance.now', /performance\.now\s*\(/],

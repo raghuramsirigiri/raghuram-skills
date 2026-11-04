@@ -97,3 +97,9 @@ test('a typed number in copy fails', () => {
   const s = FIXTURE_SPEC(); s.scenes[1].copy.title = 'The works grew 40%';
   assert.ok(fails(check(s)).some(x => /typed into copy/.test(x)));
 });
+
+test('a page script that does not parse fails, naming the error', () => {
+  const r = check(FIXTURE_SPEC(), PAINTER + '\nconst broken = -2 ** 2;\n');
+  assert.notStrictEqual(r.status, 0);
+  assert.ok(r.rows.some(x => x.level === 'FAIL' && x.name === 'page' && /does not parse/.test(x.detail)));
+});

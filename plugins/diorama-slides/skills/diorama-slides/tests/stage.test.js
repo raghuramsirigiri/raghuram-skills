@@ -238,3 +238,20 @@ test('forms blend: numbers and arrays smoothly, profiles point by point, the res
   assert.strictEqual(JSON.stringify(f.p), '[[1,1],[3,3]]');
   assert.strictEqual(f.tag, 'x');
 });
+
+test('a stage label gives way on its own to whatever the beat\'s subject draws', () => {
+  const s = FIXTURE_SPEC();
+  const { C, M } = compile(s);
+  const t = C.scenes[0].t0 + (C.scenes[0].t1 - C.scenes[0].t0) / 2;
+  const alphaOf = painter => {
+    M.things.works = painter;
+    M.debug.record = []; M.seek(mockCtx(), C, t);
+    const r = M.debug.record.filter(x => x.role === 'stage'); M.debug.record = null;
+    return r.length;
+  };
+  const base = { marks() { return { tank: [0, 0, 6] }; } };
+  const on = alphaOf(Object.assign({}, base, { draw(w, api) { api.view('subject').block(-8, -8, 0, 16, 16, 10, api.mat.N3); api.label('Works', 0, 0, 5); } }));
+  const off = alphaOf(Object.assign({}, base, { draw(w, api) { api.view('subject').block(-8, -8, 0, 16, 16, 10, api.mat.N3); api.label('Works', -36, 18, 0, { dy: 8 }); } }));
+  assert.strictEqual(on, 0, 'a label on the subject is not painted');
+  assert.strictEqual(off, 1, 'a label clear of the subject is');
+});
