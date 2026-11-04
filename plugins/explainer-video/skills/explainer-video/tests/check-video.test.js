@@ -115,7 +115,19 @@ test('pictures: slides is the default, so a picture left in a spec without a sty
   assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
 });
 test('pictures: a picture that cannot show its scene fails, naming the scene', () => failsWith(s => { continuous(s); s.scenes[2].picture = { kind: 'blocks', of: 'households' }; }, 'timing', /scene "e2" picture: "blocks" shows a share in %/));
-test('numbers: a typed figure in the words of a picture fails', () => failsWith(s => { continuous(s); s.scenes[0].picture.of = '300 households'; }, 'numbers', /picture\.of/));
+// A place the video draws itself, registered in the page: the check lays it
+// out from its footprint, as the browser will.
+const PLACE = '<script>Motion.pictures.register({ kind: KIND, footprint() { return { w: 400, d: 240, h: 90 }; }, draw(V, p, t, W) {} });</script></body>';
+const withPlace = (kind, extra) => h => h.replace('</body>', PLACE.replace('KIND', "'" + kind + "'" + (extra || '')));
+const onPlace = s => { s.meta.style = 'continuous'; s.scenes[0].picture = { kind: 'reservoir' }; };
+test('pictures: a place the page registers lays out and passes', () => {
+  const s = good(); onPlace(s);
+  const r = check(page(s, withPlace('reservoir')));
+  assert.strictEqual(r.code, 0, JSON.stringify(r.fails));
+});
+test('pictures: a page place under a library name fails', () => failsWith(s => { s.meta.style = 'continuous'; s.scenes[0].picture = { kind: 'desk' }; }, 'pictures', /library's own name/, withPlace('desk')));
+test('pictures: a page place that carries data fails', () => failsWith(onPlace, 'pictures', /carries data \(shares\)/, withPlace('reservoir', ', shares: true')));
+test('numbers: a typed figure in the words of a picture fails',() => failsWith(s => { continuous(s); s.scenes[0].picture.of = '300 households'; }, 'numbers', /picture\.of/));
 
 test('copy: over the word limit fails', () => failsWith(s => { s.scenes[0].copy.line = 'much less water was used across the whole valley this winter'; }, 'copy', /limit 8/));
 test('copy: a V handle in the caption fails', () => failsWith(s => { s.caption += ' (see V2.1)'; }, 'copy', /handle/));
