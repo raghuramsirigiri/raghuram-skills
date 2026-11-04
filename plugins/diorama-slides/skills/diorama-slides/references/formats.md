@@ -25,20 +25,19 @@ Each aspect class composes the card and the stage its own way
 
 | Class | Formats | Type step | Composition |
 | --- | --- | --- | --- |
-| `tall` | 9:16, 4:5 | 1.2× | the card across the top, the stage under it down to the footer, the full frame width |
-| `square` | 1:1 | 1× | as tall, with less stage: keep its beats' words short, and charts to beats of their own |
-| `wide` | 16:9 | 1.15× | the card in a left column (40%), the stage in the room to its right at full height |
+| `tall` | 9:16, 4:5 | 1.2× | the stage fills the frame, its focus centred; the card's words across the top on one white card |
+| `square` | 1:1 | 1× | as tall, with less room round the focus: keep its beats' words short, and charts to beats of their own |
+| `wide` | 16:9 | 1.15× | the stage fills the frame, its focus centred; the card's words in a left column (40%) on one white card |
 
 The type step applies to the kicker, headline and units and to chart text;
-the source line stays card size. A beat with a figure or a chart in the
-card gives the stage the room under it, and the camera reframes; a 1:1
-frame has little room to give, so a chart there usually belongs to a beat
-in the 9:16 or 16:9 cut only. `check-video.js` warns when the stage is left
-under about a fifth of the frame's height.
+the source line stays card size. A figure or a chart in the card sits on
+a white panel over the stage and pushes down into the centred focus, so
+a 1:1 frame has little room to give: a chart there usually belongs to a
+beat in the 9:16 or 16:9 cut only.
 
 **Fill.** The audit measures how much of the safe area each beat's
 mid-hold frame covers and warns under 60%. The stage usually fills it; a
-warning means the stage's room is mostly empty ground or sky (zoom in, or give the
+warning means the stage is mostly empty ground or sky (zoom in, or give the
 subject a larger `size`), never a reason to add decoration.
 
 ## Frame rate

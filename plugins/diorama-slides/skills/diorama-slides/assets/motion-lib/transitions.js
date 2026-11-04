@@ -4,7 +4,7 @@
  * One transition, the same between every pair of scenes: real explainers use
  * one grammar, and a different move at each change reads as random. The
  * outgoing content rises and fades out (its exit, in core.js); over the short
- * overlap that follows, the shared chrome (the accent bar, the kicker line,
+ * overlap that follows, the shared chrome (the kicker line,
  * the footer) stays still and only swaps its words; then the incoming
  * content rises in through its masks. Nothing sweeps, floods or wipes the
  * frame, and nothing resizes the bar.

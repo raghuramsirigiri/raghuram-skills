@@ -175,29 +175,40 @@ test('the kit lofts bodies with volume and draws their facets back to front', ()
   assert.ok(m.nature.water && m.nature.foliage && m.nature.night);
 });
 
-test('a stage behind the card fills the frame, with a veil under the words', () => {
-  const s = FIXTURE_SPEC(); s.stage.room = 'behind';
-  const { C } = compile(s);
-  C.scenes.forEach(sc => {
-    assert.strictEqual(sc.stageBox.y, 0);
-    assert.ok(sc.stageBox.under > 0, 'the veil reaches below the words');
-    assert.ok(!sc.stageBox.inner.top);
-  });
+test('the stage fills the frame in every format, its focus centred, the words on white cards', () => {
+  for (const format of ['9:16', '4:5', '1:1', '16:9']) {
+    for (const room of [undefined, 'below', 'behind']) {
+      const s = FIXTURE_SPEC(); s.cuts.main.format = format; if (room) s.stage.room = room;
+      const { C, M } = compile(s);
+      assert.strictEqual(C.textBox, '#ffffff');
+      C.scenes.forEach(sc => {
+        const B = sc.stageBox;
+        assert.deepStrictEqual([B.x, B.y, B.w, B.h], [0, 0, C.W, C.H], format + ' ' + sc.id + ': the stage is the whole frame');
+        const F = B.focus;
+        assert.ok(Math.abs(F.x + F.w / 2 - C.W / 2) < 1 && Math.abs(F.y + F.h / 2 - C.H / 2) < 1, 'the focus is centred');
+        assert.ok(F.w < C.W && F.h < C.H);
+        // One card round the block: every line of the beat's words inside it.
+        const T = sc.cards.top;
+        assert.ok(T && T.w > 0 && T.h > 0, format + ' ' + sc.id + ': the words have a card');
+        sc.layers.filter(l => l.kind === 'text').forEach(l => l.lines.forEach(ln => {
+          assert.ok(ln.x >= T.x && ln.y >= T.y && ln.x + ln.w <= T.x + T.w + 0.5 && ln.y + ln.h <= T.y + T.h + 0.5, '"' + ln.text + '" is inside its card');
+        }));
+        if (sc.chrome && sc.chrome.source) assert.ok(sc.cards.foot, 'the source line has a card');
+        // Every card line lies inside the rectangle stage labels give way to.
+        sc.layers.filter(l => l.kind === 'text' && !/^(label|rank|value)-/.test(l.id)).forEach(l => l.lines.forEach(ln => {
+          assert.ok(ln.y + ln.h <= B.words.y1 && ln.x + ln.w <= B.words.x1, format + ' ' + sc.id + ': "' + ln.text + '" is inside the words rectangle');
+        }));
+      });
+      // The words carry the box colour as their background.
+      M.debug.record = [];
+      M.seek(mockCtx(), C, mid(C.scenes[1]));
+      const card = M.debug.record.filter(r => r.role === 'headline');
+      M.debug.record = null;
+      assert.ok(card.length && card.every(r => r.bg === '#ffffff'));
+    }
+  }
   const bad = FIXTURE_SPEC(); bad.stage.room = 'above';
   assert.throws(() => compile(bad), /stage\.room must be/);
-});
-
-test('the stage keeps clear of the card in every format', () => {
-  for (const format of ['9:16', '4:5', '1:1', '16:9']) {
-    const s = FIXTURE_SPEC(); s.cuts.main.format = format;
-    const { C } = compile(s);
-    C.scenes.forEach(sc => {
-      const B = sc.stageBox;
-      sc.layers.filter(l => l.kind === 'text').forEach(l => l.lines.forEach(ln => {
-        assert.ok(ln.y + ln.h <= B.y || ln.x + ln.w <= B.x, format + ' ' + sc.id + ': "' + ln.text + '" sits clear of the stage');
-      }));
-    });
-  }
 });
 
 test('stage labels are one size on screen whatever the zoom, as role "stage"', () => {

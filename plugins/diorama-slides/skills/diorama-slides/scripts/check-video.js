@@ -163,11 +163,6 @@ try {
       if (C.duration > max + 0.5) fail('timing', 'cut "' + name + '" runs ' + C.duration.toFixed(1) + ' s — a ' + C.shape + ' video runs at most ' + max + ' s; cut beats, or make two videos');
       else if (C.duration > 60.5) warn('timing', 'cut "' + name + '" runs ' + C.duration.toFixed(1) + ' s — longer than 60 s, which a ' + C.shape + ' story may; say so at handover');
       if (C.duration < 14.5) warn('timing', 'cut "' + name + '" runs ' + C.duration.toFixed(1) + ' s — under 15 s');
-      // The stage's room: too little and the stage can't carry the story.
-      C.scenes.forEach((sc, i) => {
-        const B = sc.stageBox;
-        if (B && B.h < C.H * 0.22) warn('stage', 'cut "' + name + '" V' + (i + 1) + ' ' + sc.id + ': the stage has ' + Math.round(B.h) + ' px of height under the card — shorten the words, or give the chart a beat of its own');
-      });
       // Every beat directs the world: what happens on the stage to show its
       // insight (references/story.md § Direct each insight).
       C.scenes.forEach((sc, i) => {

@@ -1,6 +1,6 @@
 /*!
  * scenes/beat.js — one beat of the card layer. The card sits still over the
- * stage for the whole video: the accent bar, the kicker line and the footer
+ * stage for the whole video: the kicker line and the footer
  * are the shared frame (core.js), and the headline and units always start in
  * the same place. Only the words change from beat to beat.
  *

@@ -70,7 +70,7 @@
     const art = C.art;
     C.art = null;
     try { M.seek(ctx, C, t, { frameT: t }); } finally { C.art = art; }
-    const top = Math.round(S.y + R.accentH * 2 + 4);
+    const top = Math.round(S.y);
     const x0 = Math.round(S.x), w = Math.round(S.w), h = Math.round(S.y + S.h) - top;
     const px = ctx.getImageData(x0, top, w, h).data;
     const bg = rgbOf(C.design.bg);
@@ -230,9 +230,8 @@
     }
 
     // The stage. While a beat holds, its subject (and anything the shape
-    // calls the subject) sits wholly inside the beat's stage room, clear of
-    // the card's words and above the footer. A stage label never touches
-    // the subject.
+    // calls the subject) sits wholly inside the frame (the stage fills it,
+    // its focus centred). A stage label never touches the subject.
     function stageChecks(t, recs, shapes) {
       const sc = C.scenes.find(s => t >= s.enterEnd && t < s.exitStart);
       const vis = shapes.filter(r => r.alpha > 0.06 && r.kind !== 'shadow');
@@ -248,7 +247,7 @@
       const F = M.stage.FADE * 0.5;
       const inner = B.inner || {};   // a stage behind the card has no inner top edge
       const out = (inner.top && y0 < B.y + F) || (inner.left && x0 < B.x + F) || (inner.bottom && y1 > B.y + B.h - F) || x0 < -1 || x1 > C.W + 1 || y0 < -1;
-      if (out) once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the subject spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside its stage room (' + [B.x, B.y, B.x + B.w, B.y + B.h].map(Math.round).join(',') + '), clear of the soft edges, while the beat holds — lower its zoom or its look' });
+      if (out) once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the subject spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside the frame (' + [B.x, B.y, B.x + B.w, B.y + B.h].map(Math.round).join(',') + ') while the beat holds — lower its zoom or its look' });
     }
     const ms = performance.now() - t0;
 
@@ -323,7 +322,10 @@
     const actions = [];
     C.scenes.forEach((sc, j) => {
       if (j === 0 || sc.type !== 'beat' || (only && !only.some(o => o.id === sc.id))) return;
-      const t = (sc.enterEnd + sc.exitStart) / 2, B = sc.stageBox;
+      // Measured over the focus, where the camera puts the beat's subject:
+      // the stage fills the frame, and over all of it a real change is
+      // diluted by sky and ground the beat never touches.
+      const t = (sc.enterEnd + sc.exitStart) / 2, B = sc.stageBox.focus || sc.stageBox;
       // Two frames, 0.4 s apart: what the world looks like, and how it is
       // moving (a stop or a change of pace shows only in motion when the
       // camera follows the thing).

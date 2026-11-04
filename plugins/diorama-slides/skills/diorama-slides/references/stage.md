@@ -1,7 +1,7 @@
 # The stage: your world, its camera, its things
 
 The stage is the living half of the frame: the story's own world, toy-like
-and 2.5D, under the card, running without a break from the first frame to the last. It is
+and 2.5D, filling the whole frame under the card, running without a break from the first frame to the last. It is
 **your world**: one painter the page registers draws all of it, and every
 insight in the video is something that painter makes happen
 (`story.md` § Direct each insight). The engine gives the painter time, the
@@ -9,21 +9,21 @@ claims and a camera; it never decides what happens.
 
 ## The room the stage gets
 
-The card owns the top of a tall or square frame (the left column of a
-wide one) and the footer; the stage owns the rest, the full frame width,
-and dissolves into the paper at its inner edges, so no word ever sits on
-it. Beats with only words share one stage top, so the stage holds still
-from beat to beat; a beat with a figure or a chart in the card gives the
-stage the room under it, and the camera reframes to fit.
-`check-video.js` warns when a beat leaves the stage less than about a
-fifth of the frame's height.
+The stage is the whole frame, edge to edge, in every format: the world is
+coloured, so it is the picture, not an inset on paper. Paint its ground,
+sky or water across all of `room` (which is the frame). The card's words
+sit over it on one white card per block (the paper itself on a dark
+preset): one round the kicker, headline, units and figure or chart, and
+one round the source line.
 
-A story whose subject is tall (a tower, a tree, a rocket) or whose sky
-matters can set `stage.room: "behind"`: the stage then fills the whole
-frame down to the footer, and the card's words sit on a paper veil that
-thins out below them, so the subject rises behind the headline the way a
-magazine cover lets it. Keep the framed subject clear of the words' own
-lines; let only its upper reaches pass behind the veil.
+The camera frames each beat's focus in a centred rectangle (`FOCUS` in
+`stage.js`: 84% × 50% of a tall frame, 76% × 56% of a square one, 62% ×
+62% of a wide one), so the subject sits in the middle of the frame, mostly
+clear of the headline above it and the footer below. `stage.size` and
+`zoom` fit the world to that rectangle, not to the whole frame. Stage
+labels give way to the card's words and the footer on their own.
+`stage.room` (`"below"` or `"behind"`) from older specs is still accepted
+and means the same full frame.
 
 ## The camera
 

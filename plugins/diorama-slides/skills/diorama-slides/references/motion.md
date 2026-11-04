@@ -20,8 +20,8 @@ words be read while the world keeps going.
 
 ## The card layer
 
-The accent bar, the kicker line under it and the footer (a hairline over
-the source line) sit in one place for the whole video, per format, and stay
+The kicker line at the top and the footer (the source line on its
+own card) sit in one place for the whole video, per format, and stay
 still through every transition. The headline always starts at the same
 point under the kicker, at one size, and the units line follows it. Under
 them, a beat may hold one figure or one flat chart.
