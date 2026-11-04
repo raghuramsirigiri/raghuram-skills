@@ -892,11 +892,10 @@
       const wait = M.stage.travel(stage, i);
       return wait > 0 ? Object.assign({}, M.transitions.get('travel'), { dur: wait }) : M.transitions.get('swap');
     };
-    // What a scene's chrome occupies, for the art to keep clear of: the bar,
-    // its kicker, the footer's hairline and its source line.
+    // What a scene's chrome occupies, for the art to keep clear of: the kicker, the footer's hairline and its source line.
     const chromeBoxes = ch => {
       if (!ch) return [];
-      const S = fr.safe, out = [{ x: S.x, y: S.y, w: M.layout.RULE.accentW, h: M.layout.RULE.accentH }];
+      const S = fr.safe, out = [];
       if (ch.kicker) out.push({ x: ch.kicker.x, y: ch.kicker.y, w: ch.kicker.w, h: ch.kicker.h });
       if (rows) out.push({ x: S.x, y: zone.ruleY - 2, w: S.w, h: 4 });
       if (ch.source) ch.source.runs.forEach(run => out.push({ x: run.x, y: run.y, w: run.w, h: run.h }));
@@ -966,6 +965,7 @@
       scenes.push({
         id: it.id, type: it.type, index: i, def: it.def, spec: it.spec, built: b,
         layers: b.layers, rule: b.rule || null, used: it.used, art: artAt, chrome, reserved: it.reserved,
+        cards: cardsFor(b, chrome, it.reserved, fr, ctx),
         t0, t1, cStart, enterEnd: cStart + enter, exitStart, cEnd, ovIn, ovOut,
         enter, read: holdFloor, exit, minDur, dur, trIn, trOut, last
       });
@@ -978,9 +978,73 @@
 
     return {
       cut: name, format: fr.format, W: fr.W, H: fr.H, cls: fr.cls, profile: fr.profile, safe: fr.safe, fps, frames, duration, stage, shape: stage.st.shape,
+      // The cards the words sit on over the coloured stage: white, or the
+      // paper itself on a dark preset (white would fail its light ink).
+      textBox: design.dark ? design.bg : '#ffffff',
       scenes, zone, design, art: art ? Object.assign({ tone: M.art.tone(design), grid: artGrid }, art) : null, seed: spec.meta.seed || 0, grain: spec.meta.grain || 0, bpm, spec, R,
       images: opts.images || M.images || {}
     };
+  }
+
+  // The cards the words sit on over the coloured stage: one round the
+  // card's block (kicker, headline, units and the figure or chart under
+  // them) and one round the footer's source line. Each is the block's own
+  // extent plus even padding, so a short headline gets a short card.
+  const CARD = { px: 10, py: 8, r: 6 };   // card px; x K at frame scale
+  function cardsFor(b, chrome, reserved, fr, ctx) {
+    const K = M.layout.K;
+    const ext = () => ({ x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
+    const add = (e, x, y, w, h) => { if (!(w > 0 && h > 0)) return; e.x0 = Math.min(e.x0, x); e.y0 = Math.min(e.y0, y); e.x1 = Math.max(e.x1, x + w); e.y1 = Math.max(e.y1, y + h); };
+    const pad = e => {
+      if (!(e.x1 > e.x0)) return null;
+      const px = CARD.px * K, py = CARD.py * K;
+      const x = Math.max(0, e.x0 - px), y = Math.max(0, e.y0 - py);
+      return { x, y, w: Math.min(fr.W, e.x1 + px) - x, h: Math.min(fr.H, e.y1 + py) - y };
+    };
+    const top = ext();
+    if (chrome && chrome.kicker) add(top, chrome.kicker.x, chrome.kicker.y, chrome.kicker.w, chrome.kicker.h);
+    b.layers.forEach(L => {
+      if (L.kind === 'text') L.lines.forEach(ln => add(top, ln.x, ln.y, ln.w, ln.h));
+      else if (L.kind === 'counter') { const w = M.text.tabular(ctx, L.display, L.font).w; add(top, L.align === 'center' ? L.x + (L.boxW - w) / 2 : L.x, L.y, w, L.h); }
+      else if (L.kind === 'rect' || L.kind === 'image') add(top, L.x, L.y, L.w, L.h);
+    });
+    // A drawn chart's plot area (a line chart) is in the scene's reserved
+    // boxes; the stage's own full-frame box is not.
+    (reserved || []).forEach(r => { if (r.w < fr.W * 0.95) add(top, r.x, r.y, r.w, r.h); });
+    const foot = ext();
+    if (chrome && chrome.source) chrome.source.runs.forEach(r => add(foot, r.x, r.y, r.w, r.h));
+    return { top: pad(top), foot: pad(foot) };
+  }
+
+  // A card at alpha, eased from box a toward box b by k.
+  function drawCard(ctx, C, a, b, k, alpha) {
+    if (!C.textBox || alpha <= 0.001 || (!a && !b)) return;
+    const A = a || b, B = b || a, l = (p, q) => p + (q - p) * k;
+    if (!a || !b) alpha *= a ? 1 - k : k;
+    const K = M.layout.K;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    M.paint.rect(ctx, l(A.x, B.x), l(A.y, B.y), l(A.w, B.w), l(A.h, B.h), C.textBox, CARD.r * K);
+    ctx.restore();
+  }
+
+  // Both of a scene's cards, still.
+  function cardsSteady(ctx, C, sc, t) {
+    const c = sc.cards;
+    if (!c) return;
+    const a = sc.chrome ? arrival(C, sc, t - sc.cStart) : null;
+    drawCard(ctx, C, c.top, c.top, 1, a ? a.kicker : 1);
+    drawCard(ctx, C, c.foot, c.foot, 1, a ? a.source : 1);
+  }
+
+  // The cards through the transition from A to B: they ease to B's size;
+  // across a long travel, where no words are on screen, they fade out and
+  // back in at the new size instead of standing empty.
+  function cardsBetween(ctx, C, A, B, p, g, dur) {
+    const a = A.cards || {}, b = B.cards || {};
+    const alpha = dur > 0.5 ? Math.pow(Math.abs(1 - 2 * M.ease.clamp01(p)), 2) : 1;
+    const k = dur > 0.5 ? (p < 0.5 ? 0 : 1) : g;
+    drawCard(ctx, C, a.top, b.top, k, alpha);
+    drawCard(ctx, C, a.foot, b.foot, k, alpha);
   }
 
   // A scene's kicker and source line, placed in the shared frame. `key` says
@@ -1022,8 +1086,8 @@
     if (M.debug.record && M.debug.phase !== 'transition') M.debug.phase = e > 0 ? 'exit' : raw < 1 ? 'enter' : 'hold';
     if (e > 0) { ctx.globalAlpha *= 1 - e; ctx.translate(0, -24 * e); }
 
-    if (L.kind === 'text') drawText(ctx, L, p, raw, lt);
-    else if (L.kind === 'counter') drawCounter(ctx, C, L, frameLt == null ? lt : frameLt);
+    if (L.kind === 'text') { drawText(ctx, Object.assign({}, L, { bg: C.textBox }), p, raw, lt); }
+    else if (L.kind === 'counter') drawCounter(ctx, C, Object.assign({}, L, { bg: C.textBox }), frameLt == null ? lt : frameLt);
     else if (L.kind === 'rect') {
       const g = L.grow || 'x';
       const w = g === 'x' ? L.w * p : L.w, h = g === 'y' ? L.h * p : L.h;
@@ -1058,7 +1122,7 @@
     const n = lines.length;
     lines.forEach((ln, i) => {
       if (style === 'fade') {
-        M.paint.text(ctx, ln.text, ln.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: p, layer: L.id, role: L.role, size: L.size, large: L.large });
+        M.paint.text(ctx, ln.text, ln.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: p, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
         return;
       }
       if (style === 'brighten') {
@@ -1068,8 +1132,8 @@
         words.forEach((w, j) => {
           const idx = (L.wordIndex ? L.wordIndex[i] : 0) + j;
           const q = M.ease.clamp01(raw * total - idx);
-          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: (1 - q) * shown, layer: L.id, role: L.role, size: L.size, large: L.large });
-          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: q, layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.from || L.color, h: ln.h, w: w.w, alpha: (1 - q) * shown, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
+          M.paint.text(ctx, w.text, w.x, ln.y, { font: L.font, color: L.color, h: ln.h, w: w.w, alpha: q, layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
         });
         return;
       }
@@ -1084,7 +1148,7 @@
           if (q <= 0) return;
           ctx.save();
           M.paint.clipRect(ctx, w.x - 4, ln.y - 2, w.w + 8, ln.h + 4);
-          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { clip: [w.x - 4, ln.y - 2, w.w + 8, ln.h + 4], font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large });
+          M.paint.text(ctx, w.text, w.x, ln.y + (1 - q) * ln.h, { clip: [w.x - 4, ln.y - 2, w.w + 8, ln.h + 4], font: L.font, color: L.color, h: ln.h, w: w.w, alpha: Math.min(1, q * 1.5), layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
           ctx.restore();
         });
         return;
@@ -1100,7 +1164,7 @@
       M.paint.clipRect(ctx, cl[0], cl[1], cl[2], cl[3]);
       const dx = style === 'mask-left' ? -(1 - q) * Math.min(ln.w, 200) : 0;
       const dy = style === 'mask-left' ? 0 : (1 - q) * ln.h;
-      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { clip: cl, font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large });
+      M.paint.text(ctx, ln.text, ln.x + dx, ln.y + dy, { clip: cl, font: L.font, color: L.color, h: ln.h, w: ln.w, alpha: Math.min(1, q * 1.4), layer: L.id, role: L.role, size: L.size, large: L.large, bg: L.bg });
       ctx.restore();
     });
   }
@@ -1127,7 +1191,7 @@
     const r0 = M.debug.record ? M.debug.record.length : 0;
     tab.parts.forEach(pt => {
       const cx = x + pt.x + (pt.w - M.text.measure(ctx, pt.ch, L.font)) / 2;
-      M.paint.text(ctx, pt.ch, cx, L.y, { font: L.font, color: L.color, h: L.h, w: pt.w, alpha, layer: L.id + '#' + pt.x, role: 'value-glyph', size: L.size, large: true });
+      M.paint.text(ctx, pt.ch, cx, L.y, { font: L.font, color: L.color, h: L.h, w: pt.w, alpha, layer: L.id + '#' + pt.x, role: 'value-glyph', size: L.size, large: true, bg: L.bg });
     });
     if (M.debug.record) {
       // One record for the whole number, for overlap/read checks.
@@ -1135,7 +1199,7 @@
       for (let i = r0; i < r.length; i++) r[i].skip = true;
       // In frame pixels, through any transform, like paint.text's records.
       const m = ctx.getTransform ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
-      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, large: true });
+      r.push({ scene: M.debug.scene, phase: M.debug.phase, layer: L.id, role: L.role || 'value', text: str, bbox: [m.a * x + m.e, m.d * L.y + m.f, tab.w * m.a, L.h * m.d], alpha: ctx.globalAlpha * alpha, size: L.size, color: L.color, bg: L.bg || null, large: true });
     }
     return x + tab.w;
   }
@@ -1157,7 +1221,7 @@
   }
 
   // ── chrome: the parts every scene shares ─────────────────────────────
-  // The accent bar (the through-line), the kicker line under it and the
+  // The kicker line at the top and the
   // footer (a hairline over the source line) sit in one place for the whole
   // video (C.zone), outside the scenes, and stay still through every
   // transition. Only their words change, and only when the next scene's
@@ -1173,26 +1237,7 @@
     const prev = C.scenes[sc.index - 1];
     if (prev && prev.chrome) return null;
     const q = (at, dur, e) => M.ease[e || 'outQuint'](M.ease.clamp01((lt - at) / dur));
-    return { bar: q(0, 0.5), kicker: q(0, 0.5), hair: q(0.7, 0.6, 'glide'), source: q(0.8, 0.5) };
-  }
-
-  // The bar, drawn in to `shown` (0..1) of its width, at `alpha`.
-  function drawBar(ctx, C, shown, alpha) {
-    const S = C.safe, R = M.layout.RULE;
-    const w = R.accentW * shown;
-    if (w <= 0.5 || alpha <= 0.001) return;
-    ctx.save(); ctx.globalAlpha *= alpha;
-    M.paint.rect(ctx, S.x, S.y, w, R.accentH, C.design.subject);
-    ctx.restore();
-  }
-
-  // The footer's hairline, drawn in to `shown` of the safe width, at `alpha`.
-  function drawHair(ctx, C, shown, alpha) {
-    const Z = C.zone, S = C.safe;
-    if (!Z.rows || shown <= 0.001 || alpha <= 0.001) return;
-    ctx.save(); ctx.globalAlpha *= alpha;
-    M.paint.line(ctx, S.x, Z.ruleY, S.x + S.w * shown, Z.ruleY, C.design.hair, M.layout.RULE.hair);
-    ctx.restore();
+    return { kicker: q(0, 0.5), source: q(0.8, 0.5) };
   }
 
   // A kicker, shifted dy inside its own line's mask.
@@ -1202,14 +1247,14 @@
     const clip = [k.x - 6, k.y - 4, C.safe.w + 12, k.h + 8];
     ctx.save();
     M.paint.clipRect(ctx, clip[0], clip[1], clip[2], clip[3]);
-    M.paint.text(ctx, k.text, k.x, k.y + dy, { clip, font: k.font, color: k.color, h: k.h, w: k.w, alpha, layer: 'chrome-kicker', role: 'kicker', size: k.size });
+    M.paint.text(ctx, k.text, k.x, k.y + dy, { clip, font: k.font, color: k.color, h: k.h, w: k.w, alpha, layer: 'chrome-kicker', role: 'kicker', size: k.size, bg: C.textBox });
     ctx.restore();
   }
 
   function drawSource(ctx, C, sc, src, alpha) {
     if (!src || alpha <= 0.001) return;
     M.debug.scene = sc.id;
-    src.runs.forEach((r, i) => M.paint.text(ctx, r.text, r.x, r.y, { font: r.font, color: r.color, h: r.h, w: r.w, alpha, layer: 'chrome-source-' + i, role: 'source', size: src.size }));
+    src.runs.forEach((r, i) => M.paint.text(ctx, r.text, r.x, r.y, { font: r.font, color: r.color, h: r.h, w: r.w, alpha, layer: 'chrome-source-' + i, role: 'source', size: src.size, bg: C.textBox }));
   }
 
   // The chrome on a frame inside scene sc.
@@ -1219,8 +1264,6 @@
     const a = arrival(C, sc, t - sc.cStart);
     const phase = M.debug.phase;
     if (M.debug.record) M.debug.phase = a && a.source < 1 ? 'enter' : 'hold';
-    drawBar(ctx, C, a ? a.bar : 1, 1);
-    drawHair(ctx, C, a ? a.hair : 1, 1);
     if (ch.kicker) { const q = a ? a.kicker : 1; drawKicker(ctx, C, sc, ch.kicker, Math.min(1, q * 1.4), (1 - q) * ch.kicker.h); }
     drawSource(ctx, C, sc, ch.source, a ? a.source : 1);
     M.debug.phase = phase;
@@ -1231,8 +1274,6 @@
   function chromeBetween(ctx, C, A, B, p, g) {
     const a = A.chrome, b = B.chrome;
     if (!a) return;
-    drawBar(ctx, C, 1, b ? 1 : 1 - g);
-    drawHair(ctx, C, 1, b ? 1 : 1 - g);
     const ka = a.kicker, kb = b && b.kicker;
     if (ka && kb && ka.key === kb.key) drawKicker(ctx, C, A, ka, 1, 0);
     else {
@@ -1273,6 +1314,7 @@
       if (M.debug.record) M.debug.phase = 'transition';
       M.stage.paint(ctx, C, t, next.id);
       drawArt(ctx, C, sc.art, next.art, g);
+      cardsBetween(ctx, C, sc, next, p, g, tr.dur);
       // The chrome stays still over the transition; only its words change.
       tr.draw(ctx, p, { C, A: sc, B: next, holdA, drawB, background: () => { background(ctx, C); drawArt(ctx, C, next.art, next.art, 1); } });
       chromeBetween(ctx, C, sc, next, p, g);
@@ -1285,6 +1327,7 @@
       // On the first scene the dots grow in; after that they hold.
       if (sc.index === 0) drawArt(ctx, C, null, sc.art, M.ease.outQuint(M.ease.clamp01((t - 0.3) / 0.8)));
       else drawArt(ctx, C, sc.art, sc.art, 1);
+      cardsSteady(ctx, C, sc, t);
       paintScene(ctx, C, sc, t, frameT);
       chromeSteady(ctx, C, sc, t);
     }
@@ -1338,6 +1381,7 @@
   Object.assign(M, { compile, seek, rng, registerScene, readTime, READ, EXIT, marks, measureContext, readSpec, loadImages, resolver, hashStr });
   if (typeof module !== 'undefined' && module.exports) module.exports = M;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -1423,6 +1467,7 @@
   M.ease = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -1594,6 +1639,7 @@
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -1684,6 +1730,19 @@
     ctx.restore();
   }
 
+  // The box a line of words sits on over the coloured stage: a rounded
+  // rectangle a little wider and taller than the line box (x, y, w, h).
+  // pad: [horizontal, top, bottom] in px; by default from the line height.
+  function textBox(ctx, x, y, w, h, color, alpha, pad) {
+    const a = alpha == null ? 1 : alpha;
+    if (!color || a <= 0.001 || w <= 0 || h <= 0) return;
+    const px = pad ? pad[0] : Math.round(h * 0.3), pt = pad ? pad[1] : Math.round(h * 0.08), pb = pad ? pad[2] : Math.round(h * 0.08);
+    ctx.save();
+    ctx.globalAlpha *= a;
+    rect(ctx, x - px, y - pt, w + 2 * px, h + pt + pb, color, Math.round(h * 0.14));
+    ctx.restore();
+  }
+
   // Text. Draws at line-box top `y` with height `h` (textBaseline middle).
   function text(ctx, str, x, y, o) {
     const a = o.alpha == null ? 1 : o.alpha;
@@ -1736,9 +1795,10 @@
 
   function clipRect(ctx, x, y, w, h) { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
 
-  M.paint = { rect, line, polyline, dot, hatch, text, grain, clipRect };
+  M.paint = { rect, line, polyline, dot, hatch, text, textBox, grain, clipRect };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.paint;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -1821,6 +1881,7 @@
   M.layout = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -1904,7 +1965,7 @@
   }
 
   // ── the frame every scene shares ─────────────────────────────────────
-  // The accent bar, the kicker line under it and the footer (a hairline over
+  // The kicker line at the top of the safe area and the footer (a hairline over
   // the source line) sit in one place for the whole video, per format, and
   // stay still through every transition: core.js draws them outside the
   // scenes and changes only their words. `rows` is the video's footer height
@@ -1914,7 +1975,7 @@
   //   frameZone(frame, rows) -> { kickerY, kickerH, top, bottom, ruleY, rowsY, rows }
   function frameZone(F, rows) {
     const S = F.safe, K = M.layout.K, R = M.layout.RULE, TY = M.layout.typeFor(F);
-    const kickerY = S.y + R.accentH + 8 * K;
+    const kickerY = S.y;
     const ruleY = S.y + S.h - rows * TY.source.lh - TY.source.pad;
     return {
       kickerY, kickerH: TY.kicker.lh, top: kickerY + TY.kicker.lh + TY.kicker.gap,
@@ -2195,6 +2256,7 @@
   M.sourceText = sourceText;
   if (typeof module !== 'undefined' && module.exports) module.exports = M.design;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -2203,7 +2265,7 @@
  * One transition, the same between every pair of scenes: real explainers use
  * one grammar, and a different move at each change reads as random. The
  * outgoing content rises and fades out (its exit, in core.js); over the short
- * overlap that follows, the shared chrome (the accent bar, the kicker line,
+ * overlap that follows, the shared chrome (the kicker line,
  * the footer) stays still and only swaps its words; then the incoming
  * content rises in through its masks. Nothing sweeps, floods or wipes the
  * frame, and nothing resizes the bar.
@@ -2245,6 +2307,7 @@
   M.transitions = { get, list: T };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.transitions;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -2384,6 +2447,7 @@
   M.art = { resolve, tone, grid, boxes, sizes, draw, CLEAR };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.art;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -2739,6 +2803,7 @@
   M.iso = { COS, materials, view, shade, soften, inset, ngon, blend, area };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.iso;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -2797,36 +2862,31 @@
   const SETTLE = 0.5;        // the camera keeps easing this long into the next beat's words
   const INTRO = 0.6;         // the stage arrives over the first beat's first 0.6 s
   const WAIT = 1.4;          // the swap's quiet stretch when story time changes
-  const VEIL = 0.86;         // how much paper sits behind the words when the stage runs behind the card
-  const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
+    const NAMES = ['transformation', 'lineup', 'assembly', 'episodes', 'journey'];
 
   // ── the stage's room, per beat ───────────────────────────────────────
-  // A tall or square frame: under the card's words, the whole frame width,
-  // down to the footer. Beats without a figure or chart share one top (the
-  // lowest their words reach), so the stage holds still from beat to beat;
-  // a beat with one gives the stage the room under it, and the camera
-  // reframes. A wide frame: the room right of the words' column.
+  // The stage fills the whole frame, edge to edge, in every format: the
+  // world is coloured, so it is the picture, not an inset. The card's words
+  // sit over it on white cards (core.js). The camera frames each beat's
+  // focus in `focus`, a centred rectangle, so the subject sits in the middle
+  // of the frame, mostly clear of the words above it and the footer below.
   //
-  // `stage.room: "behind"` lets the stage run up behind the card instead
-  // (a tall subject, a sky): the room is the whole frame down to the footer,
-  // and the words sit on a paper veil that thins out below them (`under`).
-  function boxes(list, fr, zone, room) {
+  // `words` and `foot` are the card's own rectangles on this beat (the
+  // headline down to its figure or chart, and the footer): stage labels give
+  // way to them. `stage.room` ("below" or "behind") is still accepted from
+  // older specs and means the same full frame.
+  const FOCUS = { tall: [0.84, 0.5], square: [0.76, 0.56], wide: [0.62, 0.62] };
+  function boxes(list, fr, zone) {
     const S = fr.safe, K = M.layout.K;
-    const bottom = zone.ruleY - 8 * K;
-    if (room === 'behind') {
-      const card = it => it.built.card || { bottom: zone.top };
-      return list.map(it => ({ x: 0, y: 0, w: fr.W, h: bottom, inner: { bottom: true }, under: card(it).bottom + 6 * K }));
-    }
-    if (fr.cls === 'wide') {
-      const colW = Math.round(S.w * M.layout.PROFILE.wide.col);
-      const x = S.x + colW + 20 * K;
-      return list.map(() => ({ x, y: 0, w: fr.W - x, h: bottom, inner: { left: true, bottom: true } }));
-    }
-    const card = it => it.built.card || { bottom: zone.top, extra: false };
-    const common = Math.max(zone.top, ...list.filter(it => !card(it).extra).map(it => card(it).bottom));
+    const [fw, fh] = FOCUS[fr.cls] || FOCUS.square;
+    const focus = { x: fr.W * (1 - fw) / 2, y: fr.H * (1 - fh) / 2, w: fr.W * fw, h: fr.H * fh };
+    const foot = { x0: 0, y0: zone.ruleY - 6 * K, x1: fr.W, y1: fr.H };
+    const card = it => it.built.card || { bottom: zone.top };
     return list.map(it => {
-      const top = (card(it).extra ? Math.max(common, card(it).bottom) : common) + 14 * K;
-      return { x: 0, y: top, w: fr.W, h: Math.max(40, bottom - top), inner: { top: true, bottom: true } };
+      const words = fr.cls === 'wide'
+        ? { x0: 0, y0: 0, x1: S.x + (card(it).colW || Math.round(S.w * M.layout.PROFILE.wide.col)) + 12 * K, y1: card(it).bottom + 12 * K }
+        : { x0: 0, y0: 0, x1: fr.W, y1: card(it).bottom + 12 * K };
+      return { x: 0, y: 0, w: fr.W, h: fr.H, inner: {}, focus, words, foot };
     });
   }
 
@@ -2845,7 +2905,7 @@
       return +c.value;
     };
     if (st.room != null && st.room !== 'below' && st.room !== 'behind') throw new Error('stage.room must be "below" (the default) or "behind"');
-    const bx = boxes(o.list, o.fr, o.zone, st.room);
+    const bx = boxes(o.list, o.fr, o.zone);
     let time = st.time != null ? num(st.time, 'stage.time') : 0, focus = null;
     const beats = o.list.map((it, i) => {
       const dir = (it.spec && it.spec.stage) || {};
@@ -2959,7 +3019,7 @@
     }
     const a = S.beats[Math.max(0, i - 1)], b = S.beats[i], w = S.windows[i];
     const k = w ? M.ease.glide(clamp((t - w[0]) / (w[1] - w[0]))) : 1;
-    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner, under: q.under == null ? null : lerp(p.under == null ? q.under : p.under, q.under, k) });
+    const mixBox = (p, q) => ({ x: lerp(p.x, q.x, k), y: lerp(p.y, q.y, k), w: lerp(p.w, q.w, k), h: lerp(p.h, q.h, k), inner: q.inner, focus: q.focus, words: k < 0.5 ? p.words : q.words, foot: q.foot });
     return { index: i, k, from: a, to: b, zoom: lerp(a.zoom, b.zoom, k), look: a.look.map((v, n) => lerp(v, b.look[n], k)), box: mixBox(a.box, b.box) };
   }
 
@@ -2979,7 +3039,7 @@
     if (!(cam.k > 0 && cam.k < 1)) return 1;
     const dx = fb[0] - fa[0], dy = fb[1] - fa[1], dz = fb[2] - fa[2];
     const dist = Math.hypot((dx - dy) * M.iso.COS, (dx + dy) / 2 - dz);
-    const room = Math.min(cam.box.w, cam.box.h);
+    const room = Math.min((cam.box.focus || cam.box).w, (cam.box.focus || cam.box).h);
     const sA = base * cam.from.zoom * (fa[3] > 0 ? fa[3] : 1), sB = base * cam.to.zoom * (fb[3] > 0 ? fb[3] : 1);
     if (!(dist * Math.min(sA, sB) > room)) return 1;
     const ratio = Math.min(1, (0.8 * room / dist) / lerp(sA, sB, cam.k));
@@ -3037,10 +3097,11 @@
     // A mark's optional fourth number scales the zoom: the world can move
     // the camera in or out during a beat (a reveal), still on the world only.
     const zm = lerp(fa[3] > 0 ? fa[3] : 1, fb[3] > 0 ? fb[3] : 1, cam.k);
-    const base = fit(cam.box, S.st.size);
+    const base = fit(cam.box.focus || cam.box, S.st.size);
     const s = base * cam.zoom * zm * climb(fa, fb, cam, base);
     const F = [0, 1, 2].map(n => lerp(fa[n], fb[n], cam.k) + cam.look[n]);
-    const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
+    const Fb = cam.box.focus || cam.box;
+    const ax = Fb.x + Fb.w / 2, ay = Fb.y + Fb.h / 2;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
     const mat = S.mat || (S.mat = M.iso.materials(S.design));
     M.debug.scene = sceneId;
@@ -3083,50 +3144,19 @@
         // whatever the painter asked them to avoid.
         const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + tw), y - B.y, B.y + B.h - (y + h));
         let a = clamp(edge / FADE) * ((o && o.alpha) == null ? 1 : o.alpha);
-        avoid.concat(subj.x1 > subj.x0 ? [subj] : []).forEach(r => {
+        avoid.concat(subj.x1 > subj.x0 ? [subj] : [], B.words ? [B.words] : [], B.foot ? [B.foot] : []).forEach(r => {
           const gx = Math.max(r.x0 - (x + tw), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
         if (a <= 0.01) return;
-        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: (o && o.on) || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
+        const on = (o && o.on) || C.textBox;
+        if (C.textBox && !(o && o.on)) M.paint.textBox(ctx, x, y, tw, h, C.textBox, a);
+        M.paint.text(ctx, str, x, y, { font: f, color: (o && o.color) || S.design.muted, bg: on || null, h, w: tw, alpha: a, layer: 'stage-label:' + str, role: 'stage', size: labelSize });
       }
     };
     ctx.save();
     ctx.globalAlpha *= M.ease.outQuint(clamp(t / INTRO));
     world.draw(w, api);
-    ctx.restore();
-    fade(ctx, C, cam.box);
-  }
-
-  // The stage dissolves into the paper at its inner edges (toward the card's
-  // words and the footer), and nothing of it shows beyond them. Frame edges
-  // are the stage's own: things run off them.
-  function fade(ctx, C, B) {
-    const bg = C.design.bg, W = C.W, H = C.H;
-    ctx.save();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = bg;
-    const inner = B.inner || {};
-    if (inner.top) ctx.fillRect(0, 0, W, Math.max(0, B.y));
-    if (inner.left) ctx.fillRect(0, 0, Math.max(0, B.x), H);
-    if (inner.bottom) ctx.fillRect(0, B.y + B.h, W, H - (B.y + B.h));
-    const band = (x0, y0, x1, y1, rx, ry, rw, rh) => {
-      if (!ctx.createLinearGradient) return;
-      const g = ctx.createLinearGradient(x0, y0, x1, y1);
-      g.addColorStop(0, bg); g.addColorStop(1, bg + '00');
-      ctx.fillStyle = g; ctx.fillRect(rx, ry, rw, rh);
-    };
-    if (inner.top) band(0, B.y, 0, B.y + FADE, 0, B.y, W, FADE);
-    if (inner.left) band(B.x, 0, B.x + FADE, 0, B.x, 0, FADE, H);
-    if (inner.bottom) band(0, B.y + B.h, 0, B.y + B.h - FADE, 0, B.y + B.h - FADE, W, FADE);
-    // Behind the card: a paper veil under the words, thinning out below them,
-    // so the headline reads while the world rises behind it.
-    if (B.under != null) {
-      ctx.globalAlpha = VEIL;
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, B.under);
-      band(0, B.under, 0, B.under + FADE * 1.8, 0, B.under, W, FADE * 1.8);
-      ctx.globalAlpha = 1;
-    }
     ctx.restore();
   }
 
@@ -3147,14 +3177,15 @@
     return out;
   }
 
-  M.stage = { NAMES, plan, travel, finish, paint, cameraAt, fit, climb, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
+  M.stage = { NAMES, FOCUS, plan, travel, finish, paint, cameraAt, fit, climb, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.stage;
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
  * scenes/beat.js — one beat of the card layer. The card sits still over the
- * stage for the whole video: the accent bar, the kicker line and the footer
+ * stage for the whole video: the kicker line and the footer
  * are the shared frame (core.js), and the headline and units always start in
  * the same place. Only the words change from beat to beat.
  *
@@ -3320,6 +3351,7 @@
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -3373,6 +3405,7 @@
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -3547,6 +3580,7 @@
 
   M.audio = { render, preview, stopPreview, events, RATE };
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -3822,6 +3856,7 @@
   M.muxMP4 = muxMP4;
   if (typeof module !== 'undefined' && module.exports) module.exports = { muxMP4 };
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -3985,6 +4020,7 @@
   M.muxWebM = muxWebM;
   if (typeof module !== 'undefined' && module.exports) module.exports = { muxWebM, opusHead };
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -4244,6 +4280,7 @@
   M.exportVideo = exportVideo;
   M.exportInternals = { pickCodec, painter, roundTrip, bitrateFor };
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /*!
@@ -4481,6 +4518,7 @@
 
   M.player = { mount, start, contactSheet, poster, tc };
 })(typeof window !== 'undefined' ? window : globalThis);
+
 </script>
 <script>
 /* A schematic map of northern Eurasia, north away from the camera, east to

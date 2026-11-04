@@ -322,7 +322,10 @@
     const actions = [];
     C.scenes.forEach((sc, j) => {
       if (j === 0 || sc.type !== 'beat' || (only && !only.some(o => o.id === sc.id))) return;
-      const t = (sc.enterEnd + sc.exitStart) / 2, B = sc.stageBox;
+      // Measured over the focus, where the camera puts the beat's subject:
+      // the stage fills the frame, and over all of it a real change is
+      // diluted by sky and ground the beat never touches.
+      const t = (sc.enterEnd + sc.exitStart) / 2, B = sc.stageBox.focus || sc.stageBox;
       // Two frames, 0.4 s apart: what the world looks like, and how it is
       // moving (a stop or a change of pace shows only in motion when the
       // camera follows the thing).
