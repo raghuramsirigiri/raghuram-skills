@@ -30,8 +30,11 @@
         y += placed.length * lh;
         at += 0.12;
       };
+      // One or two sources are named at the headline's size; a longer list
+      // at the units' size, so the stage keeps its room under the card.
+      const nm = srcs.length > 2 ? TY.units : TY.headline;
       srcs.forEach((src, i) => {
-        put('name-' + i, src.name, TY.headline.size, TY.headline.lh, 600, d.ink);
+        put('name-' + i, src.name, nm.size, nm.lh, 600, d.ink);
         const rest = [M.formatDate(src.date, locale), src.asOf ? 'as of ' + M.formatDate(src.asOf, locale) : ''].filter(Boolean).join(' · ');
         if (rest) { y += 2 * K; put('date-' + i, rest, TY.units.size, TY.units.lh, 400, d.muted); }
         y += TY.units.gap;
@@ -40,7 +43,9 @@
       if (note) put('note', note, TY.units.size, TY.units.lh, 400, d.muted);
       const words = layers.reduce((n, l) => n + (l.lines ? l.lines.reduce((m, ln) => m + T.wordCount(ln.text), 0) : 0), 0);
       const read = Math.max(M.READ.source, M.readTime(words) * 0.8);
-      return { layers, rule: c.rule, read, card: { wordsBottom: y, bottom: y, extra: false, colW } };
+      // The card takes its own room, like a beat with a figure: a list of
+      // several sources must never push down the stage top every beat shares.
+      return { layers, rule: c.rule, read, card: { wordsBottom: y, bottom: y, extra: true, colW } };
     }
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -226,6 +226,23 @@
     return Math.min(0.58 * box.w / ((w + d) * M.iso.COS), 0.6 * box.h / ((w + d) / 2 + h));
   }
 
+  // A long move climbs. When the camera travels between two framings further
+  // than its room can show at their scale, it rises mid-move (the scale
+  // dips) until both ends nearly fit, then comes down at the far end, so a
+  // viewer sees where it is going instead of a blur of whatever lies between.
+  // Short moves are untouched. `base` is the scale that fits the stage's
+  // size in the room; returns the multiplier on the move's own scale at cam.k.
+  function climb(fa, fb, cam, base) {
+    if (!(cam.k > 0 && cam.k < 1)) return 1;
+    const dx = fb[0] - fa[0], dy = fb[1] - fa[1], dz = fb[2] - fa[2];
+    const dist = Math.hypot((dx - dy) * M.iso.COS, (dx + dy) / 2 - dz);
+    const room = Math.min(cam.box.w, cam.box.h);
+    const sA = base * cam.from.zoom * (fa[3] > 0 ? fa[3] : 1), sB = base * cam.to.zoom * (fb[3] > 0 ? fb[3] : 1);
+    if (!(dist * Math.min(sA, sB) > room)) return 1;
+    const ratio = Math.min(1, (0.8 * room / dist) / lerp(sA, sB, cam.k));
+    return 1 - (1 - ratio) * Math.sin(Math.PI * cam.k);
+  }
+
   // A painter the page registered, or a clear error naming it.
   function thing(name, where) {
     const p = M.things[name];
@@ -277,7 +294,8 @@
     // A mark's optional fourth number scales the zoom: the world can move
     // the camera in or out during a beat (a reveal), still on the world only.
     const zm = lerp(fa[3] > 0 ? fa[3] : 1, fb[3] > 0 ? fb[3] : 1, cam.k);
-    const s = fit(cam.box, S.st.size) * cam.zoom * zm;
+    const base = fit(cam.box, S.st.size);
+    const s = base * cam.zoom * zm * climb(fa, fb, cam, base);
     const F = [0, 1, 2].map(n => lerp(fa[n], fb[n], cam.k) + cam.look[n]);
     const ax = cam.box.x + cam.box.w / 2, ay = cam.box.y + cam.box.h * 0.56;
     const cx = (F[0] - F[1]) * M.iso.COS * s, cy = ((F[0] + F[1]) / 2 - F[2]) * s;
@@ -286,7 +304,14 @@
     // A view named after the mark this beat frames draws the beat's subject:
     // the audit keeps it inside the stage's room while the words hold.
     const framed = typeof cam.to.focus === 'string' ? cam.to.focus : null;
-    const view = (owner, origin) => M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font }, owner && (owner === framed || owner === 'subject') ? 'subject' : owner || 'world');
+    // Whatever the subject draws is tracked on screen, and every stage label
+    // gives way to it without the page having to say where it is.
+    const subj = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    const track = (x0, y0, x1, y1) => { subj.x0 = Math.min(subj.x0, x0); subj.y0 = Math.min(subj.y0, y0); subj.x1 = Math.max(subj.x1, x1); subj.y1 = Math.max(subj.y1, y1); };
+    const view = (owner, origin) => {
+      const role = owner && (owner === framed || owner === 'subject') ? 'subject' : owner || 'world';
+      return M.iso.view(ctx, { ax, ay, cx, cy, s, origin, font: S.design.font, track: role === 'subject' ? track : null }, role);
+    };
     const worldX = sx => (sx - ax + cx) / (M.iso.COS * s);
     const range = [worldX(cam.box.x) - cam.box.h / s * 1.2, worldX(cam.box.x + cam.box.w) + cam.box.h / s * 1.2];
     const labelSize = Math.max(M.layout.MIN_TEXT + 2, M.layout.typeFor(C).units.size * 0.85);
@@ -315,7 +340,7 @@
         // whatever the painter asked them to avoid.
         const B = cam.box, edge = Math.min(x - B.x, B.x + B.w - (x + tw), y - B.y, B.y + B.h - (y + h));
         let a = clamp(edge / FADE) * ((o && o.alpha) == null ? 1 : o.alpha);
-        avoid.forEach(r => {
+        avoid.concat(subj.x1 > subj.x0 ? [subj] : []).forEach(r => {
           const gx = Math.max(r.x0 - (x + tw), x - r.x1, 0), gy = Math.max(r.y0 - (y + h), y - r.y1, 0);
           a *= clamp((Math.max(gx, gy) - 8) / 40);
         });
@@ -379,6 +404,6 @@
     return out;
   }
 
-  M.stage = { NAMES, plan, travel, finish, paint, cameraAt, fit, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
+  M.stage = { NAMES, plan, travel, finish, paint, cameraAt, fit, climb, boxes, blendForm, thing, worldAt, timeAt, accumulate, progress, sstep, clamp, lerp, FADE, WAIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = M.stage;
 })(typeof window !== 'undefined' ? window : globalThis);
