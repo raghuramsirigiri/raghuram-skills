@@ -107,7 +107,10 @@ own nouns.
    `references/motion.md` for how the card and the stage each move. You draw
    every thing from the source's nouns, in its natural colours and with real
    volume (living things are lofted bodies, never cut-outs), and make each
-   beat's `shows` happen by its progress, its time or its rate. There is no library of things or
+   beat's `shows` happen by its progress, its time or its rate. Each thing
+   the story is about is a hero, drawn so it can't be mistaken for its
+   nearest lookalike: its telling features pushed and posed toward the
+   camera. There is no library of things or
    behaviours, on purpose. A value with nothing to act out gets a flat chart
    in the card (`references/video-charts.md`) while the world keeps living.
 
@@ -132,7 +135,9 @@ own nouns.
 7. **Verify before reporting done.** Read `references/verify-and-ship.md`
    and follow it in full: `node <skill-dir>/scripts/check-video.js
    <slug>.html` with no FAIL; in a browser, `VideoAudit.run` on every cut
-   with `exportProbe: true` until each is `ok`; look at the contact sheet as
+   with `exportProbe: true` until each is `ok`; show each hero alone to a
+   fresh reader who hasn't been told the topic and fix what they can't
+   name (the cold read); look at the contact sheet as
    an illustrator would against `stage.look`, and keep going while it reads
    as a board, cut-outs or greys;
    re-read every figure and hedge against the source. Without a browser,

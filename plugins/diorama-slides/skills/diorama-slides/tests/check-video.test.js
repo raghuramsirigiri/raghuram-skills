@@ -50,6 +50,13 @@ test('a shape that hasn\'t been through its acceptance video warns, and still bu
   assert.ok(r.rows.some(x => x.level === 'WARN' && /"journey" has not been through its acceptance video/.test(x.detail)));
 });
 
+test('a world that lists no heroes warns: its things can\'t be shown alone for the cold read', () => {
+  const r = check(FIXTURE_SPEC(), PAINTER.replace(/heroes:/, 'others:'));
+  assert.deepStrictEqual(fails(r), []);
+  assert.ok(r.rows.some(x => x.level === 'WARN' && /lists no heroes/.test(x.detail)));
+  assert.ok(!check(FIXTURE_SPEC()).rows.some(x => /lists no heroes/.test(x.detail)));
+});
+
 test('a world the page doesn\'t register fails', () => {
   const s = FIXTURE_SPEC(); s.stage.world = 'town';
   assert.ok(fails(check(s)).some(x => /registers no Motion\.things\.town/.test(x)));

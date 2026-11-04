@@ -102,7 +102,38 @@ The export probe encodes the first 2 s through the real export path and
 plays it back. Its `path` (`mp4-h264`, `webm-vp9` or `realtime`) is what
 this browser would give the user. Report it.
 
-### 7.3 Look at it once
+### 7.3 The cold read, then look at it once
+
+Your own eye knows what each thing is meant to be, so it can't tell
+whether the drawing says it. Before the contact sheet, show each hero
+alone to a reader who hasn't been told the topic:
+
+```js
+(await VideoAudit.things()).map(h => ({ id: h.id, png: h.png }))
+```
+
+Hand the pictures, and nothing else (no topic, no names, no spec), to a
+fresh reader: a subagent, a new chat, or a person. Ask for each: what is
+it, as specifically as you can; how sure, 0–100; what looks wrong or
+makes it hard to tell. A thing passes when it is named as itself (or as
+the generic thing the video says it is) at 60 or more, and no answer
+says a part looks detached, stuck on, missing or generic. Otherwise fix
+exactly what the answer names, reading `stage.md` § Drawing the story's
+things (step 3) again, and show the new drawing to another fresh reader,
+not the same one. Stop after three rounds and say in the handover which
+thing still reads weakly and how.
+
+When a reader can't name a thing at all after a round, the drawing may be
+missing what the thing really looks like rather than how it's drawn: look
+that one thing up (a reference photo and the names of its parts, in an
+encyclopedia or a museum's page), redraw it, and say in its picture block
+(`tracing.md`) what you looked up and where. Never look up figures this
+way; the claims ledger still comes only from the source.
+
+With no fresh reader available, judging your own drawing is not the cold
+read: say in the handover that it wasn't done.
+
+Then the whole video:
 
 ```js
 VideoAudit.run({ cut: 'main' }).then(r => r.contactSheet())

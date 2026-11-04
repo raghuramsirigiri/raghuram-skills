@@ -73,11 +73,13 @@ function mockCtx(log) {
 // a label. Its tank is the subject the camera keeps in the stage's room.
 const PAINTER = `Motion.things.works = {
   marks(w) { return { tank: [0, 0, 6], pumps: [30, 0, 2] }; },
+  heroes: {
+    S1: { name: 'the water tank', draw(V, api, h) { V.block(-8, -8, 0, 16, 16, h == null ? 12 : h, api.mat.N3); } }
+  },
   draw(w, api) {
     const V = api.view('ground'), T = api.view('subject'), m = api.mat;
     V.block(-40, -20, 0, 100, 40, 2, m.N2);
-    const h = 4 + (w.time - 1990) * 0.4;
-    T.block(-8, -8, 2, 16, 16, h, m.N3);
+    this.heroes.S1.draw(api.view('subject', [0, 0, 2]), api, 4 + (w.time - 1990) * 0.4);
     const turned = w.accumulate('pump', b => (b.id === 'big' ? 2 : 0.5));
     T.block(26, -3, 2, 6, 6, 3 + Math.sin(turned) * 0.5, m.N);
     api.label('Works', 20, -30, 0, { dy: 8 });
