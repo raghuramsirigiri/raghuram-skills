@@ -9,8 +9,10 @@
  *   V.extrude(profile, 'y', y0, y1, mat.N)    a side profile pushed across its depth
  *   V.cone(x, y, z, r, h, mat.N, n)           a faceted cone (a tree, a roof, a horn)
  *   V.ball(x, y, z, r, mat.N)                 a ball, lit from the top left (a head, a fruit, a planet)
- *   V.loft(rings, tint, n)                    a body with volume: rings of [centre, radius] along a spine
- *   V.tube(a, b, ra, rb, tint, n)             a tapering limb, a trunk, a neck
+ *   V.loft(rings, tint, n, { caps })          a body with volume: rings of [centre, radius] along one spine
+ *   V.tube(a, b, ra, rb, tint, n)             one tapering bone, a trunk, a pipe
+ *   V.sheet(outline, tint, { sag })           a thin lit surface: a membrane, a sail, an ear
+ *   V.face(points, colour)                    one flat polygon, painted at once (even inside a batch)
  *   V.begin() … V.end()                       draw several bodies' facets back to front together
  *   mat.tone('#7a8f4e')                       any colour as a lit tint; mat.nature.foliage, .water, …
  *   V.shadow(x, y, w, d, h)   V.shade(x, y, rw, rd, colour, alpha)   V.P(x, y, z) -> [sx, sy]
@@ -255,11 +257,20 @@
     const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
     const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
     const depthOf = pts => pts.reduce((s, p) => s + p[0] + p[1] + p[2], 0) / pts.length + (o[0] + o[1] + o[2]);
-    // A loft: rings [{ c: [x, y, z], r: radius | [across, up] }…] along a
-    // spine, joined by n facets each; the ends are capped. A torso that
-    // swells and tapers, a neck, a tail, a hull, a tree trunk.
-    V.loft = (rings, t, n) => {
+    // A loft: rings [{ c: [x, y, z], r: radius | [across, up], t? }…] along
+    // a spine, joined by n facets each. A torso that swells and tapers, a
+    // neck, a tail, a hull, a tree trunk. Run one loft through a whole chain
+    // (tail, body, neck, head; hip, knee, ankle, toe): where two lofts meet,
+    // the join shows however the ends are closed. A ring's `t` colours the
+    // body from that ring on, so one loft can change colour along its spine.
+    // Ends are rounded by default (opts.caps 'round'), so a part that starts
+    // inside another shows no rim; 'flat' for a cut end (a log, a pipe),
+    // 'open' for none.
+    V.loft = (rings, t, n, opts) => {
       n = n || 8;
+      const caps = (opts && opts.caps) || 'round';
+      let cur = t;
+      const tints = rings.map(rg => (cur = rg.t || cur));
       const R = rings.map((rg, i) => {
         const a = rings[Math.max(0, i - 1)].c, b = rings[Math.min(rings.length - 1, i + 1)].c;
         const T = norm(sub(b, a));
@@ -271,27 +282,69 @@
           const ang = k / n * Math.PI * 2;
           pts.push([0, 1, 2].map(j => rg.c[j] + S[j] * Math.cos(ang) * rw + U[j] * Math.sin(ang) * rh));
         }
-        return { c: rg.c, pts, T };
+        return { c: rg.c, pts, T, rr: Math.max(rw, rh) };
       });
       const faces = [];
-      const add = (pts, inside) => {
+      const add = (pts, inside, tint) => {
         let nrm = norm(cross(sub(pts[1], pts[0]), sub(pts[2], pts[0])));
         const mid = pts.reduce((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length, s[2] + p[2] / pts.length], [0, 0, 0]);
         const out = sub(mid, inside);
         if (nrm[0] * out[0] + nrm[1] * out[1] + nrm[2] * out[2] < 0) nrm = [-nrm[0], -nrm[1], -nrm[2]];
         if (nrm[0] + nrm[1] + nrm[2] <= 1e-6) return;
-        faces.push({ pts, fill: shade(t, nrm[0], nrm[1], nrm[2]), depth: depthOf(pts) });
+        faces.push({ pts, fill: shade(tint, nrm[0], nrm[1], nrm[2]), depth: depthOf(pts) });
       };
       for (let i = 0; i + 1 < R.length; i++) {
         const A = R[i], B = R[i + 1], inside = [(A.c[0] + B.c[0]) / 2, (A.c[1] + B.c[1]) / 2, (A.c[2] + B.c[2]) / 2];
-        for (let k = 0; k < n; k++) add([A.pts[k], A.pts[(k + 1) % n], B.pts[(k + 1) % n], B.pts[k]], inside);
+        for (let k = 0; k < n; k++) add([A.pts[k], A.pts[(k + 1) % n], B.pts[(k + 1) % n], B.pts[k]], inside, tints[i]);
       }
-      const ends = [[R[0], -1], [R[R.length - 1], 1]];
-      ends.forEach(([E, sgn]) => add(E.pts.slice(), [E.c[0] - E.T[0] * sgn, E.c[1] - E.T[1] * sgn, E.c[2] - E.T[2] * sgn]));
+      if (caps !== 'open') {
+        const ends = [[R[0], -1, tints[0]], [R[R.length - 1], 1, tints[tints.length - 1]]];
+        ends.forEach(([E, sgn, tint]) => {
+          const inside = [E.c[0] - E.T[0] * sgn, E.c[1] - E.T[1] * sgn, E.c[2] - E.T[2] * sgn];
+          if (caps === 'flat') { add(E.pts.slice(), inside, tint); return; }
+          // a low cone: no flat disc for a joining part's rim to show
+          // against, and a free end that reads as rounded, at n facets
+          const apex = [0, 1, 2].map(j => E.c[j] + E.T[j] * sgn * E.rr * 0.5);
+          for (let k = 0; k < n; k++) add([E.pts[k], E.pts[(k + 1) % n], apex], inside, tint);
+        });
+      }
       emit(faces);
     };
-    // A tapering tube from a to b: a limb, a neck, a trunk, a pipe.
-    V.tube = (a, b, ra, rb, t, n) => V.loft([{ c: a, r: ra }, { c: b, r: rb }], t, n || 6);
+    // A tapering tube from a to b: a pipe, a trunk, one bone. A limb with
+    // joints is one loft through them, not a chain of tubes.
+    V.tube = (a, b, ra, rb, t, n, opts) => V.loft([{ c: a, r: ra }, { c: b, r: rb }], t, n || 6, opts);
+
+    // A sheet: a thin surface on an outline of world points (a wing's
+    // membrane, a sail, an ear, a leaf). Its middle bellies out by `sag`
+    // (a share of its size, along the outline's normal taken in right-hand
+    // order; negative the other way), and it is drawn as a fan of facets,
+    // each lit by its own normal from whichever side faces the camera, so
+    // it reads as a surface, not a cut-out. It joins a V.begin()/V.end()
+    // batch, so a body in front of or behind it sorts correctly. Root it
+    // along a bone (a loft or tube along the edge it hangs from). A fin or
+    // flipper with thickness is a flattened loft instead (r: [wide, thin]).
+    V.sheet = (pts, t, opts) => {
+      const m = pts.length;
+      if (m < 3) return;
+      const sag = opts && opts.sag != null ? opts.sag : 0.1;
+      const c = [0, 1, 2].map(j => pts.reduce((s, p) => s + p[j], 0) / m);
+      let nx = 0, ny = 0, nz = 0;
+      for (let i = 0; i < m; i++) {
+        const a = pts[i], b = pts[(i + 1) % m];
+        nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]);
+      }
+      const N = norm([nx, ny, nz]);
+      const size = pts.reduce((s, p) => s + Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]), 0) / m;
+      const apex = [0, 1, 2].map(j => c[j] + N[j] * sag * size);
+      const faces = [];
+      for (let i = 0; i < m; i++) {
+        const tri = [pts[i], pts[(i + 1) % m], apex];
+        let f = norm(cross(sub(tri[1], tri[0]), sub(tri[2], tri[0])));
+        if (f[0] + f[1] + f[2] < 0) f = [-f[0], -f[1], -f[2]];
+        faces.push({ pts: tri, fill: shade(t, f[0], f[1], f[2]), depth: depthOf(tri) });
+      }
+      emit(faces);
+    };
 
     // A ball of radius r centred at (x, y, z): one disc on screen, lit like
     // every other surface (the light from the top left, the right side in

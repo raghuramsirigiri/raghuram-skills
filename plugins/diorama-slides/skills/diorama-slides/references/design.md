@@ -109,8 +109,10 @@ as the card. It is never a tabletop model unless the story is about one.
   marked share), so it still means "data" when it appears. A world in
   greys has ignored where it is; the audit warns (`colour`).
 - **Volume where it lives.** Bodies, trunks, hulls and limbs are lofted
-  (`V.loft`, `V.tube`): a torso that swells and tapers, a neck, a tail,
-  legs with joints, drawn facet by facet back to front (`V.begin`/`V.end`).
+  (`V.loft`, one per chain, `stage.md` § Drawing the story's things): a
+  torso that swells and tapers into its neck and tail, legs with joints,
+  drawn facet by facet back to front (`V.begin`/`V.end`). Membranes and
+  sails are `V.sheet`s rooted on a bone.
   Flat extruded profiles are for flat things (a sign, a wall, a car's
   side), never for an animal or a person. Blocks, prisms and cones are for
   buildings, rocks, roofs and trees.

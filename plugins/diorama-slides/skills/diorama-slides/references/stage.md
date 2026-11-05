@@ -185,10 +185,21 @@ the world needs, for this video:
    are the numbers that change (a height, a fill, a count, a 0–1 for a
    part that comes and goes).
 2. **Give it the form it has, at the size it's drawn**, with the kit
-   below. Anything alive, or round and organic, is lofted with volume
-   (`V.loft` for a body along its spine, `V.tube` for each limb segment,
-   `V.ball` for a head or a planet), drawn inside `V.begin()`/`V.end()` so
-   its facets overlap correctly. Buildings and machines are blocks, prisms
+   below. Anything alive, or round and organic, is lofted with volume,
+   drawn inside `V.begin()`/`V.end()` so its facets overlap correctly:
+   - **One loft per chain.** Run one `V.loft` through the whole body,
+     tail to body to neck to head, and one through each limb, hip to knee
+     to ankle to toe. Two parts that meet as separate lofts or tubes show
+     a seam at the join however they are closed, and a reader calls the
+     part stuck on. Where the colour changes along a chain (a pale throat,
+     a dark back), give the ring where it changes its own tint (`t`)
+     rather than starting a new loft.
+   - **Fins, flippers and tails with a blade** are flattened lofts
+     (`r: [wide, thin]`), so they have an edge and a root.
+   - **A membrane, a sail or an ear** is a `V.sheet` on its outline,
+     rooted along the bone or body it hangs from. Never a `V.face`: one
+     flat polygon in one tone reads as paper pasted on.
+   - `V.ball` for a round head, a fruit or a planet. Buildings and machines are blocks, prisms
    and extrusions; trees and roofs are cones. Recognisable beats detailed,
    but an animal must look like a living animal, not a cut-out: a body that
    swells and tapers, legs that bend, a head with mass.
@@ -248,10 +259,15 @@ heroes.
 bevelled by b), `V.prism(footprint, z, h, tint, b)`, `V.extrude(profile,
 axis, a0, a1, tint)` (axis `'y'`: a side view; `'x'`: a front view; `'z'`:
 a plan), `V.cone(x, y, z, r, h, tint, n)`, `V.ball(x, y, z, r, tint)`,
-`V.loft([{ c: [x, y, z], r: radius | [across, up] }…], tint, n)` (a body
-with volume along a spine), `V.tube(a, b, ra, rb, tint, n)` (a tapering
-limb), `V.begin()`/`V.end()` (draw several bodies' facets back to front
-together), `V.face(points3d, colour)`,
+`V.loft([{ c: [x, y, z], r: radius | [across, up], t }…], tint, n, {
+caps })` (a body with volume along one spine; a ring's `t` recolours it
+from there on; ends rounded unless `caps` is `'flat'` for a cut end or
+`'open'`), `V.tube(a, b, ra, rb, tint, n)` (one bone, a trunk, a pipe),
+`V.sheet(outline, tint, { sag })` (a thin surface lit facet by facet, its
+middle bellied by `sag`), `V.begin()`/`V.end()` (draw several bodies'
+facets back to front together; lofts, tubes and sheets join the batch),
+`V.face(points3d, colour)` (one flat polygon in one colour, painted at
+once even inside a batch: for markings, not for parts),
 `V.line`, `V.path`, `V.shadow` (a box's contact shadow), `V.shade(x, y,
 rw, rd, colour, alpha)` (a soft oval shadow for anything round or alive),
 and `V.P(x, y, z)` for a screen point.

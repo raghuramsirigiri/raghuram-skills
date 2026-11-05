@@ -170,9 +170,57 @@ test('the kit lofts bodies with volume and draws their facets back to front', ()
   const r = w.Motion.debug.record.filter(x => x.owner === 'creature');
   w.Motion.debug.record = null;
   assert.ok(r.length > 10, 'many facets');
-  assert.ok(r.length < 2 * 8 + 2 + 2 * 6 + 2, 'back-facing facets are culled');
+  // sides plus a rounded end (n triangles) at each end
+  assert.ok(r.length < (2 * 8 + 2 * 8) + (6 + 2 * 6), 'back-facing facets are culled');
   assert.ok(m.tone('#3366aa').left !== m.tone('#aa6633').left);
   assert.ok(m.nature.water && m.nature.foliage && m.nature.night);
+});
+
+// Facets a loft draws, with the fills it used.
+function loftFacets(rings, opts) {
+  const w = load();
+  const V = w.Motion.iso.view(mockCtx(), { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  const fills = [];
+  const poly = V.poly;
+  V.poly = (pts, fill) => { fills.push(fill); poly(pts, fill); };
+  V.loft(rings(m), m.nature.earth, 8, opts);
+  return { fills, m };
+}
+
+test('a loft\'s ends are rounded by default, so a part that starts inside another shows no flat rim', () => {
+  const rings = () => [{ c: [0, 0, 5], r: 2 }, { c: [10, 0, 5], r: 2 }];
+  const round = loftFacets(rings).fills.length, flat = loftFacets(rings, { caps: 'flat' }).fills.length, open = loftFacets(rings, { caps: 'open' }).fills.length;
+  assert.ok(round > flat && flat > open, `round ${round} > flat ${flat} > open ${open}`);
+  assert.strictEqual(flat, open + 1, 'a flat end is one facet');
+});
+
+test('a ring\'s own tint colours the loft from that ring on', () => {
+  const rings = m => [{ c: [0, 0, 5], r: 2 }, { c: [5, 0, 5], r: 2, t: m.tone('#2255cc') }, { c: [10, 0, 5], r: 1 }];
+  const { fills, m } = loftFacets(rings);
+  const earth = Object.values(m.nature.earth), blue = Object.values(m.tone('#2255cc'));
+  const near = (a, list) => list.some(b => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16); return Math.abs((x >> 16) - (y >> 16)) + Math.abs(((x >> 8) & 255) - ((y >> 8) & 255)) + Math.abs((x & 255) - (y & 255)) < 120; });
+  assert.ok(fills.some(f => near(f, earth) && !near(f, blue)), 'the first stretch keeps the loft\'s tint');
+  assert.ok(fills.some(f => near(f, blue) && !near(f, earth)), 'from the second ring on, the ring\'s tint');
+});
+
+test('a sheet is a lit fan of facets that waits for its batch', () => {
+  const w = load();
+  const V = w.Motion.iso.view(mockCtx(), { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  const fills = [];
+  const poly = V.poly;
+  V.poly = (pts, fill) => { fills.push(fill); poly(pts, fill); };
+  const wing = [[0, 0, 5], [6, 0, 5], [8, 6, 4], [1, 7, 5]];
+  V.begin();
+  V.sheet(wing, m.tone('#a08c7a'));
+  assert.strictEqual(fills.length, 0, 'nothing is painted before V.end()');
+  V.end();
+  assert.strictEqual(fills.length, wing.length, 'one facet per edge, double-sided');
+  assert.ok(new Set(fills).size > 1, 'the bellied facets are lit differently');
+  fills.length = 0;
+  V.sheet(wing.map(p => [p[0], p[1], 5]), m.tone('#a08c7a'), { sag: 0 });
+  assert.strictEqual(new Set(fills).size, 1, 'a flat sheet is one tone');
 });
 
 test('the stage fills the frame in every format, its focus centred, the words on white cards', () => {

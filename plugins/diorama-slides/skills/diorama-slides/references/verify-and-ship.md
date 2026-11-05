@@ -131,10 +131,12 @@ With no fresh reader available, judging your own drawing is not the cold
 read, and the handover says it wasn't done. Do the joint check instead,
 on each hero's picture alone, since it catches the faults readers name
 most often: every limb, bill, wing, fin and engine starts inside the body
-it hangs from (not beside it, not flat on it); a body swells and tapers
+it hangs from (not beside it, not flat on it); a join shows no rim, step
+or change of colour (if it does, the two parts become one loft, its
+colour changing at a ring); a body swells and tapers
 rather than running as one even tube; each leg bends and ends in a foot;
 a wing or fin has a root where it meets the body and lies at the angle it
-would in life; every identity feature (`stage.md` § Real things) is drawn
+would in life, and is a sheet or a flattened loft, never one flat face; every identity feature (`stage.md` § Real things) is drawn
 and faces the camera. Fix what fails, and list in the handover each hero
 with what the joint check fixed, so the user knows which drawings no
 fresh eye has seen.

@@ -56,6 +56,9 @@ test('a world that lists no heroes warns: its things can\'t be shown alone for t
   assert.deepStrictEqual(fails(r), []);
   assert.ok(r.rows.some(x => x.level === 'WARN' && /lists no heroes/.test(x.detail)));
   assert.ok(!check(FIXTURE_SPEC()).rows.some(x => /lists no heroes/.test(x.detail)));
+  // the shorthand `{ heroes, draw … }` lists them too
+  const short = PAINTER.replace(/heroes:/, 'others:') + '\nconst heroes = {};\nMotion.things.__probe = { heroes, draw() {} };\n';
+  assert.ok(!check(FIXTURE_SPEC(), short).rows.some(x => /lists no heroes/.test(x.detail)));
 });
 
 test('a world the page doesn\'t register fails', () => {

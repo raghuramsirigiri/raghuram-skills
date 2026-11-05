@@ -101,7 +101,7 @@ else {
   else if (!registered.has(stg.world)) shape.push('stage.world names "' + stg.world + '", but the page registers no Motion.things.' + stg.world);
   // The things the story is about are drawn by functions of their own, so
   // the audit can show each one alone to a reader who doesn't know the topic.
-  else if (!/\bheroes\s*:/.test(html)) warn('stage', 'Motion.things.' + stg.world + ' lists no heroes: draw each thing the story is about in heroes: { S1: { name, draw(V, api) } } so VideoAudit.things() can show it alone for the cold read (references/verify-and-ship.md § 7.3)');
+  else if (!/\bheroes\s*[:,}]/.test(html)) warn('stage', 'Motion.things.' + stg.world + ' lists no heroes: draw each thing the story is about in heroes: { S1: { name, draw(V, api) } } so VideoAudit.things() can show it alone for the cold read (references/verify-and-ship.md § 7.3)');
 }
 const scenes = spec.scenes || [];
 const byId = {};
