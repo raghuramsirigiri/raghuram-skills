@@ -200,7 +200,10 @@ the world needs, for this video:
    those features about half as big again as life, and turn the thing in
    the world so they face the one camera, which sees the top, the +x and
    the +y faces: a droop, a profile or a bill drawn edge-on to it isn't
-   there on screen. Everything else stays plain. Joints are where real
+   there on screen. For a real thing these may be features the source
+   doesn't mention; for a thing the source invents they must be ones it
+   describes (§ Real things, brands and people). Everything else stays
+   plain. Joints are where real
    things go wrong in the kit: a bill, a limb, an engine starts inside the
    body it hangs from, never floating beside it or stuck flat on it.
 4. **Its natural colours; the accent only for data.** Things take their
@@ -259,9 +262,21 @@ draw far things first (smaller x + y), near things last.
 ## Real things, brands and people
 
 - **What the source names may be shown as itself.** A car model, a
-  building, a ship or a brand the source mentions may be drawn as that
-  thing, in the kit's toy style (its proportions and the features the
-  source describes). When the source names two brands, both may appear.
+  building, a ship, an animal or a brand the source mentions may be drawn
+  as that thing, in the kit's toy style. When the source names two brands,
+  both may appear.
+- **Two kinds of feature, two rules.** A thing's *identity features* are
+  what it really looks like, the ones that tell it from its nearest
+  lookalike (step 3 above): a named animal's sail or crest, a named
+  aircraft's six engines. Draw them for any real thing the source names,
+  even when the source doesn't describe them, because without them the
+  picture says it is something else; look one up if you aren't sure
+  (`verify-and-ship.md` § 7.3), and list it in the picture block under
+  *What I chose without the source*. A *claim feature* says something the
+  story asserts: what changed between two states, what was added, what a
+  thing had at a time (fins on one era's car, a charging post on another).
+  Claim features come only from the source. An invented or fictitious
+  thing has only what the source describes, plus plain generic form.
 - **What it doesn't name is generic.** No real model, building or brand
   the source doesn't mention; use a generic thing or a fictitious name.
 - **Logos only from files.** A logo is used only when the user or the

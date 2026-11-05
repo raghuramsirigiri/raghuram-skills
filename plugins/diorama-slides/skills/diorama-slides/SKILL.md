@@ -126,7 +126,7 @@ own nouns.
    Then build it in stages, cheapest check first: stage
    (`finalize.js --stage`) and run `check-video.js` until no FAIL, with no
    browser. Then write the world **a beat at a time**, the hook's first
-   first: look at one beat's still, fix it, then the next
+   one: look at one beat's still, fix it, then the next
    (`references/verify-and-ship.md` § Build in stages).
 
 6. **Sound only if asked.** Read `references/audio.md` before turning
@@ -137,7 +137,8 @@ own nouns.
    <slug>.html` with no FAIL; in a browser, `VideoAudit.run` on every cut
    with `exportProbe: true` until each is `ok`; show each hero alone to a
    fresh reader who hasn't been told the topic and fix what they can't
-   name (the cold read); look at the contact sheet as
+   name (the cold read; with no fresh reader, the joint check, and say
+   so); look at the contact sheet as
    an illustrator would against `stage.look`, and keep going while it reads
    as a board, cut-outs or greys;
    re-read every figure and hedge against the source. Without a browser,

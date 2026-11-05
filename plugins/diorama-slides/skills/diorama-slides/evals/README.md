@@ -54,7 +54,11 @@ source.
   (pterosaurs, marine reptiles), a wingspan that must not be called a
   length (Quetzalcoatlus), and two sizes for Argentinosaurus in different
   units ("over 100 feet" in the notes, 30–35 m from Wikipedia). The prompt
-  asks for diet, which the notes don't give (eval 3).
+  invites the cousins into the cast (an earlier prompt said "five
+  dinosaurs", so a correct run left them out and the cousin checks tested
+  nothing) and asks for diet, which the notes don't give (eval 3). The
+  notes never mention Spinosaurus's sail: an identity feature, drawn and
+  listed as chosen without the source.
 - `burj-construction.md`: verbatim sentences from Wikipedia's "Burj
   Khalifa" by section. It plants "more than" and "over" hedges, a record
   that was a *then* record, an opinion that must stay attributed ("widely

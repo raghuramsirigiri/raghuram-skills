@@ -128,7 +128,16 @@ encyclopedia or a museum's page), redraw it, and say in its picture block
 way; the claims ledger still comes only from the source.
 
 With no fresh reader available, judging your own drawing is not the cold
-read: say in the handover that it wasn't done.
+read, and the handover says it wasn't done. Do the joint check instead,
+on each hero's picture alone, since it catches the faults readers name
+most often: every limb, bill, wing, fin and engine starts inside the body
+it hangs from (not beside it, not flat on it); a body swells and tapers
+rather than running as one even tube; each leg bends and ends in a foot;
+a wing or fin has a root where it meets the body and lies at the angle it
+would in life; every identity feature (`stage.md` § Real things) is drawn
+and faces the camera. Fix what fails, and list in the handover each hero
+with what the joint check fixed, so the user knows which drawings no
+fresh eye has seen.
 
 Then the whole video:
 
@@ -160,9 +169,12 @@ Go back to the source, not your notes. For each claim: the `verbatim` is
 really in the source at the `locator`; the `display` matches it; a derived
 figure's `working` reproduces; every hedge from the source is on screen and
 in the caption; no word on screen says more than the source does. Then the
-stage: every feature drawn on a thing (a fin, an open top, a charging post)
-is one the source names, and nothing real appears that the source doesn't
-mention. This is
+stage: every claim feature on a thing (what changed, what was added, what
+it had at a time: a fin, an open top, a charging post) is one the source
+names; every identity feature of a real thing that the source doesn't
+describe is listed as chosen without the source; and nothing real appears
+that the source doesn't mention (`stage.md` § Real things, brands and
+people). This is
 where a wrong paragraph or a dropped "could" is caught.
 
 **Without a browser**, 7.1 and 7.4 are the floor. Say plainly in the

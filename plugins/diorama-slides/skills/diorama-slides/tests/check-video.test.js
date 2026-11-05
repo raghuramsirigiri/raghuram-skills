@@ -101,6 +101,25 @@ test('a dropped hedge fails', () => {
   assert.ok(fails(check(s)).some(x => /without its hedge "about"/.test(x)));
 });
 
+test('a hedge in a figure\'s verbatim that the claim doesn\'t record warns', () => {
+  const s = FIXTURE_SPEC();
+  s.claims[0].verbatim = 'use could likely fall up to 12%';
+  s.claims[0].hedge = 'up to';
+  const r = check(s);
+  assert.ok(r.rows.some(x => x.level === 'WARN' && x.name === 'hedges' && /F1's verbatim says "likely"/.test(x.detail)));
+});
+
+test('a list of hedges is checked word by word, in copy and in the alt text', () => {
+  const s = FIXTURE_SPEC();
+  s.claims[0].verbatim = 'use could likely fall up to 12%';
+  s.claims[0].hedge = ['likely', 'up to'];
+  const ok = check(s);
+  assert.ok(fails(ok).some(x => /without its hedge "likely"/.test(x)), 'copy without "likely" fails');
+  assert.ok(!ok.rows.some(x => x.level === 'WARN' && /F1's verbatim says/.test(x.detail)), 'recorded hedges do not warn');
+  s.alt = 'Use fell up to 12%.';
+  assert.ok(fails(check(s)).some(x => /alt gives F1 without its hedge "likely"/.test(x)));
+});
+
 test('a typed number in copy fails', () => {
   const s = FIXTURE_SPEC(); s.scenes[1].copy.title = 'The works grew 40%';
   assert.ok(fails(check(s)).some(x => /typed into copy/.test(x)));

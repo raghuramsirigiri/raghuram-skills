@@ -269,15 +269,31 @@ if (ill.length) pass('illustrative', ill.map(c => c.id).join(', ') + ' are illus
 const hedgeFails = [];
 const sceneText = s => paintedStrings(s).map(p => p.text).join(' \n ').toLowerCase();
 const hasAny = (text, words) => words.some(w => new RegExp('(^|[^a-z])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)', 'i').test(text));
+// A claim's hedges: one word or a list, since a source can stack them
+// ("could likely … up to"). Each one recorded must survive wherever the
+// claim is shown (references/copy.md § Hedges).
+const hedgesOf = c => [].concat(c.hedge || []).map(h => String(h).toLowerCase().trim()).filter(Boolean);
+// The ledger is where hedges get lost: a hedge word in a figure's own
+// verbatim that the claim doesn't record is never checked downstream. Warn,
+// not fail: a sentence can carry two figures, and the word may be the
+// other one's.
+Object.values(claims).forEach(c => {
+  if (c.statement || c.kind === 'illustrative' || !c.verbatim) return;
+  const recorded = hedgesOf(c);
+  const covered = k => recorded.some(h => h === k || (HEDGES[h] || []).includes(k) || (HEDGES[k] || []).includes(h));
+  const verb = String(c.verbatim).toLowerCase().replace(/\bmay\s+\d|\b\d{1,2}\s+may\b/g, ' ');
+  const missed = Object.keys(HEDGES).filter(k => hasAny(verb, [k]) && !covered(k));
+  if (missed.length) warn('hedges', c.id + '\'s verbatim says "' + missed.join('", "') + '" but its hedge records ' + (recorded.length ? '"' + recorded.join('", "') + '"' : 'none') + ': list every hedge that qualifies this figure in "hedge" (a list is fine), or say why the word belongs to another figure in the sentence');
+});
 Object.values(compiled).forEach(C => C.scenes.forEach(sc => {
   const text = sceneText(sc.spec);
   sc.used.forEach(id => {
     const c = claims[id];
     if (!c) return;
-    if (c.hedge) {
-      const eq = HEDGES[String(c.hedge).toLowerCase()] || [String(c.hedge).toLowerCase()];
-      if (!hasAny(text, eq)) hedgeFails.push('cut "' + C.cut + '" scene "' + sc.id + '" shows ' + id + ' without its hedge "' + c.hedge + '" (or ' + eq.slice(1).join(', ') + ')');
-    }
+    hedgesOf(c).forEach(h => {
+      const eq = HEDGES[h] || [h];
+      if (!hasAny(text, eq)) hedgeFails.push('cut "' + C.cut + '" scene "' + sc.id + '" shows ' + id + ' without its hedge "' + h + '"' + (eq.length > 1 ? ' (or ' + eq.slice(1).join(', ') + ')' : ''));
+    });
     if (c.forecast && !hasAny(text, FORECAST_WORDS)) hedgeFails.push('cut "' + C.cut + '" scene "' + sc.id + '" shows forecast ' + id + ' without forecast wording (forecast, projected, expected, could, target…)');
   });
 }));
@@ -285,7 +301,7 @@ Object.values(compiled).forEach(C => C.scenes.forEach(sc => {
   const text = (spec[field] || '').toLowerCase();
   numberTokens(spec[field] || '').forEach(t => {
     const c = matchClaim(t);
-    if (c && c.hedge && !hasAny(text, HEDGES[String(c.hedge).toLowerCase()] || [c.hedge])) hedgeFails.push(field + ' gives ' + c.id + ' without its hedge "' + c.hedge + '"');
+    if (c) hedgesOf(c).forEach(h => { if (!hasAny(text, HEDGES[h] || [h])) hedgeFails.push(field + ' gives ' + c.id + ' without its hedge "' + h + '"'); });
     if (c && c.forecast && !hasAny(text, FORECAST_WORDS)) hedgeFails.push(field + ' gives forecast ' + c.id + ' without forecast wording');
   });
 });

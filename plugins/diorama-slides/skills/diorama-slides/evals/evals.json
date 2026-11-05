@@ -1,6 +1,6 @@
 {
   "skill_name": "diorama-slides",
-  "note": "Faithfulness, the story's shape and the stage are the metrics. A figure on screen, in the caption or in the alt text that does not reproduce from the fixture is a FAIL; a dropped hedge, an upgrade word or a cause the source does not state is a FAIL; a feature drawn on the stage that the source does not name is a WARN, a real brand or likeness the source does not name a FAIL. Never give a graded run this file, evals/README.md or any .KEY.md. Run one shape at a time, inline, no parallel agents. Every run that builds a page must run finalize.js and report its exit code; grade the page with check-video.js --final and VideoAudit.run({ exportProbe: true }) in Chrome or Edge over a local HTTP server, and look at the contact sheet.",
+  "note": "Faithfulness, the story's shape and the stage are the metrics. A figure on screen, in the caption or in the alt text that does not reproduce from the fixture is a FAIL; a dropped hedge, an upgrade word or a cause the source does not state is a FAIL; a claim feature on the stage (what changed or was added) that the source does not name is a WARN, while an identity feature of a real thing the source names is fine when the picture block lists it as chosen without the source, a real brand or likeness the source does not name a FAIL. Never give a graded run this file, evals/README.md or any .KEY.md. Run one shape at a time, inline, no parallel agents. Every run that builds a page must run finalize.js and report its exit code; grade the page with check-video.js --final and VideoAudit.run({ exportProbe: true }) in Chrome or Edge over a local HTTP server, and look at the contact sheet. The grader runs the cold read itself (one fresh reader, the hero pictures only); a run that skipped it still gets graded on its drawings.",
   "evals": [
     {
       "id": 1,
@@ -23,7 +23,8 @@
         "No 1979 top speed is shown; any top-speed chart is bars, never an evenly spaced line",
         "No real car brand, model or logo; the drawn features are the ones the guide names",
         "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
-        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done and lists each hero with what the joint check fixed",
+        "Grader's cold read: each hero from VideoAudit.things(), shown alone to a fresh reader with no topic or names, is named as itself (or as the generic thing the video says it is) at 60 or more, and no answer calls a part detached, stuck on, missing or generic",
         "The handover names the shape, lists V1… with timecodes and locators and S1 with its forms, and ends with the closing line"
       ]
     },
@@ -56,24 +57,26 @@
     {
       "id": 3,
       "name": "lineup-dinosaurs",
-      "prompt": "Make a vertical video comparing five dinosaurs by size, then by what they ate, then by how they hunted. Use these notes.",
+      "prompt": "Make a vertical video comparing these dinosaurs and their cousins in the air and the sea by size, then by what they ate, then by how they hunted. Use these notes.",
       "files": [
         "skills/diorama-slides/evals/dinosaur-diversity.md"
       ],
-      "expected_output": "One standalone HTML page, 9:16, 30-90 s, stage.shape lineup: the cast living in their own places (land, river, sea, sky), pulled together only for the beat whose insight is the size comparison. Every size from the notes or the cited Wikipedia sentences with its hedge; pterosaurs and marine reptiles named as cousins, never dinosaurs; Quetzalcoatlus's figure a wingspan. The notes say little about diet or hunting, so the handover says what was left out rather than inventing it. A dated source card naming the notes and Wikipedia.",
+      "expected_output": "One standalone HTML page, 9:16, 30-90 s, stage.shape lineup: the cast living in their own places (land, river, sea, sky), pulled together only for the beat whose insight is the size comparison. The cousins (a pterosaur such as Quetzalcoatlus, a marine reptile such as Mosasaurus or a plesiosaur) are in the cast and named as cousins, never dinosaurs; Quetzalcoatlus's figure a wingspan. Every size from the notes or the cited Wikipedia sentences with all its hedges. The notes say little about diet or hunting, so the handover says what was left out rather than inventing it. Each named animal carries its identity features, listed as chosen without the source where the notes don't describe them. A dated source card naming the notes and Wikipedia.",
       "runs": 3,
       "assertions": [
         "finalize.js exits 0; check-video.js --final exits 0",
         "VideoAudit.run({ exportProbe: true }) is ok: true for every cut, and the export path is reported",
         "stage.shape is \"lineup\"; the contact sheet shows the animals in the places the notes give them (land, river, sea, sky), not standing in a row on a board for every beat",
-        "Pterosaurs, Quetzalcoatlus, plesiosaurs, ichthyosaurs and mosasaurs are never called dinosaurs on screen, in the caption or in the alt text",
-        "Quetzalcoatlus's 10–11 m is given as a wingspan, with the source's 'estimates' wording, never as a length",
-        "The sprint speed appears only with 'likely' and 'up to'; Archaeopteryx's 50 cm only with 'about'; Mosasaurus's 12 m only with 'up to' or 'estimated'",
+        "At least one pterosaur and one marine reptile are in the cast, and none of them is called a dinosaur on screen, in the caption or in the alt text",
+        "If Quetzalcoatlus is sized, its 10–11 m is given as a wingspan, with the source's 'estimates' wording, never as a length",
+        "Every hedge in a shown figure's source sentence survives on screen, in the caption and in the alt text: the sprint speed with 'likely' and 'up to', Archaeopteryx's 50 cm with 'could' and 'about', Mosasaurus's 12 m with 'estimated' and 'up to'",
         "Argentinosaurus's size is shown from one source with its locator, never 'over 100 feet' and 30–35 m mixed or converted without a working",
         "No diet or hunting fact appears that the notes don't state, and the handover says which of the asked-for comparisons the notes don't cover",
         "Each animal is drawn as a living animal (a lofted body that swells and tapers, legs that bend, a head with mass), not a cut-out",
         "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
-        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done and lists each hero with what the joint check fixed",
+        "Grader's cold read: each hero from VideoAudit.things(), shown alone to a fresh reader with no topic or names, is named as itself (or as the generic thing the video says it is) at 60 or more, and no answer calls a part detached, stuck on, missing or generic",
+        "The picture block or handover lists every identity feature drawn that the notes don't describe (for example a sail or crest) as chosen without the source, and no claim feature appears that the notes don't state",
         "The handover names the shape, lists V1… with timecodes and locators, says the video is long for a feed if it runs past 60 s, and ends with the closing line"
       ]
     },
@@ -97,7 +100,8 @@
         "No cause the excerpts do not state, on screen, in the caption or in the alt text",
         "The source card names all four articles with their date and says the world is schematic or not to scale",
         "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
-        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done and lists each hero with what the joint check fixed",
+        "Grader's cold read: each hero from VideoAudit.things(), shown alone to a fresh reader with no topic or names, is named as itself (or as the generic thing the video says it is) at 60 or more, and no answer calls a part detached, stuck on, missing or generic",
         "The handover names the shape, lists V1… with timecodes and locators, names the things on the stage as generic, and ends with the closing line"
       ]
     },
@@ -119,7 +123,8 @@
         "29,280 km, 174 days, 20 days of flying and 11,680 km in eight days are E7's; \"record\" appears only as the source words it",
         "The godwit is drawn as a living wader (a body with volume, long legs, long upturned bill), red underparts only for breeding",
         "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
-        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done and lists each hero with what the joint check fixed",
+        "Grader's cold read: each hero from VideoAudit.things(), shown alone to a fresh reader with no topic or names, is named as itself (or as the generic thing the video says it is) at 60 or more, and no answer calls a part detached, stuck on, missing or generic",
         "The handover names the shape, lists V1… with timecodes and locators, and ends with the closing line"
       ]
     },
@@ -144,7 +149,8 @@
         "No cause the excerpts do not state, on screen, on the stage, in the caption or in the alt text",
         "Skidmore, Owings & Merrill, if named, is set as text, with no logo",
         "Every beat's stage.shows names a noun or verb from the source, and no two beats' shows describe the same action",
-        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done",
+        "The handover reports the cold read: each hero (S1…) was shown alone to a fresh reader not told the topic, with what it was named as and how sure; or it says plainly that the cold read wasn't done and lists each hero with what the joint check fixed",
+        "Grader's cold read: each hero from VideoAudit.things(), shown alone to a fresh reader with no topic or names, is named as itself (or as the generic thing the video says it is) at 60 or more, and no answer calls a part detached, stuck on, missing or generic",
         "The handover names the shape, lists V1… with timecodes and locators and S1 with its forms, and ends with the closing line"
       ]
     },

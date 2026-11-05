@@ -30,8 +30,8 @@ per figure or quote that could appear on screen, in the spec's `claims`:
   character. The hedge and upgrade-word lints read it.
 - **Statements**: a sentence a beat asserts with no figure ("the first
   vertebrates to achieve powered flight", "not actually dinosaurs") is a
-  claim too, `S1, S2…`, with `"statement": true`, its `verbatim` and its
-  `locator`. It is how an upgrade word (*first*, *largest*) the source
+  claim too, `T1, T2…` (never `S`, which names a thing on the stage),
+  with `"statement": true`, its `verbatim` and its `locator`. It is how an upgrade word (*first*, *largest*) the source
   really uses passes the lint, and how a trace finds the sentence a beat
   rests on.
 - **`kind`**:
@@ -44,7 +44,12 @@ per figure or quote that could appear on screen, in the spec's `claims`:
     the user gave a topic with no figures (SKILL.md rule 1). The engine
     labels every beat that shows one and the source card.
 - **`hedge`**: the qualifier the source attaches (`could`, `estimated`,
-  `up to`…). See § Hedges.
+  `up to`…), or a list when it stacks several: "the new line could likely
+  carry up to 900 riders an hour" is `["could", "likely", "up to"]`. Record every one
+  that qualifies this figure: only what is recorded is checked downstream,
+  so a hedge left out here is the one that gets dropped from the alt text.
+  `check-video.js` warns on a hedge word in the `verbatim` that `hedge`
+  doesn't hold. See § Hedges.
 - **`forecast`**: `true` for any projected, planned or target value.
 
 Tables and series go in `data` (`{ id, source, locator, unit, x, y }`),
@@ -71,6 +76,7 @@ it**, in the caption and in the alt text:
 | projected, expected, forecast | projected · expected · forecast |
 | preliminary, provisional | preliminary · provisional · early figures |
 | about, around, nearly | about · around · roughly · nearly · almost |
+| likely, probably | likely · probably |
 | alleged | alleged · allegedly |
 | according to X | according to X · X says |
 
