@@ -1,0 +1,823 @@
+#!/usr/bin/env python3
+"""Vision-only browser driver for persona crawls.
+
+  check     validate a study file
+  start     open a persona's browser on the study's start page
+  look      screenshot what is on screen (plus a copy with a coordinate grid)
+  zoom      lean in: an enlarged crop of part of the last screenshot
+  measure   eyedropper: the two main colours in a box, their contrast ratio, the box size
+  act       record the persona's reaction, then do one thing (JSON on stdin)
+  feedback  record the persona's exit interview once the session has ended (JSON on stdin)
+  stop      shut a session down
+
+The persona receives pixels and the address bar, the way a person does: never the
+page's text, markup, accessibility names, link targets or form attributes. The driver
+keeps to the same rule. It never evaluates script in the page or queries elements;
+it clicks, types and scrolls by screen position. `zoom` and `measure` work on the
+saved screenshot, not the page.
+
+Safety limits are enforced here, at the network layer and on what gets typed,
+because a prompt can be misread and these limits protect real sites and people.
+"""
+import argparse
+import asyncio
+import hashlib
+import json
+import os
+import re
+import secrets
+import subprocess
+import sys
+import time
+from collections import Counter
+from pathlib import Path
+from urllib.parse import urlsplit
+
+for stream in (sys.stdout, sys.stderr):
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+ANALYTICS_HOST = re.compile(
+    r"(^|\.)(google-analytics\.com|analytics\.google\.com|googletagmanager\.com|doubleclick\.net|demdex\.net"
+    r"|omtrdc\.net|facebook\.net|bat\.bing\.com|clarity\.ms|hotjar\.com|segment\.(io|com)|fullstory\.com"
+    r"|quantummetric\.com|contentsquare\.net|mouseflow\.com|px\.ads\.linkedin\.com|googleadservices\.com)$"
+)
+TEST_LABELS = {"staging", "stage", "dev", "test", "qa", "sandbox", "preview", "uat"}
+READ_ONLY_METHODS = {"GET", "HEAD", "OPTIONS"}
+OUTCOMES = {
+    "reached_goal", "reached_boundary", "gave_up", "left_site", "would_call_or_visit",
+    "saved_for_later", "blocked_by_site",
+}
+DECISION_KEYS = ("thought", "noticed", "read", "clarity", "trust", "effort", "emotion",
+                 "doubts", "friction", "est_seconds", "memory")
+FRICTION_TYPES = {
+    "unclear_copy", "missing_information", "contradiction", "hidden_cost_or_condition", "surprise_requirement",
+    "trust_concern", "navigation", "dead_end", "button_unclear", "button_hard_to_find", "low_contrast",
+    "small_text", "small_target", "visual_hierarchy", "layout_or_overlap", "form_burden", "error_handling",
+    "no_feedback", "performance", "accessibility",
+}
+SEVERITIES = {"critical", "high", "medium", "low"}
+# Looks like real identity or payment data. Typed values must not, even on a test site.
+REAL_LOOKING = re.compile(
+    r"\b\d{3}-\d{2}-\d{4}\b|\b(?:\d[ -]?){13,19}\b|[A-Z0-9._%+-]+@(?!example\.(com|org|net)\b)[A-Z0-9.-]+\.[A-Z]{2,}",
+    re.I,
+)
+FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
+FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
+
+
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "item"
+
+
+def is_test_host(host: str) -> bool:
+    host = host.lower().strip("[]")
+    if host in ("localhost", "::1") or host.endswith((".localhost", ".test")) or host.startswith("127."):
+        return True
+    return any(part in TEST_LABELS for label in host.split(".")[:-1] for part in label.split("-"))
+
+
+def load_study(path: Path) -> dict:
+    study = json.loads(path.read_text(encoding="utf-8"))
+    problems = []
+    for key in ("id", "product", "start_url", "allowed_hosts"):
+        if not study.get(key):
+            problems.append(f"missing {key}")
+    study.setdefault("mode", "observe_only")
+    if study["mode"] not in ("observe_only", "test_env"):
+        problems.append("mode must be observe_only or test_env")
+    start_host = (urlsplit(study.get("start_url", "")).hostname or "").lower()
+    if start_host and start_host not in [h.lower() for h in study.get("allowed_hosts", [])]:
+        problems.append(f"start_url host {start_host} is not in allowed_hosts")
+    if study["mode"] == "test_env":
+        if not study.get("environment_confirmation"):
+            problems.append("test_env needs environment_confirmation: who confirmed these hosts are test systems")
+        bad = [h for h in study.get("allowed_hosts", []) if not is_test_host(h)]
+        if bad:
+            problems.append(f"test_env refused, not test hosts: {bad}. Use observe_only for live sites.")
+    study.setdefault("max_steps", 30)
+    study.setdefault("pace_ms", 1200)
+    study.setdefault("stages", [])
+    if problems:
+        raise SystemExit("Study invalid: " + "; ".join(problems))
+    return study
+
+
+def find_env() -> dict:
+    here = Path(__file__).resolve()
+    for base in [Path.cwd(), *Path.cwd().parents, *here.parents]:
+        root = base / ".ux-visual-crawl"
+        py = root / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if py.exists():
+            env = dict(os.environ)
+            env["PLAYWRIGHT_BROWSERS_PATH"] = str(root / "browsers")
+            env["PYTHONIOENCODING"] = "utf-8"
+            return {"python": str(py), "env": env}
+    raise SystemExit("No local environment. Run scripts/setup_env.py --project <project> first.")
+
+
+# ---------------------------------------------------------------- pixels
+
+def luminance(rgb) -> float:
+    def ch(c):
+        c = c / 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = rgb
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+
+def contrast(a, b) -> float:
+    la, lb = sorted((luminance(a), luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def hexof(rgb) -> str:
+    return "#%02x%02x%02x" % tuple(int(round(c)) for c in rgb)
+
+
+def two_colours(img):
+    """Background = the commonest colour; foreground = the most contrasting colour that covers a real share."""
+    px = list(img.convert("RGB").getdata())
+    buckets = Counter()
+    sums = {}
+    for r, g, b in px:
+        key = (r >> 3, g >> 3, b >> 3)
+        buckets[key] += 1
+        s = sums.setdefault(key, [0, 0, 0])
+        s[0] += r; s[1] += g; s[2] += b
+    mean = {k: tuple(v / buckets[k] for v in sums[k]) for k in buckets}
+    bg_key, _ = buckets.most_common(1)[0]
+    bg = mean[bg_key]
+    total = len(px)
+    floor = max(4, total * 0.004)
+    best, best_ratio = None, 1.0
+    for key, n in buckets.most_common(60):
+        if key == bg_key or n < floor:
+            continue
+        ratio = contrast(bg, mean[key])
+        if ratio > best_ratio:
+            best, best_ratio = mean[key], ratio
+    return bg, best, best_ratio, (buckets[bg_key] / total)
+
+
+def draw_grid(src: Path, dst: Path, step: int = 100):
+    from PIL import Image, ImageDraw
+
+    img = Image.open(src).convert("RGB")
+    over = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(over)
+    w, h = img.size
+    for x in range(step, w, step):
+        d.line([(x, 0), (x, h)], fill=(255, 0, 80, 70), width=1)
+        d.rectangle([x + 2, 1, x + 30, 13], fill=(255, 0, 80, 200))
+        d.text((x + 3, 1), str(x), fill=(255, 255, 255, 255))
+    for y in range(step, h, step):
+        d.line([(0, y), (w, y)], fill=(255, 0, 80, 70), width=1)
+        d.rectangle([1, y + 2, 30, y + 14], fill=(255, 0, 80, 200))
+        d.text((2, y + 2), str(y), fill=(255, 255, 255, 255))
+    Image.alpha_composite(img.convert("RGBA"), over).convert("RGB").save(dst)
+
+
+def parse_box(text: str):
+    parts = [int(float(p)) for p in re.split(r"[ ,]+", text.strip()) if p]
+    if len(parts) != 4 or parts[2] <= 0 or parts[3] <= 0:
+        raise SystemExit("--box must be x,y,width,height in screenshot pixels")
+    return parts
+
+
+# ---------------------------------------------------------------- session
+
+class Session:
+    def __init__(self, session_dir: Path):
+        self.dir = session_dir
+        meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+        self.meta = meta
+        self.study = load_study(Path(meta["study_path"]))
+        self.persona = meta["persona"]
+        self.allowed = {h.lower() for h in self.study["allowed_hosts"]}
+        self.observe_only = self.study["mode"] == "observe_only"
+        self.step = 0
+        self.looked = None
+        self.last_hash = None
+        self.events = []
+        self.dialogs = []
+        self.no_change = 0
+        self.ended = None
+        self.boundary_hit = False
+        self.visited = []
+        self.est_total = 0.0
+        self.counts = {"analytics_blocked": 0, "writes_blocked": 0, "off_site_refused": 0, "typing_refused": 0}
+        self.done = asyncio.Event()
+        self.last_seen = time.time()
+        (self.dir / "shots").mkdir(exist_ok=True)
+        self.journey = {
+            "study": self.study["id"], "product": self.study["product"], "mode": self.study["mode"],
+            "persona": {k: self.persona.get(k) for k in ("id", "name", "device", "browser_zoom")},
+            "demographics": self.persona.get("demographics", {}), "task": self.persona.get("task"),
+            "start_url": meta["start_url"], "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "steps": [],
+        }
+
+    # browser
+    async def boot(self):
+        from playwright.async_api import async_playwright
+
+        self.pw = await async_playwright().start()
+        self.browser = await self.pw.chromium.launch(headless=not self.meta.get("headed"))
+        zoom = float(self.persona.get("browser_zoom", 100)) / 100
+        if self.persona.get("device") == "mobile":
+            opts = dict(self.pw.devices["Pixel 7"])
+            opts.pop("default_browser_type", None)
+            opts["device_scale_factor"] = 2 * zoom
+            if zoom != 1:
+                vw, vh = opts["viewport"]["width"], opts["viewport"]["height"]
+                opts["viewport"] = {"width": round(vw / zoom), "height": round(vh / zoom)}
+        else:
+            opts = {"viewport": {"width": round(1280 / zoom), "height": round(800 / zoom)}, "device_scale_factor": zoom}
+        self.k = opts["device_scale_factor"]  # screenshot pixels per CSS pixel
+        self.meta["image_scale"] = self.k
+        (self.dir / "session.json").write_text(json.dumps(self.meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        self.mobile = self.persona.get("device") == "mobile"
+        self.context = await self.browser.new_context(**opts)
+        await self.context.route("**/*", self.on_route)
+        self.context.on("page", self.on_new_page)
+        self.page = await self.context.new_page()
+        self.watch(self.page)
+        if self.persona.get("network") == "slow":
+            cdp = await self.context.new_cdp_session(self.page)
+            await cdp.send("Network.enable")
+            await cdp.send("Network.emulateNetworkConditions",
+                           {"offline": False, "latency": 400, "downloadThroughput": 200000, "uploadThroughput": 90000})
+        await self.page.goto(self.meta["start_url"], wait_until="domcontentloaded", timeout=30000)
+
+    def watch(self, page):
+        async def on_dialog(dialog):
+            # A native pop-up is on a person's screen even though no screenshot can show it.
+            self.dialogs.append({"kind": dialog.type, "says": dialog.message[:400]})
+            try:
+                await dialog.dismiss()
+            except Exception:
+                pass
+        page.on("dialog", lambda d: asyncio.ensure_future(on_dialog(d)))
+
+    def on_new_page(self, page):
+        self.page = page
+        self.watch(page)
+        self.events.append({"kind": "new_tab"})
+
+    async def refuse(self, route, navigation):
+        # A 204 leaves the current page on screen instead of stranding the persona on a browser error page.
+        if navigation:
+            return await route.fulfill(status=204, body="")
+        return await route.abort()
+
+    async def on_route(self, route):
+        req = route.request
+        parts = urlsplit(req.url)
+        if parts.scheme not in ("http", "https"):
+            return await route.continue_()
+        host = (parts.hostname or "").lower()
+        navigation = req.resource_type == "document"
+        if navigation:
+            try:
+                navigation = req.frame.parent_frame is None
+            except Exception:
+                navigation = True
+        if ANALYTICS_HOST.search(host):
+            self.counts["analytics_blocked"] += 1
+            return await route.abort()
+        if req.method not in READ_ONLY_METHODS:
+            if self.observe_only or not (is_test_host(host) and host in self.allowed):
+                self.counts["writes_blocked"] += 1
+                self.boundary_hit = True
+                self.events.append({"kind": "write_blocked", "host": host})
+                return await self.refuse(route, navigation)
+        if navigation and host not in self.allowed:
+            self.counts["off_site_refused"] += 1
+            self.events.append({"kind": "off_site", "host": host})
+            return await self.refuse(route, True)
+        await route.continue_()
+
+    async def settle(self):
+        try:
+            await self.page.wait_for_load_state("domcontentloaded", timeout=9000)
+            await self.page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:
+            pass
+        await self.page.wait_for_timeout(self.study["pace_ms"])
+
+    async def shot_bytes(self) -> bytes:
+        return await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+
+    def to_css(self, v) -> float:
+        return float(v) / self.k
+
+    # commands
+    async def look(self) -> dict:
+        if self.ended:
+            return {"ended": self.ended}
+        await self.settle()
+        step = self.step + 1
+        raw = await self.shot_bytes()
+        clean = self.dir / "shots" / f"step-{step:03d}.png"
+        grid = self.dir / "shots" / f"step-{step:03d}-grid.png"
+        clean.write_bytes(raw)
+        draw_grid(clean, grid)
+        digest = hashlib.sha1(raw).hexdigest()
+        from PIL import Image
+        size = Image.open(clean).size
+        url = self.page.url
+        if not self.visited or self.visited[-1] != url:
+            self.visited.append(url)
+        self.looked = {"step": step, "url": url, "hash": digest, "size": size, "shot": str(clean)}
+        view = {
+            "step": step, "steps_left": self.study["max_steps"] - self.step, "address_bar": url,
+            "tabs_open": len(self.context.pages), "screenshot": str(clean), "screenshot_with_grid": str(grid),
+            "image_size": list(size),
+        }
+        if self.last_hash == digest:
+            view["note"] = "The screen looks exactly as it did at your last look."
+        if self.dialogs:
+            view["browser_popup"] = self.dialogs.pop(0)
+            view["browser_popup"]["note"] = "A browser pop-up appeared with this message. It was closed with Cancel."
+        self.last_hash = digest
+        return view
+
+    def guard_type(self, action: dict):
+        text = str(action.get("text", ""))
+        if self.observe_only:
+            if action.get("purpose") != "search" or re.search(r"[\d@]", text) or len(text) > 80:
+                return "typing_disabled_live_site"
+            return None
+        if text.startswith("test:"):
+            return None
+        if REAL_LOOKING.search(text):
+            return "use_test_value"
+        return None
+
+    async def act(self, payload: dict) -> dict:
+        if self.ended:
+            return {"ok": False, "ended": self.ended}
+        if not self.looked or self.looked["step"] != self.step + 1:
+            return {"ok": False, "error": "Run look first. Every action must follow a fresh look."}
+        decision, action = payload.get("decision") or {}, payload.get("action") or {}
+        if self.meta.get("recon"):
+            # The study author is surveying the site for facts.md, not role-playing, so no reaction is required.
+            decision = {"thought": "", "noticed": "", "read": [], "clarity": 3, "trust": 3, "effort": 1, "emotion": "",
+                        "doubts": [], "friction": [], "est_seconds": 0, "memory": "", **decision}
+        missing = [k for k in DECISION_KEYS if k not in decision]
+        if missing or "type" not in action:
+            return {"ok": False, "error": f"Missing decision fields {missing} or action.type"}
+        for key in ("clarity", "trust", "effort"):
+            if not isinstance(decision[key], (int, float)) or not 1 <= decision[key] <= 5:
+                return {"ok": False, "error": f"{key} must be a number from 1 to 5"}
+        if not isinstance(decision["read"], list):
+            return {"ok": False, "error": "read must be a list of the words you read on screen, copied as shown"}
+        for f in decision["friction"]:
+            if f.get("type") not in FRICTION_TYPES or f.get("severity") not in SEVERITIES:
+                return {"ok": False, "error": f"friction needs type in {sorted(FRICTION_TYPES)} and severity in {sorted(SEVERITIES)}"}
+
+        self.events.clear()
+        url_before = self.page.url
+        started = time.perf_counter()
+        result = await self.perform(action)
+        result["ms"] = round((time.perf_counter() - started) * 1000)
+        self.step += 1
+        self.est_total += float(decision.get("est_seconds") or 0)
+
+        if not self.ended and action["type"] not in ("finish", "wait"):
+            try:
+                after = hashlib.sha1(await self.shot_bytes()).hexdigest()
+            except Exception:
+                after = None
+            result["screen_changed"] = after != self.looked["hash"]
+            result["address_changed"] = self.page.url != url_before
+            result["address_after"] = self.page.url
+            expects_change = action["type"] in ("click", "double_click", "key", "back", "scroll", "type")
+            if expects_change and result.get("ok") and not result["screen_changed"]:
+                result["no_visible_response"] = True
+            self.no_change = self.no_change + 1 if result.get("no_visible_response") else 0
+        result["events"] = list(self.events)
+
+        logged = dict(action)
+        if result.get("blocked") in ("typing_disabled_live_site", "use_test_value"):
+            logged["text"] = "[refused, not recorded]"
+        self.journey["steps"].append({
+            "step": self.step, "at": time.strftime("%H:%M:%S"), "address_bar": self.looked["url"],
+            "screenshot": Path(self.looked["shot"]).name, "image_size": self.looked["size"],
+            "decision": decision, "action": logged, "result": result,
+        })
+        if self.ended:
+            self.journey["steps_taken"] = self.step
+        self.save()
+
+        if self.step >= self.study["max_steps"] and not self.ended:
+            await self.finish("step_cap", "Step limit reached", auto=True)
+            result["ended"] = self.ended
+        elif self.no_change >= 5 and not self.ended:
+            await self.finish("harness_stall", "Five actions in a row produced no visible change", auto=True)
+            result["ended"] = self.ended
+        elif self.no_change >= 3:
+            result["stall_warning"] = "Your last few actions changed nothing on screen. Try something else, or give up if that is what this person would do."
+        return result
+
+    async def perform(self, action: dict) -> dict:
+        kind = action["type"]
+        page = self.page
+        try:
+            if kind == "finish":
+                if action.get("outcome") not in OUTCOMES:
+                    return {"ok": False, "error": f"outcome must be one of {sorted(OUTCOMES)}"}
+                await self.finish(action["outcome"], action.get("reason", ""))
+                return {"ok": True, "ended": self.ended,
+                        "next": "Now record this person's exit interview with the feedback command."}
+            if kind in ("click", "double_click", "hover"):
+                if "x" not in action or "y" not in action:
+                    return {"ok": False, "error": f"{kind} needs x and y in screenshot pixels"}
+                w, h = self.looked["size"]
+                if not (0 <= action["x"] < w and 0 <= action["y"] < h):
+                    return {"ok": False, "error": f"x,y must be inside the {w}x{h} screenshot"}
+                x, y = self.to_css(action["x"]), self.to_css(action["y"])
+                if kind == "hover":
+                    await page.mouse.move(x, y, steps=4)
+                elif kind == "double_click":
+                    await page.mouse.dblclick(x, y)
+                elif self.mobile:
+                    await page.touchscreen.tap(x, y)
+                else:
+                    await page.mouse.move(x, y, steps=4)
+                    await page.mouse.click(x, y)
+            elif kind == "type":
+                refused = self.guard_type(action)
+                if refused:
+                    self.counts["typing_refused"] += 1
+                    note = {
+                        "typing_disabled_live_site": "Typing is off on a live site, apart from short search words. Say what this person would enter and how they feel about being asked, then go on or finish with reached_boundary.",
+                        "use_test_value": "That looks like real identity or payment data. Type only test:<name> values from the list in your brief, or ordinary words.",
+                    }[refused]
+                    return {"ok": False, "blocked": refused, "note": note}
+                text = str(action.get("text", ""))
+                if text.startswith("test:"):
+                    data = self.study.get("test_data") or {}
+                    if text[5:] not in data:
+                        return {"ok": False, "error": f"No test value named {text[5:]} in this study."}
+                    text = str(data[text[5:]])
+                await page.keyboard.type(text, delay=35)
+                if action.get("enter"):
+                    await page.keyboard.press("Enter")
+            elif kind == "key":
+                key = str(action.get("key", ""))
+                allowed = {"Tab", "Shift+Tab", "Enter", "Escape", "Space", "Backspace", "ArrowDown", "ArrowUp",
+                           "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End"}
+                if key not in allowed:
+                    return {"ok": False, "error": f"key must be one of {sorted(allowed)}"}
+                await page.keyboard.press(key)
+            elif kind == "scroll":
+                amount = {"little": 0.3, "half": 0.5, "screen": 0.85}.get(action.get("amount", "screen"), 0.85)
+                vp = page.viewport_size or {"width": 1280, "height": 800}
+                sign = -1 if action.get("direction") == "up" else 1
+                x = self.to_css(action["x"]) if "x" in action else vp["width"] / 2
+                y = self.to_css(action["y"]) if "y" in action else vp["height"] / 2
+                await page.mouse.move(x, y)
+                await page.mouse.wheel(0, sign * vp["height"] * amount)
+            elif kind == "back":
+                await page.go_back(wait_until="domcontentloaded", timeout=15000)
+            elif kind == "wait":
+                await page.wait_for_timeout(3000)
+            else:
+                return {"ok": False, "error": f"Unknown action {kind}"}
+        except Exception as exc:
+            message = str(exc).splitlines()[0][:300]
+            if "net::" not in message:
+                return {"ok": False, "error": message}
+        await self.settle()
+        out = {"ok": True}
+        off = next((e for e in self.events if e["kind"] == "off_site"), None)
+        if off:
+            out["blocked"] = "off_site"
+            out["note"] = f"That leads off the site to {off['host']}, which this crawl does not visit. Go back to what you were doing, or finish with left_site if this person would leave."
+        if any(e["kind"] == "write_blocked" for e in self.events):
+            out["blocked"] = "write_blocked"
+            out["note"] = "That would have sent information to the site, which is not allowed here. Say what you expected to happen next, then finish with reached_boundary."
+        return out
+
+    async def finish(self, outcome: str, reason: str, auto: bool = False):
+        grounded = outcome
+        goal = self.study.get("goal_match")
+        if outcome == "reached_goal" and goal and not any(re.search(goal, u, re.I) for u in self.visited):
+            grounded = "claimed_goal_unverified"
+        if outcome == "reached_boundary" and not self.boundary_hit and not self.observe_only:
+            grounded = "claimed_boundary_unverified"
+        self.journey.update({
+            "ended": time.strftime("%Y-%m-%dT%H:%M:%S"), "claimed_outcome": outcome, "outcome": grounded,
+            "reason": reason, "auto_ended": auto, "steps_taken": self.step, "pages_visited": self.visited,
+            "est_seconds": self.est_total, "counts": self.counts,
+            "viewport_css": self.page.viewport_size, "image_scale": self.k,
+        })
+        self.save()
+        self.ended = grounded
+
+    def save(self):
+        (self.dir / "journey.json").write_text(json.dumps(self.journey, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    async def close(self):
+        for closer in (self.browser.close, self.pw.stop):
+            try:
+                await closer()
+            except Exception:
+                pass
+
+
+async def daemon(session_dir: Path):
+    session = Session(session_dir)
+    token = secrets.token_hex(16)
+    try:
+        await session.boot()
+    except Exception as exc:
+        (session_dir / "daemon.json").write_text(json.dumps({"error": str(exc)[:800]}), encoding="utf-8")
+        raise
+
+    async def handle(reader, writer):
+        try:
+            request = json.loads(await reader.readline())
+            session.last_seen = time.time()
+            if request.get("token") != token:
+                response = {"error": "bad token"}
+            elif request["cmd"] == "look":
+                response = await session.look()
+            elif request["cmd"] == "act":
+                response = await session.act(request["payload"])
+            elif request["cmd"] == "stop":
+                if not session.ended:
+                    await session.finish("harness_stopped", "Stopped by operator", auto=True)
+                response = {"ok": True}
+                session.done.set()
+            else:
+                response = {"error": "unknown command"}
+        except Exception as exc:
+            response = {"error": f"{type(exc).__name__}: {str(exc)[:400]}"}
+        writer.write((json.dumps(response, ensure_ascii=False) + "\n").encode("utf-8"))
+        await writer.drain()
+        writer.close()
+        if session.ended and request.get("cmd") in ("act", "stop"):
+            session.done.set()
+
+    server = await asyncio.start_server(handle, "127.0.0.1", 0, limit=8 * 1024 * 1024)
+    port = server.sockets[0].getsockname()[1]
+    (session_dir / "daemon.json").write_text(json.dumps({"port": port, "token": token, "pid": os.getpid()}), encoding="utf-8")
+
+    async def watchdog():
+        while not session.done.is_set():
+            await asyncio.sleep(10)
+            if time.time() - session.last_seen > 1800:
+                await session.finish("harness_stopped", "Idle timeout", auto=True)
+                session.done.set()
+
+    watcher = asyncio.create_task(watchdog())
+    await session.done.wait()
+    await asyncio.sleep(0.5)
+    watcher.cancel()
+    server.close()
+    await session.close()
+
+
+def call(session_dir: Path, cmd: str, payload=None) -> dict:
+    import socket
+
+    info_path = session_dir / "daemon.json"
+    if not info_path.exists():
+        raise SystemExit("No running session here. Was it started?")
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    if "error" in info:
+        raise SystemExit("Browser failed to start: " + info["error"])
+    try:
+        with socket.create_connection(("127.0.0.1", info["port"]), timeout=120) as sock:
+            sock.settimeout(120)
+            sock.sendall((json.dumps({"token": info["token"], "cmd": cmd, "payload": payload}) + "\n").encode("utf-8"))
+            chunks = []
+            while True:
+                data = sock.recv(1 << 16)
+                if not data:
+                    break
+                chunks.append(data)
+    except ConnectionRefusedError:
+        journey = session_dir / "journey.json"
+        ended = json.loads(journey.read_text(encoding="utf-8")).get("outcome") if journey.exists() else None
+        return {"ended": ended or "session_closed"}
+    return json.loads(b"".join(chunks).decode("utf-8"))
+
+
+# ---------------------------------------------------------------- offline commands (saved screenshot only)
+
+def last_shot(session_dir: Path, step=None) -> Path:
+    shots = sorted(p for p in (session_dir / "shots").glob("step-[0-9][0-9][0-9].png"))
+    if not shots:
+        raise SystemExit("No screenshot yet. Run look first.")
+    if step is None:
+        return shots[-1]
+    path = session_dir / "shots" / f"step-{int(step):03d}.png"
+    if not path.exists():
+        raise SystemExit(f"No screenshot for step {step}")
+    return path
+
+
+def cmd_zoom(args):
+    from PIL import Image
+
+    src = last_shot(Path(args.session), args.step)
+    x, y, w, h = parse_box(args.box)
+    img = Image.open(src).convert("RGB")
+    crop = img.crop((x, y, min(x + w, img.width), min(y + h, img.height)))
+    factor = max(2, min(4, int(900 / max(crop.width, 1))))
+    big = crop.resize((crop.width * factor, crop.height * factor), Image.LANCZOS)
+    n = len(list((src.parent).glob(src.stem + "-zoom-*.png"))) + 1
+    out = src.parent / f"{src.stem}-zoom-{n}.png"
+    big.save(out)
+    print(json.dumps({"zoomed": str(out), "from": src.name, "box": [x, y, w, h], "enlarged": f"{factor}x"}))
+
+
+def cmd_measure(args):
+    from PIL import Image
+
+    session_dir = Path(args.session)
+    src = last_shot(session_dir, args.step)
+    x, y, w, h = parse_box(args.box)
+    img = Image.open(src).convert("RGB")
+    crop = img.crop((x, y, min(x + w, img.width), min(y + h, img.height)))
+    bg, fg, ratio, bg_share = two_colours(crop)
+    meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+    persona = meta["persona"]
+    k = float(meta.get("image_scale", 1))
+    log = session_dir / "measurements.jsonl"
+    n = sum(1 for _ in log.open(encoding="utf-8")) + 1 if log.exists() else 1
+    rec = {
+        "id": f"{slug(persona['id'])}:M{n}", "step": int(src.stem.split("-")[1]), "box": [x, y, w, h],
+        "what": args.what or "", "background": hexof(bg), "foreground": hexof(fg) if fg else None,
+        "contrast_ratio": round(ratio, 2) if fg else None, "background_share": round(bg_share, 2),
+        "size_css_px": [round(w / k), round(h / k)],
+    }
+    if fg:
+        rec["wcag"] = {"body_text_4_5": ratio >= 4.5, "large_text_3": ratio >= 3.0, "ui_component_3": ratio >= 3.0}
+    else:
+        rec["note"] = "Only one colour in that box. Draw the box tighter around the text or control and its background."
+    rec["tap_target_24px"] = min(rec["size_css_px"]) >= 24
+    with log.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(json.dumps(rec))
+
+
+def cmd_feedback(args):
+    session_dir = Path(args.session)
+    journey_path = session_dir / "journey.json"
+    journey = json.loads(journey_path.read_text(encoding="utf-8")) if journey_path.exists() else {}
+    if not journey.get("outcome"):
+        raise SystemExit("The session has not ended. Finish it first, then give the exit interview.")
+    data = read_payload(args)
+    problems = []
+    for key, (lo, hi) in FEEDBACK_SCALES.items():
+        v = data.get(key)
+        if not isinstance(v, (int, float)) or not lo <= v <= hi:
+            problems.append(f"{key} must be {lo} to {hi}")
+    for key in FEEDBACK_TEXT:
+        if not str(data.get(key, "")).strip():
+            problems.append(f"{key} is required")
+    if problems:
+        raise SystemExit("Feedback incomplete: " + "; ".join(problems))
+    data["persona"] = journey["persona"]["id"]
+    data["outcome"] = journey["outcome"]
+    (session_dir / "feedback.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps({"ok": True, "saved": str(session_dir / "feedback.json")}))
+
+
+# ---------------------------------------------------------------- start / main
+
+def read_payload(args) -> dict:
+    """JSON from --file if given, else stdin. A file lets each walker keep its own copy in its session folder."""
+    text = Path(args.file).read_text(encoding="utf-8") if getattr(args, "file", None) else sys.stdin.read()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Not valid JSON: {exc}")
+
+
+# Deepest file a session writes, relative to the study folder:
+# sessions/<24-char name>/shots/step-001-zoom-12.png
+SESSION_TAIL = 60
+PATH_LIMIT = 250 if os.name == "nt" else 4000
+
+
+def path_warning(study_dir: Path):
+    room = PATH_LIMIT - len(str(study_dir)) - SESSION_TAIL
+    if room < 0:
+        return (f"The study folder path is {len(str(study_dir))} characters long; screenshot paths would pass Windows' "
+                f"260-character limit. Move the study to a shorter folder (for example ux-crawl-runs/<short-id>) and use a short id.")
+    return None
+
+
+def cmd_check(args):
+    path = Path(args.study).resolve()
+    study = load_study(path)
+    out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"]}
+    warn = path_warning(path.parent)
+    if warn:
+        out["warning"] = warn
+    print(json.dumps(out))
+
+
+RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "desktop"}
+
+
+def cmd_start(args):
+    study_path = Path(args.study).resolve()
+    study = load_study(study_path)
+    warn = path_warning(study_path.parent)
+    if warn:
+        raise SystemExit(warn)
+    if args.recon:
+        persona = dict(RECON_PERSONA, device=args.device or "desktop")
+        base = study_path.parent / "recon"
+    else:
+        if not args.personas or not args.persona:
+            raise SystemExit("start needs --personas and --persona, or --recon")
+        people = json.loads(Path(args.personas).read_text(encoding="utf-8"))
+        people = people["personas"] if isinstance(people, dict) else people
+        persona = next((p for p in people if p["id"] == args.persona), None)
+        if persona is None:
+            raise SystemExit(f"Persona {args.persona} not found")
+        base = study_path.parent / "sessions"
+    start_url = persona.get("start_url") or study["start_url"]
+    if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
+        raise SystemExit("The persona's start_url is not on an allowed host")
+    base.mkdir(exist_ok=True)
+    name = slug(persona["id"])[:24].strip("-")
+    session_dir, n = base / name, 1
+    while session_dir.exists():
+        n += 1
+        session_dir = base / f"{name}-{n}"
+    session_dir.mkdir()
+    meta = {"study_path": str(study_path), "persona": persona, "start_url": start_url, "headed": args.headed,
+            "recon": bool(args.recon)}
+    (session_dir / "session.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    runtime = find_env()
+    log = open(session_dir / "daemon.log", "ab")
+    flags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
+    subprocess.Popen(
+        [runtime["python"], str(Path(__file__).resolve()), "_daemon", "--session", str(session_dir)],
+        stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=runtime["env"], creationflags=flags,
+        start_new_session=os.name != "nt", close_fds=True,
+    )
+    deadline = time.time() + 90
+    while time.time() < deadline and not (session_dir / "daemon.json").exists():
+        time.sleep(0.25)
+    if not (session_dir / "daemon.json").exists():
+        raise SystemExit(f"Browser did not start. See {session_dir / 'daemon.log'}")
+    info = json.loads((session_dir / "daemon.json").read_text(encoding="utf-8"))
+    if "error" in info:
+        raise SystemExit("Browser failed to start: " + info["error"])
+    print(json.dumps({"session": str(session_dir), "start_url": start_url, "mode": study["mode"]}, ensure_ascii=False))
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("check"); p.add_argument("--study", required=True)
+    p = sub.add_parser("start")
+    p.add_argument("--study", required=True); p.add_argument("--personas")
+    p.add_argument("--persona"); p.add_argument("--headed", action="store_true")
+    p.add_argument("--recon", action="store_true", help="a screen-only session for the study author, kept out of the analysis")
+    p.add_argument("--device", choices=["desktop", "mobile"], help="device for a --recon session")
+    for name in ("look", "stop"):
+        p = sub.add_parser(name); p.add_argument("--session", required=True)
+    for name in ("act", "feedback"):
+        p = sub.add_parser(name); p.add_argument("--session", required=True)
+        p.add_argument("--file", help="read the JSON from this file instead of stdin; keep it inside your session folder")
+    p = sub.add_parser("zoom")
+    p.add_argument("--session", required=True); p.add_argument("--box", required=True); p.add_argument("--step")
+    p = sub.add_parser("measure")
+    p.add_argument("--session", required=True); p.add_argument("--box", required=True)
+    p.add_argument("--step"); p.add_argument("--what", help="what is in the box, e.g. 'fee footnote text'")
+    p = sub.add_parser("_daemon"); p.add_argument("--session", required=True)
+    args = ap.parse_args()
+
+    if args.cmd == "_daemon":
+        asyncio.run(daemon(Path(args.session)))
+        return
+    if args.cmd == "check":
+        return cmd_check(args)
+    if args.cmd == "start":
+        return cmd_start(args)
+    if args.cmd == "zoom":
+        return cmd_zoom(args)
+    if args.cmd == "measure":
+        return cmd_measure(args)
+    if args.cmd == "feedback":
+        return cmd_feedback(args)
+    session_dir = Path(args.session)
+    payload = read_payload(args) if args.cmd == "act" else None
+    print(json.dumps(call(session_dir, args.cmd, payload), ensure_ascii=False, indent=1))
+
+
+if __name__ == "__main__":
+    main()
