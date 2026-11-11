@@ -1,0 +1,12 @@
+{
+  "name": "ux-visual-persona-crawl",
+  "description": "Create synthetic personas with demographics and have each crawl a website by sight alone, from screenshots and pixel positions, never reading page text or markup. Records every persona's navigation as JSON, collects reactions and an exit interview, measures colour contrast from pixels, and reports bottlenecks, friction points, contradictions, button, UI and UX problems with screenshot evidence. Read-only on live sites.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Raghuram Sirigiri"
+  },
+  "homepage": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "repository": "https://github.com/raghuramsirigiri/raghuram-skills",
+  "license": "MIT",
+  "keywords": ["ux", "usability", "usability-testing", "synthetic-users", "personas", "user-research", "ux-audit", "heuristic-review", "accessibility", "contrast", "wcag", "funnel", "conversion", "friction", "playwright", "visual-testing", "customer-journey"]
+}

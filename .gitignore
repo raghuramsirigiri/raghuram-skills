@@ -28,3 +28,7 @@ graphify-out/
 .agents/skills/
 .claude/skills/
 skills-lock.json
+
+# ux-visual-persona-crawl: local browser env and eval workspace
+.ux-visual-crawl/
+ux-visual-persona-crawl-workspace/
