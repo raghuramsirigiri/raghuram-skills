@@ -10,6 +10,10 @@
  * frame, and nothing resizes the bar.
  *
  * `cut` is internal: the first scene has nothing before it.
+ *
+ * `pan` is the continuous style's (world.js): the words leave, the camera
+ * pans level to the next place, the next words rise in. Its length is set
+ * per change from how far the camera travels.
  */
 (function (root) {
   'use strict';
@@ -22,6 +26,10 @@
     },
     swap: {
       dur: 0.25, ownsExit: false, reveal: 'mask-up',
+      draw(ctx, p, x) { x.drawB(); }
+    },
+    pan: {
+      dur: 1.5, ownsExit: false, reveal: 'mask-up',
       draw(ctx, p, x) { x.drawB(); }
     }
   };

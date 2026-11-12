@@ -115,3 +115,20 @@ test('the headline never grows into the footer', () => {
     }
   }
 });
+
+test('the outro grows its name only as far as the safe width: a long word never runs past it', () => {
+  for (const f of ['9:16', '4:5', '1:1', '16:9']) {
+    const w = load();
+    const s = {
+      meta: { title: 'O', locale: 'en-GB', preset: 'default', fps: 30, seed: 1, audio: { score: 'off' }, brand: { name: 'Northvale Co-operative' } },
+      cuts: { c: { format: f, scenes: ['src', 'out'] } },
+      sources: [{ id: 'A', name: 'Annual report', date: '2026-03-02' }],
+      claims: [], scenes: [{ id: 'src', type: 'source-card' }, { id: 'out', type: 'outro', copy: { cta: 'Read the findings' } }]
+    };
+    const C = w.Motion.compile(s, 'c', { measure: mockCtx() });
+    const name = layer(scene(C, 'out'), 'name');
+    for (const ln of name.lines) {
+      assert.ok(ln.x >= C.safe.x - 0.5 && ln.x + ln.w <= C.safe.x + C.safe.w + 0.5, `${f}: "${ln.text}" spans ${Math.round(ln.x)}..${Math.round(ln.x + ln.w)}, the safe area ${C.safe.x}..${C.safe.x + C.safe.w}`);
+    }
+  }
+});

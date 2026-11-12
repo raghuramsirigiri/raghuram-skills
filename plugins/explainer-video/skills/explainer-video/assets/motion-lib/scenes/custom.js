@@ -10,7 +10,11 @@
  *       api.paint.rect(ctx, api.box.x, api.box.y, api.box.w * p, 40, api.design.subject);
  *     }
  *   };
- *   { "type": "custom", "draw": "tideClock", "copy": { "kicker", "title", "units" } }
+ *   { "type": "custom", "draw": "tideClock", "claims": ["F2"], "copy": { "kicker", "title", "units" } }
+ *
+ * `claims` names the figures the painter draws: api.value('F2') is the
+ * claim's number and api.display('F2') its exact wording, so the units drawn
+ * come from the ledger and the source line lists them.
  *
  * The contract: a pure function of lt. No Math.random (use api.rng), no
  * Date.now, no timers, no state kept between calls. Draw text through
@@ -20,13 +24,25 @@
 (function (root) {
   'use strict';
   const M = root.Motion;
+  // The figures a painter draws, in either style (world.js calls this too):
+  // cites them for the source line, and reads only the ones the scene lists.
+  M.painterClaims = (s, api) => {
+    const own = {};
+    (s.claims || []).forEach(id => { own[id] = api.claim(id); });
+    const pick = id => { if (!own[id]) throw new Error('scene "' + s.id + '": the painter reads claim "' + id + '", which is not in its "claims"'); return own[id]; };
+    return {
+      value: id => +pick(id).value,
+      display: id => { const k = pick(id); return k.display != null ? String(k.display) : String(k.value); }
+    };
+  };
   M.registerScene({
     type: 'custom',
     slots: { kicker: { words: 4 }, title: { words: 10 }, units: { words: 8 } },
-    data: 'draw: the name of a painter registered on Motion.custom',
+    data: 'draw: the name of a painter registered on Motion.custom; claims: the claim ids it draws',
     build(s, api) {
       const painter = M.custom[s.draw];
       if (!painter || typeof painter.draw !== 'function') throw new Error('no painter Motion.custom.' + s.draw + ' with a draw(ctx, lt, api) function');
+      const claims = M.painterClaims(s, api);
       const c = M.card(api, { kicker: api.copy('kicker'), headline: api.copy('title'), units: api.copy('units'), chart: true, sourceIds: api.used() });
       const box = c.chart;
       api.reserved.push(box);   // the painter may draw anywhere in it
@@ -39,6 +55,11 @@
           box, design: a.design, paint: M.paint, ease: M.ease,
           at: (start, dur, ease) => M.ease.get(ease || 'outQuint')(M.ease.clamp01((lt - start) / (dur || 1e-6))),
           rng: (...keys) => M.rng(seed, s.id, ...keys),
+          value: claims.value, display: claims.display,
+          // The 2.5D kit, as the continuous style's painters get it: a view
+          // centred in the box (world 0,0,0 a little below its middle) and the tints.
+          mat: M.iso ? M.iso.materials(a.design) : null,
+          iso: k => M.iso.view(cx, { ax: box.x + box.w / 2, ay: box.y + box.h * 0.62, cx: 0, cy: 0, s: k || 1, font: a.design.font }, 'custom:' + s.id),
           text: (str, x, y, o) => {
             const f = M.text.font(o && o.weight || 400, o && o.size || a.design.size.label, a.design.font);
             M.paint.text(cx, str, x, y, { font: f, color: (o && o.color) || a.design.ink, h: (o && o.size || a.design.size.label) * 1.3, alpha: o && o.alpha, layer: 'custom-' + str.slice(0, 12), role: 'body', size: o && o.size || a.design.size.label });

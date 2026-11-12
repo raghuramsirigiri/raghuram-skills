@@ -1,0 +1,316 @@
+// node --test plugins/diorama-slides/skills/diorama-slides/tests/stage.test.js
+//
+// The stage: the page's own world, drawn as a pure function of what the
+// story has done so far. The engine gives it time (each beat's progress,
+// story time eased between beats), exact running totals of rates the page
+// gives, the claims, and one camera angle that pans and zooms the world
+// while the card stays put. It decides nothing about what happens.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const { load, mockCtx, FIXTURE_SPEC } = require('./harness');
+
+function compile(spec, cut) {
+  const w = load();
+  return { C: w.Motion.compile(spec, cut || 'main', { measure: mockCtx() }), M: w.Motion, w };
+}
+const mid = sc => (sc.enterEnd + sc.exitStart) / 2;
+
+test('every video names a shape and the page\'s world painter', () => {
+  const a = FIXTURE_SPEC(); delete a.stage;
+  assert.throws(() => compile(a), /spec\.stage is missing/);
+  const b = FIXTURE_SPEC(); b.stage.shape = 'montage';
+  assert.throws(() => compile(b), /stage\.shape must be one of transformation, lineup, assembly, episodes, journey/);
+  const c = FIXTURE_SPEC(); delete c.stage.world;
+  assert.throws(() => compile(c), /stage\.world/);
+});
+
+test('any shape compiles: the shape guides the story, it does not decide what happens', () => {
+  for (const shape of ['lineup', 'assembly', 'episodes', 'journey']) {
+    const s = FIXTURE_SPEC(); s.stage.shape = shape;
+    const { C, M } = compile(s);
+    assert.strictEqual(C.shape, shape);
+    M.seek(mockCtx(), C, mid(C.scenes[1]));
+  }
+});
+
+test('story time holds through a beat and eases to the next beat\'s over its action', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage;
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[0])), 1990);
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[1])), 2005);
+  const act = S.beats[1].act, half = M.stage.timeAt(S, (act[0] + act[1]) / 2);
+  assert.ok(half > 1990 && half < 2005);
+  assert.ok(act[0] >= C.scenes[0].exitStart - 1e-9, 'the action waits for the words to leave');
+  assert.strictEqual(M.stage.timeAt(S, mid(C.scenes[3])), 2020, 'a beat with no time keeps the one before');
+});
+
+test('story time may be a claim', () => {
+  const s = FIXTURE_SPEC(); s.scenes[2].stage.time = 'F3';
+  const { C, M } = compile(s);
+  assert.strictEqual(M.stage.timeAt(C.stage, mid(C.scenes[2])), 55);
+  const bad = FIXTURE_SPEC(); bad.scenes[2].stage.time = 'F9';
+  assert.throws(() => compile(bad), /"F9" is not a number or a claim/);
+});
+
+test('a beat whose story time changes holds the words\' swap longer; one that doesn\'t, swaps', () => {
+  const { C } = compile(FIXTURE_SPEC());
+  assert.strictEqual(C.scenes[1].trIn.name, 'travel');
+  assert.strictEqual(C.scenes[3].trIn.name, 'swap');
+  const s = FIXTURE_SPEC(); s.scenes[3].stage.wait = 2;
+  const c2 = compile(s).C;
+  assert.strictEqual(c2.scenes[3].trIn.name, 'travel');
+  assert.strictEqual(c2.scenes[3].trIn.dur, 2);
+});
+
+test('each beat\'s progress runs 0 to 1 over its action, and stays 1 after', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, a = S.beats[2].act;
+  assert.strictEqual(M.stage.progress(S, 2, a[0] - 0.01), 0);
+  assert.ok(Math.abs(M.stage.progress(S, 2, (a[0] + a[1]) / 2) - 0.5) < 1e-9);
+  assert.strictEqual(M.stage.progress(S, 2, C.duration - 0.1), 1);
+});
+
+test("since counts the seconds after a beat's action, and is 0 under the override", () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, end = S.beats[2].act[1];
+  assert.strictEqual(M.stage.worldAt(S, end - 0.5).since('big'), 0);
+  assert.ok(Math.abs(M.stage.worldAt(S, end + 1.5).since('big') - 1.5) < 1e-9);
+  S.override = 2;
+  assert.strictEqual(M.stage.worldAt(S, end + 1.5).since('big'), 0);
+  S.override = null;
+});
+
+test('accumulate is the exact running total of a rate given per beat, easing between beats', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, rate = b => (b.id === 'big' ? 3 : 1);
+  const at = t => M.stage.accumulate(S, 'r', rate, t);
+  const a = S.beats[2].act;
+  assert.ok(Math.abs(at(a[0]) - a[0]) < 1e-9, 'rate 1 until big\'s action');
+  assert.ok(Math.abs(at(a[1]) - (a[0] + 2 * (a[1] - a[0]))) < 1e-9, 'a linear ramp from 1 to 3 averages 2');
+  assert.ok(Math.abs(at(a[1] + 1) - at(a[1]) - 3) < 1e-9, 'then rate 3');
+  let last = -1;
+  for (let x = 0; x < C.duration; x += 0.2) { assert.ok(at(x) >= last); last = at(x); }
+});
+
+test('the world gets the claims, in proportion from zero', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const w = M.stage.worldAt(C.stage, 1);
+  assert.strictEqual(w.value('F3'), 55);
+  assert.strictEqual(w.display('F2'), '40');
+  assert.ok(Math.abs(w.share('F2', 'F3') - 40 / 55) < 1e-12);
+  assert.throws(() => w.value('F9'), /unknown claim "F9"/);
+});
+
+test('the "what if this beat never happened" override takes the beat before\'s time, progress and rates', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const S = C.stage, t = mid(C.scenes[2]);
+  const rate = b => (b.id === 'big' ? 3 : 1);
+  const real = [M.stage.timeAt(S, t), M.stage.accumulate(S, 'r', rate, t)];
+  S.override = 2;
+  assert.strictEqual(M.stage.timeAt(S, t), 2005);
+  assert.strictEqual(M.stage.progress(S, 2, t), 0);
+  assert.ok(Math.abs(M.stage.accumulate(S, 'r', rate, t) - t) < 1e-9);
+  S.override = null;
+  assert.strictEqual(real[0], 2020);
+  assert.ok(real[1] > t);
+});
+
+test('the camera frames each beat\'s focus at its zoom, and the card never moves with it', () => {
+  const a = FIXTURE_SPEC(), b = FIXTURE_SPEC();
+  b.scenes[1].stage.zoom = 2;
+  const ca = compile(a).C, cb = compile(b).C;
+  assert.strictEqual(cb.stage.beats[1].zoom, 2);
+  const at = C => JSON.stringify(C.scenes[1].layers.map(l => l.lines && l.lines.map(x => [x.x, x.y])));
+  assert.strictEqual(at(cb), at(ca));
+  const s = FIXTURE_SPEC(); s.scenes[1].stage.zoom = 120;
+  assert.throws(() => compile(s), /stage.zoom must be between 0.1 and 80/);
+  const f = FIXTURE_SPEC(); f.scenes[1].stage.focus = 'nowhere';
+  const { C, M } = compile(f);
+  assert.throws(() => M.seek(mockCtx(), C, mid(C.scenes[1])), /the world names no such mark/);
+});
+
+test('a mark\u2019s fourth number scales the zoom, so a world can reveal during a beat', () => {
+  const near = FIXTURE_SPEC(), far = FIXTURE_SPEC();
+  const run = (spec, mul) => {
+    const w = load();
+    w.Motion.things.works.marks = () => ({ tank: [0, 0, 6, mul], pumps: [30, 0, 2] });
+    const C = w.Motion.compile(spec, 'main', { measure: mockCtx() });
+    w.Motion.debug.record = [];
+    w.Motion.seek(mockCtx(), C, mid(C.scenes[0]));
+    const r = w.Motion.debug.record.filter(x => x.owner === 'subject');
+    w.Motion.debug.record = null;
+    return Math.max(...r.map(x => x.bbox[2]));
+  };
+  assert.ok(run(far, 2) > run(near, 1) * 1.8, 'twice the zoom draws the subject about twice as wide');
+});
+
+test('the kit draws a ball as one lit disc, recorded for the audit', () => {
+  const w = load();
+  const ctx = mockCtx();
+  w.Motion.debug.record = [];
+  const V = w.Motion.iso.view(ctx, { ax: 100, ay: 100, cx: 0, cy: 0, s: 2 }, 'subject');
+  V.ball(0, 0, 0, 10, { top: '#eeeeee', left: '#cccccc', right: '#999999' });
+  const r = w.Motion.debug.record;
+  w.Motion.debug.record = null;
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(JSON.stringify(r[0].bbox.map(Math.round)), '[80,80,40,40]');
+});
+
+test('the kit lofts bodies with volume and draws their facets back to front', () => {
+  const w = load();
+  const log = [], ctx = mockCtx(log);
+  const V = w.Motion.iso.view(ctx, { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  w.Motion.debug.record = [];
+  V.begin();
+  V.loft([{ c: [-10, 0, 5], r: 1 }, { c: [0, 0, 6], r: [3, 4] }, { c: [10, 0, 7], r: 1.5 }], m.nature.foliage, 8);
+  V.tube([0, 0, 4], [1, 0, 0], 1, 0.6, m.nature.earth);
+  V.end();
+  const r = w.Motion.debug.record.filter(x => x.owner === 'creature');
+  w.Motion.debug.record = null;
+  assert.ok(r.length > 10, 'many facets');
+  // sides plus a rounded end (n triangles) at each end
+  assert.ok(r.length < (2 * 8 + 2 * 8) + (6 + 2 * 6), 'back-facing facets are culled');
+  assert.ok(m.tone('#3366aa').left !== m.tone('#aa6633').left);
+  assert.ok(m.nature.water && m.nature.foliage && m.nature.night);
+});
+
+// Facets a loft draws, with the fills it used.
+function loftFacets(rings, opts) {
+  const w = load();
+  const V = w.Motion.iso.view(mockCtx(), { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  const fills = [];
+  const poly = V.poly;
+  V.poly = (pts, fill) => { fills.push(fill); poly(pts, fill); };
+  V.loft(rings(m), m.nature.earth, 8, opts);
+  return { fills, m };
+}
+
+test('a loft\'s ends are rounded by default, so a part that starts inside another shows no flat rim', () => {
+  const rings = () => [{ c: [0, 0, 5], r: 2 }, { c: [10, 0, 5], r: 2 }];
+  const round = loftFacets(rings).fills.length, flat = loftFacets(rings, { caps: 'flat' }).fills.length, open = loftFacets(rings, { caps: 'open' }).fills.length;
+  assert.ok(round > flat && flat > open, `round ${round} > flat ${flat} > open ${open}`);
+  assert.strictEqual(flat, open + 1, 'a flat end is one facet');
+});
+
+test('a ring\'s own tint colours the loft from that ring on', () => {
+  const rings = m => [{ c: [0, 0, 5], r: 2 }, { c: [5, 0, 5], r: 2, t: m.tone('#2255cc') }, { c: [10, 0, 5], r: 1 }];
+  const { fills, m } = loftFacets(rings);
+  const earth = Object.values(m.nature.earth), blue = Object.values(m.tone('#2255cc'));
+  const near = (a, list) => list.some(b => { const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16); return Math.abs((x >> 16) - (y >> 16)) + Math.abs(((x >> 8) & 255) - ((y >> 8) & 255)) + Math.abs((x & 255) - (y & 255)) < 120; });
+  assert.ok(fills.some(f => near(f, earth) && !near(f, blue)), 'the first stretch keeps the loft\'s tint');
+  assert.ok(fills.some(f => near(f, blue) && !near(f, earth)), 'from the second ring on, the ring\'s tint');
+});
+
+test('a sheet is a lit fan of facets that waits for its batch', () => {
+  const w = load();
+  const V = w.Motion.iso.view(mockCtx(), { ax: 200, ay: 200, cx: 0, cy: 0, s: 4 }, 'creature');
+  const m = w.Motion.iso.materials(w.Motion.design.resolve({ preset: 'default' }));
+  const fills = [];
+  const poly = V.poly;
+  V.poly = (pts, fill) => { fills.push(fill); poly(pts, fill); };
+  const wing = [[0, 0, 5], [6, 0, 5], [8, 6, 4], [1, 7, 5]];
+  V.begin();
+  V.sheet(wing, m.tone('#a08c7a'));
+  assert.strictEqual(fills.length, 0, 'nothing is painted before V.end()');
+  V.end();
+  assert.strictEqual(fills.length, wing.length, 'one facet per edge, double-sided');
+  assert.ok(new Set(fills).size > 1, 'the bellied facets are lit differently');
+  fills.length = 0;
+  V.sheet(wing.map(p => [p[0], p[1], 5]), m.tone('#a08c7a'), { sag: 0 });
+  assert.strictEqual(new Set(fills).size, 1, 'a flat sheet is one tone');
+});
+
+test('the stage fills the frame in every format, its focus centred, the words on white cards', () => {
+  for (const format of ['9:16', '4:5', '1:1', '16:9']) {
+    for (const room of [undefined, 'below', 'behind']) {
+      const s = FIXTURE_SPEC(); s.cuts.main.format = format; if (room) s.stage.room = room;
+      const { C, M } = compile(s);
+      assert.strictEqual(C.textBox, '#ffffff');
+      C.scenes.forEach(sc => {
+        const B = sc.stageBox;
+        assert.deepStrictEqual([B.x, B.y, B.w, B.h], [0, 0, C.W, C.H], format + ' ' + sc.id + ': the stage is the whole frame');
+        const F = B.focus;
+        assert.ok(Math.abs(F.x + F.w / 2 - C.W / 2) < 1 && Math.abs(F.y + F.h / 2 - C.H / 2) < 1, 'the focus is centred');
+        assert.ok(F.w < C.W && F.h < C.H);
+        // One card round the block: every line of the beat's words inside it.
+        const T = sc.cards.top;
+        assert.ok(T && T.w > 0 && T.h > 0, format + ' ' + sc.id + ': the words have a card');
+        sc.layers.filter(l => l.kind === 'text').forEach(l => l.lines.forEach(ln => {
+          assert.ok(ln.x >= T.x && ln.y >= T.y && ln.x + ln.w <= T.x + T.w + 0.5 && ln.y + ln.h <= T.y + T.h + 0.5, '"' + ln.text + '" is inside its card');
+        }));
+        if (sc.chrome && sc.chrome.source) assert.ok(sc.cards.foot, 'the source line has a card');
+        // Every card line lies inside the rectangle stage labels give way to.
+        sc.layers.filter(l => l.kind === 'text' && !/^(label|rank|value)-/.test(l.id)).forEach(l => l.lines.forEach(ln => {
+          assert.ok(ln.y + ln.h <= B.words.y1 && ln.x + ln.w <= B.words.x1, format + ' ' + sc.id + ': "' + ln.text + '" is inside the words rectangle');
+        }));
+      });
+      // The words carry the box colour as their background.
+      M.debug.record = [];
+      M.seek(mockCtx(), C, mid(C.scenes[1]));
+      const card = M.debug.record.filter(r => r.role === 'headline');
+      M.debug.record = null;
+      assert.ok(card.length && card.every(r => r.bg === '#ffffff'));
+    }
+  }
+  const bad = FIXTURE_SPEC(); bad.stage.room = 'above';
+  assert.throws(() => compile(bad), /stage\.room must be/);
+});
+
+test('stage labels are one size on screen whatever the zoom, as role "stage"', () => {
+  const sizes = [1, 1.6].map(zoom => {
+    const s = FIXTURE_SPEC(); s.scenes.forEach(sc => { sc.stage = Object.assign({}, sc.stage, { zoom }); });
+    const { C, M } = compile(s);
+    const out = [];
+    for (let t = 0.7; t < C.duration; t += 0.5) {
+      M.debug.record = [];
+      M.seek(mockCtx(), C, t);
+      M.debug.record.filter(r => r.role === 'stage').forEach(r => out.push(r.size));
+    }
+    M.debug.record = null;
+    return out;
+  });
+  assert.ok(sizes[0].length > 0 && sizes[1].length > 0);
+  assert.strictEqual(JSON.stringify([...new Set(sizes[0])]), JSON.stringify([...new Set(sizes[1])]));
+});
+
+test('every frame is a pure function of t', () => {
+  const { C, M } = compile(FIXTURE_SPEC());
+  const at = t => { const log = []; M.seek(mockCtx(log), C, t); return log.join('\n'); };
+  const t = [0.4, 5.2, 9.9, C.duration - 0.2];
+  assert.deepStrictEqual(t.slice().reverse().map(at).reverse(), t.map(at));
+});
+
+test('a missing world painter is named', () => {
+  const s = FIXTURE_SPEC(); s.stage.world = 'ghost';
+  const { C, M } = compile(s);
+  assert.throws(() => M.seek(mockCtx(), C, 1), /no painter Motion\.things\.ghost/);
+});
+
+test('forms blend: numbers and arrays smoothly, profiles point by point, the rest halfway', () => {
+  const { M } = compile(FIXTURE_SPEC());
+  const f = M.stage.blendForm({ a: 0, b: [0, 10], p: [[0, 0], [2, 2]], tag: 'x' }, { a: 10, b: [10, 20], p: [[4, 4], [6, 6]], tag: 'y' }, 0.25);
+  assert.strictEqual(f.a, 2.5);
+  assert.strictEqual(JSON.stringify(f.b), '[2.5,12.5]');
+  assert.strictEqual(JSON.stringify(f.p), '[[1,1],[3,3]]');
+  assert.strictEqual(f.tag, 'x');
+});
+
+test('a stage label gives way on its own to whatever the beat\'s subject draws', () => {
+  const s = FIXTURE_SPEC();
+  const { C, M } = compile(s);
+  const t = C.scenes[0].t0 + (C.scenes[0].t1 - C.scenes[0].t0) / 2;
+  const alphaOf = painter => {
+    M.things.works = painter;
+    M.debug.record = []; M.seek(mockCtx(), C, t);
+    const r = M.debug.record.filter(x => x.role === 'stage'); M.debug.record = null;
+    return r.length;
+  };
+  const base = { marks() { return { tank: [0, 0, 6] }; } };
+  const on = alphaOf(Object.assign({}, base, { draw(w, api) { api.view('subject').block(-8, -8, 0, 16, 16, 10, api.mat.N3); api.label('Works', 0, 0, 5); } }));
+  const off = alphaOf(Object.assign({}, base, { draw(w, api) { api.view('subject').block(-8, -8, 0, 16, 16, 10, api.mat.N3); api.label('Works', -36, 18, 0, { dy: 8 }); } }));
+  assert.strictEqual(on, 0, 'a label on the subject is not painted');
+  assert.strictEqual(off, 1, 'a label clear of the subject is');
+});

@@ -22,6 +22,10 @@ shared frame); a scene's `kicker` copy fills the kicker line. The source line
 is built automatically from the sources of the claims the scene shows. You
 never write it.
 
+In the continuous style (`continuous.md`) every type below keeps its slots
+and data, sets its words in the band, and takes a `picture` that draws what
+its chart would (`pictures.md` § Choosing).
+
 Evidence headlines may run to 10 words because they state the finding with its
 number. Kinetic layers (the hook headline, a big number's line, bullets, steps)
 stay at 7–8 words (`copy.md` § Word limits).
@@ -206,8 +210,10 @@ is `meta.brand.logo`, a data URI the user supplied.
 
 ## custom
 
-**Job:** the escape hatch, for the rare scene the catalog can't draw.
-**Not for:** anything the catalog already draws.
+**Job:** a finding's own thing, drawn for this video (`pictures.md` §
+Drawing the finding's own thing), or a scene no other type can show.
+**Not for:** a value, a rate, a series or a comparison of values (their
+flat chart scenes), and never a grid of boxes or dots for a share.
 **Data:** `draw` names a painter the page registers on `Motion.custom`. The
 contract is in `motion.md` § Custom scenes. The card's kicker, headline,
 units and source line come for free.

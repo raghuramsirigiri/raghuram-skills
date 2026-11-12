@@ -7,10 +7,13 @@ const vm = require('vm');
 
 const SKILL = path.join(__dirname, '..');
 const LIB = path.join(SKILL, 'assets', 'motion-lib');
-const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art'];
+const ORDER = ['core', 'ease', 'text', 'paint', 'layout', 'design', 'transitions', 'art', 'iso', 'world'];
 
 function sceneFiles() {
   return fs.readdirSync(path.join(LIB, 'scenes')).filter(f => f.endsWith('.js')).sort();
+}
+function pictureFiles() {
+  return fs.readdirSync(path.join(LIB, 'pictures')).filter(f => f.endsWith('.js')).sort();
 }
 
 // A fresh sandbox per call, so no state leaks between tests.
@@ -23,6 +26,7 @@ function load(opts) {
   const run = f => vm.runInContext(fs.readFileSync(f, 'utf8'), sandbox, { filename: f });
   run(path.join(SKILL, 'assets', 'charts-lib', 'theme.js'));
   ORDER.forEach(n => run(path.join(LIB, n + '.js')));
+  pictureFiles().forEach(f => run(path.join(LIB, 'pictures', f)));
   (opts.scenes || sceneFiles()).forEach(f => run(path.join(LIB, 'scenes', f)));
   (opts.extra || []).forEach(n => run(path.join(LIB, n + '.js')));
   return sandbox;
@@ -50,6 +54,10 @@ function mockCtx(log) {
     scale(x, y) { T.a *= x; T.d *= y; rec('scale', [x, y]); },
     rotate(a) { rec('rotate', [a]); },
     setTransform() { T = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; },
+    transform(a, b, c, d, e, f) {
+      T = { a: T.a * a + T.c * b, b: T.b * a + T.d * b, c: T.a * c + T.c * d, d: T.b * c + T.d * d, e: T.a * e + T.c * f + T.e, f: T.b * e + T.d * f + T.f };
+      rec('transform', [a, b, c, d, e, f]);
+    },
     setLineDash(d) { rec('dash', d); },
     roundRect(...a) { rec('roundRect', a); }
   };
@@ -77,4 +85,4 @@ const FIXTURE_SPEC = () => ({
   ]
 });
 
-module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, FIXTURE_SPEC };
+module.exports = { load, mockCtx, SKILL, LIB, ORDER, sceneFiles, pictureFiles, FIXTURE_SPEC };

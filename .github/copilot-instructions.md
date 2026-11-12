@@ -5,6 +5,12 @@ self-contained HTML dashboard, report, slide deck or printable one-pager with
 interactive SVG charts. No CDN, no npm install, no build step, no runtime
 dependencies.
 
+The repository also holds ten other independent skills, each with its own
+`SKILL.md` under `plugins/<name>/skills/<name>/`: `social-post`,
+`explainer-video`, `documentary-video`, `diorama-slides`, `decisions-only`, `exec-brief`,
+`whats-changed`, `sanity-check`, `chart-honesty` and `action-titles`. When a
+request matches one of them, follow that skill's `SKILL.md` instead.
+
 Shared cross-tool instructions live in [`AGENTS.md`](../AGENTS.md); the canonical
 workflow is [`plugins/chart-dashboard/skills/chart-dashboard/SKILL.md`](../plugins/chart-dashboard/skills/chart-dashboard/SKILL.md).
 Read both before building a dashboard, analytics page, KPI view, data report, slide deck, or

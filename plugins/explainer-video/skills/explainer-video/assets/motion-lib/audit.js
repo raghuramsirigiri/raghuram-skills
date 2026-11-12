@@ -6,6 +6,8 @@
  *   const r = await VideoAudit.run({ cut: 'main' });     // { ok, fails, warns, stats }
  *   r.contactSheet()                                     // PNG data URL
  *   await VideoAudit.run({ cut: 'main', exportProbe: true })
+ *   const r = await VideoAudit.run({ cut: 'main', scenes: ['e2'] });   // one scene, while drafting
+ *   r.stills()                                           // [{ handle, id, png }] at each scene's hold
  *
  * Fails: a scene throws; text outside the safe zone; two text layers
  * overlapping; text below the minimum size; contrast below 4.5 (3 for large
@@ -13,6 +15,10 @@
  * 0.5 s. Warns: single-frame pops, a frame held still longer than its read
  * needs (frozen), text near a box edge, a scene whose hold frame leaves too
  * much of the safe area empty (fill).
+ *
+ * With `scenes`, only those scenes' frames are painted and judged: the
+ * layout, read-time, world and fill checks run; the checks that need the
+ * whole video (hook, pops, frozen, loop, export probe) wait for a full run.
  */
 (function (root) {
   'use strict';
@@ -112,6 +118,13 @@
     const handle = {};
     C.scenes.forEach((s, i) => { handle[s.id] = 'V' + (i + 1); });
     const hd = id => (handle[id] || id);
+    // Scene mode: a draft checks the scenes it just wrote, not the whole video.
+    const only = opts.scenes && opts.scenes.length ? C.scenes.filter(s => opts.scenes.indexOf(s.id) >= 0) : null;
+    if (only && only.length !== opts.scenes.length) {
+      const miss = opts.scenes.filter(id => !C.scenes.some(s => s.id === id));
+      return { ok: false, fails: [{ check: 'scenes', msg: 'cut "' + cutName + '" has no scene ' + miss.map(id => '"' + id + '"').join(', ') }], warns, stats: {} };
+    }
+    const inScope = t => !only || only.some(s => t >= s.t0 && t < s.t1);
 
     const diffs = [];
     let prev = null;
@@ -127,6 +140,7 @@
 
     for (let n = 0; n < C.frames; n++) {
       const t = n / C.fps;
+      if (!inScope(t)) continue;
       M.debug.record = [];
       try { M.seek(ctx, C, t, { frameT: t }); } catch (e) {
         const sc = C.scenes.find(s => t >= s.t0 && t < s.t1);
@@ -134,8 +148,11 @@
         M.debug.record = null;
         continue;
       }
-      const recs = M.debug.record.filter(r => !r.skip);
+      const all = M.debug.record.filter(r => !r.skip);
       M.debug.record = null;
+      // The continuous style's world reports its shapes too; the text checks read the words.
+      const shapes = all.filter(r => r.role === 'shape');
+      const recs = all.filter(r => r.role !== 'shape');
 
       // Thumbnail diff for pops and dead time.
       tctx.drawImage(canvas, 0, 0, tw, th);
@@ -148,7 +165,7 @@
       if (back) { let s = 0; for (let i = 0; i < lum.length; i++) s += Math.abs(lum[i] - back[i]); lag.push(s / lum.length); } else lag.push(Infinity);
       ring[n % C.fps] = lum;
 
-      if (n === Math.round(0.5 * C.fps) && !recs.some(r => r.alpha > 0.5)) {
+      if (!only && n === Math.round(0.5 * C.fps) && !recs.some(r => r.alpha > 0.5)) {
         fails.push({ check: 'hook', t: tc(t, C.fps), msg: 'nothing readable on screen by 0.5 s' });
       }
 
@@ -171,8 +188,9 @@
           if (ratio < need) once('contrast:' + r.scene + r.layer + r.color, fails, { check: 'contrast', scene: hd(r.scene), msg: '"' + r.text.slice(0, 40) + '" ' + r.color + ' on ' + d.bg + ' is ' + ratio.toFixed(2) + ':1, needs ' + need });
         }
         // Read time: how long has this exact text sat fully revealed and still?
+        // Words carried through a transition (a world label in a pan) aren't being read.
         const st = still.get(key);
-        const solid = r.alpha >= 0.99;
+        const solid = r.alpha >= 0.99 && r.phase !== 'transition';
         const same = st && st.bbox.every((v, i) => Math.abs(v - r.bbox[i]) < 0.5);
         if (solid && st && same && st.last === n - 1) { st.last = n; }
         else if (solid) { const best = st ? st.best : 0; still.set(key, { start: n, last: n, bbox: r.bbox.slice(), best, role: r.role, text: r.text, scene: r.scene }); }
@@ -190,6 +208,34 @@
             once('overlap:' + [a.layer, b.layer].sort().join('|'), fails, { check: 'overlap', scene: hd(a.scene), t: tc(t, C.fps), msg: '"' + a.text.slice(0, 30) + '" overlaps "' + b.text.slice(0, 30) + '"' });
           }
         }
+      }
+
+      if (shapes.length) worldChecks(t, recs, shapes);
+    }
+
+    // The world (continuous style). Words never touch a shape (a place's own
+    // labels may sit beside its own lines, a share's mark). While a beat holds, the
+    // place in view sits wholly inside the frame, below its words and above
+    // the footer's hairline.
+    function worldChecks(t, recs, shapes) {
+      const vis = shapes.filter(r => r.alpha > 0.06 && r.kind !== 'shadow');
+      const words = recs.filter(r => r.alpha > 0.3 && !/^world-face:/.test(r.layer || ''));
+      for (const w of words) {
+        const own = /^world-label:([^:]+)/.exec(w.layer || '');
+        const hit = vis.find(sh => !(own && sh.kind === 'line' && String(sh.owner).indexOf(own[1]) === 0) && intersects(w.bbox, sh.bbox));
+        if (hit) once('world:' + w.layer + '|' + hit.owner, fails, { check: 'world-overlap', scene: hd(w.scene), t: tc(t, C.fps), msg: '"' + w.text.slice(0, 30) + '" touches the picture ' + hit.owner });
+      }
+      const sc = C.scenes.find(s => t >= s.enterEnd && t < s.exitStart);
+      if (!sc || !sc.place) return;
+      const mine = vis.filter(r => r.owner === sc.place);
+      if (!mine.length) return;
+      const x0 = Math.min(...mine.map(r => r.bbox[0])), y0 = Math.min(...mine.map(r => r.bbox[1]));
+      const x1 = Math.max(...mine.map(r => r.bbox[0] + r.bbox[2])), y1 = Math.max(...mine.map(r => r.bbox[1] + r.bbox[3]));
+      // The words' own room: the band above the world, or a wide frame's column beside it.
+      const B = sc.bandRect || { x0: 0, y0: C.zone.top, x1: C.W, y1: C.zone.top };
+      const intoWords = x0 < B.x1 + 12 && x1 > B.x0 - 12 && y0 < B.y1 + 12 && y1 > B.y0 - 12;
+      if (x0 < -1 || x1 > C.W + 1 || intoWords || y1 > C.zone.ruleY) {
+        once('stage:' + sc.id, fails, { check: 'stage', scene: hd(sc.id), t: tc(t, C.fps), msg: 'the picture spans ' + [x0, y0, x1, y1].map(Math.round).join(',') + ': it must sit inside the frame, clear of the words (' + [B.x0, B.y0, B.x1, B.y1].map(Math.round).join(',') + ') and above the footer (' + Math.round(C.zone.ruleY) + ')' });
       }
     }
     const ms = performance.now() - t0;
@@ -230,14 +276,14 @@
       const around = Math.max(diffs[n - 1], diffs[n + 1], 0.1);
       if (diffs[n] > 1.5 && diffs[n] > 5 * around && diffs[n] > 6 * Math.max(med, 0.15) && !cutFrames.has(n) && !textSteps.has(n)) pops.push(n);
     }
-    if (pops.length) warns.push({ check: 'pops', msg: 'single-frame jumps at frames ' + pops.slice(0, 12).join(', ') + (pops.length > 12 ? '…' : '') + ' — look at them in the player (← →)' });
+    if (pops.length && !only) warns.push({ check: 'pops', msg: 'single-frame jumps at frames ' + pops.slice(0, 12).join(', ') + (pops.length > 12 ? '…' : '') + ' — look at them in the player (← →)' });
 
     // Frozen: a still frame held longer than the reading it is there for.
     // A hold as long as its read needs is fine (the engine sets auto holds to
     // exactly that); one stretched past it by a long `dur`, or a custom
     // painter that stops, reads as the video freezing.
     let run0 = -1;
-    for (let n = 0; n <= lag.length; n++) {
+    for (let n = 0; !only && n <= lag.length; n++) {
       const quiet = n < lag.length && lag[n] < FROZEN;
       if (quiet && run0 < 0) run0 = n;
       if (!quiet && run0 >= 0) {
@@ -251,20 +297,20 @@
       }
     }
 
-    if (opts.loop) {
+    if (opts.loop && !only) {
       M.seek(ctx, C, 0); const a = ctx.getImageData(0, 0, C.W, C.H).data;
       M.seek(ctx, C, C.duration - 1 / C.fps); const b = ctx.getImageData(0, 0, C.W, C.H).data;
       let s = 0; for (let i = 0; i < a.length; i += 16) s += Math.abs(a[i] - b[i]);
       if (s / (a.length / 16) > 2) fails.push({ check: 'loop', msg: 'first and last frames differ; the loop will jump' });
     }
 
-    const fill = fills(C, ctx);
+    const fill = fills(C, ctx).filter(f => !only || only.some(s => s.id === f.id));
     fill.forEach(f => {
       if (f.fill < FILL.target && FILL.exempt.indexOf(f.type) < 0) warns.push({ check: 'fill', scene: hd(f.id), msg: f.type + ' covers ' + Math.round(f.fill * 100) + '% of the safe area on its hold frame, under ' + Math.round(FILL.target * 100) + '% — lay it out for the ' + C.cls + ' frame (references/formats.md § Layout per format)' });
     });
 
     let probe = null;
-    if (opts.exportProbe) {
+    if (opts.exportProbe && !only) {
       if (!M.exportVideo) warns.push({ check: 'export-probe', msg: 'export.js is not loaded' });
       else {
         try { probe = await M.exportVideo({ spec, cut: cutName, seconds: Math.min(2, C.duration), probe: true }); if (!probe.ok) fails.push({ check: 'export-probe', msg: probe.message }); }
@@ -275,10 +321,23 @@
     const stats = {
       cut: cutName, format: C.format, frames: C.frames, duration: +C.duration.toFixed(3), fps: C.fps,
       msPerFrame: +(ms / C.frames).toFixed(2), fill: fill.map(f => ({ handle: hd(f.id), type: f.type, fill: f.fill })), scenes: C.scenes.map(s => ({ handle: hd(s.id), id: s.id, type: s.type, from: tc(s.t0, C.fps), to: tc(s.t1, C.fps) })),
-      exportPath: probe && probe.path
+      exportPath: probe && probe.path, scope: only ? only.map(s => hd(s.id)) : 'all'
     };
-    stats.lag = { min: +Math.min(...lag).toFixed(3), median: +lag.filter(isFinite).sort((a, b) => a - b)[Math.floor(lag.filter(isFinite).length / 2)].toFixed(3) };
-    return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C) };
+    if (!only) stats.lag = { min: +Math.min(...lag).toFixed(3), median: +lag.filter(isFinite).sort((a, b) => a - b)[Math.floor(lag.filter(isFinite).length / 2)].toFixed(3) };
+    return { ok: fails.length === 0, fails, warns, stats, probe, contactSheet: () => contactSheet(spec, C), stills: () => stills(C, only || C.scenes, hd) };
+  }
+
+  // One frame per scene at the middle of its hold, to look at a draft
+  // scene by scene before the whole video is built.
+  function stills(C, scenes, hd) {
+    const cv = document.createElement('canvas');
+    cv.width = C.W; cv.height = C.H;
+    const cx = cv.getContext('2d');
+    return scenes.map(s => {
+      const t = (s.enterEnd + s.exitStart) / 2;
+      M.seek(cx, C, t, { frameT: t });
+      return { handle: hd(s.id), id: s.id, t: tc(t, C.fps), png: cv.toDataURL('image/png') };
+    });
   }
 
   // The contact sheet is the player's (player.js), so the page and the audit

@@ -4,6 +4,37 @@ Cheapest check first, text reports before pictures, one look at the
 contact sheet at the end, then re-read every figure against the source.
 Done means `finalize.js` exits 0.
 
+## Build in stages (step 5)
+
+A video built in one go shows every mistake at the end, and each fix costs
+a whole re-render. Build it so each check is the cheapest one that can
+catch the mistake:
+
+1. **The spec, no browser.** Write the claims, the story and every scene;
+   stage and run the static check (§ 7.1) until it has no FAIL. It compiles
+   every cut in seconds, so wrong ids, typed figures, dropped hedges, copy
+   limits, timing and a picture refusing its data all surface here.
+2. **Each custom painter alone.** Register one painter, serve the folder
+   (§ 7.2), and audit only its scene, then look at its still:
+
+   ```js
+   const r = await VideoAudit.run({ cut: 'main', scenes: ['e2'] });
+   JSON.stringify({ ok: r.ok, fails: r.fails, warns: r.warns });
+   r.stills()[0].png      // the scene at the middle of its hold
+   ```
+
+   Scene mode paints that scene's frames only and runs the layout,
+   read-time, world and fill checks. Fix it until it is `ok` and the still
+   shows its thing, then write the next painter. Rerun only the scene you
+   changed, never the whole video, to check a fix.
+3. **The whole video, once.** When every scene has passed on its own, run
+   § 7.2 in full: it adds the checks that need the whole cut (the hook by
+   0.5 s, pops, frozen holds, the export probe).
+
+A scene that fails the same check twice gets simpler, the way
+`pictures.md` § Drawing the finding's own thing says. It never gets
+swapped for a chart or the nearest picture.
+
 ## Step 7 — verify
 
 ### 7.1 Stage and run the static check
@@ -19,7 +50,10 @@ shape, timing, numbers, hedges and upgrade words, quotes, copy limits,
 determinism and offline-ness. Read every row; fix every FAIL in the spec,
 then run it again. A WARN is a judgement call: read it, act on it or say
 why not. The `timing` rows print each scene's handle and length: that is
-the scene list for the handover.
+the scene list for the handover. A `pictures` FAIL names a retired 3D
+picture (a chart or a grid of units): draw the finding's thing with a custom
+painter (`pictures.md` § Drawing the finding's own thing), or give it its
+flat chart in the slides style.
 
 ### 7.2 Run the audit in a browser
 
@@ -43,7 +77,11 @@ seconds, and **fails** on:
 - contrast under 4.5:1 (3:1 for large text);
 - a layer not held still long enough to read;
 - nothing readable by 0.5 s;
-- the export probe not round-tripping.
+- the export probe not round-tripping;
+- in the continuous style, `world-overlap` (a word touching a shape of the
+  world: a key, a label or the band's words) and `stage` (the place in view,
+  while a beat holds, running off the frame, into its words or past the
+  footer).
 
 It **warns** on single-frame pops, a still frame held longer than its read
 needs (`frozen`), and a scene whose hold frame

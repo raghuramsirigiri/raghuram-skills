@@ -17,7 +17,9 @@ rules a custom scene follows.
 - **Eases**: entrances on `outQuint` (cubic-bezier .16,1,.3,1), morphs on
   `glide` (.45,0,.15,1), exits on expo-in.
 - **No zoom**: content is drawn at its laid-out size from entrance to exit.
-  Nothing pushes, zooms, drifts or shakes, pictures included.
+  Nothing pushes, zooms, drifts or shakes, pictures included. In the
+  continuous style the camera pans level between places and the world's
+  scale is set once per video (`continuous.md`).
 - **No dead time**: a still frame lasts only as long as its read needs. The
   engine sets holds to that; a `dur` that stretches one further, or a
   custom painter that stops, gets an audit warning (`frozen`).
@@ -61,10 +63,16 @@ There is no per-scene choice. A `transitionIn` left in a spec is ignored,
 and `check-video.js` warns so you delete it. Don't build another transition
 in a custom scene.
 
+**The continuous style has one more move, the pan**: between beats at
+different places the words leave, the camera pans level to the next place
+(1.25–1.8 s by distance, 0.9 s for a pan down), and the next words rise in.
+Beats at the same place use the swap. The shared frame behaves the same in
+both styles (`continuous.md` § A beat, in order).
+
 ## Banned by default
 
 Particle bursts, shockwave rings, lens flares, glows and bloom, zooms,
-pushes and camera moves, camera shake, RGB split, glitches, full-frame crossfades, bouncy or elastic easing,
+pushes and camera moves other than the continuous style's level pan, camera shake, RGB split, glitches, full-frame crossfades, bouncy or elastic easing,
 stock "HUD" décor, fake UI of a real product, emoji decoration, spinning
 logos, gradient panels. They aren't in the engine. Don't build them in a
 custom scene. The one decoration the engine draws is the halftone
@@ -73,8 +81,10 @@ from two corners of the frame, around the content and never on it.
 
 ## Custom scenes
 
-Only when no catalog scene can show the finding. The page registers a
-painter, and the spec names it (`"type": "custom", "draw": "name"`):
+For a finding that is a real thing (`pictures.md` § Drawing the finding's
+own thing), or a scene no catalog type can show.
+The page registers a painter, and the spec names it (`"type": "custom",
+"draw": "name"`, with `"claims"` listing the figures it draws):
 
 ```js
 Motion.custom.tideClock = {
@@ -94,12 +104,18 @@ The contract:
   before. That is what makes export, motion blur and the audit work.
 - **No `Math.random`** (use `api.rng(...keys)`, seeded), no `Date.now`, no
   timers, no state kept between calls, no `requestAnimationFrame`.
+- **Figures through `api.value(id)` and `api.display(id)`**, for ids in
+  the scene's `claims`, never a typed number. Reading a claim it didn't
+  list throws.
 - **Text through `api.text`**, so the audit sees it (safe zone, overlap,
   contrast, read time).
 - **Colours from `api.design`** (`subject`, `context`, `ink`, `muted`,
   `hair`). Never hard-code a colour.
-- **Inside `api.box`**, the area under the card's headline; the card's
+- **Inside `api.box`**, the area under the card's headline (in the
+  continuous style, the stage the world steps aside from); the card's
   kicker, headline, units and source line come for free.
+- **The 2.5D kit**, in either style: `api.iso(scale)` and `api.mat`
+  (`pictures.md` § A custom picture).
 
 `check-video.js` fails `Math.random`, `Date.now`, `performance.now`,
 `setTimeout`, `setInterval` and `requestAnimationFrame` in the page's own

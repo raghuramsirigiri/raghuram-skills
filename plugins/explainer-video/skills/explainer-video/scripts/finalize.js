@@ -28,10 +28,10 @@ const THEME = path.join(ASSETS, 'charts-lib', 'theme.js');
 const MLIB = path.join(ASSETS, 'motion-lib');
 
 // What --stage copies, listed so the cleanup can recognise its own folder.
+const SUBDIRS = ['pictures', 'scenes'];
 function motionFiles() {
   const top = fs.readdirSync(MLIB).filter(f => f.endsWith('.js')).sort();
-  const scenes = fs.readdirSync(path.join(MLIB, 'scenes')).filter(f => f.endsWith('.js')).sort().map(f => 'scenes/' + f);
-  return top.concat(scenes);
+  return SUBDIRS.reduce((out, d) => out.concat(fs.readdirSync(path.join(MLIB, d)).filter(f => f.endsWith('.js')).sort().map(f => d + '/' + f)), top);
 }
 
 const argv = process.argv.slice(2);
@@ -49,7 +49,7 @@ const run = (script, args) => spawnSync(process.execPath, [path.join(SCRIPTS, sc
 if (stageOnly) {
   fs.mkdirSync(stagedCharts, { recursive: true });
   fs.copyFileSync(THEME, path.join(stagedCharts, 'theme.js'));
-  fs.mkdirSync(path.join(stagedMotion, 'scenes'), { recursive: true });
+  SUBDIRS.forEach(d => fs.mkdirSync(path.join(stagedMotion, d), { recursive: true }));
   for (const f of motionFiles()) fs.copyFileSync(path.join(MLIB, f), path.join(stagedMotion, f));
   console.log('staged charts-lib/ and motion-lib/ beside ' + path.basename(target) +
     ' — serve the folder over http, open the page, run `await VideoAudit.run()` after loading motion-lib/audit.js' +

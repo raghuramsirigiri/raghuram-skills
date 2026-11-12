@@ -1,0 +1,25 @@
+{
+ "meta": { "title": "Northvale members survey 2026", "locale": "en-GB", "preset": "default", "palette": null, "brand": null, "fonts": [], "fps": 30, "seed": 1, "audio": { "score": "off" }, "art": "halftone", "style": "continuous" },
+ "cuts": { "main": { "format": "9:16", "scenes": ["ctx", "hook", "e1", "e2", "e3", "why", "e5", "src"] } },
+ "sources": [ { "id": "A", "name": "Northvale Co-op members survey 2026: findings, research team", "date": "2026-08-12", "asOf": null } ],
+ "claims": [
+  { "id": "F1", "value": 72, "unit": "%", "display": "72%", "source": "A", "locator": "Finding 1", "verbatim": "72% rated home delivery good or very good.", "kind": "copied" },
+  { "id": "F2", "value": 61, "unit": "%", "display": "61%", "source": "A", "locator": "Finding 1", "verbatim": "That compares with 61% last year.", "kind": "copied" },
+  { "id": "F3", "value": 1204, "unit": "responses", "display": "1,204", "source": "A", "locator": "Intro", "verbatim": "1,204 responses.", "kind": "copied" },
+  { "id": "F4", "value": 58, "unit": "%", "display": "58%", "source": "A", "locator": "Finding 2", "verbatim": "58% would recommend us.", "kind": "copied" },
+  { "id": "F5", "value": 64, "unit": "%", "display": "64%", "source": "A", "locator": "Finding 2", "verbatim": "In 2025 the figure was 64%.", "kind": "copied" }
+ ],
+ "data": [],
+ "scenes": [
+  { "id": "ctx", "type": "big-number", "copy": { "kicker": "Members survey 2026", "value": "F3", "line": "members answered our survey in July", "units": "Online survey, research team notes" }, "picture": { "kind": "people" } },
+  { "id": "hook", "type": "big-number", "copy": { "kicker": "Home delivery", "value": "F1", "line": "rated home delivery good or very good", "units": "Delivery users, last three months" }, "picture": { "kind": "blocks", "skin": "parcel", "of": "delivery users", "props": ["home"] } },
+  { "id": "e1", "type": "before-after", "copy": { "kicker": "Home delivery", "title": "Delivery ratings rose from {F2} to {F1}", "units": "% rating it good or very good" }, "before": { "label": "last year", "value": "F2" }, "after": { "label": "this year", "value": "F1" } },
+  { "id": "e2", "type": "kicker-title", "copy": { "kicker": "The research team says", "title": "Delivery: now the strongest part of the service" }, "picture": { "kind": "plinth", "at": "hook" } },
+  { "id": "e3", "type": "compare-bars", "copy": { "kicker": "Would recommend us", "title": "Likely to recommend fell from {F5} to {F4}", "units": "% likely or very likely, all respondents" }, "bars": [ { "label": "2025", "value": "F5" }, { "label": "2026", "value": "F4", "emph": true } ], "picture": { "at": "ctx" } },
+  { "id": "why", "type": "kicker-title", "copy": { "kicker": "Not yet known", "title": "Why satisfaction changed has not been analysed", "sub": "Open-text coding is due in September" }, "picture": { "kind": "desk", "due": "September", "from": "ctx" } },
+  { "id": "e5", "type": "bullet-stack", "copy": { "kicker": "In short", "title": "What the survey tells us" }, "points": [ "Delivery is rated higher than last year", "Fewer members would recommend us", "Why it changed is not yet analysed" ], "picture": { "icons": ["hook", "e3", "why"] } },
+  { "id": "src", "type": "source-card", "copy": { "note": "Online member survey, July. Percentages of those answering." } }
+ ],
+ "caption": "Northvale Co-op members survey 2026: 72% of delivery users rated home delivery good or very good, up from 61% last year. 58% said they were likely or very likely to recommend us, down from 64% in 2025. Why satisfaction changed has not been analysed; open-text coding is due in September. Source: research team, 12 August 2026 (1,204 responses).",
+ "alt": "An explainer video in one continuous world: a field of 1,204 dots for the members who answered, a pallet of parcels by a house, one parcel per percent of delivery users, where 72% light up for delivery users rating it good, a plinth for the verdict, the field again for 64% falling to 58%, and a desk of answers waiting to be coded by September."
+}

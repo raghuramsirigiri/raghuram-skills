@@ -147,7 +147,21 @@ topic with figures in it.
   fails on drift. Everything else in it (`assets/motion-lib/`, `references/`)
   is its own. Its output is JavaScript only: Canvas 2D plus the browser's
   WebCodecs and Web Audio. Never add ffmpeg, Remotion, a render pipeline, TTS
-  or a CDN animation library.
+  or a CDN animation library. Its default style is slides, with flat charts.
+  The continuous 2.5D world (`references/continuous.md`) is used only when
+  the user asks for it, and **is frozen at 1.1.0**: never add a picture,
+  prop, skin or `things/` library, and never grow its layout (`world.js`,
+  `iso.js`, `pictures/`). Each round that did fixed the story being worked
+  on and nothing else, and new topics fell back to the nearest picture or to
+  plain boxes. Its data pictures (`people`, `dots`, `blocks`, `split`,
+  `columns`, `funnel`, `podium`, `ribbon`) are 3D charts and unit grids, and
+  `check-video.js` fails them. A finding that is a real thing is drawn by
+  that video's own custom painter (`references/pictures.md` § Drawing the
+  finding's own thing); a value is a flat chart. A video is built scene by scene
+  (`references/verify-and-ship.md` § Build in stages). `node --test
+  plugins/explainer-video/skills/explainer-video/tests/freeze.test.js` fails
+  on any change to the frozen files; a real bug fix there updates its hash
+  in the same commit and says why.
 - `plugins/documentary-video/` films a document in its own WebGL2 world
   (`assets/film-lib/`), in charts-lib's design system, so it carries a
   **copy** of `assets/charts-lib/theme.js` (identical to chart-dashboard's)
@@ -156,6 +170,19 @@ topic with figures in it.
   plugins/documentary-video/skills/documentary-video/tests/shared-files.test.js`
   fails on drift. It ships primitives, never ready-made things: every cast
   item is built for its film from the document's nouns.
+- `plugins/diorama-slides/` is a card layer over a living 2.5D stage, copied
+  from explainer-video and changed: it carries its **own copy** of
+  `assets/charts-lib/theme.js` and the three brand-recolour scripts
+  (identical to chart-dashboard's) and of explainer-video's
+  `assets/motion-lib/mux-mp4.js` and `mux-webm.js`. The copies rule covers
+  it too: a change to any of them goes into every plugin that carries it,
+  in one commit, and `node --test
+  plugins/diorama-slides/skills/diorama-slides/tests/shared-files.test.js`
+  fails on drift. Everything else in it is its own; never change
+  explainer-video to suit it, or the reverse. It has one mode (no
+  `meta.style`); the story's shape decides how the stage moves, and every
+  thing on the stage is drawn by the video's own painter from the source's
+  nouns, never from a library of things.
 - If the page has a control, wire it completely: filter the data, redraw every
   dependent panel and KPI, and recompute any title that states a finding. A
   static page is fine; a half-wired dropdown is not.
@@ -204,6 +231,8 @@ plugins/decisions-only/
 plugins/whats-changed/      same shape as decisions-only
 plugins/sanity-check/       same shape as decisions-only
 plugins/exec-brief/         same shape as decisions-only
+plugins/action-titles/      same shape as decisions-only
+plugins/chart-honesty/      same shape as decisions-only
 plugins/social-post/
   .claude-plugin/plugin.json
   skills/social-post/       SKILL.md, references/, templates/, assets/, scripts/, tests/, evals/
@@ -212,7 +241,16 @@ plugins/explainer-video/
   .claude-plugin/plugin.json
   skills/explainer-video/   SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
                             (assets/charts-lib/theme.js and the theme scripts are copies of chart-dashboard's)
-examples/                   six finished outputs (two dashboards, deck, report, one-pager, email snapshot)
+plugins/documentary-video/
+  .claude-plugin/plugin.json
+  skills/documentary-video/ SKILL.md, references/, templates/, assets/film-lib/, scripts/, tests/, evals/
+                            (assets/charts-lib/theme.js is chart-dashboard's; the muxers are explainer-video's)
+plugins/diorama-slides/
+  .claude-plugin/plugin.json
+  skills/diorama-slides/    SKILL.md, references/, templates/, assets/motion-lib/, scripts/, tests/, evals/
+                            (theme.js, the theme scripts and the muxers are copies)
+examples/                   finished outputs: two dashboards, deck, report, one-pager, email snapshot,
+                            social post, and ten diorama-slides videos
 docs/                       GitHub Pages landing page
 .claude-plugin/             the marketplace manifest listing every plugin
 ```

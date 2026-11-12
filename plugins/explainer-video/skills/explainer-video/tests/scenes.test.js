@@ -87,6 +87,19 @@ test('the manifest lists every transition the engine knows', () => {
   }
 });
 
+test('the manifest lists every picture the continuous style knows, with its skins and needs', () => {
+  const w = load();
+  const reg = w.Motion.pictures.list;
+  assert.deepStrictEqual(Object.keys(reg).sort(), Object.keys(manifest.pictures).sort());
+  for (const [k, v] of Object.entries(manifest.pictures)) {
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(reg[k].skins || null)), v.skins || null, `skins of ${k}`);
+    if (v.needs) assert.deepStrictEqual(JSON.parse(JSON.stringify(reg[k].needs || [])), v.needs, `needs of ${k}`);
+    // A place of its own with no data (the desk) has no skins; a prop has skins.
+    const d = reg[k], role = d.emphasis ? 'emphasis' : d.data ? 'data' : d.prop && !d.skins ? 'place' : 'prop';
+    assert.strictEqual(role, v.role, `role of ${k}`);
+  }
+});
+
 test('the manifest formats match the layout module', () => {
   const w = load();
   for (const [k, v] of Object.entries(manifest.formats)) {
@@ -106,4 +119,26 @@ test('chart scenes refuse bad data with readable errors', () => {
   assert.throws(one({ id: 'x', type: 'trend-line', copy: { title: 't' }, series: 'nope' }), /no data table/);
   assert.throws(one({ id: 'x', type: 'photo-pan', copy: { caption: 'c', image: 'https://example.com/a.jpg' } }), /data:image/);
   assert.throws(one({ id: 'x', type: 'custom', draw: 'missing' }), /Motion.custom.missing/);
+});
+
+test('a custom painter draws its figures from the claims it names, in both styles', () => {
+  for (const style of ['slides', 'continuous']) {
+    const w = load();
+    const seen = [];
+    w.Motion.custom.cars = { enter: 0.5, read: 1.2, draw(ctx, lt, api) { seen.push([api.value('F4'), api.display('F4')]); } };
+    const spec = gallery();
+    spec.meta.style = style;
+    spec.scenes = [
+      { id: 'big', type: 'big-number', copy: { value: 'F1', line: 'of trips' }, picture: { kind: 'blocks', skin: 'plain', of: 'trips' } },
+      { id: 'cars', type: 'custom', draw: 'cars', claims: ['F4'], copy: { title: 'Cars' } },
+      { id: 'src', type: 'source-card' }];
+    spec.cuts = { m: { format: '9:16', scenes: ['big', 'cars', 'src'] } };
+    const C = w.Motion.compile(spec, 'm', { measure: mockCtx() });
+    const sc = C.scenes[1];
+    assert.ok([...sc.used].includes('F4'), style + ': the scene cites the claim it draws, so its source line lists it');
+    w.Motion.seek(mockCtx(), C, (sc.enterEnd + sc.exitStart) / 2);
+    assert.deepStrictEqual([...seen[seen.length - 1]], [62, '62%'], style);
+    w.Motion.custom.cars.draw = (ctx, lt, api) => api.value('F5');
+    assert.throws(() => w.Motion.seek(mockCtx(), C, (sc.enterEnd + sc.exitStart) / 2), /not in its "claims"/, style);
+  }
 });
