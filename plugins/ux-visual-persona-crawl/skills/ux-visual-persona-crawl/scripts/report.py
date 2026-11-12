@@ -4,6 +4,7 @@
   analyze  --study-dir DIR   navigation.json, flows.json, demographics.json, feedback.json
   verify   --study-dir DIR   check findings.json against the recordings -> verified_findings.json
   render   --study-dir DIR   report.html and report.md
+  export   --study-dir DIR   issues/F1.md ... (one ticket per verified finding) and findings.csv
 
 Runs under the project's .ux-visual-crawl venv (Pillow is used for evidence crops).
 Every number in the report is computed here from journey.json files, so it can be traced.
@@ -148,7 +149,7 @@ def analyze(study_dir: Path) -> dict:
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
-                       "effort": st["decision"]["effort"], "emotion": st["decision"]["emotion"]} for st in steps],
+                       "effort": st["decision"]["effort"], "emotion": st["decision"].get("emotion", "")} for st in steps],
         }
 
     pages = []
@@ -414,6 +415,59 @@ def esc(x) -> str:
     return html.escape(str(x if x is not None else ""))
 
 
+def click_heatmaps(study_dir: Path, data: dict, limit: int = 12) -> list:
+    """Every persona's clicks drawn on one screen per view: red where nothing happened, blue where the screen changed.
+    A click belongs only to the view it was made on, so views are grouped by how they look, not just by page."""
+    from PIL import Image, ImageChops, ImageDraw
+
+    def thumb(path):
+        im = Image.open(path).convert("L")
+        return im.resize((max(1, im.width // 8), max(1, im.height // 8)))
+
+    groups = []  # {page, size, base, thumb, clicks: [(x, y, dead, persona)]}
+    for name, s in data.items():
+        for st in s["journey"].get("steps", []):
+            a = st["action"]
+            if a.get("type") not in CLICKS or "x" not in a:
+                continue
+            shot = s["dir"] / "shots" / st["screenshot"]
+            if not shot.exists():
+                continue
+            page, size, t = page_of(st["address_bar"]), tuple(st["image_size"]), thumb(shot)
+            home = None
+            for g in groups:
+                if g["page"] == page and g["size"] == size:
+                    diff = ImageChops.difference(g["thumb"], t).point(lambda v: 255 if v > 16 else 0)
+                    if diff.histogram()[255] < 0.03 * t.width * t.height:
+                        home = g
+                        break
+            if home is None:
+                home = {"page": page, "size": size, "base": shot, "thumb": t, "clicks": []}
+                groups.append(home)
+            home["clicks"].append((a["x"], a["y"], bool(st["result"].get("no_visible_response")), name))
+
+    groups.sort(key=lambda g: (-len(g["clicks"]), g["page"]))
+    out_dir = study_dir / "heatmaps"
+    out_dir.mkdir(exist_ok=True)
+    maps = []
+    for i, g in enumerate(groups[:limit], 1):
+        img = Image.open(g["base"]).convert("RGB")
+        over = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        d = ImageDraw.Draw(over)
+        r = max(10, img.width // 70)
+        for x, y, dead, _ in g["clicks"]:
+            colour = (220, 30, 40) if dead else (40, 110, 230)
+            d.ellipse([x - r, y - r, x + r, y + r], fill=colour + (90,), outline=colour + (255,), width=3)
+        img = Image.alpha_composite(img.convert("RGBA"), over).convert("RGB")
+        if img.width > 900:
+            img = img.resize((900, round(img.height * 900 / img.width)))
+        path = out_dir / f"view-{i}.jpg"
+        img.save(path, quality=80)
+        maps.append({"page": g["page"], "image": path, "clicks": len(g["clicks"]),
+                     "dead": sum(c[2] for c in g["clicks"]), "personas": sorted({c[3] for c in g["clicks"]})})
+    return maps
+
+
 def img_data(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
@@ -478,6 +532,17 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
                    f"<td>{sp['backtracked_from']}</td><td>{sp['exits_short_of_goal']}</td><td>{p['friction_reports']}</td>"
                    f"<td>{p['avg_clarity']} · {p['avg_trust']} · {p['avg_effort']}</td><td><b>{p['bottleneck_score']}</b></td></tr>")
     out.append(f"</table></div><p class='muted'>Score = {esc(flows['score_formula'])}. Clarity and trust 1 to 5, higher is better; effort 1 to 5, higher is worse.</p>")
+
+    # where people clicked
+    maps = click_heatmaps(study_dir, data)
+    if maps:
+        out.append("<h2>Where people clicked</h2><p class='muted'>Each picture is one view of a page with every persona's clicks on it: "
+                   "<b style='color:#2e6ee6'>blue</b> changed the screen, <b style='color:#dc1e28'>red</b> did nothing visible.</p>"
+                   "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px'>")
+        for m in maps:
+            out.append(f"<figure style='margin:0'><img src='{img_data(m['image'])}' alt='Clicks on {esc(m['page'])}' style='max-width:100%;border:1px solid var(--line);border-radius:6px'>"
+                       f"<figcaption class='muted'>{esc(m['page'])} · {m['clicks']} clicks, {m['dead']} with no response · {esc(', '.join(m['personas']))}</figcaption></figure>")
+        out.append("</div>")
 
     # findings
     out.append(f"<h2>Findings ({len(findings)})</h2>")
@@ -555,15 +620,67 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
     return 0
 
 
+def export(study_dir: Path) -> int:
+    """Verified findings as one Markdown ticket each (issues/F1.md ...) and a findings.csv, for an issue tracker or a sheet."""
+    import csv
+
+    vf = load(study_dir / "verified_findings.json")
+    if vf is None:
+        raise SystemExit("Run verify first")
+    study = load(study_dir / "study.json", {})
+    ins = load(study_dir / "insights.json", {})
+    out_dir = study_dir / "issues"
+    out_dir.mkdir(exist_ok=True)
+    rows = []
+    for f in vf["kept"]:
+        fid = f.get("id", "F?")
+        lines = [f"# {fid}: {f.get('title', '')}", "",
+                 f"**Severity:** {f.get('severity')} · **Category:** {f.get('category')} · **Page:** `{f.get('page', '')}` · "
+                 f"**Confidence:** {f.get('confidence', '')}", "",
+                 f"**Seen by simulated personas:** {', '.join(f.get('personas', []))}", "",
+                 "## What happens", "", str(f.get("description", "")), ""]
+        if f.get("conflict"):
+            lines += ["## The two statements", ""] + [f"- {c}" for c in f["conflict"]] + [""]
+        if f.get("measurement"):
+            lines += ["## Measured", "", f"Measurement `{f['measurement']}`, target `{f.get('contrast_target', '')}`.", ""]
+        lines += ["## Evidence", ""]
+        for e in f.get("evidence", []):
+            where = f"session `{e.get('session')}`, step {e.get('step')}, box {e.get('box')}"
+            quote = f' — "{e["quote"]}"' if e.get("quote") else ""
+            pic = f"\n\n  ![{fid} evidence](../{e['crop']})" if e.get("crop") else ""
+            lines.append(f"- {where}{quote}{pic}")
+        lines += ["", "## Suggested fix", "", str(f.get("recommendation", "")), "",
+                  f"_From a simulated persona study ({study.get('id')}, {study.get('product')}). "
+                  "It shows where to look, not how many real customers are affected._", ""]
+        (out_dir / f"{fid}.md").write_text("\n".join(lines), encoding="utf-8")
+        rows.append({"id": fid, "title": f.get("title"), "severity": f.get("severity"), "category": f.get("category"),
+                     "page": f.get("page"), "personas": "; ".join(f.get("personas", [])),
+                     "recommendation": f.get("recommendation"), "measurement": f.get("measurement", ""),
+                     "evidence": "; ".join(f"{e.get('session')}#{e.get('step')}" for e in f.get("evidence", [])),
+                     "ticket": f"issues/{fid}.md"})
+    with (study_dir / "findings.csv").open("w", encoding="utf-8-sig", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["id"])
+        w.writeheader()
+        w.writerows(rows)
+    if ins.get("research_questions"):
+        (out_dir / "research-questions.md").write_text(
+            "# Questions to test with real users\n\n" + "\n".join(f"- {q}" for q in ins["research_questions"]) + "\n",
+            encoding="utf-8")
+    print(json.dumps({"tickets": len(rows), "folder": shown(out_dir), "csv": shown(study_dir / "findings.csv")}))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["analyze", "verify", "render"])
+    ap.add_argument("cmd", choices=["analyze", "verify", "render", "export"])
     ap.add_argument("--study-dir", required=True)
     args = ap.parse_args()
     d = lp(args.study_dir)
     if args.cmd == "analyze":
         analyze(d)
         return 0
+    if args.cmd == "export":
+        return export(d)
     return verify(d) if args.cmd == "verify" else render(d)
 
 

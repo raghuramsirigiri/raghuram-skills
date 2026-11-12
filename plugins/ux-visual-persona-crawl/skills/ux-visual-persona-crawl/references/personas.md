@@ -14,7 +14,7 @@ Choose 4 to 8 people so these are all covered at least once:
 | Tech confidence | Low to high |
 | Patience | Leaves quickly / sticks with it |
 | Device | Mobile for at least a third of the panel, more if the audience is mobile-heavy |
-| Eyesight and access | At least one person at `browser_zoom` 150 or 200, or who relies on the keyboard, or who needs plain language |
+| Eyesight and access | At least one person at `browser_zoom` 150 or 200, or who relies on the keyboard, or who needs plain language. Colour blindness affects about 1 in 12 men: when colour carries meaning on the site (prices, statuses, errors, charts), include a `vision` persona |
 | Trust | Existing customer / new to the brand / sceptical |
 
 Give each person a reason to be on the site **today**, and one thing they don't have or don't know. That gap is what surfaces friction: someone holding every document never shows you where the requirements are unclear.
@@ -64,6 +64,8 @@ If the user supplied real customer data (segments, survey results, an analytics 
 | `device` | `desktop` (1280x800) or `mobile` (a Pixel 7-sized phone) |
 | `browser_zoom` | 100 (default), 150 or 200. The screenshots the persona sees are taken at that zoom, so cramped and overlapping layouts show up for real |
 | `network` | `normal`, or `slow` to throttle the connection |
+| `vision` | Optional: `deuteranopia`, `protanopia` or `tritanopia` (colour blindness), or `blurred` (uncorrected low vision). The persona's screenshots and zooms are filtered to match; contrast is still measured on the true colours |
+| `color_scheme`, `reduced_motion`, `locale`, `timezone` | Optional device settings: `dark` mode, `true` to ask the site for less motion, a language such as `fr-FR`, a zone such as `Europe/Paris`. Use them when the panel's customers would have them, and to see whether the site holds up in that state |
 | `task` | What they came to do, in their own terms. The walker brief gives them this, so it's their goal and not the study's |
 | `traits` | 1 to 5, where 5 is highest. `reading` is `skims` or `careful`. `eyesight` 1 to 5 tells the persona how hard faint or small text is for them |
 | `assumptions_not_allowed` | Things this person must not know unless they see them on screen. This stops the model's general knowledge leaking in |

@@ -50,8 +50,9 @@ OUTCOMES = {
     "reached_goal", "reached_boundary", "gave_up", "left_site", "would_call_or_visit",
     "saved_for_later", "blocked_by_site",
 }
-DECISION_KEYS = ("thought", "noticed", "read", "clarity", "trust", "effort", "emotion",
-                 "doubts", "friction", "est_seconds", "memory")
+DECISION_KEYS = ("thought", "read", "clarity", "trust", "effort", "doubts", "friction", "est_seconds")
+# Worth writing only when something new happens on a screen; left out, they are recorded as empty.
+OPTIONAL_DECISION_KEYS = ("noticed", "emotion", "memory")
 FRICTION_TYPES = {
     "unclear_copy", "missing_information", "contradiction", "hidden_cost_or_condition", "surprise_requirement",
     "trust_concern", "navigation", "dead_end", "button_unclear", "button_hard_to_find", "low_contrast",
@@ -184,10 +185,31 @@ def two_colours(img):
     return bg, best, best_ratio, (buckets[bg_key] / total)
 
 
-def draw_grid(src: Path, dst: Path, step: int = 100):
+# Machado, Oliveira & Fernandes (2009) at full severity, applied to sRGB values: a common approximation.
+CVD = {
+    "protanopia": (0.152286, 1.052583, -0.204868, 0, 0.114503, 0.786281, 0.099216, 0, -0.003882, -0.048116, 1.051998, 0),
+    "deuteranopia": (0.367322, 0.860646, -0.227968, 0, 0.280085, 0.672501, 0.047413, 0, -0.011820, 0.042940, 0.968881, 0),
+    "tritanopia": (1.255528, -0.076749, -0.178779, 0, -0.078411, 0.930809, 0.147602, 0, 0.004733, 0.691367, 0.303900, 0),
+}
+VISION = set(CVD) | {"blurred"}
+
+
+def as_seen(img, vision, k: float = 1.0):
+    """The screen as this persona sees it. Measurements still use the true pixels."""
+    from PIL import ImageFilter
+
+    img = img.convert("RGB")
+    if vision in CVD:
+        img = img.convert("RGB", CVD[vision])
+    elif vision == "blurred":  # uncorrected low vision: soft edges, small text runs together
+        img = img.filter(ImageFilter.GaussianBlur(radius=1.4 * k))
+    return img
+
+
+def draw_grid(src: Path, dst: Path, step: int = 100, vision=None, k: float = 1.0):
     from PIL import Image, ImageDraw
 
-    img = Image.open(src).convert("RGB")
+    img = as_seen(Image.open(src), vision, k)
     over = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(over)
     w, h = img.size
@@ -304,6 +326,15 @@ class Session:
         self.meta["image_scale"] = self.k
         (self.dir / "session.json").write_text(json.dumps(self.meta, indent=2, ensure_ascii=False), encoding="utf-8")
         self.mobile = self.persona.get("device") == "mobile"
+        # How this person's own device is set up: the site may look different in dark mode or another language.
+        if self.persona.get("color_scheme") in ("light", "dark"):
+            opts["color_scheme"] = self.persona["color_scheme"]
+        if self.persona.get("reduced_motion"):
+            opts["reduced_motion"] = "reduce"
+        if self.persona.get("locale"):
+            opts["locale"] = str(self.persona["locale"])
+        if self.persona.get("timezone"):
+            opts["timezone_id"] = str(self.persona["timezone"])
         self.context = await self.browser.new_context(**opts)
         await self.context.route("**/*", self.on_route)
         self.context.on("page", self.on_new_page)
@@ -391,7 +422,7 @@ class Session:
         clean = self.dir / "shots" / f"step-{step:03d}.png"
         grid = self.dir / "shots" / f"step-{step:03d}-grid.png"
         clean.write_bytes(raw)
-        draw_grid(clean, grid)
+        draw_grid(clean, grid, vision=self.persona.get("vision"), k=self.k)
         digest = hashlib.sha1(raw).hexdigest()
         from PIL import Image
         size = Image.open(clean).size
@@ -435,6 +466,7 @@ class Session:
             # The study author is surveying the site for facts.md, not role-playing, so no reaction is required.
             decision = {"thought": "", "noticed": "", "read": [], "clarity": 3, "trust": 3, "effort": 1, "emotion": "",
                         "doubts": [], "friction": [], "est_seconds": 0, "memory": "", **decision}
+        decision = {**{k: "" for k in OPTIONAL_DECISION_KEYS}, **decision}
         missing = [k for k in DECISION_KEYS if k not in decision]
         if missing or "type" not in action:
             return {"ok": False, "error": f"Missing decision fields {missing} or action.type"}
@@ -718,9 +750,12 @@ def last_shot(session_dir: Path, step=None) -> Path:
 def cmd_zoom(args):
     from PIL import Image
 
-    src = last_shot(lp(args.session), args.step)
+    session_dir = lp(args.session)
+    src = last_shot(session_dir, args.step)
     x, y, w, h = parse_box(args.box)
-    img = Image.open(src).convert("RGB")
+    meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+    # Leaning in enlarges what this person sees; it doesn't correct their colour vision or blur.
+    img = as_seen(Image.open(src), meta["persona"].get("vision"), float(meta.get("image_scale", 1)))
     crop = img.crop((x, y, min(x + w, img.width), min(y + h, img.height)))
     factor = max(2, min(4, int(900 / max(crop.width, 1))))
     big = crop.resize((crop.width * factor, crop.height * factor), Image.LANCZOS)
@@ -846,6 +881,8 @@ def cmd_start(args):
         if persona is None:
             raise SystemExit(f"Persona {args.persona} not found")
         base = lp(study_path.parent) / "sessions"
+    if persona.get("vision") and persona["vision"] not in VISION:
+        raise SystemExit(f"vision must be one of {sorted(VISION)}")
     start_url = persona.get("start_url") or study["start_url"]
     if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
         raise SystemExit("The persona's start_url is not on an allowed host")

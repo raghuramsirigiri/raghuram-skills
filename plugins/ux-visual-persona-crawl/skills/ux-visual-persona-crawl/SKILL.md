@@ -72,7 +72,7 @@ Keep `id` short and each persona `id` to 24 characters or fewer; they become fol
 
 `goal_match` is a pattern on the address bar. A persona that claims `reached_goal` without ever reaching a matching address is recorded as `claimed_goal_unverified`. `stages`, in journey order, give the report its funnel; each `match` is tried against the full address and against the path alone, so `^/$` and `join\\.acme\\.com` both work. `test_env` also needs `environment_confirmation` (who confirmed it's a test system) and `test_data` (for example `{"meter": "0000000000"}`). Check the file with `eyes.py check --study <path>`.
 
-Then survey the key pages and write `facts.md` in the study folder: the prices, conditions and promises the site makes, with the page each is on. It goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Personas must know only what they see.
+Then survey the key pages and write `facts.md` in the study folder: the prices, conditions and promises the site makes, with the page each is on. It goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Personas must know only what they see. Because nothing before the review needs it, the survey can run while the personas walk (step 5), which saves several minutes. On a live site the survey session counts toward the two that may run at once.
 
 Survey by sight too, through a recon session:
 
@@ -121,7 +121,9 @@ Give a fresh subagent `references/reviewer.md` with the study folder path. It re
 
 Read the `removed` list in `verified_findings.json`. A finding with a wrong step or box can be corrected against the recording and verified again. Never edit a journey or measurement to make a claim pass.
 
-`report.html` is one self-contained file: the outcomes and paths, the funnel, the bottleneck table, the findings with cropped evidence, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
+If the user tracks work in an issue tracker or a spreadsheet, also run `report.py export --study-dir <study-dir>`: it writes one Markdown ticket per verified finding to `issues/` (evidence crops linked, the fix, the simulated-study caveat), `findings.csv`, and `issues/research-questions.md`.
+
+`report.html` is one self-contained file: the outcomes and paths, the funnel, the bottleneck table, a click map per page view (clicks that did nothing in red), the findings with cropped evidence, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
 
 ### 9. Tell the user
 

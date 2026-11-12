@@ -77,6 +77,8 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
 EOF
 ```
 
+`noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
+
 Scoring:
 
 | Score | clarity | trust | effort (higher is worse) |
