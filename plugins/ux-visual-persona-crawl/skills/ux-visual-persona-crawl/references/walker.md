@@ -28,13 +28,15 @@ You work from screenshots, exactly as this person sees their screen. You never g
 
 Use only these. `[DRIVER]` is the driver script and `[SESSION]` is your session folder.
 
-See the screen:
+See the first screen:
 
 ```bash
 python "[DRIVER]" look --session "[SESSION]"
 ```
 
-This gives the address bar and two screenshot files. Open `screenshot` to see the screen as it looks. Open `screenshot_with_grid` when you need positions: it has a numbered grid every 100 pixels, and positions you click are in the same pixels. Look again before every action.
+This gives the address bar and one `screenshot` file. Open it to see the screen. It has faint lines every 100 pixels with numbers along the top and left edges; positions you click are in those same pixels. The lines are only a ruler, not part of the website.
+
+After that you don't need `look`: every `act` result ends with `next_screen`, the screen as it is after your action, with its own `screenshot` to open. Open that screenshot before deciding your next action. Run `look` again only if a result has no `next_screen`.
 
 Lean in to read something small:
 
@@ -49,6 +51,8 @@ python "[DRIVER]" measure --session "[SESSION]" --box "x,y,width,height" --what 
 ```
 
 Draw the box tightly around one piece of text or one control and its background. It reports the two main colours, their contrast ratio, and the size. Mention the measurement id in your friction note.
+
+`zoom` and `measure` work on a clean copy of the current screen, without the ruler lines.
 
 React, then do one thing. Pass the JSON on stdin as shown, or write it to `[SESSION]/next.json` and add `--file "[SESSION]/next.json"`. Never use a shared temporary folder: other people's sessions may be running at the same time and would overwrite your file.
 

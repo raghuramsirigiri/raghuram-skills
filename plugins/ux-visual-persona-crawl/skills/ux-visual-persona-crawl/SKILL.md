@@ -66,9 +66,11 @@ Create `ux-crawl-runs/<study-id>/study.json`:
 }
 ```
 
-Keep `id` and the folder name short (20 characters or fewer) and each persona `id` to 24 or fewer. Every session writes screenshots several folders deep, and on Windows a path over 260 characters fails; `eyes.py check` warns when the study folder is too deep.
+Keep `id` short and each persona `id` to 24 characters or fewer; they become folder names. Deep folders are fine: the scripts write through Windows' long-path form, so there's no need to move a study to a shorter folder.
 
-`goal_match` is a pattern on the address bar. A persona that claims `reached_goal` without ever reaching a matching address is recorded as `claimed_goal_unverified`. `stages`, in journey order, give the report its funnel. `test_env` also needs `environment_confirmation` (who confirmed it's a test system) and `test_data` (for example `{"meter": "0000000000"}`). Check the file with `eyes.py check --study <path>`.
+`pace_ms` is the pause after every action. Leave it out and it defaults to 1200 when any allowed host is a live site, and 300 when every host is local or staging, where politeness doesn't apply.
+
+`goal_match` is a pattern on the address bar. A persona that claims `reached_goal` without ever reaching a matching address is recorded as `claimed_goal_unverified`. `stages`, in journey order, give the report its funnel; each `match` is tried against the full address and against the path alone, so `^/$` and `join\\.acme\\.com` both work. `test_env` also needs `environment_confirmation` (who confirmed it's a test system) and `test_data` (for example `{"meter": "0000000000"}`). Check the file with `eyes.py check --study <path>`.
 
 Then survey the key pages and write `facts.md` in the study folder: the prices, conditions and promises the site makes, with the page each is on. It goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Personas must know only what they see.
 
@@ -92,7 +94,7 @@ For each persona, start a session, then hand it to its own subagent:
 python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.json> --persona <id>
 ```
 
-Read `references/walker.md` and give the subagent that brief with the persona JSON, the session path and the driver path filled in, and nothing else. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
+Read `references/walker.md` and give the subagent that brief with the persona JSON, the session path and the driver path filled in, and nothing else. Start the walkers together: all of them on a test system, two at a time on a live site. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
@@ -104,7 +106,7 @@ Every session ends with an exit interview (`eyes.py feedback`). Check that every
 <venv-python> <skill>/scripts/report.py analyze --study-dir <study-dir>
 ```
 
-This writes `navigation.json` (every persona's path and every step), `flows.json` (per-page bottleneck scores with their parts, plus the funnel), `demographics.json` and the panel's `feedback.json`.
+This writes `navigation.json` (every persona's path and every step), `flows.json` (per-page bottleneck scores with their parts, plus the funnel), `demographics.json`, the panel's `feedback.json`, and for the reviewer `hot_steps.json` (the steps worth a close look, with reasons) and a contact sheet per session (`sessions/<id>/contact-N.jpg`, every step as a thumbnail). The sheets let the reviewer see whole walks in a few images and open full screenshots only where it matters.
 
 ### 7. Review
 

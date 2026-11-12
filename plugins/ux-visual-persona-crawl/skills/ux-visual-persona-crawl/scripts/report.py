@@ -19,6 +19,23 @@ from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import os
+
+LONG_PREFIX = "\\\\?\\"
+
+
+def lp(path) -> Path:
+    """Extended-length form on Windows, so studies in deep folders still read and write."""
+    path = Path(path)
+    if os.name != "nt" or str(path).startswith(LONG_PREFIX):
+        return path
+    return Path(LONG_PREFIX + os.path.abspath(str(path)))
+
+
+def shown(path) -> str:
+    text = str(path)
+    return text[len(LONG_PREFIX):] if text.startswith(LONG_PREFIX) else text
+
 for stream in (sys.stdout, sys.stderr):
     try:
         stream.reconfigure(encoding="utf-8", errors="replace")
@@ -55,10 +72,15 @@ def sessions(study_dir: Path) -> dict:
     return out
 
 
-def stage_of(study: dict, url: str):
+PAGE_URLS = {}  # page path -> a full address seen for it, so stage patterns can name a host
+
+
+def stage_of(study: dict, page: str):
+    """A stage matches if its pattern fits the full address (host included) or the path alone."""
+    targets = [PAGE_URLS.get(page, page), page]
     hit = None
     for stage in study.get("stages", []):
-        if re.search(stage["match"], url, re.I):
+        if any(re.search(stage["match"], t, re.I) for t in targets):
             hit = stage["id"]
     return hit
 
@@ -81,6 +103,7 @@ def analyze(study_dir: Path) -> dict:
         path, seen, backtracks, dead = [], [], [], []
         for st in steps:
             page = page_of(st["address_bar"])
+            PAGE_URLS.setdefault(page, st["address_bar"])
             d, a, r = st["decision"], st["action"], st["result"]
             if not path or path[-1]["page"] != page:
                 if page in seen and path:
@@ -178,14 +201,119 @@ def analyze(study_dir: Path) -> dict:
             "recommend_counts": {"9-10": sum(r >= 9 for r in rec), "7-8": sum(7 <= r <= 8 for r in rec), "0-6": sum(r <= 6 for r in rec)},
             "missing": [n for n in navigation if not data[n]["feedback"]],
         }
+    hot = hot_steps(data)
+    sheets = {}
+    for name, s in data.items():
+        try:
+            sheets[name] = contact_sheets(s["dir"], s["journey"].get("steps", []), {h["step"] for h in hot.get(name, [])})
+        except Exception as exc:  # a missing screenshot must not stop the analysis
+            sheets[name] = {"error": str(exc)[:200]}
+    (study_dir / "hot_steps.json").write_text(json.dumps(
+        {"how": "Steps worth opening at full size, and why. Each session's contact sheets show every step as a "
+                "thumbnail, hot steps outlined in red; open the full screenshot only where you need detail.",
+         "contact_sheets": sheets, "sessions": hot}, indent=2, ensure_ascii=False), encoding="utf-8")
     (study_dir / "navigation.json").write_text(json.dumps(navigation, indent=2, ensure_ascii=False), encoding="utf-8")
     (study_dir / "flows.json").write_text(json.dumps(flows, indent=2, ensure_ascii=False), encoding="utf-8")
     (study_dir / "demographics.json").write_text(json.dumps(demo_rows, indent=2, ensure_ascii=False), encoding="utf-8")
     (study_dir / "feedback.json").write_text(json.dumps({"summary": summary, "responses": fb_rows}, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps({"sessions": len(navigation), "pages": len(pages),
+                      "hot_steps": sum(len(v) for v in hot.values()),
                       "top_bottlenecks": [(p["handle"], p["page"], p["bottleneck_score"]) for p in pages[:3]],
                       "feedback_missing": summary.get("missing", list(navigation))}, ensure_ascii=False))
     return flows
+
+
+def hot_steps(data: dict) -> dict:
+    """The moments a reviewer should look at closely: where something went wrong for the persona."""
+    out = {}
+    for name, s in data.items():
+        j = s["journey"]
+        steps = j.get("steps", [])
+        reasons = defaultdict(list)
+        seen_pages = []
+        for i, st in enumerate(steps):
+            d, a, r = st["decision"], st["action"], st["result"]
+            n = st["step"]
+            page = page_of(st["address_bar"])
+            if a["type"] in CLICKS and r.get("no_visible_response"):
+                reasons[n].append("dead click")
+            if d["clarity"] <= 2:
+                reasons[n].append(f"clarity {d['clarity']}")
+            if d["trust"] <= 2:
+                reasons[n].append(f"trust {d['trust']}")
+            if d["effort"] >= 4:
+                reasons[n].append(f"effort {d['effort']}")
+            if i:
+                prev = steps[i - 1]["decision"]
+                for k in ("clarity", "trust"):
+                    if prev[k] - d[k] >= 2:
+                        reasons[n].append(f"{k} fell {prev[k]}->{d[k]}")
+            sev = [f.get("type") for f in d.get("friction", []) if f.get("severity") in ("critical", "high")]
+            if sev:
+                reasons[n].append("high friction: " + ", ".join(sev))
+            if any(f.get("type") == "contradiction" for f in d.get("friction", [])):
+                reasons[n].append("reported contradiction")
+            if a["type"] == "back" or (seen_pages and seen_pages[-1] != page and page in seen_pages):
+                reasons[n].append("backtrack")
+            if not seen_pages or seen_pages[-1] != page:
+                seen_pages.append(page)
+        if steps and j.get("outcome") != "reached_goal":
+            for st in steps[-2:]:
+                reasons[st["step"]].append(f"before exit ({j.get('outcome')})")
+        by_step = {st["step"]: st for st in steps}
+        out[name] = [{"step": n, "page": page_of(by_step[n]["address_bar"]), "screenshot": by_step[n]["screenshot"],
+                      "why": sorted(set(w)), "thought": str(by_step[n]["decision"].get("thought", ""))[:220]}
+                     for n, w in sorted(reasons.items()) if w]
+    return out
+
+
+def contact_sheets(session_dir: Path, steps: list, hot: set, per_sheet: int = 12) -> list:
+    """Every step as a numbered thumbnail, a few sheets per session, so a reviewer sees a whole walk in one image."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    box, cols, label = 300, 4, 22
+    files = []
+    for start in range(0, len(steps), per_sheet):
+        chunk = steps[start:start + per_sheet]
+        thumbs = []
+        for st in chunk:
+            src = session_dir / "shots" / st["screenshot"]
+            if not src.exists():
+                continue
+            im = Image.open(src).convert("RGB")
+            im.thumbnail((box, box))
+            thumbs.append((st, im))
+        if not thumbs:
+            continue
+        rows = [thumbs[i:i + cols] for i in range(0, len(thumbs), cols)]
+        tops, y = [], 8
+        for row in rows:
+            tops.append(y)
+            y += label + max(im.height for _, im in row) + 10
+        sheet = Image.new("RGB", (cols * (box + 8) + 8, y), (245, 246, 248))
+        d = ImageDraw.Draw(sheet)
+        try:
+            font = ImageFont.load_default(size=15)
+        except TypeError:  # Pillow older than 10.1
+            font = ImageFont.load_default()
+        for i, (st, im) in enumerate(thumbs):
+            x = 8 + (i % cols) * (box + 8)
+            y = tops[i // cols]
+            mark = st["step"] in hot
+            d.text((x + 2, y + 2), f"step {st['step']}  {st['action']['type']}" + ("  *" if mark else ""),
+                   fill=(200, 0, 50) if mark else (40, 40, 40), font=font)
+            sheet.paste(im, (x, y + label))
+            if mark:
+                d.rectangle([x - 3, y + label - 3, x + im.width + 2, y + label + im.height + 2], outline=(220, 0, 60), width=3)
+            a = st["action"]
+            if a["type"] in CLICKS + ("hover",) and "x" in a:
+                k = im.width / max(st["image_size"][0], 1)
+                cx, cy = x + a["x"] * k, y + label + a["y"] * k
+                d.ellipse([cx - 6, cy - 6, cx + 6, cy + 6], outline=(220, 0, 60), width=2)
+        out = session_dir / f"contact-{start // per_sheet + 1}.jpg"
+        sheet.save(out, quality=80)
+        files.append(str(out.relative_to(session_dir.parent.parent)).replace("\\", "/"))
+    return files
 
 
 # ---------------------------------------------------------------- verify
@@ -423,7 +551,7 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
         md.append(f"- **{f['id']}** [{f['severity']} · {f['category']}] {f['title']}: {f.get('recommendation', '')}")
     md += ["", 'Ask "show me F1" or "how do you know a real person would struggle here?" to see the screens, steps and measurements behind any finding.']
     (study_dir / "report.md").write_text("\n".join(md), encoding="utf-8")
-    print(json.dumps({"report": str(study_dir / "report.html"), "findings": len(findings), "removed": len(vf["removed"])}))
+    print(json.dumps({"report": shown(study_dir / "report.html"), "findings": len(findings), "removed": len(vf["removed"])}))
     return 0
 
 
@@ -432,7 +560,7 @@ def main() -> int:
     ap.add_argument("cmd", choices=["analyze", "verify", "render"])
     ap.add_argument("--study-dir", required=True)
     args = ap.parse_args()
-    d = Path(args.study_dir)
+    d = lp(args.study_dir)
     if args.cmd == "analyze":
         analyze(d)
         return 0

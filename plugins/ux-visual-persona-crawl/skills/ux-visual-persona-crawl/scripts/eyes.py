@@ -3,10 +3,10 @@
 
   check     validate a study file
   start     open a persona's browser on the study's start page
-  look      screenshot what is on screen (plus a copy with a coordinate grid)
+  look      screenshot what is on screen, with a light coordinate grid (a clean copy is kept on disk)
   zoom      lean in: an enlarged crop of part of the last screenshot
   measure   eyedropper: the two main colours in a box, their contrast ratio, the box size
-  act       record the persona's reaction, then do one thing (JSON on stdin)
+  act       record the persona's reaction, do one thing, and return the next screen (JSON on stdin)
   feedback  record the persona's exit interview once the session has ended (JSON on stdin)
   stop      shut a session down
 
@@ -64,8 +64,27 @@ REAL_LOOKING = re.compile(
     r"\b\d{3}-\d{2}-\d{4}\b|\b(?:\d[ -]?){13,19}\b|[A-Z0-9._%+-]+@(?!example\.(com|org|net)\b)[A-Z0-9.-]+\.[A-Z]{2,}",
     re.I,
 )
+MAX_EDGE = 1568  # longest screenshot side a vision model takes without resizing
 FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
 FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
+
+
+LONG_PREFIX = "\\\\?\\"
+
+
+def lp(path) -> Path:
+    """Windows refuses paths over 260 characters unless they carry the extended-length prefix.
+    Every file this driver writes goes through such a path, so a deep project folder still works."""
+    path = Path(path)
+    if os.name != "nt" or str(path).startswith(LONG_PREFIX):
+        return path
+    return Path(LONG_PREFIX + os.path.abspath(str(path)))
+
+
+def shown(path) -> str:
+    """A path as people and tools expect to see it, without the extended-length prefix."""
+    text = str(path)
+    return text[len(LONG_PREFIX):] if text.startswith(LONG_PREFIX) else text
 
 
 def slug(text: str) -> str:
@@ -80,7 +99,7 @@ def is_test_host(host: str) -> bool:
 
 
 def load_study(path: Path) -> dict:
-    study = json.loads(path.read_text(encoding="utf-8"))
+    study = json.loads(lp(path).read_text(encoding="utf-8"))
     problems = []
     for key in ("id", "product", "start_url", "allowed_hosts"):
         if not study.get(key):
@@ -98,7 +117,10 @@ def load_study(path: Path) -> dict:
         if bad:
             problems.append(f"test_env refused, not test hosts: {bad}. Use observe_only for live sites.")
     study.setdefault("max_steps", 30)
-    study.setdefault("pace_ms", 1200)
+    # Pacing protects real sites. A local or staging system needs only enough time for the screen to settle.
+    all_test = all(is_test_host(h) for h in study.get("allowed_hosts", []))
+    study["local_pace"] = all_test
+    study.setdefault("pace_ms", 300 if all_test else 1200)
     study.setdefault("stages", [])
     if problems:
         raise SystemExit("Study invalid: " + "; ".join(problems))
@@ -169,15 +191,52 @@ def draw_grid(src: Path, dst: Path, step: int = 100):
     over = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(over)
     w, h = img.size
+    # Faint lines so the screen still reads as itself; solid labels on the top and left edges as rulers.
     for x in range(step, w, step):
-        d.line([(x, 0), (x, h)], fill=(255, 0, 80, 70), width=1)
+        d.line([(x, 0), (x, h)], fill=(255, 0, 80, 45), width=1)
         d.rectangle([x + 2, 1, x + 30, 13], fill=(255, 0, 80, 200))
         d.text((x + 3, 1), str(x), fill=(255, 255, 255, 255))
     for y in range(step, h, step):
-        d.line([(0, y), (w, y)], fill=(255, 0, 80, 70), width=1)
+        d.line([(0, y), (w, y)], fill=(255, 0, 80, 45), width=1)
         d.rectangle([1, y + 2, 30, y + 14], fill=(255, 0, 80, 200))
         d.text((2, y + 2), str(y), fill=(255, 255, 255, 255))
     Image.alpha_composite(img.convert("RGBA"), over).convert("RGB").save(dst)
+
+
+def _grey(raw: bytes, scale: int = 4):
+    import io
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(raw)).convert("L")
+    return img.resize((max(1, img.width // scale), max(1, img.height // scale)))
+
+
+def restless_mask(looked: bytes, before: bytes):
+    """Parts of the screen that changed while nobody touched it (carousels, clocks, video), widened a little."""
+    from PIL import ImageChops, ImageFilter
+
+    a, b = _grey(looked), _grey(before)
+    if a.size != b.size:
+        return None
+    diff = ImageChops.difference(a, b).point(lambda v: 255 if v > 12 else 0)
+    if not diff.getbbox():
+        return None
+    return diff.filter(ImageFilter.MaxFilter(9))
+
+
+def visible_change(before: bytes, after: bytes, ignore=None) -> bool:
+    """Did the action change the screen, outside the parts that move by themselves?
+    Counts pixels that changed clearly, on a quarter-size greyscale copy; a few stray pixels don't count."""
+    from PIL import ImageChops
+
+    a, b = _grey(before), _grey(after)
+    if a.size != b.size:
+        return True
+    diff = ImageChops.difference(a, b).point(lambda v: 255 if v > 12 else 0)
+    if ignore is not None and ignore.size == diff.size:
+        diff = ImageChops.subtract(diff, ignore)
+    changed = diff.histogram()[255]
+    return changed >= 6  # identical renders differ by nothing; a ticked checkbox is about 16 pixels here
 
 
 def parse_box(text: str):
@@ -235,6 +294,12 @@ class Session:
                 opts["viewport"] = {"width": round(vw / zoom), "height": round(vh / zoom)}
         else:
             opts = {"viewport": {"width": round(1280 / zoom), "height": round(800 / zoom)}, "device_scale_factor": zoom}
+        # Vision models scale down images whose long edge passes MAX_EDGE, and a scaled image makes the walker's
+        # click estimates land off target. Lowering the pixel density keeps the CSS layout (and so the zoom) intact.
+        vp = opts["viewport"]
+        cap = MAX_EDGE / max(vp["width"], vp["height"])
+        if opts["device_scale_factor"] > cap:
+            opts["device_scale_factor"] = round(cap - 0.005, 2)
         self.k = opts["device_scale_factor"]  # screenshot pixels per CSS pixel
         self.meta["image_scale"] = self.k
         (self.dir / "session.json").write_text(json.dumps(self.meta, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -302,7 +367,7 @@ class Session:
     async def settle(self):
         try:
             await self.page.wait_for_load_state("domcontentloaded", timeout=9000)
-            await self.page.wait_for_load_state("networkidle", timeout=3000)
+            await self.page.wait_for_load_state("networkidle", timeout=1500 if self.study["local_pace"] else 3000)
         except Exception:
             pass
         await self.page.wait_for_timeout(self.study["pace_ms"])
@@ -314,12 +379,15 @@ class Session:
         return float(v) / self.k
 
     # commands
-    async def look(self) -> dict:
+    async def look(self, raw: bytes = None) -> dict:
+        """Screenshot the screen for the next step. `act` passes the shot it already took after settling,
+        so the walker gets the next screen in the same call without a second wait."""
         if self.ended:
             return {"ended": self.ended}
-        await self.settle()
+        if raw is None:
+            await self.settle()
+            raw = await self.shot_bytes()
         step = self.step + 1
-        raw = await self.shot_bytes()
         clean = self.dir / "shots" / f"step-{step:03d}.png"
         grid = self.dir / "shots" / f"step-{step:03d}-grid.png"
         clean.write_bytes(raw)
@@ -330,11 +398,12 @@ class Session:
         url = self.page.url
         if not self.visited or self.visited[-1] != url:
             self.visited.append(url)
-        self.looked = {"step": step, "url": url, "hash": digest, "size": size, "shot": str(clean)}
+        self.looked = {"step": step, "url": url, "hash": digest, "size": size, "shot": str(clean), "raw": raw}
+        # One image per step: the walker sees the screen with a light ruler grid, which serves both for
+        # reading and for picking positions. The clean copy stays on disk for zoom, measure and evidence.
         view = {
             "step": step, "steps_left": self.study["max_steps"] - self.step, "address_bar": url,
-            "tabs_open": len(self.context.pages), "screenshot": str(clean), "screenshot_with_grid": str(grid),
-            "image_size": list(size),
+            "tabs_open": len(self.context.pages), "screenshot": shown(grid), "image_size": list(size),
         }
         if self.last_hash == digest:
             view["note"] = "The screen looks exactly as it did at your last look."
@@ -380,18 +449,37 @@ class Session:
 
         self.events.clear()
         url_before = self.page.url
+        # A screen that moves by itself would make every click look like it did something.
+        # Compare the screen the persona saw with one taken just now, and ignore whatever changed meanwhile.
+        try:
+            before_raw = await self.shot_bytes()
+            restless = restless_mask(self.looked["raw"], before_raw)
+            # On a desktop the pointer reaches the target before the click lands. Take the "before" picture
+            # with it there, so a hover highlight alone isn't counted as the click doing something.
+            if action.get("type") in ("click", "double_click") and not self.mobile and "x" in action and "y" in action:
+                w, h = self.looked["size"]
+                if 0 <= action["x"] < w and 0 <= action["y"] < h:
+                    await self.page.mouse.move(self.to_css(action["x"]), self.to_css(action["y"]), steps=4)
+                    await self.page.wait_for_timeout(150)
+                    before_raw = await self.shot_bytes()
+        except Exception:
+            before_raw, restless = self.looked["raw"], None
         started = time.perf_counter()
         result = await self.perform(action)
         result["ms"] = round((time.perf_counter() - started) * 1000)
         self.step += 1
         self.est_total += float(decision.get("est_seconds") or 0)
 
-        if not self.ended and action["type"] not in ("finish", "wait"):
+        after_raw = None
+        if not self.ended:
             try:
-                after = hashlib.sha1(await self.shot_bytes()).hexdigest()
+                after_raw = await self.shot_bytes()
             except Exception:
-                after = None
-            result["screen_changed"] = after != self.looked["hash"]
+                after_raw = None
+        if not self.ended and action["type"] not in ("finish", "wait"):
+            result["screen_changed"] = visible_change(before_raw, after_raw, restless) if after_raw else True
+            if restless is not None:
+                result["screen_moves_by_itself"] = True
             result["address_changed"] = self.page.url != url_before
             result["address_after"] = self.page.url
             expects_change = action["type"] in ("click", "double_click", "key", "back", "scroll", "type")
@@ -420,6 +508,11 @@ class Session:
             result["ended"] = self.ended
         elif self.no_change >= 3:
             result["stall_warning"] = "Your last few actions changed nothing on screen. Try something else, or give up if that is what this person would do."
+        if not self.ended:
+            try:
+                result["next_screen"] = await self.look(raw=after_raw)
+            except Exception as exc:
+                result["next_screen"] = {"error": f"Run look: {str(exc)[:200]}"}
         return result
 
     async def perform(self, action: dict) -> dict:
@@ -625,7 +718,7 @@ def last_shot(session_dir: Path, step=None) -> Path:
 def cmd_zoom(args):
     from PIL import Image
 
-    src = last_shot(Path(args.session), args.step)
+    src = last_shot(lp(args.session), args.step)
     x, y, w, h = parse_box(args.box)
     img = Image.open(src).convert("RGB")
     crop = img.crop((x, y, min(x + w, img.width), min(y + h, img.height)))
@@ -634,13 +727,13 @@ def cmd_zoom(args):
     n = len(list((src.parent).glob(src.stem + "-zoom-*.png"))) + 1
     out = src.parent / f"{src.stem}-zoom-{n}.png"
     big.save(out)
-    print(json.dumps({"zoomed": str(out), "from": src.name, "box": [x, y, w, h], "enlarged": f"{factor}x"}))
+    print(json.dumps({"zoomed": shown(out), "from": src.name, "box": [x, y, w, h], "enlarged": f"{factor}x"}))
 
 
 def cmd_measure(args):
     from PIL import Image
 
-    session_dir = Path(args.session)
+    session_dir = lp(args.session)
     src = last_shot(session_dir, args.step)
     x, y, w, h = parse_box(args.box)
     img = Image.open(src).convert("RGB")
@@ -668,7 +761,7 @@ def cmd_measure(args):
 
 
 def cmd_feedback(args):
-    session_dir = Path(args.session)
+    session_dir = lp(args.session)
     journey_path = session_dir / "journey.json"
     journey = json.loads(journey_path.read_text(encoding="utf-8")) if journey_path.exists() else {}
     if not journey.get("outcome"):
@@ -687,42 +780,47 @@ def cmd_feedback(args):
     data["persona"] = journey["persona"]["id"]
     data["outcome"] = journey["outcome"]
     (session_dir / "feedback.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"ok": True, "saved": str(session_dir / "feedback.json")}))
+    print(json.dumps({"ok": True, "saved": shown(session_dir / "feedback.json")}))
 
 
 # ---------------------------------------------------------------- start / main
 
 def read_payload(args) -> dict:
     """JSON from --file if given, else stdin. A file lets each walker keep its own copy in its session folder."""
-    text = Path(args.file).read_text(encoding="utf-8") if getattr(args, "file", None) else sys.stdin.read()
+    text = lp(args.file).read_text(encoding="utf-8") if getattr(args, "file", None) else sys.stdin.read()
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
         raise SystemExit(f"Not valid JSON: {exc}")
 
 
-# Deepest file a session writes, relative to the study folder:
-# sessions/<24-char name>/shots/step-001-zoom-12.png
-SESSION_TAIL = 60
-PATH_LIMIT = 250 if os.name == "nt" else 4000
-
-
-def path_warning(study_dir: Path):
-    room = PATH_LIMIT - len(str(study_dir)) - SESSION_TAIL
-    if room < 0:
-        return (f"The study folder path is {len(str(study_dir))} characters long; screenshot paths would pass Windows' "
-                f"260-character limit. Move the study to a shorter folder (for example ux-crawl-runs/<short-id>) and use a short id.")
-    return None
-
-
 def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
     out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"]}
-    warn = path_warning(path.parent)
-    if warn:
-        out["warning"] = warn
     print(json.dumps(out))
+
+
+MAX_LIVE_SESSIONS = 2  # at once, on a study whose hosts include a live site
+
+
+def running_sessions(study_dir: Path) -> list:
+    """Sessions of this study whose browser is still up: an unfinished journey and a daemon that answers."""
+    import socket
+
+    alive = []
+    for info_path in list(study_dir.glob("sessions/*/daemon.json")) + list(study_dir.glob("recon/*/daemon.json")):
+        journey = info_path.parent / "journey.json"
+        try:
+            if journey.exists() and json.loads(journey.read_text(encoding="utf-8")).get("outcome"):
+                continue
+            port = json.loads(info_path.read_text(encoding="utf-8")).get("port")
+            if port:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    alive.append(info_path.parent.name)
+        except (OSError, ValueError):
+            continue
+    return alive
 
 
 RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "desktop"}
@@ -731,21 +829,23 @@ RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "deskt
 def cmd_start(args):
     study_path = Path(args.study).resolve()
     study = load_study(study_path)
-    warn = path_warning(study_path.parent)
-    if warn:
-        raise SystemExit(warn)
+    if not study["local_pace"]:
+        busy = running_sessions(lp(study_path.parent))
+        if len(busy) >= MAX_LIVE_SESSIONS:
+            raise SystemExit(f"{len(busy)} sessions are already open on this live site ({', '.join(busy)}). "
+                             f"Live runs use at most {MAX_LIVE_SESSIONS} at a time: start this one when one of them finishes.")
     if args.recon:
         persona = dict(RECON_PERSONA, device=args.device or "desktop")
-        base = study_path.parent / "recon"
+        base = lp(study_path.parent) / "recon"
     else:
         if not args.personas or not args.persona:
             raise SystemExit("start needs --personas and --persona, or --recon")
-        people = json.loads(Path(args.personas).read_text(encoding="utf-8"))
+        people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
         persona = next((p for p in people if p["id"] == args.persona), None)
         if persona is None:
             raise SystemExit(f"Persona {args.persona} not found")
-        base = study_path.parent / "sessions"
+        base = lp(study_path.parent) / "sessions"
     start_url = persona.get("start_url") or study["start_url"]
     if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
         raise SystemExit("The persona's start_url is not on an allowed host")
@@ -776,7 +876,7 @@ def cmd_start(args):
     info = json.loads((session_dir / "daemon.json").read_text(encoding="utf-8"))
     if "error" in info:
         raise SystemExit("Browser failed to start: " + info["error"])
-    print(json.dumps({"session": str(session_dir), "start_url": start_url, "mode": study["mode"]}, ensure_ascii=False))
+    print(json.dumps({"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}, ensure_ascii=False))
 
 
 def main():
@@ -802,7 +902,7 @@ def main():
     args = ap.parse_args()
 
     if args.cmd == "_daemon":
-        asyncio.run(daemon(Path(args.session)))
+        asyncio.run(daemon(lp(args.session)))
         return
     if args.cmd == "check":
         return cmd_check(args)
@@ -814,7 +914,7 @@ def main():
         return cmd_measure(args)
     if args.cmd == "feedback":
         return cmd_feedback(args)
-    session_dir = Path(args.session)
+    session_dir = lp(args.session)
     payload = read_payload(args) if args.cmd == "act" else None
     print(json.dumps(call(session_dir, args.cmd, payload), ensure_ascii=False, indent=1))
 
