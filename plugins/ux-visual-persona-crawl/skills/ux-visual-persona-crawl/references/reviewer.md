@@ -63,7 +63,7 @@ One root cause is one finding, even if several personas hit it. List every perso
 ```
 
 - `category`: `bottleneck`, `friction`, `contradiction`, `ui`, `ux`, `button`, `contrast`, `accessibility`, `copy`, `trust` or `performance`.
-- `contradiction` needs two evidence spots and a two-item `conflict`.
+- `contradiction` needs two evidence spots and a two-item `conflict`. The spots can be on different steps, or on one step when the clash is on one screen (two prices on the same page), as two boxes that don't overlap.
 - `contrast` needs `"measurement": "<persona>:M<n>"` from a `measure` you ran, and `contrast_target`: `body_text` (4.5:1), `large_text` or `ui_component` (3:1). Verify removes it if the measurement passes the target.
 - `bottleneck` needs `page` to be a page from `flows.json`.
 - `quote`, if given, should be words a persona recorded at that step. Verify marks quotes it can't find in the record as read from the screenshot by you.

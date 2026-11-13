@@ -992,6 +992,30 @@ def running_sessions(study_dir: Path) -> list:
     return alive
 
 
+def cmd_status(args):
+    """One line per persona session: how far it got, how it ended, whether the exit interview is in."""
+    study_path = Path(args.study).resolve()
+    study_dir = lp(study_path.parent)
+    alive = set(running_sessions(study_dir))
+    rows = []
+    for d in sorted((study_dir / "sessions").glob("*/")) if (study_dir / "sessions").exists() else []:
+        try:
+            j = json.loads((d / "journey.json").read_text(encoding="utf-8")) if (d / "journey.json").exists() else {}
+        except ValueError:
+            j = {}
+        steps = j.get("steps", [])
+        rows.append({"session": d.name, "steps": len(steps), "outcome": j.get("outcome"),
+                     "feedback": (d / "feedback.json").exists(), "running": d.name in alive,
+                     "from": steps[0]["at"] if steps else None, "to": steps[-1]["at"] if steps else None})
+    blocked = [r["session"] for r in rows if r["outcome"] == "blocked_by_site"]
+    out = {"sessions": rows,
+           "all_done": bool(rows) and all(r["outcome"] and r["feedback"] for r in rows),
+           "waiting_on": [r["session"] for r in rows if not (r["outcome"] and r["feedback"])]}
+    if len(blocked) >= 2:
+        out["stop"] = f"{len(blocked)} sessions were stopped by the site ({', '.join(blocked)}): tell the user before running more."
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+
+
 RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "desktop"}
 
 
@@ -1062,6 +1086,8 @@ def main():
     p.add_argument("--persona"); p.add_argument("--headed", action="store_true")
     p.add_argument("--recon", action="store_true", help="a screen-only session for the study author, kept out of the analysis")
     p.add_argument("--device", choices=["desktop", "mobile"], help="device for a --recon session")
+    p = sub.add_parser("status", help="how each persona session of a study stands")
+    p.add_argument("--study", required=True)
     p = sub.add_parser("brief", help="print the filled-in walker brief for a persona session")
     p.add_argument("--session", required=True)
     for name in ("look", "stop"):
@@ -1086,6 +1112,8 @@ def main():
         return cmd_start(args)
     if args.cmd == "brief":
         return cmd_brief(args)
+    if args.cmd == "status":
+        return cmd_status(args)
     if args.cmd == "zoom":
         return cmd_zoom(args)
     if args.cmd == "measure":

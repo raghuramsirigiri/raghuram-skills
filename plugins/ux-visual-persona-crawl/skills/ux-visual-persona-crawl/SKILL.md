@@ -100,7 +100,7 @@ python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.j
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
-Every session ends with an exit interview (`eyes.py feedback`). Check that every `sessions/<id>/` has both `journey.json` with an `outcome` and `feedback.json`. If several end as `blocked_by_site`, stop and tell the user rather than burning more runs.
+Every session ends with an exit interview (`eyes.py feedback`). When the walkers report back, run `eyes.py status --study <study.json>`. It lists each session's steps, outcome and walk times, and whether its exit interview is in. `all_done` must be true before analysis, and `waiting_on` names any session that isn't finished. If it prints `stop` (several sessions ended as `blocked_by_site`), tell the user rather than burning more runs.
 
 ### 6. Compute the flows
 

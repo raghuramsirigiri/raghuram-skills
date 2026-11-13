@@ -400,9 +400,21 @@ def verify(study_dir: Path) -> int:
                     problems.append(f"measured {m['contrast_ratio']}:1 meets the {need}:1 target")
                 f["measured"] = {"ratio": m["contrast_ratio"], "foreground": m["foreground"], "background": m["background"], "target": need}
         if f.get("category") == "contradiction":
-            spots = {(e.get("session"), e.get("step")) for e in evidence}
-            if len(spots) < 2 or not f.get("conflict") or len(f.get("conflict", [])) < 2:
-                problems.append("a contradiction needs two evidence spots and a conflict list stating both claims")
+            # Two claims that clash can sit on different screens or on one screen (two prices on the same page),
+            # but they must be two separate places: different steps, or boxes on the same step that don't overlap.
+            def apart(a, b):
+                if (a.get("session"), a.get("step")) != (b.get("session"), b.get("step")):
+                    return True
+                if not all(isinstance(x.get("box"), list) and len(x["box"]) == 4 for x in (a, b)):
+                    return False
+                (ax, ay, aw, ah), (bx, by, bw, bh) = a["box"], b["box"]
+                ix = max(0, min(ax + aw, bx + bw) - max(ax, bx))
+                iy = max(0, min(ay + ah, by + bh) - max(ay, by))
+                return ix * iy < 0.5 * min(aw * ah, bw * bh)
+            separate = any(apart(a, b) for i, a in enumerate(evidence) for b in evidence[i + 1:])
+            if not separate or len(f.get("conflict") or []) < 2:
+                problems.append("a contradiction needs two evidence spots, on different steps or in separate boxes on one "
+                                "step, and a conflict list stating both claims")
         if f.get("category") == "bottleneck" and f.get("page") not in pages:
             problems.append("a bottleneck must name a page from flows.json")
         # How many walks had the chance to hit this, and how many did: a finding hit by 1 of 4 walks that reached
