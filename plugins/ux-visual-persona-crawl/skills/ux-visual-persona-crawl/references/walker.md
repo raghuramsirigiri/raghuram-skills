@@ -111,7 +111,7 @@ Outcomes: `reached_goal`, `reached_boundary` (stopped at a form on a live site, 
 
 **When the driver says no**
 
-A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it. If it also says `on_blank_space`, there was nothing drawn where you clicked; look again and aim, as a person would after a missed tap.
+A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it. If it also says `on_blank_space`, there was nothing drawn where you clicked; look again and aim, as a person would after a missed tap. `screen_moves_by_itself` means part of the page changes on its own, such as a rotating banner. Those parts were left out when judging whether your action did anything, so `no_visible_response` still means your action changed nothing. Things moving by themselves may be worth a friction note if this person would find them hard to follow.
 
 **After you finish: the exit interview**
 

@@ -170,6 +170,18 @@ class Sessions(unittest.TestCase):
             for row in out["sessions"]:
                 eyes("stop", "--session", row["session"])
 
+    def test_no_goal_page_means_goal_claims_are_unverified(self):
+        d = study("nogoal", goal_match=None)
+        p = personas(d, [{"id": "a"}])
+        s = jrun("start", "--study", d / "study.json", "--personas", p, "--persona", "a")["session"]
+        try:
+            jrun("look", "--session", s)
+            jrun("act", "--session", s, payload={"decision": DEC, "action": {"type": "finish", "outcome": "reached_goal", "reason": "r"}})
+            j = json.loads((Path(s) / "journey.json").read_text(encoding="utf-8"))
+            self.assertEqual(j["outcome"], "claimed_goal_unverified")
+        finally:
+            eyes("stop", "--session", s)
+
     def test_recon_has_no_brief(self):
         d = study("recon")
         s = jrun("start", "--study", d / "study.json", "--recon")

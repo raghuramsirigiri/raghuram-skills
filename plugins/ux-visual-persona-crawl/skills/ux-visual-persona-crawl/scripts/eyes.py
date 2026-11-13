@@ -694,7 +694,8 @@ class Session:
     async def finish(self, outcome: str, reason: str, auto: bool = False):
         grounded = outcome
         goal = self.study.get("goal_match")
-        if outcome == "reached_goal" and goal and not any(re.search(goal, u, re.I) for u in self.visited):
+        # goal_match null means recon found no goal page at all, so no claim of reaching it can be checked.
+        if outcome == "reached_goal" and "goal_match" in self.study and not (goal and any(re.search(goal, u, re.I) for u in self.visited)):
             grounded = "claimed_goal_unverified"
         if outcome == "reached_boundary" and not self.boundary_hit and not self.observe_only:
             grounded = "claimed_boundary_unverified"
