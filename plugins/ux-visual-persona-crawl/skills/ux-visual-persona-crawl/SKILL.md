@@ -68,7 +68,7 @@ Create `ux-crawl-runs/<study-id>/study.json`:
 
 Keep `id` short and each persona `id` to 24 characters or fewer; they become folder names. Deep folders are fine: the scripts write through Windows' long-path form, so there's no need to move a study to a shorter folder.
 
-`pace_ms` is the pause after every action. Leave it out and it defaults to 1200 when any allowed host is a live site, and 300 when every host is local or staging, where politeness doesn't apply.
+`pace_ms` is the pause after every action. Leave it out and it defaults to 1200 when any allowed host is a live site, and 300 when every host is local or staging, where politeness doesn't apply. Hosts may be written with a port or scheme (`localhost:8765`); they're reduced to the host name. `eyes.py check` prints `treated_as` and `pace_ms`, so a local system mistaken for a live site shows up before the walks.
 
 Write `goal_match` and `stages` from addresses you have seen, not guessed. Write the rest of the file first, start a recon session (below), click once along the main path and note each address bar, then fill them in. A stage that matches nothing leaves a hole in the funnel. This short recon has to come before the walks; the full survey for `facts.md` doesn't.
 

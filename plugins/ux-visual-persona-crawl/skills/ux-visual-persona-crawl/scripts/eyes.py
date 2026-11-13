@@ -105,6 +105,16 @@ def load_study(path: Path) -> dict:
     for key in ("id", "product", "start_url", "allowed_hosts"):
         if not study.get(key):
             problems.append(f"missing {key}")
+    # People write hosts the way they see them: "localhost:8765", "https://www.acme.com/". Every check here
+    # compares bare host names, so a port or scheme would make a local system look like a live site (slow
+    # pace, two sessions at a time) and its own start_url look off-site.
+    hosts = []
+    for h in study.get("allowed_hosts") or []:
+        name = (urlsplit(h if "//" in h else "//" + h).hostname or "").lower()
+        if name and name not in hosts:
+            hosts.append(name)
+    if study.get("allowed_hosts"):
+        study["allowed_hosts"] = hosts
     study.setdefault("mode", "observe_only")
     if study["mode"] not in ("observe_only", "test_env"):
         problems.append("mode must be observe_only or test_env")
@@ -958,6 +968,8 @@ def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
     out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"],
+           "treated_as": "test system" if study["local_pace"] else f"live site (at most {MAX_LIVE_SESSIONS} sessions at a time)",
+           "pace_ms": study["pace_ms"],
            "report_command": report_command()}
     if args.personas:
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
@@ -1161,7 +1173,8 @@ def main():
         return cmd_feedback(args)
     session_dir = lp(args.session)
     payload = read_payload(args) if args.cmd == "act" else None
-    print(json.dumps(call(session_dir, args.cmd, payload), ensure_ascii=False, indent=1))
+    # One line: a walker reads one of these every step, and indentation is tokens it pays for each time.
+    print(json.dumps(call(session_dir, args.cmd, payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":
