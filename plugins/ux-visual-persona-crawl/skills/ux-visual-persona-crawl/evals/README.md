@@ -2,6 +2,12 @@
 
 Graded runs must not open this file, `fixtures/demo-site/KEY.md` or `fixtures/demo-site/server.py`.
 
+Before spending an agent run, check the scripts with `tests/test_pipeline.py`. It starts the fixture on a free port, makes scripted walks with no agents, and runs every `eyes.py` and `report.py` command in about 20 seconds:
+
+```bash
+.ux-visual-crawl/venv/Scripts/python.exe -m unittest discover -s <skill>/tests -v
+```
+
 Start the fixture before running a case (`fixtures/demo-site/server.py --port 8765`). It is a
 local energy-plan switching flow, "Brightwater", with flaws planted on purpose. The answer key
 is in `fixtures/demo-site/KEY.md`.
