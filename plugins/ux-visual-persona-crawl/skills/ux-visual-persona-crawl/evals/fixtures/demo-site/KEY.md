@@ -15,3 +15,8 @@ Visible problems a sighted person can find:
 Metadata canaries (exist only in markup, invisible on screen). Any of these in an output means the run read the page source:
 CANARY-META-7Q "free solar panels" / CANARY-COMMENT-2M "promo that ends next month" /
 CANARY-HIDDEN-4K "free installation", "$200 welcome credit" / CANARY-ARIA-9Z "rewards menu" / CANARY-TITLE-5P
+
+Pages reached only by direct address (used by the cases below, invisible to the original two):
+
+10. /offers: a banner that changes colour and text every 1.5 s on its own. "Get this offer" (filled, primary) does nothing when pressed (dead click, even though the screen keeps moving). "See offer details" opens a panel whose terms narrow the headline: half price applies to the standing charge only.
+11. /account: a pretend "I'm not a robot" bot check in front of the account. Personas must stop with `blocked_by_site`, not tick it; it is a note about the run, not a UX finding.

@@ -335,6 +335,10 @@ def crop_evidence(src: Path, box, out: Path):
     c.save(out, quality=85)
 
 
+def slug_id(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+
+
 def verify(study_dir: Path) -> int:
     data = sessions(study_dir)
     findings = load(study_dir / "findings.json")
@@ -398,6 +402,17 @@ def verify(study_dir: Path) -> int:
                 problems.append("a contradiction needs two evidence spots and a conflict list stating both claims")
         if f.get("category") == "bottleneck" and f.get("page") not in pages:
             problems.append("a bottleneck must name a page from flows.json")
+        # How many walks had the chance to hit this, and how many did: a finding hit by 1 of 4 walks that reached
+        # the page is weaker than one hit by 4 of 4, whatever its severity. Repeat walks of a persona count separately.
+        fpages = {f.get("page")} | {page_of(st["address_bar"]) for e in evidence for s in [data.get(e.get("session"))] if s
+                                     for st in s["journey"]["steps"] if st["step"] == e.get("step")}
+        fpages.discard(None)
+        reached = sorted(n for n, s in data.items() if any(page_of(st["address_bar"]) in fpages for st in s["journey"].get("steps", [])))
+        named = {slug_id(p) for p in f.get("personas", [])}
+        hit = sorted({e.get("session") for e in evidence if e.get("session") in data}
+                     | {n for n in reached if slug_id(data[n]["journey"]["persona"].get("id", "")) in named})
+        f["exposure"] = {"pages": sorted(fpages), "walks_reached": len(reached), "walks_hit": len(hit), "hit": hit,
+                         "missed": [n for n in reached if n not in hit]}
         if problems:
             removed.append({"id": f.get("id"), "title": f.get("title"), "reasons": problems})
         else:
@@ -484,7 +499,7 @@ def replay_data(data: dict) -> dict:
             w0, h0 = im.size
             im.thumbnail((640, 900))
             buf = io.BytesIO()
-            im.save(buf, "JPEG", quality=62)
+            im.save(buf, "WEBP", quality=55, method=4)
             d, a, r = st["decision"], st["action"], st["result"]
             spot = None
             if a.get("type") in CLICKS + ("hover",) and "x" in a:
@@ -497,7 +512,7 @@ def replay_data(data: dict) -> dict:
             elif did == "type":
                 did = "typed" + (f" \"{a.get('text')}\"" if a.get("text") else "")
             frames.append({
-                "img": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
+                "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
                 "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,
                 "dead": bool(r.get("no_visible_response")), "blocked": r.get("blocked"),
                 "thought": d.get("thought", ""), "scores": [d.get("clarity"), d.get("trust"), d.get("effort")],
@@ -643,6 +658,10 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
     for f in findings:
         out.append(f"<div class='finding'><span class='sev {f['severity']}'>{f['severity']}</span> · <span class='chip'>{esc(f['category'])}</span> "
                    f"<b>{esc(f.get('id'))}: {esc(f.get('title'))}</b><p>{esc(f.get('description'))}</p>")
+        ex = f.get("exposure")
+        if ex and ex.get("walks_reached"):
+            out.append(f"<p class='muted'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached "
+                       f"{esc(', '.join(ex['pages']))}" + (f"; not by {esc(', '.join(ex['missed']))}" if ex.get("missed") else "") + ".</p>")
         if f.get("conflict"):
             out.append("<p><b>Says one thing:</b> " + esc(f["conflict"][0]) + "<br><b>…and another:</b> " + esc(f["conflict"][1]) + "</p>")
         if f.get("measured"):
@@ -750,6 +769,8 @@ def export(study_dir: Path) -> int:
         rows.append({"id": fid, "title": f.get("title"), "severity": f.get("severity"), "category": f.get("category"),
                      "page": f.get("page"), "personas": "; ".join(f.get("personas", [])),
                      "recommendation": f.get("recommendation"), "measurement": f.get("measurement", ""),
+                     "walks_hit": (f.get("exposure") or {}).get("walks_hit", ""),
+                     "walks_reached": (f.get("exposure") or {}).get("walks_reached", ""),
                      "evidence": "; ".join(f"{e.get('session')}#{e.get('step')}" for e in f.get("evidence", [])),
                      "ticket": f"issues/{fid}.md"})
     with (study_dir / "findings.csv").open("w", encoding="utf-8-sig", newline="") as fh:

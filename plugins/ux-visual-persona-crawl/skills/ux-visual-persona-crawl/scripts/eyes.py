@@ -225,22 +225,31 @@ def draw_grid(src: Path, dst: Path, step: int = 100, vision=None, k: float = 1.0
     Image.alpha_composite(img.convert("RGBA"), over).convert("RGB").save(dst)
 
 
-def _grey(raw: bytes, scale: int = 4):
+def _small(raw: bytes, scale: int = 4):
     import io
     from PIL import Image
 
-    img = Image.open(io.BytesIO(raw)).convert("L")
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
     return img.resize((max(1, img.width // scale), max(1, img.height // scale)))
+
+
+def _changed(a, b):
+    """Pixels that changed clearly in any colour channel. Brightness alone misses a green that turns an equally
+    bright purple, which people see at once."""
+    from PIL import ImageChops
+
+    r, g, bl = ImageChops.difference(a, b).split()
+    return ImageChops.lighter(ImageChops.lighter(r, g), bl).point(lambda v: 255 if v > 12 else 0)
 
 
 def restless_mask(looked: bytes, before: bytes):
     """Parts of the screen that changed while nobody touched it (carousels, clocks, video), widened a little."""
-    from PIL import ImageChops, ImageFilter
+    from PIL import ImageFilter
 
-    a, b = _grey(looked), _grey(before)
+    a, b = _small(looked), _small(before)
     if a.size != b.size:
         return None
-    diff = ImageChops.difference(a, b).point(lambda v: 255 if v > 12 else 0)
+    diff = _changed(a, b)
     if not diff.getbbox():
         return None
     return diff.filter(ImageFilter.MaxFilter(9))
@@ -248,13 +257,13 @@ def restless_mask(looked: bytes, before: bytes):
 
 def visible_change(before: bytes, after: bytes, ignore=None) -> bool:
     """Did the action change the screen, outside the parts that move by themselves?
-    Counts pixels that changed clearly, on a quarter-size greyscale copy; a few stray pixels don't count."""
+    Counts pixels that changed clearly, on a quarter-size copy; a few stray pixels don't count."""
     from PIL import ImageChops
 
-    a, b = _grey(before), _grey(after)
+    a, b = _small(before), _small(after)
     if a.size != b.size:
         return True
-    diff = ImageChops.difference(a, b).point(lambda v: 255 if v > 12 else 0)
+    diff = _changed(a, b)
     if ignore is not None and ignore.size == diff.size:
         diff = ImageChops.subtract(diff, ignore)
     changed = diff.histogram()[255]
@@ -281,6 +290,7 @@ class Session:
         self.observe_only = self.study["mode"] == "observe_only"
         self.step = 0
         self.looked = None
+        self.motion = {}  # address -> mask of the parts of that page that move by themselves
         self.last_hash = None
         self.events = []
         self.dialogs = []
@@ -427,6 +437,14 @@ class Session:
         from PIL import Image
         size = Image.open(clean).size
         url = self.page.url
+        if url not in self.motion:
+            # First look at this page: watch it for a moment untouched. Whatever changes on its own (a carousel,
+            # a ticker, a video) is left out later when judging whether an action did anything.
+            await self.page.wait_for_timeout(1600)
+            try:
+                self.motion[url] = restless_mask(raw, await self.shot_bytes())
+            except Exception:
+                self.motion[url] = None
         if not self.visited or self.visited[-1] != url:
             self.visited.append(url)
         self.looked = {"step": step, "url": url, "hash": digest, "size": size, "shot": str(clean), "raw": raw}
@@ -457,6 +475,8 @@ class Session:
         return None
 
     async def act(self, payload: dict) -> dict:
+        from PIL import ImageChops
+
         if self.ended:
             return {"ok": False, "ended": self.ended}
         if not self.looked or self.looked["step"] != self.step + 1:
@@ -486,6 +506,9 @@ class Session:
         try:
             before_raw = await self.shot_bytes()
             restless = restless_mask(self.looked["raw"], before_raw)
+            seen_moving = self.motion.get(self.looked["url"])
+            if seen_moving is not None:
+                restless = seen_moving if restless is None else ImageChops.lighter(restless, seen_moving)
             # On a desktop the pointer reaches the target before the click lands. Take the "before" picture
             # with it there, so a hover highlight alone isn't counted as the click doing something.
             if action.get("type") in ("click", "double_click") and not self.mobile and "x" in action and "y" in action:

@@ -37,7 +37,7 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 
 ## Write
 
-One root cause is one finding, even if several personas hit it. Every finding needs evidence: a session, a step, and a box `[x, y, width, height]` on that step's screenshot around the thing. `verify` crops each box into the report, and removes the finding if the step or box doesn't exist.
+One root cause is one finding, even if several personas hit it. List every persona who hit it in `personas`, so `verify` can report how many of the walks that reached the page hit the problem (`exposure`). A walk that reached the page and sailed past it is evidence too: say why in the description, since it tells the reader who the problem affects. Every finding needs evidence: a session, a step, and a box `[x, y, width, height]` on that step's screenshot around the thing. `verify` crops each box into the report, and removes the finding if the step or box doesn't exist.
 
 `findings.json`:
 

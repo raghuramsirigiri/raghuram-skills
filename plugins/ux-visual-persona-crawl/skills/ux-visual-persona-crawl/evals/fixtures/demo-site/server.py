@@ -117,7 +117,22 @@ DONE = """<h1>You're switching to Brightwater</h1><p style="font-size:18px">We'l
 LOGIN = """<h1>Log in</h1><label>Email</label><input><label>Password</label><input type="password">
 <p style="margin-top:20px"><button class="btn" type="button">Log in</button></p>"""
 
+# Reached only by direct address, so the original cases never see them.
+OFFERS = """<p class="steps">Offers</p><h1>This month's offers</h1>
+<div id="slides" style="height:150px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;background:#1e7f4f">Switch in April, first month half price</div>
+<script>var S=[["#1e7f4f","Switch in April, first month half price"],["#7a3fb0","Refer a friend, both get $25"],["#c2561a","Smart meter installed free"]],i=0;
+setInterval(function(){i=(i+1)%S.length;var d=document.getElementById('slides');d.style.background=S[i][0];d.textContent=S[i][1];},1500);</script>
+<p style="margin-top:22px"><button class="btn" type="button" onclick="return false">Get this offer</button>
+<button class="btn" type="button" style="background:#fff;color:#123;border:2px solid #123;margin-left:10px" onclick="document.getElementById('terms').style.display='block'">See offer details</button></p>
+<div id="terms" style="display:none;border:1px solid #ccd;padding:14px;border-radius:8px;max-width:620px">Half price applies to the standing charge only, not to energy used. New customers only.</div>"""
+
+BOTWALL = """<div style="max-width:420px;margin:60px auto;text-align:center;border:1px solid #ccd;border-radius:12px;padding:28px">
+<h1 style="font-size:22px">Checking your browser</h1><p>Please confirm you are human to continue to your account.</p>
+<label style="display:inline-flex;gap:10px;align-items:center;border:1px solid #bbb;padding:14px 18px;border-radius:6px;font-size:17px">
+<input type="checkbox" style="width:22px;height:22px"> I'm not a robot</label></div>"""
+
 ROUTES = {
+    "/offers": ("Offers", OFFERS, False), "/account": ("Security check", BOTWALL, False),
     "/": ("Home", HOME, True), "/plans": ("Plans", PLANS, True), "/plans/green-saver": ("Green Saver", GREEN, False),
     "/plans/flex": ("Flex", FLEX, False), "/plans/solar-plus": ("Solar Plus", SOLAR, False),
     "/signup": ("Your details", None, False), "/signup/2": ("Payment", BILLING, False),
