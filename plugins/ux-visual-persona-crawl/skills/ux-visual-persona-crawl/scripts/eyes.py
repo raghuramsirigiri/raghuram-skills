@@ -860,13 +860,9 @@ def cmd_measure(args):
     print(json.dumps(rec))
 
 
-def cmd_feedback(args):
-    session_dir = lp(args.session)
-    journey_path = session_dir / "journey.json"
-    journey = json.loads(journey_path.read_text(encoding="utf-8")) if journey_path.exists() else {}
-    if not journey.get("outcome"):
-        raise SystemExit("The session has not ended. Finish it first, then give the exit interview.")
-    data = read_payload(args)
+def feedback_problems(data) -> list:
+    if not isinstance(data, dict):
+        return ["the exit interview must be a JSON object"]
     problems = []
     for key, (lo, hi) in FEEDBACK_SCALES.items():
         v = data.get(key)
@@ -875,12 +871,46 @@ def cmd_feedback(args):
     for key in FEEDBACK_TEXT:
         if not str(data.get(key, "")).strip():
             problems.append(f"{key} is required")
+    return problems
+
+
+def save_feedback(session_dir: Path, data: dict) -> Path:
+    journey_path = session_dir / "journey.json"
+    journey = json.loads(journey_path.read_text(encoding="utf-8")) if journey_path.exists() else {}
+    if not journey.get("outcome"):
+        raise SystemExit("The session has not ended. Finish it first, then give the exit interview.")
+    data = dict(data, persona=journey["persona"]["id"], outcome=journey["outcome"])
+    out = session_dir / "feedback.json"
+    out.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return out
+
+
+def cmd_feedback(args):
+    data = read_payload(args)
+    problems = feedback_problems(data)
     if problems:
         raise SystemExit("Feedback incomplete: " + "; ".join(problems))
-    data["persona"] = journey["persona"]["id"]
-    data["outcome"] = journey["outcome"]
-    (session_dir / "feedback.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"ok": True, "saved": shown(session_dir / "feedback.json")}))
+    print(json.dumps({"ok": True, "saved": shown(save_feedback(lp(args.session), data))}))
+
+
+def cmd_act(args):
+    """One action. A finish may carry the exit interview, which saves the walker a separate call."""
+    session_dir = lp(args.session)
+    payload = read_payload(args)
+    interview = payload.get("exit_interview") if isinstance(payload, dict) else None
+    finishing = isinstance(payload, dict) and (payload.get("action") or {}).get("type") == "finish"
+    if interview is not None:
+        if not finishing:
+            raise SystemExit("exit_interview goes only with a finish action.")
+        problems = feedback_problems(interview)
+        if problems:
+            # Checked before the walk ends, so the walker can fix it and send the same finish again.
+            raise SystemExit("Exit interview incomplete, nothing was done: " + "; ".join(problems))
+    result = call(session_dir, "act", {k: v for k, v in payload.items() if k != "exit_interview"})
+    if interview is not None and result.get("ok") and result.get("ended"):
+        result["exit_interview"] = shown(save_feedback(session_dir, interview))
+        result.pop("next", None)
+    print(json.dumps(result, ensure_ascii=False))
 
 
 # ---------------------------------------------------------------- start / main
@@ -1125,11 +1155,22 @@ def cmd_start(args):
         if not args.recon:
             brief = session_dir / "brief.md"
             brief.write_text(build_brief(session_dir), encoding="utf-8")
+        results.append(row)
+    if not args.recon and results:
+        # Take each walker's first screen now, all at once, so the walker can open its brief and its first
+        # screenshot together instead of spending a turn on look. Every later screen comes with act.
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(len(results)) as pool:
+            firsts = list(pool.map(lambda r: call(lp(r["session"]), "look"), results))
+        for row, first in zip(results, firsts):
+            brief = Path(row["session"]) / "brief.md"
+            shot = first.get("screenshot")
             # The orchestrator passes this one line instead of the whole brief: fewer tokens to write, and
             # nothing of its own can slip into the walker's prompt.
-            row["walker_prompt"] = (f'Read the file "{shown(brief)}" with your file-reading tool and follow it exactly. '
-                                    "It is your whole brief.")
-        results.append(row)
+            row["walker_prompt"] = (
+                f'Open these two files with your file-reading tool, both at once: your brief "{shown(brief)}" and your '
+                f'first screen "{shot}". Then follow the brief exactly; it is your whole brief.' if shot else
+                f'Read the file "{shown(brief)}" with your file-reading tool and follow it exactly. It is your whole brief.')
     if failed and not results:
         raise SystemExit("Browser failed to start: " + "; ".join(failed))
     if len(results) == 1 and not failed and not queued and not args.all:
@@ -1189,6 +1230,8 @@ def main():
         return cmd_measure(args)
     if args.cmd == "feedback":
         return cmd_feedback(args)
+    if args.cmd == "act":
+        return cmd_act(args)
     session_dir = lp(args.session)
     payload = read_payload(args) if args.cmd == "act" else None
     # One line: a walker reads one of these every step, and indentation is tokens it pays for each time.

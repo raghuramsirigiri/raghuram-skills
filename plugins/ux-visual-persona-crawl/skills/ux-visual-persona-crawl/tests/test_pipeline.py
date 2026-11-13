@@ -201,15 +201,34 @@ class WalkAndReport(unittest.TestCase):
         p = personas(d, [{"id": "desk"}, {"id": "phone", "device": "mobile", "cpu": "slow"}])
         xy = dead_button_xy()
         cls.results = {}
+        cls.prompts = {}
+        finish = {"type": "finish", "outcome": "gave_up", "reason": "r"}
         for pid in ("desk", "phone"):
-            s = jrun("start", "--study", d / "study.json", "--personas", p, "--persona", pid)["session"]
-            jrun("look", "--session", s)
+            started = jrun("start", "--study", d / "study.json", "--personas", p, "--persona", pid)
+            s = started["session"]
+            cls.prompts[pid] = started["walker_prompt"]
+            # No look: start already took the first screen.
             acts = [{"type": "click", "x": 1180, "y": 700}, {"type": "click", **xy}] if pid == "desk" else [{"type": "scroll", "direction": "down"}]
             cls.results[pid] = [jrun("act", "--session", s, payload={"decision": DEC, "action": a}) for a in acts]
-            jrun("act", "--session", s, payload={"decision": DEC, "action": {"type": "finish", "outcome": "gave_up", "reason": "r"}})
             if pid == "desk":
+                cls.bad_interview = eyes("act", "--session", s, payload={"decision": DEC, "action": finish, "exit_interview": {"ease": 3}})
                 cls.status_before = jrun("status", "--study", d / "study.json")
-            jrun("feedback", "--session", s, payload=FEEDBACK)
+                cls.finished = jrun("act", "--session", s, payload={"decision": DEC, "action": finish, "exit_interview": FEEDBACK})
+            else:
+                jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
+                jrun("feedback", "--session", s, payload=FEEDBACK)
+
+    def test_first_screen_comes_with_start(self):
+        shot = re.search(r'first screen "([^"]+)"', self.prompts["desk"]).group(1)
+        self.assertTrue(Path(shot).exists() and shot.endswith("step-001-grid.png"), shot)
+        self.assertIn("brief.md", self.prompts["desk"])
+
+    def test_exit_interview_with_finish(self):
+        rc, out = self.bad_interview
+        self.assertNotEqual(rc, 0)
+        self.assertIn("nothing was done", out)
+        self.assertEqual(self.status_before["waiting_on"], ["desk"])   # the bad finish did not end the walk
+        self.assertTrue(self.finished["ended"] and self.finished["exit_interview"].endswith("feedback.json"))
 
     def test_moving_page_and_blank_clicks(self):
         blank, dead = self.results["desk"]

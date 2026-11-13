@@ -86,7 +86,7 @@ Then `look`, `zoom`, `scroll` and `click` as a persona would. Here `act` needs o
 
 ### 4. Create the personas
 
-Read `references/personas.md` and write `personas.json` in the study folder: usually 4 to 8 people who would behave differently, each with a `demographics` block and a `task`. Check it with `eyes.py check --study <study.json> --personas <personas.json>`, which stops a walk-breaking mistake before any walker starts and warns about gaps in the panel. Show the user a one-line summary of each before running, because a panel missing their key customer wastes the whole run.
+Read `references/personas.md` and write `personas.json` in the study folder: usually 4 to 8 people who would behave differently, each with a `demographics` block and a `task`. Check it with `eyes.py check --study <study.json> --personas <personas.json>`, which stops a walk-breaking mistake before any walker starts and warns about gaps in the panel. Show the user a one-line summary of each before running, because a panel missing their key customer wastes the whole run. If the user named the panel size, keep to it, and list `check`'s coverage warnings under what wasn't tested.
 
 ### 5. Walk each persona
 
@@ -100,7 +100,7 @@ This opens every persona's browser at once. Use `--persona a,b` to choose person
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
-Every session ends with an exit interview (`eyes.py feedback`). When the walkers report back, run `eyes.py status --study <study.json>`. It lists each session's steps, outcome and walk times, and whether its exit interview is in. `all_done` must be true before analysis, and `waiting_on` names any session that isn't finished. If it prints `stop` (several sessions ended as `blocked_by_site`), tell the user rather than burning more runs.
+`start` also takes each walker's first screen, which its prompt names, so the walker opens its brief and first screenshot together. Every session ends with an exit interview, sent along with the walker's `finish` action. When the walkers report back, run `eyes.py status --study <study.json>`. It lists each session's steps, outcome and walk times, and whether its exit interview is in. `all_done` must be true before analysis, and `waiting_on` names any session that isn't finished. If it prints `stop` (several sessions ended as `blocked_by_site`), tell the user rather than burning more runs.
 
 ### 6. Compute the flows
 
