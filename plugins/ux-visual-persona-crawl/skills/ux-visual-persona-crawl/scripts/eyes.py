@@ -451,7 +451,7 @@ class Session:
         from PIL import Image
         size = Image.open(clean).size
         url = self.page.url
-        if url not in self.motion:
+        if url not in self.motion and not self.meta.get("recon"):
             # First look at this page: watch it for a moment untouched. Whatever changes on its own (a carousel,
             # a ticker, a video) is left out later when judging whether an action did anything.
             await self.page.wait_for_timeout(1600)
@@ -926,7 +926,10 @@ LIVE_TYPING = ("This is a live site. You may type only short search words, with 
 
 def cmd_brief(args):
     """Print the walker brief from references/walker.md with this session's values filled in."""
-    session_dir = lp(args.session)
+    print(build_brief(lp(args.session)))
+
+
+def build_brief(session_dir: Path) -> str:
     meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
     if meta.get("recon"):
         raise SystemExit("A recon session has no walker brief.")
@@ -948,7 +951,7 @@ def cmd_brief(args):
     left = re.findall(r"\[[A-Z][A-Z' ]+\]", text)
     if left:
         raise SystemExit(f"walker.md has placeholders this command doesn't fill: {sorted(set(left))}")
-    print(text)
+    return text
 
 
 def cmd_check(args):
@@ -1022,59 +1025,93 @@ RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "deskt
 def cmd_start(args):
     study_path = Path(args.study).resolve()
     study = load_study(study_path)
-    if not study["local_pace"]:
-        busy = running_sessions(lp(study_path.parent))
-        if len(busy) >= MAX_LIVE_SESSIONS:
-            raise SystemExit(f"{len(busy)} sessions are already open on this live site ({', '.join(busy)}). "
-                             f"Live runs use at most {MAX_LIVE_SESSIONS} at a time: start this one when one of them finishes.")
     if args.recon:
-        persona = dict(RECON_PERSONA, device=args.device or "desktop")
+        chosen = [dict(RECON_PERSONA, device=args.device or "desktop")]
         base = lp(study_path.parent) / "recon"
     else:
-        if not args.personas or not args.persona:
-            raise SystemExit("start needs --personas and --persona, or --recon")
+        if not args.personas or not (args.persona or args.all):
+            raise SystemExit("start needs --personas with --persona <id[,id...]> or --all, or --recon")
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
-        persona = next((p for p in people if p["id"] == args.persona), None)
-        if persona is None:
-            raise SystemExit(f"Persona {args.persona} not found")
+        if args.all:
+            chosen = list(people)
+        else:
+            ids = [x.strip() for x in args.persona.split(",") if x.strip()]
+            missing = [i for i in ids if not any(p["id"] == i for p in people)]
+            if missing:
+                raise SystemExit(f"Persona {', '.join(missing)} not found")
+            chosen = [next(p for p in people if p["id"] == i) for i in ids]
         base = lp(study_path.parent) / "sessions"
-    if persona.get("vision") and persona["vision"] not in VISION:
-        raise SystemExit(f"vision must be one of {sorted(VISION)}")
-    start_url = persona.get("start_url") or study["start_url"]
-    if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
-        raise SystemExit("The persona's start_url is not on an allowed host")
-    base.mkdir(exist_ok=True)
-    name = slug(persona["id"])[:24].strip("-")
-    session_dir, n = base / name, 1
-    while session_dir.exists():
-        n += 1
-        session_dir = base / f"{name}-{n}"
-    session_dir.mkdir()
-    meta = {"study_path": str(study_path), "persona": persona, "start_url": start_url, "headed": args.headed,
-            "recon": bool(args.recon)}
-    (session_dir / "session.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+    for persona in chosen:
+        if persona.get("vision") and persona["vision"] not in VISION:
+            raise SystemExit(f"{persona['id']}: vision must be one of {sorted(VISION)}")
+        start_url = persona.get("start_url") or study["start_url"]
+        if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
+            raise SystemExit(f"{persona['id']}: the start_url is not on an allowed host")
+    queued = []
+    if not study["local_pace"]:
+        busy = running_sessions(lp(study_path.parent))
+        room = MAX_LIVE_SESSIONS - len(busy)
+        if room <= 0:
+            raise SystemExit(f"{len(busy)} sessions are already open on this live site ({', '.join(busy)}). "
+                             f"Live runs use at most {MAX_LIVE_SESSIONS} at a time: start this one when one of them finishes.")
+        chosen, queued = chosen[:room], [p["id"] for p in chosen[room:]]
 
+    # Each browser takes a few seconds to come up, so launch them all and then wait for all of them.
+    base.mkdir(exist_ok=True)
     runtime = find_env()
-    log = open(session_dir / "daemon.log", "ab")
     flags = (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
-    subprocess.Popen(
-        [runtime["python"], str(Path(__file__).resolve()), "_daemon", "--session", str(session_dir)],
-        stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=runtime["env"], creationflags=flags,
-        start_new_session=os.name != "nt", close_fds=True,
-    )
+    launched = []
+    for persona in chosen:
+        start_url = persona.get("start_url") or study["start_url"]
+        name = slug(persona["id"])[:24].strip("-")
+        session_dir, n = base / name, 1
+        while session_dir.exists():
+            n += 1
+            session_dir = base / f"{name}-{n}"
+        session_dir.mkdir()
+        meta = {"study_path": str(study_path), "persona": persona, "start_url": start_url, "headed": args.headed,
+                "recon": bool(args.recon)}
+        (session_dir / "session.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        log = open(session_dir / "daemon.log", "ab")
+        subprocess.Popen(
+            [runtime["python"], str(Path(__file__).resolve()), "_daemon", "--session", str(session_dir)],
+            stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=runtime["env"], creationflags=flags,
+            start_new_session=os.name != "nt", close_fds=True,
+        )
+        launched.append((session_dir, start_url))
     deadline = time.time() + 90
-    while time.time() < deadline and not (session_dir / "daemon.json").exists():
+    while time.time() < deadline and not all((d / "daemon.json").exists() for d, _ in launched):
         time.sleep(0.25)
-    if not (session_dir / "daemon.json").exists():
-        raise SystemExit(f"Browser did not start. See {session_dir / 'daemon.log'}")
-    info = json.loads((session_dir / "daemon.json").read_text(encoding="utf-8"))
-    if "error" in info:
-        raise SystemExit("Browser failed to start: " + info["error"])
-    out = {"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}
-    if not args.recon:
-        out["brief_command"] = f'python "{Path(__file__).resolve()}" brief --session "{shown(session_dir)}"'
-    print(json.dumps(out, ensure_ascii=False))
+
+    results, failed = [], []
+    for session_dir, start_url in launched:
+        info_path = session_dir / "daemon.json"
+        info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"error": f"did not start, see {shown(session_dir / 'daemon.log')}"}
+        if "error" in info:
+            failed.append(f"{session_dir.name}: {info['error']}")
+            continue
+        row = {"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}
+        if not args.recon:
+            brief = session_dir / "brief.md"
+            brief.write_text(build_brief(session_dir), encoding="utf-8")
+            # The orchestrator passes this one line instead of the whole brief: fewer tokens to write, and
+            # nothing of its own can slip into the walker's prompt.
+            row["walker_prompt"] = (f'Read the file "{shown(brief)}" with your file-reading tool and follow it exactly. '
+                                    "It is your whole brief.")
+        results.append(row)
+    if failed and not results:
+        raise SystemExit("Browser failed to start: " + "; ".join(failed))
+    if len(results) == 1 and not failed and not queued and not args.all:
+        print(json.dumps(results[0], ensure_ascii=False))
+        return
+    out = {"sessions": results}
+    if failed:
+        out["failed"] = failed
+    if queued:
+        out["queued"] = queued
+        out["note"] = f"Live site: at most {MAX_LIVE_SESSIONS} at a time. Start the queued ones as sessions finish."
+    print(json.dumps(out, ensure_ascii=False, indent=1))
 
 
 def main():
@@ -1083,7 +1120,9 @@ def main():
     p = sub.add_parser("check"); p.add_argument("--study", required=True); p.add_argument("--personas", help="also check this personas.json")
     p = sub.add_parser("start")
     p.add_argument("--study", required=True); p.add_argument("--personas")
-    p.add_argument("--persona"); p.add_argument("--headed", action="store_true")
+    p.add_argument("--persona", help="a persona id, or several separated by commas")
+    p.add_argument("--all", action="store_true", help="start every persona in the file")
+    p.add_argument("--headed", action="store_true")
     p.add_argument("--recon", action="store_true", help="a screen-only session for the study author, kept out of the analysis")
     p.add_argument("--device", choices=["desktop", "mobile"], help="device for a --recon session")
     p = sub.add_parser("status", help="how each persona session of a study stands")

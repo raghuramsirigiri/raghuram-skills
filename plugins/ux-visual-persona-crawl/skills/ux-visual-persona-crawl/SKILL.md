@@ -90,13 +90,13 @@ Read `references/personas.md` and write `personas.json` in the study folder: usu
 
 ### 5. Walk each persona
 
-For each persona, start a session, then hand it to its own subagent:
+Start the sessions, then hand each one to its own subagent:
 
 ```bash
-python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.json> --persona <id>
+python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.json> --all
 ```
 
-`start` prints a `brief_command`. Run it: `eyes.py brief --session <session>` prints the brief from `references/walker.md` with the persona, session, driver path and typing rule filled in. Give the subagent exactly that text, and nothing else. Start the walkers together: all of them on a test system, two at a time on a live site. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
+This opens every persona's browser at once. Use `--persona a,b` to choose personas. On a live site it opens two and lists the rest as `queued`; start each queued one as a walk finishes. Each session gets `brief.md`, the brief from `references/walker.md` with the persona, paths and typing rule filled in. Give each subagent its session's `walker_prompt` as the whole prompt, and nothing else. That one line points it at its brief. Start the walkers together. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
