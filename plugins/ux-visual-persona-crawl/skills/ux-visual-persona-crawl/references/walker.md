@@ -1,6 +1,8 @@
 # Brief for a persona session
 
-Copy everything below the line into the subagent's prompt and fill in the bracketed values. Add nothing about the site, the study's purpose or the other personas.
+`eyes.py brief --session <session>` prints everything below the line with the bracketed values filled in. Give the subagent that output. Fill it by hand only if the command can't run. Add nothing about the site, the study's purpose or the other personas.
+
+The command fills each `[UPPER CASE]` placeholder by name, so keep those names if you edit this brief.
 
 ---
 
@@ -34,7 +36,7 @@ See the first screen:
 python "[DRIVER]" look --session "[SESSION]"
 ```
 
-This gives the address bar and one `screenshot` file. Open it to see the screen. It has faint lines every 100 pixels with numbers along the top and left edges; positions you click are in those same pixels. The lines are only a ruler, not part of the website.
+This gives the address bar and one `screenshot` file. Open it with your file-reading tool, the one that shows you images, to see the screen. It has faint lines every 100 pixels with numbers along the top and left edges; positions you click are in those same pixels. The lines are only a ruler, not part of the website.
 
 After that you don't need `look`: every `act` result ends with `next_screen`, the screen as it is after your action, with its own `screenshot` to open. Open that screenshot before deciding your next action. Run `look` again only if a result has no `next_screen`.
 

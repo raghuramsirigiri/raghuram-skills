@@ -911,10 +911,51 @@ def lint_personas(people) -> tuple:
     return errors, warnings
 
 
+def report_command() -> str:
+    """The exact command that runs report.py: it needs the venv's Python, which is easy to get wrong."""
+    try:
+        py = find_env()["python"]
+    except SystemExit:
+        py = "python"
+    return f'"{py}" "{Path(__file__).resolve().parent / "report.py"}"'
+
+
+LIVE_TYPING = ("This is a live site. You may type only short search words, with `\"purpose\":\"search\"`. "
+               "For any form, say what you would enter and how you feel about being asked, then decide whether to go on.")
+
+
+def cmd_brief(args):
+    """Print the walker brief from references/walker.md with this session's values filled in."""
+    session_dir = lp(args.session)
+    meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+    if meta.get("recon"):
+        raise SystemExit("A recon session has no walker brief.")
+    study = load_study(Path(meta["study_path"]))
+    persona = meta["persona"]
+    text = (Path(__file__).resolve().parent.parent / "references" / "walker.md").read_text(encoding="utf-8")
+    text = text.split("\n---\n", 1)[1].lstrip("\n")
+    if study["mode"] == "test_env":
+        names = ", ".join(f"`test:{k}`" for k in study.get("test_data", {})) or "(none given)"
+        typing = ("This is a test system. For anything personal type only these test values, written exactly as "
+                  f"`test:<name>`: {names}. Anything else, type plain fake words.")
+    else:
+        typing = LIVE_TYPING
+    text = re.sub(r"\[TYPING RULE:[^\n]*\]", lambda _: typing, text)
+    text = (text.replace("[PASTE THE PERSONA JSON]", "```json\n" + json.dumps(persona, indent=2, ensure_ascii=False) + "\n```")
+                .replace("[THE PERSONA'S TASK]", str(persona.get("task", "")))
+                .replace("[DRIVER]", str(Path(__file__).resolve()))
+                .replace("[SESSION]", shown(session_dir)))
+    left = re.findall(r"\[[A-Z][A-Z' ]+\]", text)
+    if left:
+        raise SystemExit(f"walker.md has placeholders this command doesn't fill: {sorted(set(left))}")
+    print(text)
+
+
 def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
-    out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"]}
+    out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"],
+           "report_command": report_command()}
     if args.personas:
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
@@ -1006,7 +1047,10 @@ def cmd_start(args):
     info = json.loads((session_dir / "daemon.json").read_text(encoding="utf-8"))
     if "error" in info:
         raise SystemExit("Browser failed to start: " + info["error"])
-    print(json.dumps({"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}, ensure_ascii=False))
+    out = {"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}
+    if not args.recon:
+        out["brief_command"] = f'python "{Path(__file__).resolve()}" brief --session "{shown(session_dir)}"'
+    print(json.dumps(out, ensure_ascii=False))
 
 
 def main():
@@ -1018,6 +1062,8 @@ def main():
     p.add_argument("--persona"); p.add_argument("--headed", action="store_true")
     p.add_argument("--recon", action="store_true", help="a screen-only session for the study author, kept out of the analysis")
     p.add_argument("--device", choices=["desktop", "mobile"], help="device for a --recon session")
+    p = sub.add_parser("brief", help="print the filled-in walker brief for a persona session")
+    p.add_argument("--session", required=True)
     for name in ("look", "stop"):
         p = sub.add_parser(name); p.add_argument("--session", required=True)
     for name in ("act", "feedback"):
@@ -1038,6 +1084,8 @@ def main():
         return cmd_check(args)
     if args.cmd == "start":
         return cmd_start(args)
+    if args.cmd == "brief":
+        return cmd_brief(args)
     if args.cmd == "zoom":
         return cmd_zoom(args)
     if args.cmd == "measure":

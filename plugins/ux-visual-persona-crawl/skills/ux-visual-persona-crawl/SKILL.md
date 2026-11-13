@@ -32,7 +32,7 @@ These exist for reasons that don't change with the request.
 python <skill>/scripts/setup_env.py --project .
 ```
 
-This installs Playwright, Pillow and Chromium under `.ux-visual-crawl/` in the project. Skip it if `.ux-visual-crawl/venv` exists. Run `report.py` with that venv's Python (`.ux-visual-crawl/venv/Scripts/python.exe` on Windows, `.ux-visual-crawl/venv/bin/python` elsewhere), because it needs Pillow. `eyes.py` finds the venv by itself.
+This installs Playwright, Pillow and Chromium under `.ux-visual-crawl/` in the project. Skip it if `.ux-visual-crawl/venv` exists. Run `report.py` with that venv's Python (`.ux-visual-crawl/venv/Scripts/python.exe` on Windows, `.ux-visual-crawl/venv/bin/python` elsewhere), because it needs Pillow. `eyes.py` finds the venv by itself, and `eyes.py check` prints the exact command to use for `report.py` as `report_command`.
 
 ### 2. Agree the brief
 
@@ -70,6 +70,8 @@ Keep `id` short and each persona `id` to 24 characters or fewer; they become fol
 
 `pace_ms` is the pause after every action. Leave it out and it defaults to 1200 when any allowed host is a live site, and 300 when every host is local or staging, where politeness doesn't apply.
 
+Write `goal_match` and `stages` from addresses you have seen, not guessed. Write the rest of the file first, start a recon session (below), click once along the main path and note each address bar, then fill them in. A stage that matches nothing leaves a hole in the funnel. This short recon has to come before the walks; the full survey for `facts.md` doesn't.
+
 `goal_match` is a pattern on the address bar. A persona that claims `reached_goal` without ever reaching a matching address is recorded as `claimed_goal_unverified`. `stages`, in journey order, give the report its funnel; each `match` is tried against the full address and against the path alone, so `^/$` and `join\\.acme\\.com` both work. `test_env` also needs `environment_confirmation` (who confirmed it's a test system) and `test_data` (for example `{"meter": "0000000000"}`). Check the file with `eyes.py check --study <path>`.
 
 Then survey the key pages and write `facts.md` in the study folder: the prices, conditions and promises the site makes, with the page each is on. It goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Personas must know only what they see. Because nothing before the review needs it, the survey can run while the personas walk (step 5), which saves several minutes. On a live site the survey session counts toward the two that may run at once.
@@ -94,7 +96,7 @@ For each persona, start a session, then hand it to its own subagent:
 python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.json> --persona <id>
 ```
 
-Read `references/walker.md` and give the subagent that brief with the persona JSON, the session path and the driver path filled in, and nothing else. Start the walkers together: all of them on a test system, two at a time on a live site. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
+`start` prints a `brief_command`. Run it: `eyes.py brief --session <session>` prints the brief from `references/walker.md` with the persona, session, driver path and typing rule filled in. Give the subagent exactly that text, and nothing else. Start the walkers together: all of them on a test system, two at a time on a live site. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
