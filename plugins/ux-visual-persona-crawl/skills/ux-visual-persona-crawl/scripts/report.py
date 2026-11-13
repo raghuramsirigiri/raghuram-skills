@@ -824,8 +824,10 @@ def _words(text: str) -> set:
     return {w for w in re.findall(r"[a-z0-9$]+", str(text).lower()) if len(w) > 2}
 
 
-def compare(study_dir: Path, baseline: Path) -> int:
-    """The same panel before and after a change: outcomes, funnel, page scores, and which findings are fixed, remain or are new."""
+def compare(study_dir: Path, baseline: Path, versus: bool = False) -> int:
+    """The same panel before and after a change: outcomes, funnel, page scores, and which findings are fixed, remain or are new.
+    With versus, the same panel on two different sites (say, ours and a competitor's): pages can't match across
+    sites, so findings match by category within the same funnel stage instead."""
     need = ("navigation.json", "flows.json", "verified_findings.json")
     for d in (study_dir, baseline):
         missing = [n for n in need if not (d / n).exists()]
@@ -843,8 +845,14 @@ def compare(study_dir: Path, baseline: Path) -> int:
     same_panel = set(po) == set(pn)
 
     fo = {f["stage"]: f for f in old_flows.get("funnel", [])}
-    funnel = [{"stage": f["stage"], "label": f["label"], "before": fo.get(f["stage"], {}).get("reached"), "after": f["reached"], "of": f["of"]}
-              for f in new_flows.get("funnel", [])]
+    old_list = old_flows.get("funnel", [])
+    # Two sites usually get the same stage ids ("plans", "signup") for the same step of the task. If they don't,
+    # line the stages up by position.
+    by_id = any(f["stage"] in fo for f in new_flows.get("funnel", []))
+    funnel = [{"stage": f["stage"], "label": f["label"],
+               "before": (fo.get(f["stage"], {}) if by_id else (old_list[i] if i < len(old_list) else {})).get("reached"),
+               "after": f["reached"], "of": f["of"]}
+              for i, f in enumerate(new_flows.get("funnel", []))]
     so = {p["page"]: p["bottleneck_score"] for p in old_flows["pages"]}
     sn = {p["page"]: p["bottleneck_score"] for p in new_flows["pages"]}
     pages = sorted(({"page": pg, "before": so.get(pg), "after": sn.get(pg)} for pg in set(so) | set(sn)),
@@ -853,8 +861,31 @@ def compare(study_dir: Path, baseline: Path) -> int:
     def quotes(f):
         return {norm(q) for q in [e.get("quote") for e in f.get("evidence", [])] + list(f.get("conflict") or []) if q and len(norm(q)) > 3}
 
+    def stage_finder(d):
+        st = load(d / "study.json", {}) or {}
+        urls = {}
+        for v in load(d / "navigation.json", {}).values():
+            for step in v.get("steps", []):
+                if step.get("address_after"):
+                    urls.setdefault(page_of(step["address_after"]), step["address_after"])
+
+        def find(page):
+            if not page:
+                return None
+            PAGE_URLS.clear()
+            PAGE_URLS.update(urls)
+            return stage_of(st, page)
+        return find
+    new_stage, old_stage = stage_finder(study_dir), stage_finder(baseline)
+    stage = {id(f): new_stage(f.get("page")) for f in new_f}
+    stage.update({id(f): old_stage(f.get("page")) for f in old_f})
+
     def same(a, b):
-        same_page = bool(a.get("page")) and a.get("page") == b.get("page")
+        if versus:
+            # Two sites never share a page; the same kind of problem at the same step of the task is the match.
+            same_page = bool(stage[id(a)]) and stage[id(a)] == stage[id(b)]
+        else:
+            same_page = bool(a.get("page")) and a.get("page") == b.get("page")
         if same_page and a.get("category") == b.get("category"):
             return True
         if same_page and quotes(a) & quotes(b):  # two wordings of one problem usually quote the same words on screen
@@ -862,6 +893,8 @@ def compare(study_dir: Path, baseline: Path) -> int:
         wa, wb = _words(a.get("title")), _words(b.get("title"))
         return bool(wa and wb) and len(wa & wb) / len(wa | wb) >= 0.35
 
+    here, there = (study_dir.name, baseline.name) if versus else ("after", "before")
+    STATUS = ("on both sites", f"only on {here}", f"only on {there}") if versus else ("still there", "new", "not seen again")
     used, rows = set(), []
     for f in new_f:
         # Prefer an old finding not yet matched; one old finding may still match two new ones when a run splits it.
@@ -869,55 +902,69 @@ def compare(study_dir: Path, baseline: Path) -> int:
             or next((o for o in old_f if same(f, o)), None)
         if match is not None:
             used.add(old_f.index(match))
-            rows.append({"status": "still there", "after": f.get("id"), "before": match.get("id"), "title": f.get("title"),
+            rows.append({"status": STATUS[0], "after": f.get("id"), "before": match.get("id"), "title": f.get("title"),
                          "severity_before": match.get("severity"), "severity_after": f.get("severity")})
         else:
-            rows.append({"status": "new", "after": f.get("id"), "before": None, "title": f.get("title"), "severity_after": f.get("severity")})
+            rows.append({"status": STATUS[1], "after": f.get("id"), "before": None, "title": f.get("title"), "severity_after": f.get("severity")})
     for i, o in enumerate(old_f):
         if i not in used:
-            rows.append({"status": "not seen again", "after": None, "before": o.get("id"), "title": o.get("title"), "severity_before": o.get("severity")})
+            rows.append({"status": STATUS[2], "after": None, "before": o.get("id"), "title": o.get("title"), "severity_before": o.get("severity")})
 
-    result = {"baseline": shown(baseline), "study": shown(study_dir), "same_panel": same_panel, "personas": people,
-              "funnel": funnel, "pages": pages, "findings": rows,
-              "caveat": "Simulated personas vary from run to run. 'Not seen again' means no persona hit it this time, not that it is fixed; "
-                        "check the screen itself before closing it."}
+    caveat = ("Simulated personas vary from run to run. 'Not seen again' means no persona hit it this time, not that it is fixed; "
+              "check the screen itself before closing it.")
+    if versus:
+        caveat = ("Simulated personas vary from run to run, and the two sites were walked separately. A finding on only one site "
+                  "means no persona hit it on the other this time, not that the other site is free of it.")
+    if versus:
+        pages = [{"site": site, "page": pg, "score": v} for site, sc in ((baseline.name, so), (study_dir.name, sn))
+                 for pg, v in sorted(sc.items(), key=lambda kv: -kv[1])[:5]]
+    result = {"mode": "versus" if versus else "before_after", "baseline": shown(baseline), "study": shown(study_dir),
+              "same_panel": same_panel, "personas": people, "funnel": funnel, "pages": pages, "findings": rows, "caveat": caveat}
     (study_dir / "compare.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    TITLE = "Side by side" if versus else "Before and after"
+    B, A = (baseline.name, study_dir.name) if versus else ("Before", "After")
     h = ["<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-         "<title>Before and after</title><style>:root{--ink:#1d2433;--muted:#5b6475;--line:#e3e6ec;--bg:#fff}"
+         "<title>" + TITLE + "</title><style>:root{--ink:#1d2433;--muted:#5b6475;--line:#e3e6ec;--bg:#fff}"
          "@media (prefers-color-scheme:dark){:root{--ink:#e8eaf0;--muted:#a3abbc;--line:#333a48;--bg:#14171d}}"
          "body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,Segoe UI,Arial,sans-serif}"
          "main{max-width:1000px;margin:0 auto;padding:28px 16px 60px}table{border-collapse:collapse;width:100%;font-size:14px}"
          "td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}.muted{color:var(--muted)}.wrap{overflow-x:auto}"
          ".up{color:#2f855a;font-weight:600}.down{color:#b3261e;font-weight:600}</style></head><body><main>",
-         "<h1>Before and after</h1>",
-         f"<p class='muted'>Baseline {esc(baseline.name)} · this run {esc(study_dir.name)}</p>"]
+         f"<h1>{TITLE}</h1>",
+         f"<p class='muted'>{'Other site' if versus else 'Baseline'} {esc(baseline.name)} · this run {esc(study_dir.name)}</p>"]
     if not same_panel:
         h.append("<p class='down'>The two runs used different personas, so differences may come from the panel, not the site.</p>")
-    h.append("<h2>Findings</h2><div class='wrap'><table><tr><th>Status</th><th>Before</th><th>After</th><th>Finding</th><th>Severity</th></tr>")
-    for r in sorted(rows, key=lambda r: ["new", "still there", "not seen again"].index(r["status"])):
+    h.append(f"<h2>Findings</h2><div class='wrap'><table><tr><th>Status</th><th>{esc(B)}</th><th>{esc(A)}</th><th>Finding</th><th>Severity</th></tr>")
+    for r in sorted(rows, key=lambda r: [STATUS[1], STATUS[0], STATUS[2]].index(r["status"])):
         sev = " → ".join(x for x in (r.get("severity_before"), r.get("severity_after")) if x)
-        cls = "down" if r["status"] == "new" else "up" if r["status"] == "not seen again" else ""
+        cls = "" if versus else "down" if r["status"] == STATUS[1] else "up" if r["status"] == STATUS[2] else ""
         h.append(f"<tr><td class='{cls}'>{esc(r['status'])}</td><td>{esc(r['before'] or '')}</td><td>{esc(r['after'] or '')}</td>"
                  f"<td>{esc(r['title'])}</td><td>{esc(sev)}</td></tr>")
-    h.append("</table></div><h2>Outcomes</h2><div class='wrap'><table><tr><th>Persona</th><th>Before</th><th>After</th><th>Steps</th></tr>")
+    h.append("</table></div><h2>Outcomes</h2><div class='wrap'><table><tr><th>Persona</th><th>" + esc(B) + "</th><th>" + esc(A) + "</th><th>Steps</th></tr>")
     for p in people:
         h.append(f"<tr><td>{esc(p['persona'])}</td><td>{esc(p['before'])}</td><td>{esc(p['after'])}</td>"
                  f"<td>{esc(p['steps_before'])} → {esc(p['steps_after'])}</td></tr>")
     if funnel:
-        h.append("</table></div><h2>How far they got</h2><div class='wrap'><table><tr><th>Stage</th><th>Before</th><th>After</th></tr>")
+        h.append("</table></div><h2>How far they got</h2><div class='wrap'><table><tr><th>Stage</th><th>" + esc(B) + "</th><th>" + esc(A) + "</th></tr>")
         for f in funnel:
             b, a = f["before"] or 0, f["after"] or 0
-            cls = "up" if a > b else "down" if a < b else ""
+            cls = "" if versus else "up" if a > b else "down" if a < b else ""
             h.append(f"<tr><td>{esc(f['label'])}</td><td>{b} of {f['of']}</td><td class='{cls}'>{a} of {f['of']}</td></tr>")
-    h.append("</table></div><h2>Page scores</h2><p class='muted'>Bottleneck score; lower is better.</p><div class='wrap'><table><tr><th>Page</th><th>Before</th><th>After</th></tr>")
-    for p in pages[:12]:
+    if versus:
+        # No page is on both sites: show each site's worst pages on their own.
+        h.append("</table></div><h2>Worst pages</h2><p class='muted'>Bottleneck score; lower is better.</p><div class='wrap'><table><tr><th>Site</th><th>Page</th><th>Score</th></tr>")
+        for p in pages:
+            h.append(f"<tr><td>{esc(p['site'])}</td><td>{esc(p['page'])}</td><td>{p['score']}</td></tr>")
+    else:
+        h.append("</table></div><h2>Page scores</h2><p class='muted'>Bottleneck score; lower is better.</p><div class='wrap'><table><tr><th>Page</th><th>Before</th><th>After</th></tr>")
+    for p in ([] if versus else pages[:12]):
         b, a = p["before"], p["after"]
         cls = "up" if (a is not None and b is not None and a < b) else "down" if (a is not None and b is not None and a > b) else ""
         h.append(f"<tr><td>{esc(p['page'])}</td><td>{'' if b is None else b}</td><td class='{cls}'>{'' if a is None else a}</td></tr>")
     h.append(f"</table></div><p class='muted'>{esc(result['caveat'])} Persona counts are not rates.</p></main></body></html>")
     (study_dir / "compare.html").write_text("\n".join(h), encoding="utf-8")
-    counts = {s: sum(r["status"] == s for r in rows) for s in ("new", "still there", "not seen again")}
+    counts = {s: sum(r["status"] == s for r in rows) for s in STATUS}
     print(json.dumps({"same_panel": same_panel, **counts, "report": shown(study_dir / "compare.html")}))
     return 0
 
@@ -927,6 +974,7 @@ def main() -> int:
     ap.add_argument("cmd", choices=["analyze", "verify", "render", "export", "compare"])
     ap.add_argument("--study-dir", required=True)
     ap.add_argument("--baseline", help="compare: an earlier study folder to compare this one against")
+    ap.add_argument("--versus", action="store_true", help="compare: the baseline is another site walked by the same panel")
     args = ap.parse_args()
     d = lp(args.study_dir)
     if args.cmd == "analyze":
@@ -935,7 +983,7 @@ def main() -> int:
     if args.cmd == "compare":
         if not args.baseline:
             raise SystemExit("compare needs --baseline <earlier study folder>")
-        return compare(d, lp(args.baseline))
+        return compare(d, lp(args.baseline), versus=args.versus)
     if args.cmd == "export":
         return export(d)
     return verify(d) if args.cmd == "verify" else render(d)

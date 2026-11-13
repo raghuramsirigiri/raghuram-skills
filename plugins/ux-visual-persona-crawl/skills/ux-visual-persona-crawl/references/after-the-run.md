@@ -36,3 +36,25 @@ It writes `compare.html` and `compare.json`, covering:
 - the findings, as new, still there, or not seen again
 
 "Not seen again" means no persona hit that problem in the new run, not that it is fixed. Look at the screen itself before calling it fixed.
+
+## Against a competitor's site
+
+To see how the same customers fare elsewhere, write a second study for the other site:
+- same `personas.json` and task
+- the same stage ids for the same steps of the task (say `plans`, `signup`), each with that site's own `match` patterns
+
+Its terms decide whether a live run is allowed, as for any live site.
+
+Walk it, analyze and verify it, then run:
+
+```bash
+<venv-python> <skill>/scripts/report.py compare --study-dir <our-study> --baseline <their-study> --versus
+```
+
+The side-by-side page shows:
+- each persona's outcome on both sites
+- how far they got at each stage
+- each site's worst pages
+- each finding, as on both sites or on one only
+
+The two sites share no pages, so findings are matched by kind of problem at the same stage. A finding on one site only means nobody hit it on the other this time, not that the other site is free of it.

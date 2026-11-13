@@ -249,6 +249,23 @@ class WalkAndReport(unittest.TestCase):
         html = (d / "report.html").read_text(encoding="utf-8")
         self.assertIn("finding F1", html)
 
+        # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
+        # different page of the same stage under a different wording.
+        other = TMP / "other-site"
+        shutil.copytree(d, other)
+        v2 = json.loads((other / "verified_findings.json").read_text(encoding="utf-8"))
+        v2["kept"] = [dict(x, page="/offers", title="Claim button ignores presses") for x in v2["kept"] if x["id"] == "F1"]
+        (other / "verified_findings.json").write_text(json.dumps(v2), encoding="utf-8")
+        rc, out = report("compare", "--study-dir", d, "--baseline", other, "--versus")
+        self.assertEqual(rc, 0, out)
+        c = json.loads((d / "compare.json").read_text(encoding="utf-8"))
+        status = {r["after"] or r["before"]: r["status"] for r in c["findings"]}
+        self.assertEqual(status, {"F1": "on both sites", "F2": "only on walks"})
+        self.assertIn("<h1>Side by side</h1>", (d / "compare.html").read_text(encoding="utf-8"))
+        rc, out = report("compare", "--study-dir", d, "--baseline", other)
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(json.loads(out)["new"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
