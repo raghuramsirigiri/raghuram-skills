@@ -123,8 +123,11 @@ def analyze(study_dir: Path) -> dict:
                 ps["friction"] += 1
                 ps["friction_weight"] += SEV_WEIGHT.get(f.get("severity"), 1)
             if a["type"] in CLICKS and r.get("no_visible_response"):
-                dead.append({"step": st["step"], "page": page, "x": a.get("x"), "y": a.get("y")})
-                ps["dead_clicks"] += 1
+                if r.get("on_blank_space"):  # nothing drawn there: a missed click, kept out of the score
+                    ps["missed_clicks"] += 1
+                else:
+                    dead.append({"step": st["step"], "page": page, "x": a.get("x"), "y": a.get("y")})
+                    ps["dead_clicks"] += 1
             if a["type"] == "back":
                 ps["back_presses"] += 1
             if r.get("blocked"):
@@ -167,7 +170,7 @@ def analyze(study_dir: Path) -> dict:
         pages.append({
             "page": page, "stage": stage_of(study, page), "visitors": visitors, "steps": int(ps["steps"]),
             "est_seconds": round(ps["seconds"]), "friction_reports": int(ps["friction"]),
-            "back_presses": int(ps["back_presses"]), "refused_by_driver": int(ps["refused_by_driver"]),
+            "back_presses": int(ps["back_presses"]), "missed_clicks": int(ps["missed_clicks"]), "refused_by_driver": int(ps["refused_by_driver"]),
             "avg_clarity": round(ps["clarity_sum"] / n, 1), "avg_trust": round(ps["trust_sum"] / n, 1),
             "avg_effort": round(ps["effort_sum"] / n, 1), "score_parts": parts, "bottleneck_score": round(score, 1),
         })
@@ -237,7 +240,7 @@ def hot_steps(data: dict) -> dict:
             d, a, r = st["decision"], st["action"], st["result"]
             n = st["step"]
             page = page_of(st["address_bar"])
-            if a["type"] in CLICKS and r.get("no_visible_response"):
+            if a["type"] in CLICKS and r.get("no_visible_response") and not r.get("on_blank_space"):
                 reasons[n].append("dead click")
             if d["clarity"] <= 2:
                 reasons[n].append(f"clarity {d['clarity']}")
@@ -460,7 +463,9 @@ def click_heatmaps(study_dir: Path, data: dict, limit: int = 12) -> list:
             if home is None:
                 home = {"page": page, "size": size, "base": shot, "thumb": t, "clicks": []}
                 groups.append(home)
-            home["clicks"].append((a["x"], a["y"], bool(st["result"].get("no_visible_response")), name))
+            res = st["result"]
+            kind = "blank" if res.get("on_blank_space") else "dead" if res.get("no_visible_response") else "live"
+            home["clicks"].append((a["x"], a["y"], kind, name))
 
     groups.sort(key=lambda g: (-len(g["clicks"]), g["page"]))
     out_dir = study_dir / "heatmaps"
@@ -472,7 +477,7 @@ def click_heatmaps(study_dir: Path, data: dict, limit: int = 12) -> list:
         d = ImageDraw.Draw(over)
         r = max(10, img.width // 70)
         for x, y, dead, _ in g["clicks"]:
-            colour = (220, 30, 40) if dead else (40, 110, 230)
+            colour = {"dead": (220, 30, 40), "blank": (130, 130, 130)}.get(dead, (40, 110, 230))
             d.ellipse([x - r, y - r, x + r, y + r], fill=colour + (90,), outline=colour + (255,), width=3)
         img = Image.alpha_composite(img.convert("RGBA"), over).convert("RGB")
         if img.width > 900:
@@ -480,7 +485,7 @@ def click_heatmaps(study_dir: Path, data: dict, limit: int = 12) -> list:
         path = out_dir / f"view-{i}.jpg"
         img.save(path, quality=80)
         maps.append({"page": g["page"], "image": path, "clicks": len(g["clicks"]),
-                     "dead": sum(c[2] for c in g["clicks"]), "personas": sorted({c[3] for c in g["clicks"]})})
+                     "dead": sum(c[2] == "dead" for c in g["clicks"]), "personas": sorted({c[3] for c in g["clicks"]})})
     return maps
 
 
@@ -514,7 +519,8 @@ def replay_data(data: dict) -> dict:
             frames.append({
                 "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
                 "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,
-                "dead": bool(r.get("no_visible_response")), "blocked": r.get("blocked"),
+                "dead": bool(r.get("no_visible_response")) and not r.get("on_blank_space"),
+                "blank": bool(r.get("on_blank_space")), "blocked": r.get("blocked"),
                 "thought": d.get("thought", ""), "scores": [d.get("clarity"), d.get("trust"), d.get("effort")],
                 "friction": [f"{f.get('type')} ({f.get('severity')}): {f.get('note', '')}" for f in d.get("friction", [])],
             })
@@ -532,7 +538,7 @@ function esc(t){return String(t==null?'':t).replace(/[&<>]/g,function(c){return{
 function show(){var f=cur.frames[i];img.src=f.img;img.alt='Step '+f.step+' on '+f.page;
  if(f.spot){dot.style.display='block';dot.style.left=f.spot[0]+'%';dot.style.top=f.spot[1]+'%';dot.className=f.dead?'rp-dot dead':'rp-dot';}else dot.style.display='none';
  pos.textContent='Step '+f.step+' of '+cur.frames.length;
- cap.innerHTML='<b>'+esc(f.page)+'</b> \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
+ cap.innerHTML='<b>'+esc(f.page)+'</b> \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blank?' \\u00b7 clicked empty space':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
  '<br>\\u201c'+esc(f.thought)+'\\u201d<br><span class=\"muted\">clarity '+f.scores[0]+' \\u00b7 trust '+f.scores[1]+' \\u00b7 effort '+f.scores[2]+'</span>'+
  (f.friction.length?'<ul>'+f.friction.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'');}
 function pick(){cur=W[sel.value];i=0;show();}
@@ -646,7 +652,7 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
     maps = click_heatmaps(study_dir, data)
     if maps:
         out.append("<h2>Where people clicked</h2><p class='muted'>Each picture is one view of a page with every persona's clicks on it: "
-                   "<b style='color:#2e6ee6'>blue</b> changed the screen, <b style='color:#dc1e28'>red</b> did nothing visible.</p>"
+                   "<b style='color:#2e6ee6'>blue</b> changed the screen, <b style='color:#dc1e28'>red</b> did nothing visible, grey landed on empty space.</p>"
                    "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px'>")
         for m in maps:
             out.append(f"<figure style='margin:0'><img src='{img_data(m['image'])}' alt='Clicks on {esc(m['page'])}' style='max-width:100%;border:1px solid var(--line);border-radius:6px'>"
@@ -750,7 +756,9 @@ def export(study_dir: Path) -> int:
         lines = [f"# {fid}: {f.get('title', '')}", "",
                  f"**Severity:** {f.get('severity')} · **Category:** {f.get('category')} · **Page:** `{f.get('page', '')}` · "
                  f"**Confidence:** {f.get('confidence', '')}", "",
-                 f"**Seen by simulated personas:** {', '.join(f.get('personas', []))}", "",
+                 f"**Seen by simulated personas:** {', '.join(f.get('personas', []))}"
+                 + (f" (hit in {f['exposure']['walks_hit']} of {f['exposure']['walks_reached']} walks that reached the page)"
+                    if (f.get("exposure") or {}).get("walks_reached") else ""), "",
                  "## What happens", "", str(f.get("description", "")), ""]
         if f.get("conflict"):
             lines += ["## The two statements", ""] + [f"- {c}" for c in f["conflict"]] + [""]

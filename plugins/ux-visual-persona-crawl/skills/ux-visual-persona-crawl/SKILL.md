@@ -84,7 +84,7 @@ Then `look`, `zoom`, `scroll` and `click` as a persona would; `act` needs only t
 
 ### 4. Create the personas
 
-Read `references/personas.md` and write `personas.json` in the study folder: usually 4 to 8 people who would behave differently, each with a `demographics` block and a `task`. Show the user a one-line summary of each before running, because a panel missing their key customer wastes the whole run.
+Read `references/personas.md` and write `personas.json` in the study folder: usually 4 to 8 people who would behave differently, each with a `demographics` block and a `task`. Check it with `eyes.py check --study <study.json> --personas <personas.json>`, which stops a walk-breaking mistake before any walker starts and warns about gaps in the panel. Show the user a one-line summary of each before running, because a panel missing their key customer wastes the whole run.
 
 ### 5. Walk each persona
 
@@ -121,32 +121,9 @@ Give a fresh subagent `references/reviewer.md` with the study folder path. It re
 
 Read the `removed` list in `verified_findings.json`. A finding with a wrong step or box can be corrected against the recording and verified again. Never edit a journey or measurement to make a claim pass.
 
-If the user tracks work in an issue tracker or a spreadsheet, also run `report.py export --study-dir <study-dir>`: it writes one Markdown ticket per verified finding to `issues/` (evidence crops linked, the fix, the simulated-study caveat), `findings.csv`, and `issues/research-questions.md`.
+`report.html` is one self-contained file: the outcomes and paths, the funnel and each persona's stages, the bottleneck table, a step-through replay of every walk, a click map per page view, the findings with cropped evidence and how many walks hit each, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
 
-`report.html` is one self-contained file: the outcomes and paths, the funnel, the bottleneck table, a click map per page view (clicks that did nothing in red), the findings with cropped evidence, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
-
-A critical finding that rests on one persona's walk is the easiest to doubt. When there's budget, walk that persona again (`eyes.py start` with the same `--persona` makes a new `<id>-2` session) and re-run steps 6 to 8. Both walks are then in the recording, and the reviewer can say in the finding whether the second walk hit the same problem.
-
-`report.html` also has a step-through replay of every walk, and a table of how far each persona got through the stages.
-
-For a one-page brief or slides for stakeholders, hand `verified_findings.json`, `flows.json` and `insights.json` to a summary or slides skill if one is available (in this repo: `chart-dashboard` or `exec-brief`). Keep the report's caveat that persona counts are not rates.
-
-### Re-running after a fix
-
-To check whether a change helped, run the same study again with the same `personas.json` under a new study id, then:
-
-```bash
-<venv-python> <skill>/scripts/report.py compare --study-dir <new-study-dir> --baseline <old-study-dir>
-```
-
-It writes `compare.html` and `compare.json`, covering:
-
-- each persona's outcome before and after
-- the funnel
-- the page scores
-- the findings, as new, still there, or not seen again
-
-"Not seen again" means no persona hit that problem in the new run, not that it is fixed. Look at the screen itself before calling it fixed.
+For tickets or a spreadsheet, walking a persona again, a stakeholder brief, or re-running after a fix, read `references/after-the-run.md`.
 
 ### 9. Tell the user
 

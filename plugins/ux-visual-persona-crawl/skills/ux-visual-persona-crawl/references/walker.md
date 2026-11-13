@@ -109,7 +109,7 @@ Outcomes: `reached_goal`, `reached_boundary` (stopped at a form on a live site, 
 
 **When the driver says no**
 
-A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it.
+A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it. If it also says `on_blank_space`, there was nothing drawn where you clicked; look again and aim, as a person would after a missed tap.
 
 **After you finish: the exit interview**
 

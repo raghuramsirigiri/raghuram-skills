@@ -52,7 +52,7 @@ If the two figures were different things labelled clearly (say, before and after
 - **Steps**: the rows from `journey.json`, with positions, results, and `no_visible_response` where it happened.
 - **On screen**: each evidence box, the crop path, the words read and who recorded them, and the persona's own scores at that step.
 - **Measured**: the measurement record (`id`, foreground, background, ratio, target, size in CSS px), or the page's bottleneck score with its parts written out from `flows.json`.
-- **Why this severity**: the rule from the reviewer's scale.
+- **Why this severity**: the rule from the reviewer's scale, then the finding's `exposure` from `verified_findings.json`: hit in how many of the walks that reached the page, and which walks went past it.
 - **What would change it**: the fact that would lower it, raise it or clear it.
 
 ---
@@ -66,7 +66,9 @@ If the two figures were different things labelled clearly (say, before and after
 | **"It looks fine on my screen."** | The measurement: the hex colours, the ratio, the target. Pixels were read from the rendered screenshot at the persona's device and zoom, which may differ from theirs. If their claim is about a different size or state, measure that state if it's in the recording; if not, say it wasn't captured. |
 | **"What's our drop-off rate at sign-up?"** / "How many customers will we lose?" | Refuse the number. These were N simulated personas, and "3 of 5 stopped" says where to look, not a rate. Give the counts, the pages they stopped on and why, and say what data would answer the question (analytics funnel, a real usability test). Never convert to a percentage or forecast. |
 | **"Why did Margaret give up?"** | Only her recorded words: the `thought` and `reason` at her last steps, and the `gives_up_when` condition it matches in her profile. Don't add a motive she didn't record. |
-| **"The persona just misclicked."** | Check the click position against the screenshot. If the click landed on the control and nothing changed, show that `screen_changed` was false. If it landed off the control, agree, **retract or downgrade the finding**, and say so in the first line. |
+| **"The persona just misclicked."** | Check the click position against the screenshot. A result marked `on_blank_space` landed where nothing is drawn: agree, and note it was never counted as a dead click. If the click landed on the control and nothing changed, show that `screen_changed` was false, and say whether the page had parts that move by themselves (`screen_moves_by_itself`), which were left out of that judgement. If it landed off the control, agree, **retract or downgrade the finding**, and say so in the first line. |
+| **"Is that just one persona?"** | The finding's `exposure`: how many of the walks that reached its page hit it, and the ones that went past it, with what was different about those people. One of one is a lead to check, not a pattern. |
+| **"Did it get better after our fix?"** | If a `compare.html` exists, its row for this finding. If not, say a re-run with the same personas and `report.py compare` would answer it (`references/after-the-run.md`). |
 | **"Why is B1 the worst page?"** | Its score parts from `flows.json`, with the formula written out and the numbers substituted, and which part dominates. A high score with one persona looping is weaker than a moderate one hit by everyone: say which this is. |
 | **"Where do the demographics come from?"** | The persona's `source` field: illustrative, or built from the user's data (name it). They describe who the panel stands in for. They are not survey respondents. |
 | **"Did it read our code or alt text?"** | No. The persona and the driver work from screenshots and the address bar only. A finding can't come from markup, so something present only in the code (an aria-label, hidden text) is outside what this study saw. |

@@ -270,6 +270,20 @@ def visible_change(before: bytes, after: bytes, ignore=None) -> bool:
     return changed >= 6  # identical renders differ by nothing; a ticked checkbox is about 16 pixels here
 
 
+def blank_at(raw: bytes, x: float, y: float, k: float = 1.0) -> bool:
+    """True when the area around a click (about 12 CSS px each way) holds one flat colour: no text, edge or control."""
+    import io
+    from PIL import Image, ImageStat
+
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    r = max(6, round(12 * k))
+    patch = img.crop((max(0, int(x) - r), max(0, int(y) - r), min(img.width, int(x) + r), min(img.height, int(y) + r)))
+    if patch.width < 2 or patch.height < 2:
+        return False
+    lo_hi = patch.getextrema()
+    return max(hi - lo for lo, hi in lo_hi) <= 12 and max(ImageStat.Stat(patch).stddev) < 2.5
+
+
 def parse_box(text: str):
     parts = [int(float(p)) for p in re.split(r"[ ,]+", text.strip()) if p]
     if len(parts) != 4 or parts[2] <= 0 or parts[3] <= 0:
@@ -540,6 +554,9 @@ class Session:
             expects_change = action["type"] in ("click", "double_click", "key", "back", "scroll", "type")
             if expects_change and result.get("ok") and not result["screen_changed"]:
                 result["no_visible_response"] = True
+                if action["type"] in ("click", "double_click") and "x" in action and blank_at(self.looked["raw"], action["x"], action["y"], self.k):
+                    # Nothing drawn under the pointer: a missed click, not a control that ignored the person.
+                    result["on_blank_space"] = True
             self.no_change = self.no_change + 1 if result.get("no_visible_response") else 0
         result["events"] = list(self.events)
 
@@ -852,11 +869,64 @@ def read_payload(args) -> dict:
         raise SystemExit(f"Not valid JSON: {exc}")
 
 
+def lint_personas(people) -> tuple:
+    """Problems that would break a walk (errors) and gaps that weaken the panel (warnings), before any walker starts."""
+    errors, warnings = [], []
+    if not isinstance(people, list) or not people:
+        return ["personas.json must be a non-empty list"], []
+    seen = set()
+    for i, p in enumerate(people, 1):
+        pid = str(p.get("id", ""))
+        who = pid or f"persona {i}"
+        if not pid:
+            errors.append(f"{who}: missing id")
+        elif len(pid) > 24:
+            errors.append(f"{who}: id longer than 24 characters")
+        elif slug(pid) in seen:
+            errors.append(f"{who}: id repeats another persona's")
+        seen.add(slug(pid))
+        for key in ("name", "task"):
+            if not p.get(key):
+                errors.append(f"{who}: missing {key}")
+        if p.get("device", "desktop") not in ("desktop", "mobile"):
+            errors.append(f"{who}: device must be desktop or mobile")
+        if p.get("browser_zoom", 100) not in (100, 150, 200):
+            errors.append(f"{who}: browser_zoom must be 100, 150 or 200")
+        if p.get("vision") and p["vision"] not in VISION:
+            errors.append(f"{who}: vision must be one of {sorted(VISION)}")
+        for t, v in (p.get("traits") or {}).items():
+            if t != "reading" and not (isinstance(v, (int, float)) and 1 <= v <= 5):
+                errors.append(f"{who}: trait {t} must be 1 to 5")
+        if not p.get("gives_up_when"):
+            warnings.append(f"{who}: no gives_up_when, so this person will persist far longer than a real one")
+        if not p.get("demographics"):
+            warnings.append(f"{who}: no demographics block")
+        if not p.get("lacks"):
+            warnings.append(f"{who}: lacks is empty; someone holding everything rarely shows where requirements are unclear")
+    mobile = sum(p.get("device") == "mobile" for p in people)
+    if mobile * 3 < len(people):
+        warnings.append(f"only {mobile} of {len(people)} on a phone; aim for at least a third")
+    if not any(p.get("browser_zoom", 100) > 100 or p.get("vision") for p in people):
+        warnings.append("nobody browses at larger zoom or with a vision setting")
+    return errors, warnings
+
+
 def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
     out = {"ok": True, "id": study["id"], "mode": study["mode"], "hosts": study["allowed_hosts"]}
-    print(json.dumps(out))
+    if args.personas:
+        people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
+        people = people["personas"] if isinstance(people, dict) else people
+        errors, warnings = lint_personas(people)
+        out.update({"personas": len(people) if isinstance(people, list) else 0, "ok": not errors})
+        if errors:
+            out["errors"] = errors
+        if warnings:
+            out["warnings"] = warnings
+    print(json.dumps(out, ensure_ascii=False, indent=1))
+    if not out["ok"]:
+        raise SystemExit(1)
 
 
 MAX_LIVE_SESSIONS = 2  # at once, on a study whose hosts include a live site
@@ -942,7 +1012,7 @@ def cmd_start(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("check"); p.add_argument("--study", required=True)
+    p = sub.add_parser("check"); p.add_argument("--study", required=True); p.add_argument("--personas", help="also check this personas.json")
     p = sub.add_parser("start")
     p.add_argument("--study", required=True); p.add_argument("--personas")
     p.add_argument("--persona"); p.add_argument("--headed", action="store_true")
