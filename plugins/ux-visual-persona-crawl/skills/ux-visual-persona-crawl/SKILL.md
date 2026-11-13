@@ -125,6 +125,29 @@ If the user tracks work in an issue tracker or a spreadsheet, also run `report.p
 
 `report.html` is one self-contained file: the outcomes and paths, the funnel, the bottleneck table, a click map per page view (clicks that did nothing in red), the findings with cropped evidence, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
 
+A critical finding that rests on one persona's walk is the easiest to doubt. When there's budget, walk that persona again (`eyes.py start` with the same `--persona` makes a new `<id>-2` session) and re-run steps 6 to 8. Both walks are then in the recording, and the reviewer can say in the finding whether the second walk hit the same problem.
+
+`report.html` also has a step-through replay of every walk, and a table of how far each persona got through the stages.
+
+For a one-page brief or slides for stakeholders, hand `verified_findings.json`, `flows.json` and `insights.json` to a summary or slides skill if one is available (in this repo: `chart-dashboard` or `exec-brief`). Keep the report's caveat that persona counts are not rates.
+
+### Re-running after a fix
+
+To check whether a change helped, run the same study again with the same `personas.json` under a new study id, then:
+
+```bash
+<venv-python> <skill>/scripts/report.py compare --study-dir <new-study-dir> --baseline <old-study-dir>
+```
+
+It writes `compare.html` and `compare.json`, covering:
+
+- each persona's outcome before and after
+- the funnel
+- the page scores
+- the findings, as new, still there, or not seen again
+
+"Not seen again" means no persona hit that problem in the new run, not that it is fixed. Look at the screen itself before calling it fixed.
+
 ### 9. Tell the user
 
 Give the headline, then the top three findings by handle with their fix, each persona's outcome in one line, and where `report.html` and the JSON files are. Mention anything that wasn't tested. End with the closing line from `references/tracing.md`.

@@ -5,6 +5,7 @@
   verify   --study-dir DIR   check findings.json against the recordings -> verified_findings.json
   render   --study-dir DIR   report.html and report.md
   export   --study-dir DIR   issues/F1.md ... (one ticket per verified finding) and findings.csv
+  compare  --study-dir DIR --baseline OLD   before/after: compare.json and compare.html
 
 Runs under the project's .ux-visual-crawl venv (Pillow is used for evidence crops).
 Every number in the report is computed here from journey.json files, so it can be traced.
@@ -468,6 +469,65 @@ def click_heatmaps(study_dir: Path, data: dict, limit: int = 12) -> list:
     return maps
 
 
+def replay_data(data: dict) -> dict:
+    """Each walk as small screens with the click spot and the persona's words, for the step-through player."""
+    from PIL import Image
+
+    walks = {}
+    for name, s in data.items():
+        frames = []
+        for st in s["journey"].get("steps", []):
+            shot = s["dir"] / "shots" / st["screenshot"]
+            if not shot.exists():
+                continue
+            im = Image.open(shot).convert("RGB")
+            w0, h0 = im.size
+            im.thumbnail((640, 900))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=62)
+            d, a, r = st["decision"], st["action"], st["result"]
+            spot = None
+            if a.get("type") in CLICKS + ("hover",) and "x" in a:
+                spot = [round(100 * a["x"] / w0, 2), round(100 * a["y"] / h0, 2)]
+            did = a.get("type", "")
+            if did == "finish":
+                did = f"finished: {a.get('outcome', '')}"
+            elif did == "scroll":
+                did = f"scrolled {a.get('direction', 'down')}"
+            elif did == "type":
+                did = "typed" + (f" \"{a.get('text')}\"" if a.get("text") else "")
+            frames.append({
+                "img": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
+                "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,
+                "dead": bool(r.get("no_visible_response")), "blocked": r.get("blocked"),
+                "thought": d.get("thought", ""), "scores": [d.get("clarity"), d.get("trust"), d.get("effort")],
+                "friction": [f"{f.get('type')} ({f.get('severity')}): {f.get('note', '')}" for f in d.get("friction", [])],
+            })
+        if frames:
+            walks[name] = {"name": s["journey"]["persona"].get("name") or name, "outcome": s["journey"].get("outcome"), "frames": frames}
+    return walks
+
+
+REPLAY_JS = """
+(function(){var W=JSON.parse(document.getElementById('walks').textContent),sel=document.getElementById('rp-who'),
+img=document.getElementById('rp-img'),dot=document.getElementById('rp-dot'),cap=document.getElementById('rp-cap'),
+pos=document.getElementById('rp-pos'),i=0,cur=null;
+Object.keys(W).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=W[k].name+' \\u2014 '+W[k].outcome;sel.appendChild(o);});
+function esc(t){return String(t==null?'':t).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function show(){var f=cur.frames[i];img.src=f.img;img.alt='Step '+f.step+' on '+f.page;
+ if(f.spot){dot.style.display='block';dot.style.left=f.spot[0]+'%';dot.style.top=f.spot[1]+'%';dot.className=f.dead?'rp-dot dead':'rp-dot';}else dot.style.display='none';
+ pos.textContent='Step '+f.step+' of '+cur.frames.length;
+ cap.innerHTML='<b>'+esc(f.page)+'</b> \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
+ '<br>\\u201c'+esc(f.thought)+'\\u201d<br><span class=\"muted\">clarity '+f.scores[0]+' \\u00b7 trust '+f.scores[1]+' \\u00b7 effort '+f.scores[2]+'</span>'+
+ (f.friction.length?'<ul>'+f.friction.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'');}
+function pick(){cur=W[sel.value];i=0;show();}
+document.getElementById('rp-prev').onclick=function(){if(i>0){i--;show();}};
+document.getElementById('rp-next').onclick=function(){if(i<cur.frames.length-1){i++;show();}};
+document.getElementById('replay').addEventListener('keydown',function(e){if(e.key==='ArrowLeft')document.getElementById('rp-prev').click();if(e.key==='ArrowRight')document.getElementById('rp-next').click();});
+sel.onchange=pick;pick();})();
+"""
+
+
 def img_data(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
@@ -498,6 +558,9 @@ main{max-width:1100px;margin:0 auto;padding:28px 16px 80px}h1{font-size:28px;mar
 th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:1px 8px;margin:2px;font-size:12.5px}
 .sev{font-weight:700;text-transform:uppercase;font-size:11.5px;letter-spacing:.04em}.critical{color:var(--crit)}.high{color:var(--high)}.medium{color:var(--med)}.low{color:var(--low)}
 .finding{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}.finding img{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px 0}
+.rp-dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #2e6ee6;background:rgba(46,110,230,.25);display:none}
+.rp-dot.dead{border-color:#dc1e28;background:rgba(220,30,40,.25)}button{font:inherit;padding:4px 10px}
+@media (max-width:760px){.rp-grid{grid-template-columns:1fr!important}}
 .bar{height:12px;background:#3b6fd8;border-radius:3px}.fail{color:var(--crit);font-weight:700}.pass{color:var(--ok)}.headline{font-size:19px;margin:14px 0}"""
 
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -522,6 +585,23 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
             out.append(f"<tr><td style='width:28%'>{esc(f['label'])}</td><td><div class='bar' style='width:{100 * f['reached'] / max(f['of'], 1):.0f}%'></div></td>"
                        f"<td style='width:14%'>{f['reached']} of {f['of']}</td></tr>")
         out.append("</table><p class='muted'>Counts of simulated personas, not conversion rates.</p>")
+        # swimlanes: who reached which stage, and where each one stopped
+        stage_ids = [f["stage"] for f in flows["funnel"]]
+        out.append("<h3>Each persona through the stages</h3><div class='wrap'><table><tr><th>Persona</th>"
+                   + "".join(f"<th>{esc(f['label'])}</th>" for f in flows["funnel"]) + "</tr>")
+        for name, v in nav.items():
+            reached = set(v.get("stages_reached", []))
+            last = next((s for s in reversed(stage_ids) if s in reached), None)
+            cells = []
+            for sid in stage_ids:
+                if sid == last and v["outcome"] != "reached_goal":
+                    cells.append(f"<td class='fail' title='{esc(v.get('reason'))}'>stopped: {esc(v['outcome'])}</td>")
+                elif sid in reached:
+                    cells.append("<td class='pass'>&#10003;</td>")
+                else:
+                    cells.append("<td></td>")
+            out.append(f"<tr><td><b>{esc(v['persona'].get('name'))}</b></td>{''.join(cells)}</tr>")
+        out.append("</table></div>")
 
     # bottlenecks
     out.append("<h2>Where the flow slows down</h2><div class='wrap'><table><tr><th></th><th>Page</th><th>Visitors</th><th>Steps / visitor</th><th>Dead clicks</th>"
@@ -532,6 +612,20 @@ th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline
                    f"<td>{sp['backtracked_from']}</td><td>{sp['exits_short_of_goal']}</td><td>{p['friction_reports']}</td>"
                    f"<td>{p['avg_clarity']} · {p['avg_trust']} · {p['avg_effort']}</td><td><b>{p['bottleneck_score']}</b></td></tr>")
     out.append(f"</table></div><p class='muted'>Score = {esc(flows['score_formula'])}. Clarity and trust 1 to 5, higher is better; effort 1 to 5, higher is worse.</p>")
+
+    # step-through replay of every walk
+    walks = replay_data(data)
+    if walks:
+        out.append("<h2>Replay each walk</h2><p class='muted'>Step through what each persona saw, where they clicked "
+                   "(<span class='fail'>red</span> when nothing happened) and what they thought. Arrow keys work once a button has focus.</p>"
+                   "<div id='replay'><p><select id='rp-who' aria-label='Persona'></select> "
+                   "<button id='rp-prev' type='button'>&larr; Back</button> <button id='rp-next' type='button'>Next &rarr;</button> "
+                   "<span id='rp-pos' class='muted'></span></p>"
+                   "<div style='display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:16px;align-items:start' class='rp-grid'>"
+                   "<div style='position:relative;line-height:0'><img id='rp-img' alt='' style='width:100%;border:1px solid var(--line);border-radius:6px'>"
+                   "<span id='rp-dot' class='rp-dot'></span></div><div id='rp-cap'></div></div></div>"
+                   "<script type='application/json' id='walks'>" + json.dumps(walks).replace("</", "<\\/") + "</script>"
+                   "<script>" + REPLAY_JS + "</script>")
 
     # where people clicked
     maps = click_heatmaps(study_dir, data)
@@ -670,15 +764,122 @@ def export(study_dir: Path) -> int:
     return 0
 
 
+def _words(text: str) -> set:
+    return {w for w in re.findall(r"[a-z0-9$]+", str(text).lower()) if len(w) > 2}
+
+
+def compare(study_dir: Path, baseline: Path) -> int:
+    """The same panel before and after a change: outcomes, funnel, page scores, and which findings are fixed, remain or are new."""
+    need = ("navigation.json", "flows.json", "verified_findings.json")
+    for d in (study_dir, baseline):
+        missing = [n for n in need if not (d / n).exists()]
+        if missing:
+            raise SystemExit(f"{shown(d)} is missing {missing}: run analyze and verify there first")
+    old_nav, new_nav = load(baseline / "navigation.json"), load(study_dir / "navigation.json")
+    old_flows, new_flows = load(baseline / "flows.json"), load(study_dir / "flows.json")
+    old_f, new_f = load(baseline / "verified_findings.json")["kept"], load(study_dir / "verified_findings.json")["kept"]
+
+    by_persona = lambda nav: {v["persona"]["id"]: v for v in nav.values()}
+    po, pn = by_persona(old_nav), by_persona(new_nav)
+    people = [{"persona": pid, "before": po.get(pid, {}).get("outcome"), "after": pn.get(pid, {}).get("outcome"),
+               "steps_before": po.get(pid, {}).get("steps_taken"), "steps_after": pn.get(pid, {}).get("steps_taken")}
+              for pid in sorted(set(po) | set(pn))]
+    same_panel = set(po) == set(pn)
+
+    fo = {f["stage"]: f for f in old_flows.get("funnel", [])}
+    funnel = [{"stage": f["stage"], "label": f["label"], "before": fo.get(f["stage"], {}).get("reached"), "after": f["reached"], "of": f["of"]}
+              for f in new_flows.get("funnel", [])]
+    so = {p["page"]: p["bottleneck_score"] for p in old_flows["pages"]}
+    sn = {p["page"]: p["bottleneck_score"] for p in new_flows["pages"]}
+    pages = sorted(({"page": pg, "before": so.get(pg), "after": sn.get(pg)} for pg in set(so) | set(sn)),
+                   key=lambda r: -max(r["before"] or 0, r["after"] or 0))
+
+    def quotes(f):
+        return {norm(q) for q in [e.get("quote") for e in f.get("evidence", [])] + list(f.get("conflict") or []) if q and len(norm(q)) > 3}
+
+    def same(a, b):
+        same_page = bool(a.get("page")) and a.get("page") == b.get("page")
+        if same_page and a.get("category") == b.get("category"):
+            return True
+        if same_page and quotes(a) & quotes(b):  # two wordings of one problem usually quote the same words on screen
+            return True
+        wa, wb = _words(a.get("title")), _words(b.get("title"))
+        return bool(wa and wb) and len(wa & wb) / len(wa | wb) >= 0.35
+
+    used, rows = set(), []
+    for f in new_f:
+        # Prefer an old finding not yet matched; one old finding may still match two new ones when a run splits it.
+        match = next((o for i, o in enumerate(old_f) if i not in used and same(f, o)), None) \
+            or next((o for o in old_f if same(f, o)), None)
+        if match is not None:
+            used.add(old_f.index(match))
+            rows.append({"status": "still there", "after": f.get("id"), "before": match.get("id"), "title": f.get("title"),
+                         "severity_before": match.get("severity"), "severity_after": f.get("severity")})
+        else:
+            rows.append({"status": "new", "after": f.get("id"), "before": None, "title": f.get("title"), "severity_after": f.get("severity")})
+    for i, o in enumerate(old_f):
+        if i not in used:
+            rows.append({"status": "not seen again", "after": None, "before": o.get("id"), "title": o.get("title"), "severity_before": o.get("severity")})
+
+    result = {"baseline": shown(baseline), "study": shown(study_dir), "same_panel": same_panel, "personas": people,
+              "funnel": funnel, "pages": pages, "findings": rows,
+              "caveat": "Simulated personas vary from run to run. 'Not seen again' means no persona hit it this time, not that it is fixed; "
+                        "check the screen itself before closing it."}
+    (study_dir / "compare.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    h = ["<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+         "<title>Before and after</title><style>:root{--ink:#1d2433;--muted:#5b6475;--line:#e3e6ec;--bg:#fff}"
+         "@media (prefers-color-scheme:dark){:root{--ink:#e8eaf0;--muted:#a3abbc;--line:#333a48;--bg:#14171d}}"
+         "body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,Segoe UI,Arial,sans-serif}"
+         "main{max-width:1000px;margin:0 auto;padding:28px 16px 60px}table{border-collapse:collapse;width:100%;font-size:14px}"
+         "td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left}.muted{color:var(--muted)}.wrap{overflow-x:auto}"
+         ".up{color:#2f855a;font-weight:600}.down{color:#b3261e;font-weight:600}</style></head><body><main>",
+         "<h1>Before and after</h1>",
+         f"<p class='muted'>Baseline {esc(baseline.name)} · this run {esc(study_dir.name)}</p>"]
+    if not same_panel:
+        h.append("<p class='down'>The two runs used different personas, so differences may come from the panel, not the site.</p>")
+    h.append("<h2>Findings</h2><div class='wrap'><table><tr><th>Status</th><th>Before</th><th>After</th><th>Finding</th><th>Severity</th></tr>")
+    for r in sorted(rows, key=lambda r: ["new", "still there", "not seen again"].index(r["status"])):
+        sev = " → ".join(x for x in (r.get("severity_before"), r.get("severity_after")) if x)
+        cls = "down" if r["status"] == "new" else "up" if r["status"] == "not seen again" else ""
+        h.append(f"<tr><td class='{cls}'>{esc(r['status'])}</td><td>{esc(r['before'] or '')}</td><td>{esc(r['after'] or '')}</td>"
+                 f"<td>{esc(r['title'])}</td><td>{esc(sev)}</td></tr>")
+    h.append("</table></div><h2>Outcomes</h2><div class='wrap'><table><tr><th>Persona</th><th>Before</th><th>After</th><th>Steps</th></tr>")
+    for p in people:
+        h.append(f"<tr><td>{esc(p['persona'])}</td><td>{esc(p['before'])}</td><td>{esc(p['after'])}</td>"
+                 f"<td>{esc(p['steps_before'])} → {esc(p['steps_after'])}</td></tr>")
+    if funnel:
+        h.append("</table></div><h2>How far they got</h2><div class='wrap'><table><tr><th>Stage</th><th>Before</th><th>After</th></tr>")
+        for f in funnel:
+            b, a = f["before"] or 0, f["after"] or 0
+            cls = "up" if a > b else "down" if a < b else ""
+            h.append(f"<tr><td>{esc(f['label'])}</td><td>{b} of {f['of']}</td><td class='{cls}'>{a} of {f['of']}</td></tr>")
+    h.append("</table></div><h2>Page scores</h2><p class='muted'>Bottleneck score; lower is better.</p><div class='wrap'><table><tr><th>Page</th><th>Before</th><th>After</th></tr>")
+    for p in pages[:12]:
+        b, a = p["before"], p["after"]
+        cls = "up" if (a is not None and b is not None and a < b) else "down" if (a is not None and b is not None and a > b) else ""
+        h.append(f"<tr><td>{esc(p['page'])}</td><td>{'' if b is None else b}</td><td class='{cls}'>{'' if a is None else a}</td></tr>")
+    h.append(f"</table></div><p class='muted'>{esc(result['caveat'])} Persona counts are not rates.</p></main></body></html>")
+    (study_dir / "compare.html").write_text("\n".join(h), encoding="utf-8")
+    counts = {s: sum(r["status"] == s for r in rows) for s in ("new", "still there", "not seen again")}
+    print(json.dumps({"same_panel": same_panel, **counts, "report": shown(study_dir / "compare.html")}))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["analyze", "verify", "render", "export"])
+    ap.add_argument("cmd", choices=["analyze", "verify", "render", "export", "compare"])
     ap.add_argument("--study-dir", required=True)
+    ap.add_argument("--baseline", help="compare: an earlier study folder to compare this one against")
     args = ap.parse_args()
     d = lp(args.study_dir)
     if args.cmd == "analyze":
         analyze(d)
         return 0
+    if args.cmd == "compare":
+        if not args.baseline:
+            raise SystemExit("compare needs --baseline <earlier study folder>")
+        return compare(d, lp(args.baseline))
     if args.cmd == "export":
         return export(d)
     return verify(d) if args.cmd == "verify" else render(d)
