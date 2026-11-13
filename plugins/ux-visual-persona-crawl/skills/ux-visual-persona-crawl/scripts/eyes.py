@@ -374,12 +374,25 @@ class Session:
         self.context.on("page", self.on_new_page)
         self.page = await self.context.new_page()
         self.watch(self.page)
-        if self.persona.get("network") == "slow":
-            cdp = await self.context.new_cdp_session(self.page)
-            await cdp.send("Network.enable")
-            await cdp.send("Network.emulateNetworkConditions",
-                           {"offline": False, "latency": 400, "downloadThroughput": 200000, "uploadThroughput": 90000})
+        await self.throttle(self.page)
         await self.page.goto(self.meta["start_url"], wait_until="domcontentloaded", timeout=30000)
+
+    async def throttle(self, page):
+        """A slow connection or an old, slow phone, applied to every tab this person opens."""
+        slow_net, slow_cpu = self.persona.get("network") == "slow", self.persona.get("cpu") == "slow"
+        if not (slow_net or slow_cpu):
+            return
+        try:
+            cdp = await self.context.new_cdp_session(page)
+            if slow_net:
+                await cdp.send("Network.enable")
+                await cdp.send("Network.emulateNetworkConditions",
+                               {"offline": False, "latency": 400, "downloadThroughput": 200000, "uploadThroughput": 90000})
+            if slow_cpu:
+                # About a budget phone a few years old against a current laptop.
+                await cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
+        except Exception:
+            pass
 
     def watch(self, page):
         async def on_dialog(dialog):
@@ -394,6 +407,7 @@ class Session:
     def on_new_page(self, page):
         self.page = page
         self.watch(page)
+        asyncio.ensure_future(self.throttle(page))
         self.events.append({"kind": "new_tab"})
 
     async def refuse(self, route, navigation):
@@ -904,6 +918,9 @@ def lint_personas(people) -> tuple:
             errors.append(f"{who}: browser_zoom must be 100, 150 or 200")
         if p.get("vision") and p["vision"] not in VISION:
             errors.append(f"{who}: vision must be one of {sorted(VISION)}")
+        for key in ("network", "cpu"):
+            if p.get(key) not in (None, "normal", "slow"):
+                errors.append(f'{who}: {key} must be "normal" or "slow"')
         for t, v in (p.get("traits") or {}).items():
             if t != "reading" and not (isinstance(v, (int, float)) and 1 <= v <= 5):
                 errors.append(f"{who}: trait {t} must be 1 to 5")

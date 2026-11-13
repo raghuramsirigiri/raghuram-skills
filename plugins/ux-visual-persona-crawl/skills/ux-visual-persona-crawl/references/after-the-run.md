@@ -14,7 +14,7 @@ It writes one Markdown ticket per verified finding to `issues/`, `findings.csv`,
 
 ## Walking a persona again
 
-A critical finding that rests on one walk is the easiest to doubt. When there's budget, walk that persona again: `eyes.py start` with the same `--persona` makes a new `<id>-2` session. Then re-run analyze, review and verify. Each finding's `exposure` then counts both walks, so the report says "hit in 2 of 2 walks" or "1 of 2".
+A critical finding that rests on one walk is the easiest to doubt. `report.py verify` lists these under `rewalk`: each persona to walk again and the critical or high findings that rest on their one walk. When there's budget, walk that persona again: `eyes.py start` with the same `--persona` makes a new `<id>-2` session. Then re-run analyze, review and verify. Each finding's `exposure` then counts both walks, so the report says "hit in 2 of 2 walks" or "1 of 2".
 
 ## A brief or slides for stakeholders
 

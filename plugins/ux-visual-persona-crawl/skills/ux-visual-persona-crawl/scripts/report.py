@@ -435,8 +435,23 @@ def verify(study_dir: Path) -> int:
                 f["verification_notes"] = notes
             kept.append(f)
     kept.sort(key=lambda f: SEV_ORDER.index(f["severity"]))
-    (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed}, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps({"kept": len(kept), "removed": removed}, ensure_ascii=False))
+    # A serious finding that one walk produced could be a fluke of that walk. Walking the same persona again
+    # is the cheapest way to tell; list who to walk again, most serious first.
+    rewalk = {}
+    for f in kept:
+        ex = f.get("exposure", {})
+        if f["severity"] in ("critical", "high") and ex.get("walks_hit") == 1:
+            pid = data[ex["hit"][0]]["journey"]["persona"].get("id") if ex.get("hit") and ex["hit"][0] in data else None
+            if pid:
+                rewalk.setdefault(pid, []).append(f.get("id"))
+    rewalk = [{"persona": p, "findings": ids} for p, ids in rewalk.items()]
+    (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed, "rewalk": rewalk},
+                                                                 indent=2, ensure_ascii=False), encoding="utf-8")
+    out = {"kept": len(kept), "removed": removed}
+    if rewalk:
+        out["rewalk"] = rewalk
+        out["note"] = "These serious findings each rest on one walk. Walking the persona again tells a pattern from a fluke."
+    print(json.dumps(out, ensure_ascii=False))
     return 0
 
 

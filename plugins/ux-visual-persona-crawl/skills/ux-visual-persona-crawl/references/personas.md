@@ -64,6 +64,7 @@ If the user supplied real customer data (segments, survey results, an analytics 
 | `device` | `desktop` (1280x800) or `mobile` (a Pixel 7-sized phone) |
 | `browser_zoom` | 100 (default), 150 or 200. The screenshots the persona sees are taken at that zoom, so cramped and overlapping layouts show up for real |
 | `network` | `normal`, or `slow` to throttle the connection |
+| `cpu` | `normal`, or `slow` to run the page about 4 times slower, like a budget phone a few years old. Pair it with `device: mobile` for a customer on an old phone: heavy pages, late-appearing buttons and janky menus show up in their screenshots |
 | `vision` | Optional: `deuteranopia`, `protanopia` or `tritanopia` (colour blindness), or `blurred` (uncorrected low vision). The persona's screenshots and zooms are filtered to match; contrast is still measured on the true colours |
 | `color_scheme`, `reduced_motion`, `locale`, `timezone` | Optional device settings: `dark` mode, `true` to ask the site for less motion, a language such as `fr-FR`, a zone such as `Europe/Paris`. Use them when the panel's customers would have them, and to see whether the site holds up in that state |
 | `task` | What they came to do, in their own terms. The walker brief gives them this, so it's their goal and not the study's |

@@ -121,7 +121,7 @@ Give a fresh subagent `references/reviewer.md` with the study folder path. It re
 <venv-python> <skill>/scripts/report.py render --study-dir <study-dir>
 ```
 
-Read the `removed` list in `verified_findings.json`. A finding with a wrong step or box can be corrected against the recording and verified again. Never edit a journey or measurement to make a claim pass.
+Read the `removed` list in `verified_findings.json`. A `rewalk` list names personas whose one walk is the only support for a critical or high finding. Mention it to the user, and offer the re-walk in `references/after-the-run.md`. A finding with a wrong step or box can be corrected against the recording and verified again. Never edit a journey or measurement to make a claim pass.
 
 `report.html` is one self-contained file: the outcomes and paths, the funnel and each persona's stages, the bottleneck table, a step-through replay of every walk, a click map per page view, the findings with cropped evidence and how many walks hit each, the contrast measurements, the panel's demographics, the exit interviews, and the limits.
 
