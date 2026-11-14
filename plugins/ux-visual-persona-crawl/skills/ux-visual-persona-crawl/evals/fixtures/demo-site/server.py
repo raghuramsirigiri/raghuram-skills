@@ -6,6 +6,8 @@ Usage: python server.py [--port 8765]
 """
 import argparse
 import html
+import json
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -50,7 +52,8 @@ def page(title, body, cookie=False):
 <button class="menu" aria-label="CANARY-ARIA-9Z open the rewards menu" title="CANARY-TITLE-5P">&#9776;</button></div></header>
 <main>{body}</main>
 <footer>Questions? Call 0800 000 0000 (Mon to Fri, 9 to 5). &copy; Brightwater Energy (demo)</footer>
-{COOKIE if cookie else ""}</body></html>"""
+{COOKIE if cookie else ""}
+<script>try{{if(localStorage.bw_seen)fetch("/_storage-seen");else localStorage.bw_seen="1"}}catch(e){{}}</script></body></html>"""
 
 
 HOME = """<p class="steps">Home energy</p><h1>Switch to cleaner, simpler energy</h1>
@@ -140,11 +143,18 @@ ROUTES = {
 }
 
 
+# What each request carried, so a test can show that sessions share no cookies or storage. Nothing on screen uses it.
+VISITS = []
+
+
 class Handler(BaseHTTPRequestHandler):
-    def send(self, body, status=200):
+    def send(self, body, status=200, content_type="text/html; charset=utf-8"):
         data = body.encode("utf-8")
+        cookie = (self.headers.get("Cookie") or "").partition("bw_visitor=")[2].split(";")[0]
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        if not cookie:
+            self.send_header("Set-Cookie", f"bw_visitor={uuid.uuid4().hex[:12]}; Path=/")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -156,6 +166,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0].rstrip("/") or "/"
+        if path == "/_visits":
+            return self.send(json.dumps(VISITS), content_type="application/json")
+        VISITS.append({"path": path, "visitor": (self.headers.get("Cookie") or "").partition("bw_visitor=")[2].split(";")[0] or None})
+        if path == "/_storage-seen":
+            return self.send("", 204)
         if path not in ROUTES:
             return self.send(page("Not found", "<h1>Page not found</h1>"), 404)
         title, body, cookie = ROUTES[path]

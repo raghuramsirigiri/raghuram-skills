@@ -124,6 +124,20 @@ class Study(unittest.TestCase):
         self.assertEqual(len(paths), 2)
         self.assertTrue(all(Path(p).exists() for p in paths))
 
+    def test_each_persona_gets_its_own_test_values(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        st = {"mode": "test_env", "test_data": {"email": "test+{persona}@example.com", "phone": "07000000000", "meter": "0"}}
+        self.assertEqual(driver.test_values(st, {"test_data": {"phone": "07000000002"}}, "a-2"),
+                         {"email": "test+a-2@example.com", "phone": "07000000002", "meter": "0"})
+        d = study("shared-values", mode="test_env", environment_confirmation="test suite", test_data=st["test_data"])
+        p = personas(d, [{"id": "a", "test_data": {"phone": "07000000001"}}, {"id": "b", "test_data": {"phone": "07000000002"}}])
+        warned = [w for w in jrun("check", "--study", d / "study.json", "--personas", p)["warnings"] if "same" in w]
+        self.assertEqual(len(warned), 1)
+        self.assertIn("test:meter", warned[0])
+        self.assertNotIn("test:email", warned[0])
+        self.assertNotIn("test:phone", warned[0])
+
     def test_persona_lint(self):
         d = study("lint")
         bad = TMP / "lint" / "bad.json"
@@ -181,6 +195,51 @@ class Sessions(unittest.TestCase):
             self.assertEqual(j["outcome"], "claimed_goal_unverified")
         finally:
             eyes("stop", "--session", s)
+
+    def test_sessions_share_no_cookies_or_storage(self):
+        """A site that remembers visitors must see every session, a re-walk included, as someone new."""
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            pg = b.new_page(viewport={"width": 1280, "height": 800})
+            pg.goto(BASE + "/offers")
+            bb = pg.get_by_text("Log in", exact=True).bounding_box()
+            b.close()
+        login = {"type": "click", "x": round(bb["x"] + bb["width"] / 2), "y": round(bb["y"] + bb["height"] / 2)}
+
+        def visits():
+            return json.loads(urllib.request.urlopen(BASE + "/_visits", timeout=5).read())
+
+        d = study("isolation")
+        p = personas(d, [{"id": "a"}, {"id": "b"}])
+        started = []
+        try:
+            seen = len(visits())
+            started.append(jrun("start", "--study", d / "study.json", "--personas", p, "--persona", "a")["session"])
+            jrun("act", "--session", started[0], payload={"decision": DEC, "action": login})
+            time.sleep(1)
+            a = visits()[seen:]
+            # The markers work inside one session: the second page carries the cookie and finds the stored value.
+            self.assertIsNone(a[0]["visitor"])
+            self.assertTrue(any(v["path"] == "/login" and v["visitor"] for v in a))
+            self.assertTrue(any(v["path"] == "/_storage-seen" for v in a))
+            a_visitor = next(v["visitor"] for v in a if v["visitor"])
+            # While a's browser is still open, b and a re-walk of a each arrive with nothing.
+            for pid in ("b", "a"):
+                seen = len(visits())
+                started.append(jrun("start", "--study", d / "study.json", "--personas", p, "--persona", pid)["session"])
+                jrun("act", "--session", started[-1], payload={"decision": DEC, "action": login})
+                time.sleep(1)
+                new = visits()[seen:]
+                self.assertIsNone(new[0]["visitor"], f"{pid} arrived with a cookie")
+                self.assertNotIn(a_visitor, {v["visitor"] for v in new})
+                # Its own second page may find what its first page stored; its first page must find nothing.
+                first_page = new[:next(i for i, v in enumerate(new) if v["path"] == "/login")]
+                self.assertFalse(any(v["path"] == "/_storage-seen" for v in first_page), f"{pid} found another session's storage")
+            self.assertTrue(started[-1].endswith("a-2"))
+        finally:
+            for s in started:
+                eyes("stop", "--session", s)
 
     def test_recon_has_no_brief(self):
         d = study("recon")

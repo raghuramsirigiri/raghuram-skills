@@ -71,6 +71,7 @@ If the user supplied real customer data (segments, survey results, an analytics 
 | `traits` | 1 to 5, where 5 is highest. `reading` is `skims` or `careful`. `eyesight` 1 to 5 tells the persona how hard faint or small text is for them |
 | `assumptions_not_allowed` | Things this person must not know unless they see them on screen. This stops the model's general knowledge leaking in |
 | `gives_up_when` | Concrete triggers. Without these, simulated people persist far longer than real ones |
+| `test_data` | Optional, `test_env` only: this persona's own test values, overriding the study's of the same name. Use it for values that must differ per person but can't take `{persona}`, such as a digits-only phone number |
 | `start_url` | Optional, if this persona arrives somewhere other than the study's start page (say, an ad landing page) |
 
 Never use a real person's details, and invent no real business names or identifiers.

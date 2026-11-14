@@ -648,7 +648,7 @@ class Session:
                     return {"ok": False, "blocked": refused, "note": note}
                 text = str(action.get("text", ""))
                 if text.startswith("test:"):
-                    data = self.study.get("test_data") or {}
+                    data = test_values(self.study, self.persona, self.dir.name)
                     if text[5:] not in data:
                         return {"ok": False, "error": f"No test value named {text[5:]} in this study."}
                     text = str(data[text[5:]])
@@ -987,6 +987,21 @@ def cmd_brief(args):
     print(build_brief(lp(args.session)))
 
 
+def test_values(study: dict, persona: dict, session_id: str) -> dict:
+    """This session's test values: the study's, overridden by the persona's own, with {persona} set to the session id.
+    A site that saves applications by email or phone would otherwise show one persona's application to the next."""
+    merged = {**(study.get("test_data") or {}), **(persona.get("test_data") or {})}
+    return {k: str(v).replace("{persona}", session_id) for k, v in merged.items()}
+
+
+def shared_test_values(study: dict, people: list) -> list:
+    """Test value names every persona would type identically."""
+    if study.get("mode") != "test_env" or len(people) < 2:
+        return []
+    return [k for k, v in (study.get("test_data") or {}).items()
+            if "{persona}" not in str(v) and not any(k in (p.get("test_data") or {}) for p in people)]
+
+
 def build_brief(session_dir: Path) -> str:
     meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
     if meta.get("recon"):
@@ -996,7 +1011,7 @@ def build_brief(session_dir: Path) -> str:
     text = (Path(__file__).resolve().parent.parent / "references" / "walker.md").read_text(encoding="utf-8")
     text = text.split("\n---\n", 1)[1].lstrip("\n")
     if study["mode"] == "test_env":
-        names = ", ".join(f"`test:{k}`" for k in study.get("test_data", {})) or "(none given)"
+        names = ", ".join(f"`test:{k}`" for k in test_values(study, persona, session_dir.name)) or "(none given)"
         typing = ("This is a test system. For anything personal type only these test values, written exactly as "
                   f"`test:<name>`: {names}. Anything else, type plain fake words.")
     else:
@@ -1023,6 +1038,11 @@ def cmd_check(args):
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
         errors, warnings = lint_personas(people)
+        shared = shared_test_values(study, people) if isinstance(people, list) else []
+        if shared:
+            warnings.append(f"every persona types the same {', '.join('test:' + k for k in shared)}: a site that saves "
+                            "applications or accounts by these will show one persona's to the next. Put {persona} in the "
+                            "value (test+{persona}@example.com) or give each persona its own test_data")
         out.update({"personas": len(people) if isinstance(people, list) else 0, "ok": not errors})
         if errors:
             out["errors"] = errors
