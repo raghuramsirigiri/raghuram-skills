@@ -10,7 +10,9 @@ Study folder: `[STUDY_DIR]`. Driver: `[DRIVER]` (for `measure` and `zoom` only).
 - `personas.json`: who each person is, including what they lacked.
 - `flows.json`: pages ranked by bottleneck score, with the parts of each score, and the funnel. `navigation.json`: every persona's path, backtracks and dead clicks.
 - `sessions/<id>/journey.json`: each step's screenshot, what the persona thought, read and reported, the action and its result. `feedback.json` beside it is their exit interview.
-- `sessions/<id>/shots/step-NNN.png`: look at the screens yourself, especially where people hesitated, clicked something that didn't respond, backtracked or left. Judge layout, hierarchy and visibility from the pixels, the way the personas did. Don't open the site, fetch its pages or read its source: the findings must be about what is on screen.
+- `hot_steps.json`: the steps where something went wrong for a persona (dead clicks, low clarity or trust, sharp drops, high-severity friction, backtracks, the steps before an exit), each with the reasons and an excerpt of the persona's thought. It also lists each session's contact sheets.
+- `sessions/<id>/contact-N.jpg`: every step of a walk as a numbered thumbnail, with clicks circled and hot steps outlined in red. Start each session here: one image shows the whole walk.
+- `sessions/<id>/shots/step-NNN.png`: the full screens. Open them for the hot steps, for anything a contact sheet makes you curious about, and for every step you cite as evidence, since boxes must be placed on the full screenshot. There's no need to open every step. Judge layout, hierarchy and visibility from the pixels, the way the personas did. Don't open the site, fetch its pages or read its source: the findings must be about what is on screen.
 
 ## Look for
 
@@ -35,7 +37,7 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 
 ## Write
 
-One root cause is one finding, even if several personas hit it. Every finding needs evidence: a session, a step, and a box `[x, y, width, height]` on that step's screenshot around the thing. `verify` crops each box into the report, and removes the finding if the step or box doesn't exist.
+One root cause is one finding, even if several personas hit it. List every persona who hit it in `personas`, so `verify` can report how many of the walks that reached the page hit the problem (`exposure`). A walk that reached the page and sailed past it is evidence too: say why in the description, since it tells the reader who the problem affects. Every finding needs evidence: a session, a step, and a box `[x, y, width, height]` on that step's screenshot around the thing. `verify` crops each box into the report, and removes the finding if the step or box doesn't exist.
 
 `findings.json`:
 
@@ -61,7 +63,7 @@ One root cause is one finding, even if several personas hit it. Every finding ne
 ```
 
 - `category`: `bottleneck`, `friction`, `contradiction`, `ui`, `ux`, `button`, `contrast`, `accessibility`, `copy`, `trust` or `performance`.
-- `contradiction` needs two evidence spots and a two-item `conflict`.
+- `contradiction` needs two evidence spots and a two-item `conflict`. The spots can be on different steps, or on one step when the clash is on one screen (two prices on the same page), as two boxes that don't overlap.
 - `contrast` needs `"measurement": "<persona>:M<n>"` from a `measure` you ran, and `contrast_target`: `body_text` (4.5:1), `large_text` or `ui_component` (3:1). Verify removes it if the measurement passes the target.
 - `bottleneck` needs `page` to be a page from `flows.json`.
 - `quote`, if given, should be words a persona recorded at that step. Verify marks quotes it can't find in the record as read from the screenshot by you.

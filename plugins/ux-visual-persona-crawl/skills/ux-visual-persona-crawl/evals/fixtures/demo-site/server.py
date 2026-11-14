@@ -6,6 +6,8 @@ Usage: python server.py [--port 8765]
 """
 import argparse
 import html
+import json
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -50,7 +52,8 @@ def page(title, body, cookie=False):
 <button class="menu" aria-label="CANARY-ARIA-9Z open the rewards menu" title="CANARY-TITLE-5P">&#9776;</button></div></header>
 <main>{body}</main>
 <footer>Questions? Call 0800 000 0000 (Mon to Fri, 9 to 5). &copy; Brightwater Energy (demo)</footer>
-{COOKIE if cookie else ""}</body></html>"""
+{COOKIE if cookie else ""}
+<script>try{{if(localStorage.bw_seen)fetch("/_storage-seen");else localStorage.bw_seen="1"}}catch(e){{}}</script></body></html>"""
 
 
 HOME = """<p class="steps">Home energy</p><h1>Switch to cleaner, simpler energy</h1>
@@ -117,7 +120,22 @@ DONE = """<h1>You're switching to Brightwater</h1><p style="font-size:18px">We'l
 LOGIN = """<h1>Log in</h1><label>Email</label><input><label>Password</label><input type="password">
 <p style="margin-top:20px"><button class="btn" type="button">Log in</button></p>"""
 
+# Reached only by direct address, so the original cases never see them.
+OFFERS = """<p class="steps">Offers</p><h1>This month's offers</h1>
+<div id="slides" style="height:150px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;background:#1e7f4f">Switch in April, first month half price</div>
+<script>var S=[["#1e7f4f","Switch in April, first month half price"],["#7a3fb0","Refer a friend, both get $25"],["#c2561a","Smart meter installed free"]],i=0;
+setInterval(function(){i=(i+1)%S.length;var d=document.getElementById('slides');d.style.background=S[i][0];d.textContent=S[i][1];},1500);</script>
+<p style="margin-top:22px"><button class="btn" type="button" onclick="return false">Get this offer</button>
+<button class="btn" type="button" style="background:#fff;color:#123;border:2px solid #123;margin-left:10px" onclick="document.getElementById('terms').style.display='block'">See offer details</button></p>
+<div id="terms" style="display:none;border:1px solid #ccd;padding:14px;border-radius:8px;max-width:620px">Half price applies to the standing charge only, not to energy used. New customers only.</div>"""
+
+BOTWALL = """<div style="max-width:420px;margin:60px auto;text-align:center;border:1px solid #ccd;border-radius:12px;padding:28px">
+<h1 style="font-size:22px">Checking your browser</h1><p>Please confirm you are human to continue to your account.</p>
+<label style="display:inline-flex;gap:10px;align-items:center;border:1px solid #bbb;padding:14px 18px;border-radius:6px;font-size:17px">
+<input type="checkbox" style="width:22px;height:22px"> I'm not a robot</label></div>"""
+
 ROUTES = {
+    "/offers": ("Offers", OFFERS, False), "/account": ("Security check", BOTWALL, False),
     "/": ("Home", HOME, True), "/plans": ("Plans", PLANS, True), "/plans/green-saver": ("Green Saver", GREEN, False),
     "/plans/flex": ("Flex", FLEX, False), "/plans/solar-plus": ("Solar Plus", SOLAR, False),
     "/signup": ("Your details", None, False), "/signup/2": ("Payment", BILLING, False),
@@ -125,11 +143,18 @@ ROUTES = {
 }
 
 
+# What each request carried, so a test can show that sessions share no cookies or storage. Nothing on screen uses it.
+VISITS = []
+
+
 class Handler(BaseHTTPRequestHandler):
-    def send(self, body, status=200):
+    def send(self, body, status=200, content_type="text/html; charset=utf-8"):
         data = body.encode("utf-8")
+        cookie = (self.headers.get("Cookie") or "").partition("bw_visitor=")[2].split(";")[0]
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        if not cookie:
+            self.send_header("Set-Cookie", f"bw_visitor={uuid.uuid4().hex[:12]}; Path=/")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -141,6 +166,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0].rstrip("/") or "/"
+        if path == "/_visits":
+            return self.send(json.dumps(VISITS), content_type="application/json")
+        VISITS.append({"path": path, "visitor": (self.headers.get("Cookie") or "").partition("bw_visitor=")[2].split(";")[0] or None})
+        if path == "/_storage-seen":
+            return self.send("", 204)
         if path not in ROUTES:
             return self.send(page("Not found", "<h1>Page not found</h1>"), 404)
         title, body, cookie = ROUTES[path]

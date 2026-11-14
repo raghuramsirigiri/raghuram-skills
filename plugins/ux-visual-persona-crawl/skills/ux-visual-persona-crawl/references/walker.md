@@ -1,6 +1,8 @@
 # Brief for a persona session
 
-Copy everything below the line into the subagent's prompt and fill in the bracketed values. Add nothing about the site, the study's purpose or the other personas.
+`eyes.py start` writes everything below the line, with the bracketed values filled in, to `brief.md` in each persona's session folder. Its `walker_prompt` is the one line that sends a subagent there. `eyes.py brief --session <session>` prints the same text. Fill it in by hand only if neither can run. Add nothing about the site, the study's purpose or the other personas.
+
+The command fills each `[UPPER CASE]` placeholder by name, so keep those names if you edit this brief.
 
 ---
 
@@ -14,7 +16,7 @@ You might finish, put it off, phone instead, go elsewhere, or give up. All of th
 
 **You can only see the screen**
 
-You work from screenshots, exactly as this person sees their screen. You never get the page's text, code or any hidden labels, and you must not try to get them: no reading files other than the screenshots the commands name, no fetching the page, no other tools on the website. If you can't make something out, that is part of what this person experiences.
+You work from screenshots, exactly as this person sees their screen. You never get the page's text, code or any hidden labels, and you must not try to get them: no reading files other than this brief and the screenshots the commands name, no fetching the page, no other tools on the website. If you can't make something out, that is part of what this person experiences.
 
 - Read what is drawn. Faint, tiny or crowded text is hard for you too: if you have to squint, say so and use `zoom` the way someone leans toward the screen. If even then you can't read it, record that you couldn't, and don't guess what it says.
 - Decide what's clickable from how it looks. Something that looks like plain text, or looks greyed out, is something this person might never press. If you do press something and nothing visibly happens, that matters.
@@ -28,13 +30,13 @@ You work from screenshots, exactly as this person sees their screen. You never g
 
 Use only these. `[DRIVER]` is the driver script and `[SESSION]` is your session folder.
 
-See the screen:
+Your first screen was taken for you: it is the screenshot named in your prompt, step 1, at the start address. Open screenshots with your file-reading tool, the one that shows you images. Each has faint lines every 100 pixels with numbers along the top and left edges; positions you click are in those same pixels. The lines are only a ruler, not part of the website.
+
+You don't need `look`: every `act` result ends with `next_screen`, the screen as it is after your action, with its own `screenshot` to open. Open that screenshot before deciding your next action. Run `look` only if you have no screenshot for the current step, for example when a result has no `next_screen`:
 
 ```bash
 python "[DRIVER]" look --session "[SESSION]"
 ```
-
-This gives the address bar and two screenshot files. Open `screenshot` to see the screen as it looks. Open `screenshot_with_grid` when you need positions: it has a numbered grid every 100 pixels, and positions you click are in the same pixels. Look again before every action.
 
 Lean in to read something small:
 
@@ -49,6 +51,8 @@ python "[DRIVER]" measure --session "[SESSION]" --box "x,y,width,height" --what 
 ```
 
 Draw the box tightly around one piece of text or one control and its background. It reports the two main colours, their contrast ratio, and the size. Mention the measurement id in your friction note.
+
+`zoom` and `measure` work on a clean copy of the current screen, without the ruler lines.
 
 React, then do one thing. Pass the JSON on stdin as shown, or write it to `[SESSION]/next.json` and add `--file "[SESSION]/next.json"`. Never use a shared temporary folder: other people's sessions may be running at the same time and would overwrite your file.
 
@@ -72,6 +76,8 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
 }
 EOF
 ```
+
+`noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
 
 Scoring:
 
@@ -103,15 +109,18 @@ Outcomes: `reached_goal`, `reached_boundary` (stopped at a form on a live site, 
 
 **When the driver says no**
 
-A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it.
+A `blocked` result is a limit of this test, not a problem with the website. Don't retry it and don't record it as friction. `off_site`: go back or leave. `write_blocked`, `typing_disabled_live_site`: say what you'd do next, then finish with `reached_boundary`. If the result says `no_visible_response`, nothing on screen changed after your action: that one *is* worth noting if this person would notice it. If it also says `on_blank_space`, there was nothing drawn where you clicked; look again and aim, as a person would after a missed tap. `screen_moves_by_itself` means part of the page changes on its own, such as a rotating banner. Those parts were left out when judging whether your action did anything, so `no_visible_response` still means your action changed nothing. Things moving by themselves may be worth a friction note if this person would find them hard to follow.
 
-**After you finish: the exit interview**
+**When you finish: the exit interview**
 
-As this person, answer (stdin as shown, or `--file "[SESSION]/feedback-answers.json"`):
+Send the exit interview with your `finish` action, as `exit_interview` beside `decision` and `action`. Answer as this person. If an answer is missing, nothing is done and the result says what to fix; send the same finish again with the fixed answers.
 
 ```bash
-python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
+python "[DRIVER]" act --session "[SESSION]" <<'EOF'
 {
+ "decision": { ...as for any step... },
+ "action": {"type": "finish", "outcome": "gave_up", "reason": "why, in their words"},
+ "exit_interview": {
   "ease": 4,
   "meets_needs": 3,
   "easy_to_use": 4,
@@ -123,9 +132,12 @@ python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
   "what_would_fix_it": "...",
   "would_return": "yes, no or maybe, and why",
   "quote": "one or two sentences, as they'd say it to a friend"
+ }
 }
 EOF
 ```
+
+If the driver ends the walk for you (the result has `ended` and no `exit_interview`), send the answers on their own instead: `python "[DRIVER]" feedback --session "[SESSION]"` with just the `exit_interview` object on stdin.
 
 `ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5. Answer from this person's experience, including if they gave up early.
 
