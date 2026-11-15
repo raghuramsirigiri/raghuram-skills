@@ -33,3 +33,6 @@ diorama-slides-workspace/
 # ux-visual-persona-crawl: local browser env and eval workspace
 .ux-visual-crawl/
 ux-visual-persona-crawl-workspace/
+
+# Local test sites (e.g. the fictional bank for ux-visual-persona-crawl) — kept out of git
+/test/

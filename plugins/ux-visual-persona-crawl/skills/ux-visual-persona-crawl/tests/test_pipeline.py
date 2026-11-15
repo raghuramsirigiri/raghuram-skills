@@ -26,7 +26,9 @@ SERVER = SKILL / "evals" / "fixtures" / "demo-site" / "server.py"
 PY = sys.executable
 DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubts": [], "friction": [], "est_seconds": 5}
 FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3, "one_word": "meh",
-            "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q"}
+            "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q",
+            "reasons": {k: "the offer button at step 2 did nothing" for k in
+                        ("ease", "meets_needs", "easy_to_use", "recommend", "satisfaction")}}
 BASE = ""
 TMP = None
 
@@ -104,6 +106,33 @@ def dead_button_xy():
         bb = pg.get_by_text("Get this offer", exact=True).bounding_box()
         b.close()
     return {"x": round(bb["x"] + bb["width"] / 2), "y": round(bb["y"] + bb["height"] / 2)}
+
+
+class Pixels(unittest.TestCase):
+    def test_a_tick_next_to_the_pointer_counts_as_a_response(self):
+        import importlib.util
+        import io
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            self.skipTest("Pillow not installed")
+        spec = importlib.util.spec_from_file_location("eyes_mod", EYES)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        def png(tick):
+            img = Image.new("RGB", (1280, 800), "white")
+            d = ImageDraw.Draw(img)
+            d.rectangle([600, 400, 616, 416], outline="black")
+            if tick:
+                d.line([(603, 408), (607, 413), (614, 402)], fill="black", width=1)
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            return buf.getvalue()
+
+        before, after = png(False), png(True)
+        self.assertTrue(mod.local_change(before, after, 608, 408))
+        self.assertFalse(mod.local_change(before, before, 608, 408))
 
 
 class Study(unittest.TestCase):
@@ -270,9 +299,13 @@ class WalkAndReport(unittest.TestCase):
             acts = [{"type": "click", "x": 1180, "y": 700}, {"type": "click", **xy}] if pid == "desk" else [{"type": "scroll", "direction": "down"}]
             cls.results[pid] = [jrun("act", "--session", s, payload={"decision": DEC, "action": a}) for a in acts]
             if pid == "desk":
-                cls.bad_interview = eyes("act", "--session", s, payload={"decision": DEC, "action": finish, "exit_interview": {"ease": 3}})
+                cls.fill = jrun("act", "--session", s, payload={"decision": DEC, "action": {"type": "fill", "fields": [{"x": 1180, "y": 700}]}})
+                cls.bad_fill = jrun("act", "--session", s, payload={"decision": DEC, "action": {"type": "fill", "fields": []}})
+                cls.bad_interview = eyes("act", "--session", s, payload={"decision": DEC, "action": finish, "exit_interview": FEEDBACK})
                 cls.status_before = jrun("status", "--study", d / "study.json")
-                cls.finished = jrun("act", "--session", s, payload={"decision": DEC, "action": finish, "exit_interview": FEEDBACK})
+                cls.finished = jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
+                cls.no_reasons = eyes("feedback", "--session", s, payload={k: v for k, v in FEEDBACK.items() if k != "reasons"})
+                cls.saved = jrun("feedback", "--session", s, payload=FEEDBACK)
             else:
                 jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
                 jrun("feedback", "--session", s, payload=FEEDBACK)
@@ -282,12 +315,25 @@ class WalkAndReport(unittest.TestCase):
         self.assertTrue(Path(shot).exists() and shot.endswith("step-001-grid.png"), shot)
         self.assertIn("brief.md", self.prompts["desk"])
 
-    def test_exit_interview_with_finish(self):
+    def test_exit_interview_after_recap(self):
         rc, out = self.bad_interview
         self.assertNotEqual(rc, 0)
-        self.assertIn("nothing was done", out)
-        self.assertEqual(self.status_before["waiting_on"], ["desk"])   # the bad finish did not end the walk
-        self.assertTrue(self.finished["ended"] and self.finished["exit_interview"].endswith("feedback.json"))
+        self.assertIn("Nothing was done", out)
+        self.assertEqual(self.status_before["waiting_on"], ["desk"])   # an interview sent with the finish did not end the walk
+        recap = self.finished["walk_recap"]
+        self.assertTrue(self.finished["ended"])
+        self.assertEqual(recap["steps_taken"], 5)
+        self.assertIn("hardest_moments", recap)
+        rc, out = self.no_reasons
+        self.assertNotEqual(rc, 0)
+        self.assertIn("reasons needs a sentence", out)
+        self.assertTrue(self.saved["saved"].endswith("feedback.json"))
+
+    def test_fill_is_one_step(self):
+        self.assertTrue(self.fill.get("ok"), self.fill)
+        self.assertTrue(self.fill.get("on_blank_space") is None or self.fill.get("no_visible_response"))
+        self.assertFalse(self.bad_fill.get("ok"))
+        self.assertIn("fill needs fields", self.bad_fill["error"])
 
     def test_moving_page_and_blank_clicks(self):
         blank, dead = self.results["desk"]
