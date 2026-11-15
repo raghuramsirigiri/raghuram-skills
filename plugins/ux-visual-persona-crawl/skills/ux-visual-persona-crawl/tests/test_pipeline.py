@@ -296,6 +296,28 @@ class WalkAndReport(unittest.TestCase):
         self.assertTrue(dead.get("screen_moves_by_itself"), "the rotating banner should be detected")
         self.assertIn("screenshot", dead["next_screen"])
 
+    def test_walkthrough_shows_full_address(self):
+        """The replay shows each step's address as the address bar had it, query and anchor included;
+        the page scores and findings keep grouping by the trimmed page."""
+        d = TMP / "full-address"
+        shutil.copytree(self.d, d)
+        full = BASE + "/offers?ref=mail&id=7#terms"
+        j = next(d.glob("sessions/desk*/journey.json"))
+        walk = json.loads(j.read_text(encoding="utf-8"))
+        for st in walk["steps"]:
+            st["address_bar"] = full
+        j.write_text(json.dumps(walk), encoding="utf-8")
+        for cmd in ("analyze", "render"):
+            rc, out = report(cmd, "--study-dir", d)
+            self.assertEqual(rc, 0, out)
+        pages = {p["page"] for p in json.loads((d / "flows.json").read_text(encoding="utf-8"))["pages"]}
+        self.assertIn("/offers?ref=mail&id=7", pages)
+        nav = json.loads((d / "navigation.json").read_text(encoding="utf-8"))
+        self.assertEqual(nav[j.parent.name]["steps"][0]["url"], full)
+        html = (d / "report.html").read_text(encoding="utf-8")
+        walks = json.loads(re.search(r"id='walks'[^>]*>(.*?)</script>", html, re.S).group(1))
+        self.assertEqual(walks[j.parent.name]["frames"][0]["url"], full)
+
     def test_local_pace(self):
         self.assertLess(self.results["phone"][0]["ms"], 1500)
 

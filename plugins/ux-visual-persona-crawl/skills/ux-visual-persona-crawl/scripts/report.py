@@ -149,7 +149,8 @@ def analyze(study_dir: Path) -> dict:
             "steps_taken": j.get("steps_taken", len(steps)), "est_seconds": j.get("est_seconds"),
             "path": path, "stages_reached": stages, "backtracks": backtracks, "dead_clicks": dead,
             "exit_page": exit_page,
-            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "screenshot": st["screenshot"],
+            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"],
+                       "screenshot": st["screenshot"],
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
@@ -545,7 +546,9 @@ def replay_data(data: dict) -> dict:
                 did = "typed" + (f" \"{a.get('text')}\"" if a.get("text") else "")
             frames.append({
                 "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
-                "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,
+                # The walkthrough shows the address exactly as the address bar had it, query and anchor included,
+                # so a reader can open the same screen. Everything else groups by the trimmed page.
+                "step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"], "did": did, "spot": spot,
                 "dead": bool(r.get("no_visible_response")) and not r.get("on_blank_space"),
                 "blank": bool(r.get("on_blank_space")), "blocked": r.get("blocked"),
                 "thought": d.get("thought", ""), "scores": [d.get("clarity"), d.get("trust"), d.get("effort")],
@@ -561,11 +564,12 @@ REPLAY_JS = """
 img=document.getElementById('rp-img'),dot=document.getElementById('rp-dot'),cap=document.getElementById('rp-cap'),
 pos=document.getElementById('rp-pos'),i=0,cur=null;
 Object.keys(W).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=W[k].name+' \\u2014 '+W[k].outcome;sel.appendChild(o);});
-function esc(t){return String(t==null?'':t).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function show(){var f=cur.frames[i];img.src=f.img;img.alt='Step '+f.step+' on '+f.page;
  if(f.spot){dot.style.display='block';dot.style.left=f.spot[0]+'%';dot.style.top=f.spot[1]+'%';dot.className=f.dead?'rp-dot dead':'rp-dot';}else dot.style.display='none';
  pos.textContent='Step '+f.step+' of '+cur.frames.length;
- cap.innerHTML='<b>'+esc(f.page)+'</b> \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blank?' \\u00b7 clicked empty space':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
+ var at=/^https?:/i.test(f.url||'')?'<a class=\"url\" href=\"'+esc(f.url)+'\" rel=\"noopener noreferrer\"><b>'+esc(f.url)+'</b></a>':'<b class=\"url\">'+esc(f.url||f.page)+'</b>';
+ cap.innerHTML=at+' \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blank?' \\u00b7 clicked empty space':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
  '<br>\\u201c'+esc(f.thought)+'\\u201d<br><span class=\"muted\">clarity '+f.scores[0]+' \\u00b7 trust '+f.scores[1]+' \\u00b7 effort '+f.scores[2]+'</span>'+
  (f.friction.length?'<ul>'+f.friction.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'');}
 function pick(){cur=W[sel.value];i=0;show();}
@@ -604,6 +608,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,Seg
 main{max-width:1100px;margin:0 auto;padding:28px 16px 80px}h1{font-size:28px;margin:0 0 6px}h2{margin:38px 0 10px;font-size:21px;border-bottom:1px solid var(--line);padding-bottom:6px}
 .muted{color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:1px 8px;margin:2px;font-size:12.5px}
+.url{overflow-wrap:anywhere;word-break:break-all}a.url{color:inherit}
 .sev{font-weight:700;text-transform:uppercase;font-size:11.5px;letter-spacing:.04em}.critical{color:var(--crit)}.high{color:var(--high)}.medium{color:var(--med)}.low{color:var(--low)}
 .finding{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}.finding img{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px 0}
 .rp-dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #2e6ee6;background:rgba(46,110,230,.25);display:none}
