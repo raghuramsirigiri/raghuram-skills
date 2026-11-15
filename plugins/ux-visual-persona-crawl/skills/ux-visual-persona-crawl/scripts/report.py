@@ -149,8 +149,7 @@ def analyze(study_dir: Path) -> dict:
             "steps_taken": j.get("steps_taken", len(steps)), "est_seconds": j.get("est_seconds"),
             "path": path, "stages_reached": stages, "backtracks": backtracks, "dead_clicks": dead,
             "exit_page": exit_page,
-            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"],
-                       "screenshot": st["screenshot"],
+            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"], "screenshot": st["screenshot"],
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
@@ -544,10 +543,10 @@ def replay_data(data: dict) -> dict:
                 did = f"scrolled {a.get('direction', 'down')}"
             elif did == "type":
                 did = "typed" + (f" \"{a.get('text')}\"" if a.get("text") else "")
+            elif did == "fill":
+                did = f"filled {len(a.get('fields') or [])} fields"
             frames.append({
                 "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
-                # The walkthrough shows the address exactly as the address bar had it, query and anchor included,
-                # so a reader can open the same screen. Everything else groups by the trimmed page.
                 "step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"], "did": did, "spot": spot,
                 "dead": bool(r.get("no_visible_response")) and not r.get("on_blank_space"),
                 "blank": bool(r.get("on_blank_space")), "blocked": r.get("blocked"),
@@ -602,157 +601,288 @@ def render(study_dir: Path) -> int:
     for v in nav.values():
         devices[v["device"] or "desktop"] += 1
 
-    css = """:root{--ink:#1d2433;--muted:#5b6475;--line:#e3e6ec;--bg:#fff;--soft:#f5f6f9;--crit:#b3261e;--high:#d9480f;--med:#b7791f;--low:#4a5568;--ok:#2f855a}
-@media (prefers-color-scheme:dark){:root{--ink:#e8eaf0;--muted:#a3abbc;--line:#333a48;--bg:#14171d;--soft:#1c2029}}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,Segoe UI,Helvetica,Arial,sans-serif}
-main{max-width:1100px;margin:0 auto;padding:28px 16px 80px}h1{font-size:28px;margin:0 0 6px}h2{margin:38px 0 10px;font-size:21px;border-bottom:1px solid var(--line);padding-bottom:6px}
-.muted{color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:13.5px}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
-th{color:var(--muted);font-weight:600}.wrap{overflow-x:auto}.chip{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:1px 8px;margin:2px;font-size:12.5px}
-.url{overflow-wrap:anywhere;word-break:break-all}a.url{color:inherit}
-.sev{font-weight:700;text-transform:uppercase;font-size:11.5px;letter-spacing:.04em}.critical{color:var(--crit)}.high{color:var(--high)}.medium{color:var(--med)}.low{color:var(--low)}
-.finding{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}.finding img{max-width:100%;border:1px solid var(--line);border-radius:6px;margin:6px 0}
-.rp-dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #2e6ee6;background:rgba(46,110,230,.25);display:none}
-.rp-dot.dead{border-color:#dc1e28;background:rgba(220,30,40,.25)}button{font:inherit;padding:4px 10px}
-@media (max-width:760px){.rp-grid{grid-template-columns:1fr!important}}
-.bar{height:12px;background:#3b6fd8;border-radius:3px}.fail{color:var(--crit);font-weight:700}.pass{color:var(--ok)}.headline{font-size:19px;margin:14px 0}"""
+    import datetime
 
-    out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-           f"<title>{esc(study.get('product'))} persona crawl</title><style>{css}</style></head><body><main>"]
-    out.append(f"<h1>{esc(study.get('product'))}: visual persona crawl</h1>")
-    out.append(f"<p class='muted'>Study {esc(study.get('id'))} · {n} simulated personas ({', '.join(f'{v} {k}' for k, v in devices.items())}) · "
-               f"mode {esc(study.get('mode'))} · start {esc(study.get('start_url'))}</p>")
-    if ins.get("headline"):
-        out.append(f"<p class='headline'><b>{esc(ins['headline'])}</b></p>")
+    # Follows chart-dashboard's report template (templates/report.html, references/design-rules.md):
+    # one 880px paper column; kicker, h1, deck, byline, abstract; numbered h2 sections; figures with
+    # "Fig. N" captions; the soft .note surface; a footer of sources and method. No badges, custom cards,
+    # KPI strip or coloured verdicts: severity and outcome are words in the text.
+    css = """.url{overflow-wrap:anywhere;word-break:break-all}a.url{color:inherit}
+:root{--bg:#efece6;--paper:#f4f4f0;--ink:#111111;--body:#1a1a1a;--muted:#555555;--soft:#666666;--hair:#dcdbd7;--rule:#cfcdc6;
+--radius:4px;--surface-soft:#eae8e4;--accent:#243E63;--annotation:#B31B38;--series:#2323FF;--font:'Inter','Segoe UI',Arial,Helvetica,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#121315;--paper:#1a1b1e;--ink:#f2f2f0;--body:#dcdcd8;--muted:#a6a6a0;--soft:#9a9a94;--hair:#33343a;
+--rule:#3d3e44;--surface-soft:#26272b;--accent:#9db3d6;--annotation:#f08a9b;--series:#8c8cff}}
+*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.paper{max-width:880px;margin:0 auto;background:var(--paper);padding:64px 72px 96px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+@media (max-width:720px){.paper{padding:40px 24px}}
+a{color:var(--accent)}
+.kicker{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
+h1{font-size:40px;line-height:1.1;letter-spacing:-0.7px;margin:12px 0 16px;font-weight:700}
+@media (max-width:720px){h1{font-size:30px}}
+.deck{font-size:18px;color:var(--muted);line-height:1.55;margin:0 0 28px}
+.byline{font-size:12px;color:var(--soft);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:12px 0;margin:0 0 40px;
+display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}.byline b{color:var(--ink)}
+.abstract,.note{background:var(--surface-soft);border-radius:var(--radius);padding:18px 22px;margin:0 0 40px;font-size:15px;line-height:1.65;color:var(--body)}
+.abstract b.k,.note b.k{text-transform:uppercase;font-size:11px;letter-spacing:1px;display:block;margin-bottom:6px;color:var(--muted)}
+.note{margin:0 0 28px}
+ol.contents{margin:0 0 8px;padding:0;list-style:none;columns:2;column-gap:32px;font-size:14px;line-height:2}
+ol.contents .n{color:var(--soft);display:inline-block;min-width:32px;font-variant-numeric:tabular-nums}
+@media (max-width:560px){ol.contents{columns:1}}
+h2{font-size:24px;font-weight:700;margin:48px 0 12px;letter-spacing:-0.3px}h2 .n{color:var(--soft);font-weight:700;margin-right:12px}
+h3{font-size:17px;font-weight:700;margin:36px 0 8px;line-height:1.35}h3 .n{color:var(--soft);margin-right:8px}
+p{font-size:16px;line-height:1.72;color:var(--body);margin:0 0 18px}
+.sub{font-size:13px;color:var(--muted);margin:-4px 0 14px}
+ul.plain{margin:0 0 18px;padding-left:20px;font-size:16px;line-height:1.65;color:var(--body)}ul.plain li{margin:0 0 6px}
+.fig{margin:28px 0 32px}
+.fig figcaption{font-size:12px;color:var(--soft);margin-top:8px;padding-top:8px;border-top:1px dotted var(--rule);line-height:1.5}
+.fig figcaption b{color:var(--ink);margin-right:6px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.5;color:var(--body);font-variant-numeric:tabular-nums}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink);vertical-align:bottom}
+td{padding:8px 10px 8px 0;border-bottom:1px solid var(--hair);vertical-align:top}
+td.num,th.num{text-align:right}td b{color:var(--ink)}.muted{color:var(--muted)}
+.bars{display:grid;grid-template-columns:200px minmax(0,1fr) 64px;gap:8px 14px;align-items:center;font-size:13px;color:var(--body)}
+.bars .track{height:12px}.bars .fill{height:12px;background:var(--series)}.bars .cnt{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+@media (max-width:560px){.bars{grid-template-columns:110px minmax(0,1fr) 52px}}
+.shot{display:block;max-width:100%;max-height:min(70vh,640px);width:auto;height:auto;border:1px solid var(--hair);background:#fff}
+.pair{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}.pair figure{margin:0;flex:0 1 auto;max-width:100%}
+blockquote{margin:0 0 18px;padding:0 0 0 18px;border-left:2px solid var(--rule);font-size:16px;line-height:1.65;color:var(--body)}
+blockquote cite{display:block;font-style:normal;font-size:12px;color:var(--soft);margin-top:4px}
+#replay .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;font-size:13px}
+select,button{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--rule);border-radius:var(--radius);background:var(--paper);color:var(--ink)}
+.rp-row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.rp-frame{position:relative;display:inline-block;line-height:0;flex:0 0 auto;max-width:100%}
+.rp-frame img{display:block;max-width:100%;max-height:min(74vh,700px);width:auto;height:auto;border:1px solid var(--hair);background:#fff}
+#rp-cap{flex:1 1 240px;min-width:0;font-size:14px;line-height:1.6;color:var(--body)}#rp-cap ul{padding-left:18px;margin:8px 0 0}
+.rp-dot{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:3px solid var(--series);background:rgba(35,35,255,.18);display:none}
+.rp-dot.dead{border-color:var(--annotation);background:rgba(179,27,56,.2)}.fail{color:var(--annotation);font-weight:700}
+.maps{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;align-items:start}.maps .fig{margin:0}
+ol.refs{font-size:13px;line-height:1.6;color:var(--body);padding-left:24px}ol.refs li{margin:0 0 6px;overflow-wrap:anywhere}
+sup.ref{font-size:11px;line-height:0}
+footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;font-size:12px;color:var(--soft);line-height:1.6}footer.notes b{color:var(--ink)}
+@media print{body{background:#fff}.paper{box-shadow:none;padding:0}#appendix-replay{display:none}.fig,blockquote{break-inside:avoid}}"""
 
-    # outcomes
-    out.append("<h2>Who went where</h2><div class='wrap'><table><tr><th>Persona</th><th>Device</th><th>Outcome</th><th>Steps</th><th>Est. time</th><th>Path</th></tr>")
-    for name, v in nav.items():
-        path = " → ".join(f"<span class='chip'>{esc(p['page'])} ×{p['steps']}</span>" for p in v["path"])
-        out.append(f"<tr><td><b>{esc(v['persona'].get('name'))}</b><br><span class='muted'>{esc(name)}</span></td><td>{esc(v['device'])}</td>"
-                   f"<td>{esc(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td><td>{v['steps_taken']}</td>"
-                   f"<td>{round((v.get('est_seconds') or 0) / 60, 1)} min</td><td>{path}</td></tr>")
-    out.append("</table></div>")
-    if flows["funnel"]:
-        out.append("<h3>How far personas got</h3><table>")
-        for f in flows["funnel"]:
-            out.append(f"<tr><td style='width:28%'>{esc(f['label'])}</td><td><div class='bar' style='width:{100 * f['reached'] / max(f['of'], 1):.0f}%'></div></td>"
-                       f"<td style='width:14%'>{f['reached']} of {f['of']}</td></tr>")
-        out.append("</table><p class='muted'>Counts of simulated personas, not conversion rates.</p>")
-        # swimlanes: who reached which stage, and where each one stopped
-        stage_ids = [f["stage"] for f in flows["funnel"]]
-        out.append("<h3>Each persona through the stages</h3><div class='wrap'><table><tr><th>Persona</th>"
-                   + "".join(f"<th>{esc(f['label'])}</th>" for f in flows["funnel"]) + "</tr>")
-        for name, v in nav.items():
-            reached = set(v.get("stages_reached", []))
-            last = next((s for s in reversed(stage_ids) if s in reached), None)
-            cells = []
-            for sid in stage_ids:
-                if sid == last and v["outcome"] != "reached_goal":
-                    cells.append(f"<td class='fail' title='{esc(v.get('reason'))}'>stopped: {esc(v['outcome'])}</td>")
-                elif sid in reached:
-                    cells.append("<td class='pass'>&#10003;</td>")
-                else:
-                    cells.append("<td></td>")
-            out.append(f"<tr><td><b>{esc(v['persona'].get('name'))}</b></td>{''.join(cells)}</tr>")
-        out.append("</table></div>")
-
-    # bottlenecks
-    out.append("<h2>Where the flow slows down</h2><div class='wrap'><table><tr><th></th><th>Page</th><th>Visitors</th><th>Steps / visitor</th><th>Dead clicks</th>"
-               "<th>Backtracked from</th><th>Left here, short of goal</th><th>Friction reports</th><th>Clarity · trust · effort</th><th>Score</th></tr>")
-    for p in flows["pages"]:
-        sp = p["score_parts"]
-        out.append(f"<tr><td>{p['handle']}</td><td>{esc(p['page'])}</td><td>{p['visitors']}</td><td>{sp['steps_per_visitor']}</td><td>{sp['dead_clicks']}</td>"
-                   f"<td>{sp['backtracked_from']}</td><td>{sp['exits_short_of_goal']}</td><td>{p['friction_reports']}</td>"
-                   f"<td>{p['avg_clarity']} · {p['avg_trust']} · {p['avg_effort']}</td><td><b>{p['bottleneck_score']}</b></td></tr>")
-    out.append(f"</table></div><p class='muted'>Score = {esc(flows['score_formula'])}. Clarity and trust 1 to 5, higher is better; effort 1 to 5, higher is worse.</p>")
-
-    # step-through replay of every walk
-    walks = replay_data(data)
-    if walks:
-        out.append("<h2>Replay each walk</h2><p class='muted'>Step through what each persona saw, where they clicked "
-                   "(<span class='fail'>red</span> when nothing happened) and what they thought. Arrow keys work once a button has focus.</p>"
-                   "<div id='replay'><p><select id='rp-who' aria-label='Persona'></select> "
-                   "<button id='rp-prev' type='button'>&larr; Back</button> <button id='rp-next' type='button'>Next &rarr;</button> "
-                   "<span id='rp-pos' class='muted'></span></p>"
-                   "<div style='display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:16px;align-items:start' class='rp-grid'>"
-                   "<div style='position:relative;line-height:0'><img id='rp-img' alt='' style='width:100%;border:1px solid var(--line);border-radius:6px'>"
-                   "<span id='rp-dot' class='rp-dot'></span></div><div id='rp-cap'></div></div></div>"
-                   "<script type='application/json' id='walks'>" + json.dumps(walks).replace("</", "<\\/") + "</script>"
-                   "<script>" + REPLAY_JS + "</script>")
-
-    # where people clicked
-    maps = click_heatmaps(study_dir, data)
-    if maps:
-        out.append("<h2>Where people clicked</h2><p class='muted'>Each picture is one view of a page with every persona's clicks on it: "
-                   "<b style='color:#2e6ee6'>blue</b> changed the screen, <b style='color:#dc1e28'>red</b> did nothing visible, grey landed on empty space.</p>"
-                   "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px'>")
-        for m in maps:
-            out.append(f"<figure style='margin:0'><img src='{img_data(m['image'])}' alt='Clicks on {esc(m['page'])}' style='max-width:100%;border:1px solid var(--line);border-radius:6px'>"
-                       f"<figcaption class='muted'>{esc(m['page'])} · {m['clicks']} clicks, {m['dead']} with no response · {esc(', '.join(m['personas']))}</figcaption></figure>")
-        out.append("</div>")
-
-    # findings
-    out.append(f"<h2>Findings ({len(findings)})</h2>")
+    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    findings = sorted(findings, key=lambda f: (sev_order.get(f.get("severity"), 9), str(f.get("id"))))
+    sev_counts = defaultdict(int)
     for f in findings:
-        out.append(f"<div class='finding'><span class='sev {f['severity']}'>{f['severity']}</span> · <span class='chip'>{esc(f['category'])}</span> "
-                   f"<b>{esc(f.get('id'))}: {esc(f.get('title'))}</b><p>{esc(f.get('description'))}</p>")
-        ex = f.get("exposure")
-        if ex and ex.get("walks_reached"):
-            out.append(f"<p class='muted'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached "
-                       f"{esc(', '.join(ex['pages']))}" + (f"; not by {esc(', '.join(ex['missed']))}" if ex.get("missed") else "") + ".</p>")
+        sev_counts[f.get("severity")] += 1
+    reached = sum(1 for v in nav.values() if v["outcome"] == "reached_goal")
+    names = {k: v["persona"].get("name") or k for k, v in nav.items()}
+    outcome_label = {"reached_goal": "Reached goal", "claimed_goal_unverified": "Claimed goal (unverified)", "saved_for_later": "Saved for later",
+                     "gave_up": "Gave up", "left_site": "Left the site", "would_call_or_visit": "Would call or visit", "reached_boundary": "Stopped at a form",
+                     "blocked_by_site": "Blocked by the site", "step_cap": "Hit the step limit"}
+    ol = lambda o: esc(outcome_label.get(o, o))
+    cap = lambda s: esc(str(s or "").capitalize())
+
+    refs = [("wcag-143", "W3C (2023). <i>Web Content Accessibility Guidelines (WCAG) 2.2</i>, Success Criterion 1.4.3 Contrast (Minimum). "
+             "https://www.w3.org/TR/WCAG22/#contrast-minimum"),
+            ("wcag-1411", "W3C (2023). <i>WCAG 2.2</i>, Success Criterion 1.4.11 Non-text Contrast. https://www.w3.org/TR/WCAG22/#non-text-contrast"),
+            ("wcag-258", "W3C (2023). <i>WCAG 2.2</i>, Success Criterion 2.5.8 Target Size (Minimum). https://www.w3.org/TR/WCAG22/#target-size-minimum"),
+            ("umux", "Lewis, J. R., Utesch, B. S., &amp; Maher, D. E. (2013). UMUX-LITE: When there's no time for the SUS. "
+             "<i>Proceedings of CHI 2013</i>, 2099–2102. ACM."),
+            ("artefacts", "Study record, in the study folder: study.json, personas.json, navigation.json, flows.json, verified_findings.json, "
+             "feedback.json, insights.json, and each session's journey.json and screenshots under sessions/.")]
+    ref_no = {k: i for i, (k, _) in enumerate(refs, 1)}
+
+    def cite(*keys):
+        return "<sup class='ref'>[" + ", ".join(f"<a href='#ref-{k}'>{ref_no[k]}</a>" for k in keys) + "]</sup>"
+
+    fig_no = [0]
+
+    def fig(caption):
+        fig_no[0] += 1
+        return f"<figcaption><b>Fig. {fig_no[0]}</b>{caption}</figcaption>"
+
+    walks = replay_data(data)
+    maps = click_heatmaps(study_dir, data)
+    toc = [("design", "Study design"), ("outcomes", "Outcomes"), ("findings", "Findings"), ("bottlenecks", "Flow bottlenecks")]
+    if measurements:
+        toc.append(("accessibility", "Accessibility measurements"))
+    toc += [("feedback", "Participant feedback"), ("discussion", "Discussion"), ("limitations", "Limitations"), ("references", "References")]
+    appendix = ([("appendix-replay", "Walk replay")] if walks else []) + ([("appendix-clicks", "Click maps")] if maps else []) \
+        + ([("appendix-removed", "Removed in verification")] if vf["removed"] else [])
+    num = {k: f"{i:02d}" for i, (k, _) in enumerate(toc, 1)}
+    num.update({k: chr(65 + i) for i, (k, _) in enumerate(appendix)})
+
+    def h2(key, title):
+        return f"<h2 id='{key}'><span class='n'>{num[key]}</span>{esc(title)}</h2>"
+
+    product = study.get("product") or study.get("id")
+    today = datetime.date.today().isoformat()
+    out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+           f"<title>{esc(product)} — persona study</title><style>{css}</style></head><body><article class='paper'>"]
+
+    # header: kicker, title, deck, byline
+    out.append(f"<div class='kicker'>UX research · Persona study</div><h1>{esc(product)}</h1>")
+    if ins.get("headline"):
+        out.append(f"<p class='deck'>{esc(ins['headline'])}</p>")
+    panel_desc = ", ".join(f"{v} {k}" for k, v in devices.items())
+    out.append(f"<div class='byline'><div><b>Study {esc(study.get('id'))}</b> · {n} simulated personas ({esc(panel_desc)}) · mode {esc(study.get('mode'))}</div>"
+               f"<div>Report generated {today}</div></div>")
+
+    # abstract: the numbers and the caveat, without restating the deck
+    sev_line = ", ".join(f"{sev_counts[s]} {s}" for s in ("critical", "high", "medium", "low") if sev_counts[s])
+    out.append(f"<div class='abstract'><b class='k'>Summary</b>{n} personas walked {esc(study.get('start_url'))} by sight alone; {reached} reached a page that verifies "
+               f"their goal. Review kept {len(findings)} findings ({esc(sev_line) or 'none'}), each tied to a recorded screenshot, and "
+               f"{len(vf['removed'])} were removed in verification. These are simulated people: they show where to look, not how many customers would struggle.</div>")
+
+    out.append("<ol class='contents'>" + "".join(f"<li><span class='n'>{num[k]}</span><a href='#{k}'>{esc(t)}</a></li>" for k, t in toc + appendix) + "</ol>")
+
+    # 01 study design
+    out.append(h2("design", "Study design"))
+    out.append(f"<p>Each persona used the site from screenshots alone and acted by clicking screen positions, with no access to page text, markup or "
+               f"accessibility names. A separate reviewer turned the recordings into findings; each one cites a session, a step and a box on that step's "
+               f"screenshot, and was re-checked against the recording before it was kept.{cite('artefacts')}</p>")
+    out.append(f"<p><b>Objective.</b> {esc(study.get('goal'))}</p>")
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Device</th><th>Profile</th><th>Outcome</th></tr></thead><tbody>")
+    for r in demo:
+        d = r.get("demographics") or {}
+        bits = [d.get(k) for k in ("age_band", "occupation", "location", "tech_usage") if d.get(k)]
+        acc = d.get("access_needs") or []
+        out.append(f"<tr><td><b>{esc(r.get('name'))}</b></td><td>{esc(r.get('device'))}</td><td>{esc('; '.join(map(str, bits)))}"
+                   + (f"<br><span class='muted'>Access: {esc(', '.join(map(str, acc)))}</span>" if acc else "") + f"</td><td>{ol(r.get('outcome'))}</td></tr>")
+    out.append("</tbody></table></div>" + fig("The panel. Demographics describe who each simulated persona stands in for; they are not respondents.") + "</figure>")
+
+    # 02 outcomes
+    out.append(h2("outcomes", "Outcomes"))
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Outcome</th><th class='num'>Steps</th><th>Pages, in order</th></tr></thead><tbody>")
+    for name, v in nav.items():
+        path = " → ".join(f"{esc(p['page'])} ({p['steps']})" for p in v["path"])
+        out.append(f"<tr><td><b>{esc(names[name])}</b><br><span class='muted'>{esc(v['device'])}</span></td>"
+                   f"<td>{ol(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td><td class='num'>{v['steps_taken']}</td><td>{path}</td></tr>")
+    out.append("</tbody></table></div>" + fig("Every walk, with the steps spent on each page in brackets.") + "</figure>")
+    if flows["funnel"]:
+        out.append("<figure class='fig'><div class='bars'>")
+        for f in flows["funnel"]:
+            out.append(f"<div>{esc(f['label'])}</div><div class='track'><div class='fill' style='width:{100 * f['reached'] / max(f['of'], 1):.0f}%'></div></div>"
+                       f"<div class='cnt'>{f['reached']} of {f['of']}</div>")
+        out.append("</div>" + fig("Personas reaching each journey stage. Counts of simulated personas, not conversion rates.") + "</figure>")
+
+    # 03 findings
+    out.append(h2("findings", "Findings"))
+    out.append("<p>Ranked by severity. Every finding was checked against the recorded screenshots; the evidence shown is cropped from the cited steps.</p>")
+    if findings:
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>Severity</th><th>Page</th><th>Finding</th></tr></thead><tbody>")
+        for f in findings:
+            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td><td>{cap(f.get('severity'))}</td>"
+                       f"<td>{esc(f.get('page'))}</td><td>{esc(f.get('title'))}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Index of verified findings.") + "</figure>")
+    for f in findings:
+        fid = esc(f.get("id"))
+        out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
+                   f"<p class='sub'>{cap(f.get('severity'))} severity · {esc(f.get('category'))} · {esc(f.get('page'))} · "
+                   f"affects {esc(', '.join(names.get(p, p) for p in f.get('personas', [])))} · confidence {esc(f.get('confidence'))}</p>"
+                   f"<p>{esc(f.get('description'))}</p>")
         if f.get("conflict"):
-            out.append("<p><b>Says one thing:</b> " + esc(f["conflict"][0]) + "<br><b>…and another:</b> " + esc(f["conflict"][1]) + "</p>")
+            out.append(f"<p><b>One page says:</b> {esc(f['conflict'][0])}<br><b>Another says:</b> {esc(f['conflict'][1])}</p>")
         if f.get("measured"):
             m = f["measured"]
-            out.append(f"<p>Measured <span class='fail'>{m['ratio']}:1</span> ({esc(m['foreground'])} on {esc(m['background'])}), target {m['target']}:1 · {esc(f.get('measurement'))}</p>")
-        for e in f.get("evidence", []):
-            crop = study_dir / e.get("crop", "")
-            if e.get("crop") and crop.exists():
-                out.append(f"<figure style='margin:8px 0'><img alt='{esc(f.get('title'))}' src='{img_data(crop)}'>"
-                           f"<figcaption class='muted'>{esc(e['session'])}, step {e['step']}{(' · “' + esc(e['quote']) + '”') if e.get('quote') else ''}</figcaption></figure>")
-        affected = ", ".join(f.get("personas", []))
-        out.append(f"<p><b>Fix:</b> {esc(f.get('recommendation'))}</p><p class='muted'>Affects: {esc(affected)} · confidence {esc(f.get('confidence'))}</p></div>")
+            out.append(f"<p>Measured {m['ratio']}:1 ({esc(m['foreground'])} on {esc(m['background'])}) against a target of {m['target']}:1, "
+                       f"measurement {esc(f.get('measurement'))}.{cite('wcag-143', 'wcag-1411')}</p>")
+        crops = [e for e in f.get("evidence", []) if e.get("crop") and (study_dir / e["crop"]).exists()]
+        if crops:
+            out.append("<div class='pair'>")
+            for e in crops:
+                q = f", “{esc(e['quote'])}”" if e.get("quote") else ""
+                out.append(f"<figure class='fig'><img class='shot' alt='{esc(f.get('title'))}, {esc(e['session'])} step {e['step']}' src='{img_data(study_dir / e['crop'])}'>"
+                           + fig(f"{esc(names.get(e['session'], e['session']))}, step {e['step']}{q}.") + "</figure>")
+            out.append("</div>")
+        ex = f.get("exposure") or {}
+        if ex.get("walks_reached"):
+            out.append(f"<p class='sub' style='margin-top:4px'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached {esc(', '.join(ex['pages']))}"
+                       + (f"; not by {esc(', '.join(ex['missed']))}" if ex.get("missed") else "") + ".</p>")
+        out.append(f"<div class='note'><b class='k'>Recommendation</b>{esc(f.get('recommendation'))}</div></section>")
 
-    # measurements
+    # 04 bottlenecks
+    out.append(h2("bottlenecks", "Flow bottlenecks"))
+    out.append("<p>Pages ranked by a score computed from the recordings: more steps, dead clicks, backtracking and exits on a page raise it.</p>")
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th></th><th>Page</th><th class='num'>Visitors</th><th class='num'>Steps per visitor</th>"
+               "<th class='num'>Dead clicks</th><th class='num'>Backtracked</th><th class='num'>Left short</th><th class='num'>Clarity / trust / effort</th>"
+               "<th class='num'>Score</th></tr></thead><tbody>")
+    for p in flows["pages"]:
+        sp = p["score_parts"]
+        out.append(f"<tr><td>{p['handle']}</td><td>{esc(p['page'])}</td><td class='num'>{p['visitors']}</td><td class='num'>{sp['steps_per_visitor']}</td>"
+                   f"<td class='num'>{sp['dead_clicks']}</td><td class='num'>{sp['backtracked_from']}</td><td class='num'>{sp['exits_short_of_goal']}</td>"
+                   f"<td class='num'>{p['avg_clarity']} / {p['avg_trust']} / {p['avg_effort']}</td><td class='num'><b>{p['bottleneck_score']}</b></td></tr>")
+    out.append("</tbody></table></div>" + fig(f"Score = {esc(flows['score_formula'])}. Clarity and trust 1–5, higher is better; effort 1–5, higher is worse.") + "</figure>")
+
+    # 05 accessibility
     if measurements:
-        out.append("<h2>Contrast and size measurements</h2><div class='wrap'><table><tr><th>Id</th><th>What</th><th>Colours</th><th>Ratio</th><th>Body text 4.5</th><th>Large text / UI 3.0</th><th>Size (CSS px)</th></tr>")
+        out.append(h2("accessibility", "Accessibility measurements"))
+        out.append(f"<p>Contrast and size were measured from screenshot pixels, not from the page's styles, and checked against WCAG 2.2: 4.5:1 for body "
+                   f"text{cite('wcag-143')}, 3:1 for large text and interface components{cite('wcag-1411')}, and a 24 × 24 CSS px minimum target{cite('wcag-258')}.</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>What</th><th>Colours</th><th class='num'>Ratio</th>"
+                   "<th>Text 4.5:1</th><th>Large / UI 3:1</th><th class='num'>Size (CSS px)</th></tr></thead><tbody>")
         for m in measurements:
-            ok = m.get("wcag", {})
-            cls = lambda b: "pass" if b else "fail"
+            okk = m.get("wcag", {})
+            pf = lambda b: "Pass" if b else "Fail"
             out.append(f"<tr><td>{esc(m['id'])}</td><td>{esc(m.get('what'))}</td><td>{esc(m.get('foreground'))} on {esc(m.get('background'))}</td>"
-                       f"<td>{esc(m.get('contrast_ratio'))}</td><td class='{cls(ok.get('body_text_4_5'))}'>{'pass' if ok.get('body_text_4_5') else 'fail'}</td>"
-                       f"<td class='{cls(ok.get('large_text_3'))}'>{'pass' if ok.get('large_text_3') else 'fail'}</td><td>{m['size_css_px'][0]}×{m['size_css_px'][1]}</td></tr>")
-        out.append("</table></div><p class='muted'>Measured from screenshot pixels with an eyedropper method, not from the page's styles.</p>")
+                       f"<td class='num'><b>{esc(m.get('contrast_ratio'))}:1</b></td><td>{pf(okk.get('body_text_4_5'))}</td><td>{pf(okk.get('large_text_3'))}</td>"
+                       f"<td class='num'>{m['size_css_px'][0]} × {m['size_css_px'][1]}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Measurements personas took during their walks. Anti-aliasing can shift a ratio slightly near a threshold.") + "</figure>")
 
-    # demographics
-    out.append("<h2>The panel</h2><div class='wrap'><table><tr><th>Persona</th><th>Demographics</th><th>Outcome</th></tr>")
-    for r in demo:
-        d = "; ".join(f"{k.replace('_', ' ')}: {v if not isinstance(v, list) else ', '.join(map(str, v))}" for k, v in (r.get("demographics") or {}).items())
-        out.append(f"<tr><td><b>{esc(r.get('name'))}</b><br><span class='muted'>{esc(r.get('device'))}</span></td><td>{esc(d)}</td><td>{esc(r.get('outcome'))}</td></tr>")
-    out.append("</table></div><p class='muted'>Simulated people. Demographics describe who the panel stands in for, not real respondents.</p>")
-
-    # feedback
+    # 06 feedback
     s = fb.get("summary") or {}
-    out.append("<h2>What they said afterwards</h2>")
+    out.append(h2("feedback", "Participant feedback"))
     if s:
         rc = s["recommend_counts"]
-        out.append(f"<p>{s['responses']} of {s['of']} exit interviews · ease {s['ease_avg_1_7']}/7 · UMUX-Lite {s['umux_lite_avg_0_100']}/100 · "
-                   f"satisfaction {s['satisfaction_avg_1_5']}/5 · would recommend 9–10: {rc['9-10']}, 7–8: {rc['7-8']}, 0–6: {rc['0-6']}</p>")
-    out.append("<div class='wrap'><table><tr><th>Persona</th><th>In one word</th><th>Worst</th><th>Best</th><th>What would fix it</th><th>In their words</th></tr>")
+        out.append(f"<p>{s['responses']} of {s['of']} personas gave an exit interview. Ease averaged {s['ease_avg_1_7']} of 7, UMUX-Lite "
+                   f"{s['umux_lite_avg_0_100']} of 100{cite('umux')}, satisfaction {s['satisfaction_avg_1_5']} of 5. On likelihood to recommend, "
+                   f"{rc['9-10']} scored 9–10, {rc['7-8']} scored 7–8 and {rc['0-6']} scored 0–6. These are simulated answers, not a benchmark.</p>")
     for r in fb.get("responses", []):
-        out.append(f"<tr><td>{esc(r.get('session'))}</td><td>{esc(r.get('one_word'))}</td><td>{esc(r.get('worst_thing'))}</td><td>{esc(r.get('best_thing'))}</td>"
-                   f"<td>{esc(r.get('what_would_fix_it'))}</td><td>“{esc(r.get('quote'))}”</td></tr>")
-    out.append("</table></div>")
+        if r.get("quote"):
+            out.append(f"<blockquote>“{esc(r.get('quote'))}”<cite>{esc(names.get(r.get('session'), r.get('session')))}</cite></blockquote>")
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Worst</th><th>Best</th><th>What would fix it</th></tr></thead><tbody>")
+    for r in fb.get("responses", []):
+        out.append(f"<tr><td><b>{esc(names.get(r.get('session'), r.get('session')))}</b></td><td>{esc(r.get('worst_thing'))}</td>"
+                   f"<td>{esc(r.get('best_thing'))}</td><td>{esc(r.get('what_would_fix_it'))}</td></tr>")
+    out.append("</tbody></table></div>" + fig("Exit-interview answers, in each persona's words.") + "</figure>")
 
+    # 07 discussion
+    out.append(h2("discussion", "Discussion"))
     for key, title in (("insights", "Patterns across personas"), ("what_works", "What works"), ("research_questions", "Questions to put to real users")):
         if ins.get(key):
-            out.append(f"<h2>{title}</h2><ul>" + "".join(f"<li>{esc(x)}</li>" for x in ins[key]) + "</ul>")
-    if vf["removed"]:
-        out.append("<h2>Removed in verification</h2><ul>" + "".join(f"<li>{esc(r['id'])} {esc(r['title'])}: {esc('; '.join(r['reasons']))}</li>" for r in vf["removed"]) + "</ul>")
-    out.append("<h2>Limits</h2><ul><li>These are simulated personas looking at screenshots. They show where to look, not how many real customers would struggle; counts are not rates.</li>"
+            out.append(f"<h3>{title}</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins[key]) + "</ul>")
+
+    # 08 limitations
+    out.append(h2("limitations", "Limitations"))
+    out.append("<ul class='plain'><li>These are simulated personas looking at screenshots. They show where to look, not how many real customers would struggle; counts are not rates.</li>"
                "<li>Personas saw only pixels and the address bar: no page text, markup or accessibility tree. Screen-reader experience was not tested.</li>"
                "<li>Contrast was measured from rendered pixels; anti-aliasing can shift a ratio slightly near a threshold.</li>"
-               "<li>Time estimates are the personas' own estimates per screen, not measured time on task.</li></ul></main></body></html>")
+               "<li>Time estimates are the personas' own estimates per screen, not measured time on task.</li></ul>")
+    if ins.get("simulation_notes"):
+        out.append("<h3>Notes on this run</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins["simulation_notes"]) + "</ul>")
+
+    # 09 references
+    out.append(h2("references", "References") + "<ol class='refs'>" + "".join(f"<li id='ref-{k}'>{t}</li>" for k, t in refs) + "</ol>")
+
+    # appendices
+    if walks:
+        out.append(f"<section id='appendix-replay'>{h2('appendix-replay', 'Walk replay')}"
+                   "<p>Step through what each persona saw, where they clicked (<span class='fail'>red</span> when nothing visible happened) "
+                   "and what they thought. Arrow keys work once a button has focus.</p>"
+                   "<div id='replay'><div class='controls'><select id='rp-who' aria-label='Persona'></select>"
+                   "<button id='rp-prev' type='button'>&larr; Back</button><button id='rp-next' type='button'>Next &rarr;</button>"
+                   "<span id='rp-pos' class='muted'></span></div><div class='rp-row'>"
+                   "<div class='rp-frame'><img id='rp-img' alt=''><span id='rp-dot' class='rp-dot'></span></div>"
+                   "<div id='rp-cap'></div></div></div>"
+                   "<script type='application/json' id='walks'>" + json.dumps(walks).replace("</", "<\\/") + "</script>"
+                   "<script>" + REPLAY_JS + "</script></section>")
+    if maps:
+        out.append(h2("appendix-clicks", "Click maps") + "<p>Every persona's clicks on each view of a page: blue changed the screen, "
+                   "red did nothing visible, grey landed on empty space.</p><div class='maps'>")
+        for m in maps:
+            out.append(f"<figure class='fig'><img class='shot' src='{img_data(m['image'])}' alt='Clicks on {esc(m['page'])}'>"
+                       + fig(f"{esc(m['page'])}: {m['clicks']} clicks, {m['dead']} with no response.") + "</figure>")
+        out.append("</div>")
+    if vf["removed"]:
+        out.append(h2("appendix-removed", "Removed in verification") + "<ul class='plain'>"
+                   + "".join(f"<li><b>{esc(r['id'])}</b> {esc(r['title'])}: {esc('; '.join(r['reasons']))}</li>" for r in vf["removed"]) + "</ul>")
+    out.append(f"<footer class='notes'><b>Sources.</b> The recorded walks of study {esc(study.get('id'))}{cite('artefacts')}. "
+               "<b>Method.</b> Vision-only persona walks driven by ux-visual-persona-crawl; flow metrics computed from the recordings; findings verified "
+               "against screenshots. <b>Note.</b> Personas are simulated; ask for any finding by its ID to see the trace behind it.</footer>")
+    out.append("</article></body></html>")
     (study_dir / "report.html").write_text("\n".join(out), encoding="utf-8")
 
     md = [f"# {study.get('product')}: visual persona crawl", "", f"Study {study.get('id')} · {n} simulated personas · mode {study.get('mode')}", ""]

@@ -68,6 +68,8 @@ REAL_LOOKING = re.compile(
 MAX_EDGE = 1568  # longest screenshot side a vision model takes without resizing
 FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
 FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
+FILL_MAX = 8  # fields one fill action may set; more than a screen's worth means the persona isn't looking
+LOW_IMAGE_EDGE = 1100  # study "image_budget": "low" caps the screenshot's long side here, about half the image tokens
 
 
 LONG_PREFIX = "\\\\?\\"
@@ -127,7 +129,7 @@ def load_study(path: Path) -> dict:
         bad = [h for h in study.get("allowed_hosts", []) if not is_test_host(h)]
         if bad:
             problems.append(f"test_env refused, not test hosts: {bad}. Use observe_only for live sites.")
-    study.setdefault("max_steps", 30)
+    study.setdefault("max_steps", 100)
     # Pacing protects real sites. A local or staging system needs only enough time for the screen to settle.
     all_test = all(is_test_host(h) for h in study.get("allowed_hosts", []))
     study["local_pace"] = all_test
@@ -280,6 +282,24 @@ def visible_change(before: bytes, after: bytes, ignore=None) -> bool:
     return changed >= 6  # identical renders differ by nothing; a ticked checkbox is about 16 pixels here
 
 
+def local_change(before: bytes, after: bytes, x: float, y: float, k: float = 1.0) -> bool:
+    """Did the screen change right where the person clicked? A ticked checkbox or a selected radio button is
+    too small to register on the quarter-size whole-screen check, but it is plain to the eye next to the pointer."""
+    import io
+    from PIL import Image
+
+    a = Image.open(io.BytesIO(before)).convert("RGB")
+    b = Image.open(io.BytesIO(after)).convert("RGB")
+    if a.size != b.size:
+        return True
+    r = max(16, round(40 * k))
+    box = (max(0, int(x) - r), max(0, int(y) - r), min(a.width, int(x) + r), min(a.height, int(y) + r))
+    if box[2] - box[0] < 2 or box[3] - box[1] < 2:
+        return False
+    diff = _changed(a.crop(box), b.crop(box))
+    return diff.histogram()[255] >= max(12, round(12 * k * k))
+
+
 def blank_at(raw: bytes, x: float, y: float, k: float = 1.0) -> bool:
     """True when the area around a click (about 12 CSS px each way) holds one flat colour: no text, edge or control."""
     import io
@@ -353,7 +373,8 @@ class Session:
         # Vision models scale down images whose long edge passes MAX_EDGE, and a scaled image makes the walker's
         # click estimates land off target. Lowering the pixel density keeps the CSS layout (and so the zoom) intact.
         vp = opts["viewport"]
-        cap = MAX_EDGE / max(vp["width"], vp["height"])
+        edge = LOW_IMAGE_EDGE if self.study.get("image_budget") == "low" else MAX_EDGE
+        cap = edge / max(vp["width"], vp["height"])
         if opts["device_scale_factor"] > cap:
             opts["device_scale_factor"] = round(cap - 0.005, 2)
         self.k = opts["device_scale_factor"]  # screenshot pixels per CSS pixel
@@ -493,7 +514,9 @@ class Session:
             "tabs_open": len(self.context.pages), "screenshot": shown(grid), "image_size": list(size),
         }
         if self.last_hash == digest:
-            view["note"] = "The screen looks exactly as it did at your last look."
+            # Saves the walker reading the same picture twice: the image is most of a step's cost.
+            view["unchanged"] = True
+            view["note"] = "The screen looks exactly as it did at your last look. You don't need to open this screenshot again."
         if self.dialogs:
             view["browser_popup"] = self.dialogs.pop(0)
             view["browser_popup"]["note"] = "A browser pop-up appeared with this message. It was closed with Cancel."
@@ -562,6 +585,8 @@ class Session:
         result["ms"] = round((time.perf_counter() - started) * 1000)
         self.step += 1
         self.est_total += float(decision.get("est_seconds") or 0)
+        if isinstance(result.get("walk_recap"), dict):
+            result["walk_recap"]["steps_taken"] = self.step  # the finish itself is a step
 
         after_raw = None
         if not self.ended:
@@ -575,7 +600,13 @@ class Session:
                 result["screen_moves_by_itself"] = True
             result["address_changed"] = self.page.url != url_before
             result["address_after"] = self.page.url
-            expects_change = action["type"] in ("click", "double_click", "key", "back", "scroll", "type")
+            if (not result["screen_changed"] and after_raw and action["type"] in ("click", "double_click")
+                    and "x" in action and "y" in action):
+                result["screen_changed"] = local_change(before_raw, after_raw, action["x"], action["y"], self.k)
+            if not result["screen_changed"] and after_raw and action["type"] == "fill":
+                result["screen_changed"] = any(local_change(before_raw, after_raw, f["x"], f["y"], self.k)
+                                               for f in action.get("fields", []) if isinstance(f, dict) and "x" in f and "y" in f)
+            expects_change = action["type"] in ("click", "double_click", "key", "back", "scroll", "type", "fill")
             if expects_change and result.get("ok") and not result["screen_changed"]:
                 result["no_visible_response"] = True
                 if action["type"] in ("click", "double_click") and "x" in action and blank_at(self.looked["raw"], action["x"], action["y"], self.k):
@@ -587,6 +618,9 @@ class Session:
         logged = dict(action)
         if result.get("blocked") in ("typing_disabled_live_site", "use_test_value"):
             logged["text"] = "[refused, not recorded]"
+            if isinstance(logged.get("fields"), list):
+                logged["fields"] = [dict(f, text="[refused, not recorded]") if isinstance(f, dict) and "text" in f else f
+                                    for f in logged["fields"]]
         self.journey["steps"].append({
             "step": self.step, "at": time.strftime("%H:%M:%S"), "address_bar": self.looked["url"],
             "screenshot": Path(self.looked["shot"]).name, "image_size": self.looked["size"],
@@ -599,9 +633,13 @@ class Session:
         if self.step >= self.study["max_steps"] and not self.ended:
             await self.finish("step_cap", "Step limit reached", auto=True)
             result["ended"] = self.ended
+            result["walk_recap"] = self.recap()
+            result["next"] = FEEDBACK_NEXT
         elif self.no_change >= 5 and not self.ended:
             await self.finish("harness_stall", "Five actions in a row produced no visible change", auto=True)
             result["ended"] = self.ended
+            result["walk_recap"] = self.recap()
+            result["next"] = FEEDBACK_NEXT
         elif self.no_change >= 3:
             result["stall_warning"] = "Your last few actions changed nothing on screen. Try something else, or give up if that is what this person would do."
         if not self.ended:
@@ -619,8 +657,7 @@ class Session:
                 if action.get("outcome") not in OUTCOMES:
                     return {"ok": False, "error": f"outcome must be one of {sorted(OUTCOMES)}"}
                 await self.finish(action["outcome"], action.get("reason", ""))
-                return {"ok": True, "ended": self.ended,
-                        "next": "Now record this person's exit interview with the feedback command."}
+                return {"ok": True, "ended": self.ended, "walk_recap": self.recap(), "next": FEEDBACK_NEXT}
             if kind in ("click", "double_click", "hover"):
                 if "x" not in action or "y" not in action:
                     return {"ok": False, "error": f"{kind} needs x and y in screenshot pixels"}
@@ -637,15 +674,48 @@ class Session:
                 else:
                     await page.mouse.move(x, y, steps=4)
                     await page.mouse.click(x, y)
+            elif kind == "fill":
+                # Several fields on the screen the persona is looking at, in one step: a click on each, then the
+                # text if any. One reaction and one screenshot for the lot, as a person fills a form in one go.
+                fields = action.get("fields")
+                if not isinstance(fields, list) or not 1 <= len(fields) <= FILL_MAX:
+                    return {"ok": False, "error": f"fill needs fields: a list of 1 to {FILL_MAX} items such as "
+                                                  '{"x": 400, "y": 300, "text": "test:email"} or {"x": 40, "y": 520} for a tick'}
+                w, h = self.looked["size"]
+                data = test_values(self.study, self.persona, self.dir.name)
+                for f in fields:
+                    if not isinstance(f, dict) or "x" not in f or "y" not in f or not (0 <= f["x"] < w and 0 <= f["y"] < h):
+                        return {"ok": False, "error": f"each fill field needs x,y inside the {w}x{h} screenshot"}
+                    if "text" in f:
+                        refused = self.guard_type({"text": f["text"]})
+                        if refused:
+                            self.counts["typing_refused"] += 1
+                            return {"ok": False, "blocked": refused, "note": TYPING_NOTES[refused] + " Nothing in this fill was done."}
+                        if str(f["text"]).startswith("test:") and str(f["text"])[5:] not in data:
+                            return {"ok": False, "error": f"No test value named {str(f['text'])[5:]} in this study. Nothing in this fill was done."}
+                url_at_start = page.url
+                for i, f in enumerate(fields):
+                    x, y = self.to_css(f["x"]), self.to_css(f["y"])
+                    if self.mobile:
+                        await page.touchscreen.tap(x, y)
+                    else:
+                        await page.mouse.move(x, y, steps=2)
+                        await page.mouse.click(x, y)
+                    await page.wait_for_timeout(120)
+                    if "text" in f:
+                        text = str(f["text"])
+                        if text.startswith("test:"):
+                            text = str(data[text[5:]])
+                        await page.keyboard.type(text, delay=20)
+                    if self.page.url != url_at_start and i < len(fields) - 1:
+                        await self.settle()
+                        return {"ok": True, "fill_stopped": i + 1,
+                                "note": f"The page changed after field {i + 1}, so the rest of this fill was not done."}
             elif kind == "type":
                 refused = self.guard_type(action)
                 if refused:
                     self.counts["typing_refused"] += 1
-                    note = {
-                        "typing_disabled_live_site": "Typing is off on a live site, apart from short search words. Say what this person would enter and how they feel about being asked, then go on or finish with reached_boundary.",
-                        "use_test_value": "That looks like real identity or payment data. Type only test:<name> values from the list in your brief, or ordinary words.",
-                    }[refused]
-                    return {"ok": False, "blocked": refused, "note": note}
+                    return {"ok": False, "blocked": refused, "note": TYPING_NOTES[refused]}
                 text = str(action.get("text", ""))
                 if text.startswith("test:"):
                     data = test_values(self.study, self.persona, self.dir.name)
@@ -707,6 +777,25 @@ class Session:
         })
         self.save()
         self.ended = grounded
+
+    def recap(self) -> dict:
+        """What actually happened on this walk, handed back before the exit interview so the answers rest on the
+        walk rather than on a general impression of the site, which runs kind."""
+        steps = [s for s in self.journey["steps"] if isinstance(s.get("decision"), dict)]
+        dec = [s["decision"] for s in steps]
+        num = lambda d, k, dflt: float(d.get(k)) if isinstance(d.get(k), (int, float)) else dflt
+        avg = lambda k: round(sum(num(d, k, 3) for d in dec) / len(dec), 1) if dec else None
+        sev = Counter(f.get("severity") for d in dec for f in d.get("friction", []) if isinstance(f, dict))
+        hardest = sorted(steps, key=lambda s: num(s["decision"], "clarity", 3) + num(s["decision"], "trust", 3)
+                         - num(s["decision"], "effort", 3))[:3]
+        goal = self.study.get("goal_match")
+        return {
+            "outcome": self.ended, "your_reason": self.journey.get("reason", ""), "steps_taken": self.step,
+            "goal_page_reached": bool(goal and any(re.search(goal, u, re.I) for u in self.visited)),
+            "in_the_moment_average": {"clarity": avg("clarity"), "trust": avg("trust"), "effort": avg("effort")},
+            "friction_notes": {k: sev[k] for k in ("critical", "high", "medium", "low") if sev[k]},
+            "hardest_moments": [{"step": s["step"], "thought": str(s["decision"].get("thought", ""))[:200]} for s in hardest],
+        }
 
     def save(self):
         (self.dir / "journey.json").write_text(json.dumps(self.journey, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -860,6 +949,14 @@ def cmd_measure(args):
     print(json.dumps(rec))
 
 
+FEEDBACK_NEXT = ("Your walk has ended. Read walk_recap: it is what happened on this walk. Now give this person's exit "
+                 "interview with the feedback command, answering from that walk, with a reason for every score.")
+TYPING_NOTES = {
+    "typing_disabled_live_site": "Typing is off on a live site, apart from short search words. Say what this person would enter and how they feel about being asked, then go on or finish with reached_boundary.",
+    "use_test_value": "That looks like real identity or payment data. Type only test:<name> values from the list in your brief, or ordinary words.",
+}
+
+
 def feedback_problems(data) -> list:
     if not isinstance(data, dict):
         return ["the exit interview must be a JSON object"]
@@ -871,6 +968,11 @@ def feedback_problems(data) -> list:
     for key in FEEDBACK_TEXT:
         if not str(data.get(key, "")).strip():
             problems.append(f"{key} is required")
+    # A number with no reason drifts to a polite middle; a reason has to point at something that happened.
+    reasons = data.get("reasons") if isinstance(data.get("reasons"), dict) else {}
+    short = [k for k in FEEDBACK_SCALES if len(str(reasons.get(k, "")).strip()) < 12]
+    if short:
+        problems.append("reasons needs a sentence for each score, naming a moment from the walk: " + ", ".join(short))
     return problems
 
 
@@ -894,22 +996,14 @@ def cmd_feedback(args):
 
 
 def cmd_act(args):
-    """One action. A finish may carry the exit interview, which saves the walker a separate call."""
+    """One action. The exit interview comes after the walk ends, through `feedback`, so it is answered from the
+    recap the finish returns rather than written in advance alongside the last step."""
     session_dir = lp(args.session)
     payload = read_payload(args)
-    interview = payload.get("exit_interview") if isinstance(payload, dict) else None
-    finishing = isinstance(payload, dict) and (payload.get("action") or {}).get("type") == "finish"
-    if interview is not None:
-        if not finishing:
-            raise SystemExit("exit_interview goes only with a finish action.")
-        problems = feedback_problems(interview)
-        if problems:
-            # Checked before the walk ends, so the walker can fix it and send the same finish again.
-            raise SystemExit("Exit interview incomplete, nothing was done: " + "; ".join(problems))
-    result = call(session_dir, "act", {k: v for k, v in payload.items() if k != "exit_interview"})
-    if interview is not None and result.get("ok") and result.get("ended"):
-        result["exit_interview"] = shown(save_feedback(session_dir, interview))
-        result.pop("next", None)
+    if isinstance(payload, dict) and payload.get("exit_interview") is not None:
+        raise SystemExit("Nothing was done: send the finish on its own. Its result recaps your walk; then give the "
+                         "exit interview with the feedback command.")
+    result = call(session_dir, "act", payload)
     print(json.dumps(result, ensure_ascii=False))
 
 

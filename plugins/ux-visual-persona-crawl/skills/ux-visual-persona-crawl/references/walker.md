@@ -18,6 +18,8 @@ You might finish, put it off, phone instead, go elsewhere, or give up. All of th
 
 You work from screenshots, exactly as this person sees their screen. You never get the page's text, code or any hidden labels, and you must not try to get them: no reading files other than this brief and the screenshots the commands name, no fetching the page, no other tools on the website. If you can't make something out, that is part of what this person experiences.
 
+Use exactly two tools: your file-reading tool, for this brief and the screenshots the commands name, and the shell, for the driver commands below. Never use a browser, page-reading, web-fetch, web-search or screenshot tool, even if one is offered to you: whatever it shows reaches you without this person's eyes, and may be another persona's results. A walk that touches one is thrown away.
+
 - Read what is drawn. Faint, tiny or crowded text is hard for you too: if you have to squint, say so and use `zoom` the way someone leans toward the screen. If even then you can't read it, record that you couldn't, and don't guess what it says.
 - Decide what's clickable from how it looks. Something that looks like plain text, or looks greyed out, is something this person might never press. If you do press something and nothing visibly happens, that matters.
 - Only what's on the current screenshot is visible. Seeing more means scrolling, and each scroll costs this person a little patience.
@@ -32,7 +34,7 @@ Use only these. `[DRIVER]` is the driver script and `[SESSION]` is your session 
 
 Your first screen was taken for you: it is the screenshot named in your prompt, step 1, at the start address. Open screenshots with your file-reading tool, the one that shows you images. Each has faint lines every 100 pixels with numbers along the top and left edges; positions you click are in those same pixels. The lines are only a ruler, not part of the website.
 
-You don't need `look`: every `act` result ends with `next_screen`, the screen as it is after your action, with its own `screenshot` to open. Open that screenshot before deciding your next action. Run `look` only if you have no screenshot for the current step, for example when a result has no `next_screen`:
+You don't need `look`: every `act` result ends with `next_screen`, the screen as it is after your action, with its own `screenshot` to open. Open that screenshot before deciding your next action, unless `next_screen` says `unchanged`: then the screen is exactly the one you just saw, so don't open it again. Never reopen earlier screenshots; your `memory` notes carry what you need from them. Run `look` only if you have no screenshot for the current step, for example when a result has no `next_screen`:
 
 ```bash
 python "[DRIVER]" look --session "[SESSION]"
@@ -98,12 +100,15 @@ Actions (positions are pixels on the screenshot):
 | Point at something (desktop) | `{"type":"hover","x":640,"y":410}` |
 | Scroll | `{"type":"scroll","direction":"down","amount":"screen"}` (`amount`: `little`, `half`, `screen`; add `x`,`y` to scroll a panel) |
 | Type into the box you clicked | `{"type":"type","text":"words","enter":false}` |
+| Fill several fields on this screen in one go | `{"type":"fill","fields":[{"x":400,"y":300,"text":"test:email"},{"x":400,"y":380,"text":"Testville"},{"x":40,"y":520}]}` (up to 8; each is a click at x,y, then its text if it has one; an item with no text ticks or picks what is there) |
 | Press a key | `{"type":"key","key":"Tab"}` (`Tab`, `Shift+Tab`, `Enter`, `Escape`, `Space`, `Backspace`, arrows, `PageDown`, `PageUp`, `Home`, `End`) |
 | Browser back | `{"type":"back"}` |
 | Wait for something to load | `{"type":"wait"}` |
 | Stop | `{"type":"finish","outcome":"gave_up","reason":"why, in their words"}` |
 
 Typing: [TYPING RULE: either "This is a live site. You may type only short search words, with `\"purpose\":\"search\"`. For any form, say what you would enter and how you feel about being asked, then decide whether to go on." or "This is a test system. For anything personal type only these test values, written exactly as `test:<name>`: <NAMES>. Anything else, type plain fake words."]
+
+When a form shows several fields you already know how to answer, fill them with one `fill` rather than a click and a type per field, the way a person works down a form without stopping. Use single steps where this person would stop and think: a question they don't understand, a choice they're unsure of, an error to fix.
 
 Outcomes: `reached_goal`, `reached_boundary` (stopped at a form on a live site, or the site refused to send), `gave_up`, `left_site`, `would_call_or_visit`, `saved_for_later`, `blocked_by_site` (CAPTCHA, login wall or bot check: don't attempt it).
 
@@ -113,32 +118,37 @@ A `blocked` result is a limit of this test, not a problem with the website. Don'
 
 **When you finish: the exit interview**
 
-Send the exit interview with your `finish` action, as `exit_interview` beside `decision` and `action`. Answer as this person. If an answer is missing, nothing is done and the result says what to fix; send the same finish again with the fixed answers.
+Send the `finish` on its own, like any other action. Its result has `walk_recap`: your outcome, how many steps you took, whether you reached the page you came for, your own clarity, trust and effort averaged over the walk, your friction notes, and your three hardest moments in your own words. Read it, then give the exit interview from that walk:
 
 ```bash
-python "[DRIVER]" act --session "[SESSION]" <<'EOF'
+python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
 {
- "decision": { ...as for any step... },
- "action": {"type": "finish", "outcome": "gave_up", "reason": "why, in their words"},
- "exit_interview": {
-  "ease": 4,
-  "meets_needs": 3,
-  "easy_to_use": 4,
-  "recommend": 6,
-  "satisfaction": 3,
-  "one_word": "confusing",
-  "best_thing": "...",
-  "worst_thing": "...",
-  "what_would_fix_it": "...",
-  "would_return": "yes, no or maybe, and why",
-  "quote": "one or two sentences, as they'd say it to a friend"
- }
+ "ease": "<1-7>",
+ "meets_needs": "<1-7>",
+ "easy_to_use": "<1-7>",
+ "recommend": "<0-10>",
+ "satisfaction": "<1-5>",
+ "reasons": {
+  "ease": "a sentence naming the moment that decided it",
+  "meets_needs": "...",
+  "easy_to_use": "...",
+  "recommend": "...",
+  "satisfaction": "..."
+ },
+ "one_word": "...",
+ "best_thing": "...",
+ "worst_thing": "...",
+ "what_would_fix_it": "...",
+ "would_return": "yes, no or maybe, and why",
+ "quote": "one or two sentences, as they'd say it to a friend"
 }
 EOF
 ```
 
-If the driver ends the walk for you (the result has `ended` and no `exit_interview`), send the answers on their own instead: `python "[DRIVER]" feedback --session "[SESSION]"` with just the `exit_interview` object on stdin.
+Write numbers where the example shows a range. If the driver ends the walk for you (the step limit, or nothing changing for several actions), its result has the same `walk_recap`; answer the same way.
 
-`ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5. Answer from this person's experience, including if they gave up early.
+`ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5.
+
+Score what happened to this person on this walk, not how the site looks or how polite you feel. Someone who didn't get what they came for, or got it only after a struggle, says so in their numbers; someone it went smoothly for says that too. Each reason names a moment from the walk, so a number nobody could justify from the recap doesn't get written. If an answer is missing, nothing is saved and the result says what to fix.
 
 Then reply with one line: their outcome and why.
