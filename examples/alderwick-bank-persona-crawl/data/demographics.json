@@ -1,0 +1,139 @@
+[
+  {
+    "session": "cafe-owner-merchant",
+    "persona": "cafe-owner-merchant",
+    "name": "Luis, cafe owner",
+    "device": "mobile",
+    "demographics": {
+      "age_band": "40-49",
+      "gender": "man",
+      "location": "city",
+      "occupation": "owns a small cafe",
+      "household": "married, two teens",
+      "income_band": "middle",
+      "education": "high school",
+      "primary_language": "English (second language after Spanish)",
+      "tech_usage": "uses phone for everything, rarely a computer",
+      "devices_owned": [
+        "Android phone"
+      ],
+      "access_needs": []
+    },
+    "outcome": "claimed_goal_unverified"
+  },
+  {
+    "session": "cafe-owner-merchant-2",
+    "persona": "cafe-owner-merchant",
+    "name": "Luis, cafe owner",
+    "device": "mobile",
+    "demographics": {
+      "age_band": "40-49",
+      "gender": "man",
+      "location": "city",
+      "occupation": "owns a small cafe",
+      "household": "married, two teens",
+      "income_band": "middle",
+      "education": "high school",
+      "primary_language": "English (second language after Spanish)",
+      "tech_usage": "uses phone for everything, rarely a computer",
+      "devices_owned": [
+        "Android phone"
+      ],
+      "access_needs": []
+    },
+    "outcome": "reached_goal"
+  },
+  {
+    "session": "cd-rate-checker-phone",
+    "persona": "cd-rate-checker-phone",
+    "name": "Marcus, saver checking rates",
+    "device": "mobile",
+    "demographics": {
+      "age_band": "25-34",
+      "gender": "man",
+      "location": "city",
+      "occupation": "warehouse supervisor",
+      "household": "single",
+      "income_band": "lower-middle",
+      "education": "some college",
+      "primary_language": "English",
+      "tech_usage": "phone only, skims quickly",
+      "devices_owned": [
+        "Android phone"
+      ],
+      "access_needs": []
+    },
+    "outcome": "reached_goal"
+  },
+  {
+    "session": "checking-switcher",
+    "persona": "checking-switcher",
+    "name": "Dana, nurse switching banks",
+    "device": "desktop",
+    "demographics": {
+      "age_band": "30-39",
+      "gender": "woman",
+      "location": "suburb",
+      "occupation": "hospital nurse",
+      "household": "partner and one child",
+      "income_band": "middle",
+      "education": "nursing degree",
+      "primary_language": "English",
+      "tech_usage": "banks on her laptop and phone weekly",
+      "devices_owned": [
+        "laptop",
+        "iPhone"
+      ],
+      "access_needs": []
+    },
+    "outcome": "saved_for_later"
+  },
+  {
+    "session": "checking-switcher-3",
+    "persona": "checking-switcher",
+    "name": "Dana, nurse switching banks",
+    "device": "desktop",
+    "demographics": {
+      "age_band": "30-39",
+      "gender": "woman",
+      "location": "suburb",
+      "occupation": "hospital nurse",
+      "household": "partner and one child",
+      "income_band": "middle",
+      "education": "nursing degree",
+      "primary_language": "English",
+      "tech_usage": "banks on her laptop and phone weekly",
+      "devices_owned": [
+        "laptop",
+        "iPhone"
+      ],
+      "access_needs": []
+    },
+    "outcome": "step_cap"
+  },
+  {
+    "session": "retiree-wealth-callback",
+    "persona": "retiree-wealth-callback",
+    "name": "Eleanor, recently retired executive",
+    "device": "desktop",
+    "demographics": {
+      "age_band": "65-74",
+      "gender": "woman",
+      "location": "suburb",
+      "occupation": "retired finance executive",
+      "household": "widowed, lives alone",
+      "income_band": "high",
+      "education": "MBA",
+      "primary_language": "English",
+      "tech_usage": "laptop for email and news, cautious online",
+      "devices_owned": [
+        "laptop",
+        "tablet"
+      ],
+      "access_needs": [
+        "reading glasses; prefers larger text"
+      ]
+    },
+    "outcome": "step_cap"
+  }
+]

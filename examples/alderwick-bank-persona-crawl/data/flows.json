@@ -1,0 +1,200 @@
+{
+  "study": "alderwick-2026-11",
+  "personas": 6,
+  "pages": [
+    {
+      "page": "/open?product=everyday-checking",
+      "stage": "apply",
+      "visitors": 2,
+      "steps": 60,
+      "est_seconds": 595,
+      "friction_reports": 6,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 4.5,
+      "avg_trust": 3.5,
+      "avg_effort": 2.1,
+      "score_parts": {
+        "steps_per_visitor": 30.0,
+        "dead_clicks": 8,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 1,
+        "friction_weight": 8
+      },
+      "bottleneck_score": 53.0,
+      "handle": "B1"
+    },
+    {
+      "page": "/wealth/contact",
+      "stage": "apply",
+      "visitors": 1,
+      "steps": 26,
+      "est_seconds": 241,
+      "friction_reports": 4,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 4.7,
+      "avg_trust": 4.0,
+      "avg_effort": 1.2,
+      "score_parts": {
+        "steps_per_visitor": 26.0,
+        "dead_clicks": 0,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 0,
+        "friction_weight": 4
+      },
+      "bottleneck_score": 30.0,
+      "handle": "B2"
+    },
+    {
+      "page": "/business/merchant-services",
+      "stage": "product",
+      "visitors": 2,
+      "steps": 6,
+      "est_seconds": 70,
+      "friction_reports": 8,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 3.7,
+      "avg_trust": 3.0,
+      "avg_effort": 2.3,
+      "score_parts": {
+        "steps_per_visitor": 3.0,
+        "dead_clicks": 0,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 1,
+        "friction_weight": 12
+      },
+      "bottleneck_score": 12.0,
+      "handle": "B3"
+    },
+    {
+      "page": "/rates",
+      "stage": "rates",
+      "visitors": 1,
+      "steps": 3,
+      "est_seconds": 53,
+      "friction_reports": 2,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 4.3,
+      "avg_trust": 4.0,
+      "avg_effort": 1.7,
+      "score_parts": {
+        "steps_per_visitor": 3.0,
+        "dead_clicks": 0,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 0,
+        "friction_weight": 3
+      },
+      "bottleneck_score": 6.0,
+      "handle": "B4"
+    },
+    {
+      "page": "/",
+      "stage": "home",
+      "visitors": 6,
+      "steps": 19,
+      "est_seconds": 178,
+      "friction_reports": 9,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 3.6,
+      "avg_trust": 3.1,
+      "avg_effort": 1.8,
+      "score_parts": {
+        "steps_per_visitor": 3.2,
+        "dead_clicks": 0,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 0,
+        "friction_weight": 14
+      },
+      "bottleneck_score": 5.5,
+      "handle": "B5"
+    },
+    {
+      "page": "/compare/checking",
+      "stage": "product",
+      "visitors": 2,
+      "steps": 4,
+      "est_seconds": 100,
+      "friction_reports": 2,
+      "back_presses": 0,
+      "missed_clicks": 0,
+      "refused_by_driver": 0,
+      "avg_clarity": 4.0,
+      "avg_trust": 4.0,
+      "avg_effort": 2.0,
+      "score_parts": {
+        "steps_per_visitor": 2.0,
+        "dead_clicks": 0,
+        "backtracked_from": 0,
+        "exits_short_of_goal": 0,
+        "friction_weight": 2
+      },
+      "bottleneck_score": 3.0,
+      "handle": "B6"
+    }
+  ],
+  "funnel": [
+    {
+      "stage": "home",
+      "label": "Home",
+      "reached": 6,
+      "of": 6,
+      "personas": [
+        "cafe-owner-merchant",
+        "cafe-owner-merchant-2",
+        "cd-rate-checker-phone",
+        "checking-switcher",
+        "checking-switcher-3",
+        "retiree-wealth-callback"
+      ]
+    },
+    {
+      "stage": "product",
+      "label": "Product or comparison page",
+      "reached": 4,
+      "of": 6,
+      "personas": [
+        "cafe-owner-merchant",
+        "cafe-owner-merchant-2",
+        "checking-switcher",
+        "checking-switcher-3"
+      ]
+    },
+    {
+      "stage": "wealth",
+      "label": "Wealth pages",
+      "reached": 0,
+      "of": 6,
+      "personas": []
+    },
+    {
+      "stage": "rates",
+      "label": "Rates",
+      "reached": 1,
+      "of": 6,
+      "personas": [
+        "cd-rate-checker-phone"
+      ]
+    },
+    {
+      "stage": "apply",
+      "label": "Application or contact form",
+      "reached": 3,
+      "of": 6,
+      "personas": [
+        "checking-switcher",
+        "checking-switcher-3",
+        "retiree-wealth-callback"
+      ]
+    }
+  ],
+  "score_formula": "steps_per_visitor + 2*dead_clicks + 1.5*backtracked_from + 3*exits_short_of_goal + friction_weight/visitors (critical 4, high 3, medium 2, low 1)"
+}
