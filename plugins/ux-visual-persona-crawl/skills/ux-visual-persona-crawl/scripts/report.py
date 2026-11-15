@@ -543,6 +543,8 @@ def replay_data(data: dict) -> dict:
                 did = f"scrolled {a.get('direction', 'down')}"
             elif did == "type":
                 did = "typed" + (f" \"{a.get('text')}\"" if a.get("text") else "")
+            elif did == "fill":
+                did = f"filled {len(a.get('fields') or [])} fields"
             frames.append({
                 "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
                 "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,

@@ -69,7 +69,7 @@ Create `ux-crawl-runs/<study-id>/study.json`:
   "allowed_hosts": ["www.acme.com", "join.acme.com"],
   "goal": "Choose a plan and reach the start of the sign-up form",
   "goal_match": "join\\.acme\\.com",
-  "max_steps": 30,
+  "max_steps": 100,
   "pace_ms": 1200,
   "stages": [
     {"id": "landing", "label": "Landing page", "match": "/broadband$"},
@@ -78,6 +78,8 @@ Create `ux-crawl-runs/<study-id>/study.json`:
   ]
 }
 ```
+
+`max_steps` defaults to 100, which leaves room for a multi-step form and the screen after Submit. Set `"image_budget": "low"` to cap each screenshot's long side at 1100 px, about half the image tokens per step, when the pages carry no fine print the personas must read; leave it out for price tables, fees or a `browser_zoom` persona.
 
 Keep `id` short and each persona `id` to 24 characters or fewer; they become folder names. Deep folders are fine: the scripts write through Windows' long-path form, so there's no need to move a study to a shorter folder.
 
@@ -95,7 +97,7 @@ python <skill>/scripts/eyes.py start --study <study.json> --recon [--device mobi
 
 Then `look`, `zoom`, `scroll` and `click` as a persona would. Here `act` needs only the `action`, for example `echo '{"action": {"type": "click", "x": 640, "y": 410}}' | python <skill>/scripts/eyes.py act --session <recon-session>`. The action types are the table in `references/walker.md`. Recon sessions live in `recon/` and stay out of the analysis. Never fetch the HTML, run curl, open the page source or use a web-fetch tool: the markup says things the screen doesn't, and they would reach the report as if a visitor saw them.
 
-Then hand the survey to a subagent with `references/surveyor.md`, the study path and the driver path, and nothing else. It writes `facts.md`: the prices, conditions and promises the site makes, with the page each is on. That file goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Nothing before the review needs it, so start the surveyor alongside the walkers (step 5). On a live site its session counts toward the two that may run at once. Without subagents, follow `surveyor.md` yourself.
+Then hand the survey to a `screen-walker` subagent (see step 5) with `references/surveyor.md`, the study path and the driver path, and nothing else. It writes `facts.md`: the prices, conditions and promises the site makes, with the page each is on. That file goes to the reviewer only, so they can tell when a persona came away with a wrong belief. Nothing before the review needs it, so start the surveyor alongside the walkers (step 5). On a live site its session counts toward the two that may run at once. Without subagents, follow `surveyor.md` yourself.
 
 ### 4. Create the personas
 
@@ -109,13 +111,13 @@ Start the sessions, then hand each one to its own subagent:
 python <skill>/scripts/eyes.py start --study <study.json> --personas <personas.json> --all
 ```
 
-This opens every persona's browser at once. Use `--persona a,b` to choose personas. On a live site it opens two and lists the rest as `queued`; start each queued one as a walk finishes. Each session gets `brief.md`, the brief from `references/walker.md` with the persona, paths and typing rule filled in. Give each subagent its session's `walker_prompt` as the whole prompt, and nothing else. That one line points it at its brief. Pick each walker's model from the table above. In testing a mid-tier walker clicked as accurately as the top model at twice the speed, but tended to give up sooner, so when a walk ends within two or three steps, read its `reason` before trusting the gap in coverage. Start the walkers together. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
+This opens every persona's browser at once. Use `--persona a,b` to choose personas. On a live site it opens two and lists the rest as `queued`; start each queued one as a walk finishes. Each session gets `brief.md`, the brief from `references/walker.md` with the persona, paths and typing rule filled in. Give each subagent its session's `walker_prompt` as the whole prompt, and nothing else. Start every walker as this plugin's `screen-walker` agent (subagent type `ux-visual-persona-crawl:screen-walker`), which has only file reading, file writing and the shell. A general-purpose subagent also holds browser, page-reading and web tools: one walker that reached for them read a report open in an editor's browser pane and took in the other personas' findings, and the walk had to be thrown away. Where that agent type isn't available, close every browser pane or tab you have open and open no study output in a browser until all walks are done. That one line points it at its brief. Pick each walker's model from the table above. In testing a mid-tier walker clicked as accurately as the top model at twice the speed, but tended to give up sooner, so when a walk ends within two or three steps, read its `reason` before trusting the gap in coverage. Start the walkers together. Your knowledge of the site, the findings you expect and the other personas would contaminate the run. Don't steer or rescue a stuck persona: getting stuck is the data.
 
 If you can't run subagents, walk the personas one at a time yourself, working only from that persona's profile and from what the screenshots show.
 
 Every browser action, for walkers, recon and the survey, goes through `eyes.py`. It gives each session its own browser with no cookies or storage from another. A Playwright script, a Playwright or browser MCP tool, or an editor's built-in browser keeps one profile across personas, so one persona's form shows up filled in for the next, and the findings describe the leak instead of the site.
 
-`start` also takes each walker's first screen, which its prompt names, so the walker opens its brief and first screenshot together. Every session ends with an exit interview, sent along with the walker's `finish` action. When the walkers report back, run `eyes.py status --study <study.json>`. It lists each session's steps, outcome and walk times, and whether its exit interview is in. `all_done` must be true before analysis, and `waiting_on` names any session that isn't finished. If it prints `stop` (several sessions ended as `blocked_by_site`), tell the user rather than burning more runs.
+`start` also takes each walker's first screen, which its prompt names, so the walker opens its brief and first screenshot together. Every session ends with an exit interview, given after the walk ends: the finish (or the driver's own stop at the step limit) returns a `walk_recap` of what happened, and the walker answers from it with the `feedback` command, a reason for every score. Answering before the recap, or without reasons, drifted every persona to the same polite 5 of 7, whatever their outcome. When the walkers report back, run `eyes.py status --study <study.json>`. It lists each session's steps, outcome and walk times, and whether its exit interview is in. `all_done` must be true before analysis, and `waiting_on` names any session that isn't finished. If it prints `stop` (several sessions ended as `blocked_by_site`), tell the user rather than burning more runs.
 
 ### 6. Compute the flows
 
