@@ -1,0 +1,55 @@
+{
+  "id": "alderwick-2026-11",
+  "product": "Alderwick Bank (fictional demo bank website)",
+  "mode": "test_env",
+  "environment_confirmation": "The user had this fully fictional local demo bank (test/fictional-bank, Vite dev server on 127.0.0.1:5188) built as a test target and asked for this crawl via the orchestrating session; forms validate in the browser and send nothing off localhost.",
+  "start_url": "http://127.0.0.1:5188/",
+  "allowed_hosts": [
+    "127.0.0.1:5188",
+    "localhost:5188"
+  ],
+  "goal": "Each persona completes their own task: open a checking account (/open), find card-processing pricing, request a relationship-manager conversation (/wealth/contact), or find the 12-month CD rate (/rates or a CD page). goal_match is the union of these pages because the driver takes one pattern per study.",
+  "goal_match": "/open($|[/?#])|/business/merchant-services|/wealth/contact|/rates|/personal/cds",
+  "max_steps": 100,
+  "test_data": {
+    "first_name": "Testfirst",
+    "last_name": "Test-{persona}",
+    "email": "test+{persona}@example.com",
+    "phone": "5550100123",
+    "ssn": "123456789",
+    "ein": "987654321",
+    "dob": "01/15/1985",
+    "address": "1 Test Street {persona}",
+    "city": "Testville",
+    "zip": "00001",
+    "username": "test{persona}",
+    "password": "Testpass-{persona}1"
+  },
+  "stages": [
+    {
+      "id": "home",
+      "label": "Home",
+      "match": "^/$"
+    },
+    {
+      "id": "product",
+      "label": "Product or comparison page",
+      "match": "^/(personal|business|compare)/"
+    },
+    {
+      "id": "wealth",
+      "label": "Wealth pages",
+      "match": "^/wealth(/(?!contact)|$)"
+    },
+    {
+      "id": "rates",
+      "label": "Rates",
+      "match": "^/rates"
+    },
+    {
+      "id": "apply",
+      "label": "Application or contact form",
+      "match": "^/(open|wealth/contact)"
+    }
+  ]
+}

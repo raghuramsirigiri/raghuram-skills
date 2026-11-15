@@ -1,0 +1,113 @@
+{
+  "summary": {
+    "responses": 6,
+    "of": 6,
+    "ease_avg_1_7": 5.5,
+    "umux_lite_avg_0_100": 74,
+    "satisfaction_avg_1_5": 4.0,
+    "recommend_counts": {
+      "9-10": 0,
+      "7-8": 6,
+      "0-6": 0
+    },
+    "missing": []
+  },
+  "responses": [
+    {
+      "ease": 6,
+      "meets_needs": 6,
+      "easy_to_use": 6,
+      "recommend": 7,
+      "satisfaction": 4,
+      "one_word": "clear",
+      "best_thing": "Prices right there on the card: percent plus cents and $0 monthly, no form.",
+      "worst_thing": "Home page is all personal banking, and the Same day asterisk isn't explained where I can see it. Still not sure if I must bank here.",
+      "what_would_fix_it": "A merchant link on the home page, explain the asterisk by the price, and say plainly whether I need a Alderwick account.",
+      "would_return": "yes, I'd check the approval terms and compare against my processor.",
+      "quote": "Found the price quick once I found Business in the menu. Cheaper than mine, but I'd want to know about the same-day thing before switching.",
+      "persona": "cafe-owner-merchant",
+      "outcome": "claimed_goal_unverified",
+      "session": "cafe-owner-merchant"
+    },
+    {
+      "ease": 5,
+      "meets_needs": 5,
+      "easy_to_use": 5,
+      "recommend": 7,
+      "satisfaction": 4,
+      "one_word": "decent",
+      "best_thing": "The price was right there in big numbers, no quote form.",
+      "worst_thing": "The star on Same day is never explained and I can't tell if I need to bank here; terminals cost extra in a separate card.",
+      "what_would_fix_it": "Explain the asterisk, say plainly whether a Alderwick business account is required, and show an example monthly total.",
+      "would_return": "maybe, I would call or check the fine print first before switching.",
+      "quote": "Their number beats mine and there is no monthly fee, but I would want to know if I have to move my bank account and what the star means.",
+      "persona": "cafe-owner-merchant",
+      "outcome": "reached_goal",
+      "session": "cafe-owner-merchant-2"
+    },
+    {
+      "ease": 6,
+      "meets_needs": 5,
+      "easy_to_use": 6,
+      "recommend": 7,
+      "satisfaction": 4,
+      "one_word": "quick",
+      "best_thing": "Menu had Rates, and a CDs chip led straight to a clear 12-month row in big green numbers.",
+      "worst_thing": "Hero and cookie popup ate the first screen, and no early withdrawal penalty was shown with the CD table.",
+      "what_would_fix_it": "Put a Rates or CDs link on the home screen and a one-line early withdrawal penalty note under the CD table.",
+      "would_return": "maybe, 4.15% is lower than the 4.25% I already saw",
+      "quote": "Easy to find the rate, but it's a bit under the other bank and I couldn't tell what it costs to pull money out early.",
+      "persona": "cd-rate-checker-phone",
+      "outcome": "reached_goal",
+      "session": "cd-rate-checker-phone"
+    },
+    {
+      "ease": 5,
+      "meets_needs": 5,
+      "easy_to_use": 5,
+      "recommend": 7,
+      "satisfaction": 4,
+      "one_word": "clear",
+      "best_thing": "The comparison table made fees and the waiver obvious, and showed $0 overdraft.",
+      "worst_thing": "Long multi-step form that never told me up front what I'd need, like a routing number.",
+      "what_would_fix_it": "List what to have ready before step 1 and say if funding can be skipped or done later.",
+      "would_return": "yes, once I have my old bank's routing number",
+      "quote": "The fee table was great and I knew which account to pick right away. The application is long though, and I'm worried it'll block me on the funding bit.",
+      "persona": "checking-switcher",
+      "outcome": "saved_for_later",
+      "session": "checking-switcher"
+    },
+    {
+      "ease": 5,
+      "meets_needs": 5,
+      "easy_to_use": 5,
+      "recommend": 7,
+      "satisfaction": 4,
+      "one_word": "straightforward",
+      "best_thing": "The comparison table showed fees, waivers and overdraft fees side by side, and the Fund within 30 days option meant I did not need my old bank's routing number.",
+      "worst_thing": "No account is truly free for me: Everyday is $10 unless I set up a $500 direct deposit, and 'easy waiver' and the deposit period are vague. Also the page shifted once and a click missed.",
+      "what_would_fix_it": "Say plainly that the fee is waived with a $500 monthly direct deposit, and warn on the funding step that the routing number is optional.",
+      "would_return": "yes, the application was clear and did not ask for anything I lacked",
+      "quote": "The table made it easy to pick, and it let me skip my old bank's routing number. I'd just want the fee rule spelled out more clearly.",
+      "persona": "checking-switcher",
+      "outcome": "step_cap",
+      "session": "checking-switcher-3"
+    },
+    {
+      "ease": 6,
+      "meets_needs": 6,
+      "easy_to_use": 6,
+      "recommend": 8,
+      "satisfaction": 4,
+      "one_word": "straightforward",
+      "best_thing": "It told me up front a relationship manager would contact me within one business day, and let me choose a phone call in the morning with actual hours.",
+      "worst_thing": "Nothing told me whether two million is enough for private banking, and I never saw what happened after I pressed the button. A short note on how my details are kept would have helped.",
+      "what_would_fix_it": "Say the minimums plainly, and add a line by the agreement about how my information is used and stored.",
+      "would_return": "yes, it got me to a person without wading through marketing",
+      "quote": "I found the wealth section in the menu and filled in a short form asking for a morning phone call. It was clear and didn't feel like a sales trap, though I'd have liked to know whether I even qualify.",
+      "persona": "retiree-wealth-callback",
+      "outcome": "step_cap",
+      "session": "retiree-wealth-callback"
+    }
+  ]
+}

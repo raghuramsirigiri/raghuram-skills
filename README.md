@@ -799,7 +799,8 @@ plugins/
 ├── chart-honesty/        deck → charts that mislead, and the fix for each
 └── action-titles/        deck → slide titles as the claim each slide proves
 examples/                 finished outputs: two dashboards, a deck, a report, a one-pager,
-                          an email snapshot, a social post and ten diorama-slides videos
+                          an email snapshot, a social post, ten diorama-slides videos
+                          and a persona-crawl report
 docs/                     GitHub Pages landing page, and the sources of the README images
 .claude-plugin/           the marketplace manifest listing every plugin
 ```

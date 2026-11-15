@@ -149,7 +149,7 @@ def analyze(study_dir: Path) -> dict:
             "steps_taken": j.get("steps_taken", len(steps)), "est_seconds": j.get("est_seconds"),
             "path": path, "stages_reached": stages, "backtracks": backtracks, "dead_clicks": dead,
             "exit_page": exit_page,
-            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "screenshot": st["screenshot"],
+            "steps": [{"step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"], "screenshot": st["screenshot"],
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
@@ -547,7 +547,7 @@ def replay_data(data: dict) -> dict:
                 did = f"filled {len(a.get('fields') or [])} fields"
             frames.append({
                 "img": "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode("ascii"),
-                "step": st["step"], "page": page_of(st["address_bar"]), "did": did, "spot": spot,
+                "step": st["step"], "page": page_of(st["address_bar"]), "url": st["address_bar"], "did": did, "spot": spot,
                 "dead": bool(r.get("no_visible_response")) and not r.get("on_blank_space"),
                 "blank": bool(r.get("on_blank_space")), "blocked": r.get("blocked"),
                 "thought": d.get("thought", ""), "scores": [d.get("clarity"), d.get("trust"), d.get("effort")],
@@ -563,11 +563,12 @@ REPLAY_JS = """
 img=document.getElementById('rp-img'),dot=document.getElementById('rp-dot'),cap=document.getElementById('rp-cap'),
 pos=document.getElementById('rp-pos'),i=0,cur=null;
 Object.keys(W).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=W[k].name+' \\u2014 '+W[k].outcome;sel.appendChild(o);});
-function esc(t){return String(t==null?'':t).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function show(){var f=cur.frames[i];img.src=f.img;img.alt='Step '+f.step+' on '+f.page;
  if(f.spot){dot.style.display='block';dot.style.left=f.spot[0]+'%';dot.style.top=f.spot[1]+'%';dot.className=f.dead?'rp-dot dead':'rp-dot';}else dot.style.display='none';
  pos.textContent='Step '+f.step+' of '+cur.frames.length;
- cap.innerHTML='<b>'+esc(f.page)+'</b> \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blank?' \\u00b7 clicked empty space':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
+ var at=/^https?:/i.test(f.url||'')?'<a class=\"url\" href=\"'+esc(f.url)+'\" rel=\"noopener noreferrer\"><b>'+esc(f.url)+'</b></a>':'<b class=\"url\">'+esc(f.url||f.page)+'</b>';
+ cap.innerHTML=at+' \\u00b7 '+esc(f.did)+(f.dead?' \\u00b7 <span class=\"fail\">nothing visible happened</span>':'')+(f.blank?' \\u00b7 clicked empty space':'')+(f.blocked?' \\u00b7 refused by the test driver':'')+
  '<br>\\u201c'+esc(f.thought)+'\\u201d<br><span class=\"muted\">clarity '+f.scores[0]+' \\u00b7 trust '+f.scores[1]+' \\u00b7 effort '+f.scores[2]+'</span>'+
  (f.friction.length?'<ul>'+f.friction.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'');}
 function pick(){cur=W[sel.value];i=0;show();}
@@ -606,7 +607,8 @@ def render(study_dir: Path) -> int:
     # one 880px paper column; kicker, h1, deck, byline, abstract; numbered h2 sections; figures with
     # "Fig. N" captions; the soft .note surface; a footer of sources and method. No badges, custom cards,
     # KPI strip or coloured verdicts: severity and outcome are words in the text.
-    css = """:root{--bg:#efece6;--paper:#f4f4f0;--ink:#111111;--body:#1a1a1a;--muted:#555555;--soft:#666666;--hair:#dcdbd7;--rule:#cfcdc6;
+    css = """.url{overflow-wrap:anywhere;word-break:break-all}a.url{color:inherit}
+:root{--bg:#efece6;--paper:#f4f4f0;--ink:#111111;--body:#1a1a1a;--muted:#555555;--soft:#666666;--hair:#dcdbd7;--rule:#cfcdc6;
 --radius:4px;--surface-soft:#eae8e4;--accent:#243E63;--annotation:#B31B38;--series:#2323FF;--font:'Inter','Segoe UI',Arial,Helvetica,sans-serif}
 @media (prefers-color-scheme:dark){:root{--bg:#121315;--paper:#1a1b1e;--ink:#f2f2f0;--body:#dcdcd8;--muted:#a6a6a0;--soft:#9a9a94;--hair:#33343a;
 --rule:#3d3e44;--surface-soft:#26272b;--accent:#9db3d6;--annotation:#f08a9b;--series:#8c8cff}}

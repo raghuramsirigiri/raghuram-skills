@@ -1,0 +1,539 @@
+{
+  "kept": [
+    {
+      "id": "F3",
+      "title": "Merchant overview shows 'Same day*' and '$0' monthly with the conditions left off the page",
+      "category": "trust",
+      "severity": "high",
+      "page": "/business/merchant-services",
+      "personas": [
+        "cafe-owner-merchant"
+      ],
+      "description": "Both merchant walks got their per-transaction prices from the Card Processing card on the overview (2.65% + 10c in person, 3.40% + 15c online, Monthly fee $0), which genuinely answers the question with no form. In both, the asterisk on 'Same day*' stayed unexplained: the page has no footnote for it, and its Important information covers only underwriting, card brands, the $25 chargeback and hardware tax. Both inferred the condition from the intro line and both left unsure whether they must open Alderwick business checking ('I think I can get next-day without banking here, but not sure'). The 9 p.m. ET cutoff and the $19.95/month PCI non-compliance fee are stated only on the Card Processing detail page (recon), which neither walk opened, so both concluded the monthly cost is $0 beyond the percentages while asking what a month would actually total; the second walk also found terminal prices ($349+) only in a separate card.",
+      "evidence": [
+        {
+          "session": "cafe-owner-merchant",
+          "step": 5,
+          "box": [
+            285,
+            1262,
+            150,
+            62
+          ],
+          "quote": "Same day*",
+          "quote_in_record": true,
+          "crop": "evidence/F3-1.jpg"
+        },
+        {
+          "session": "cafe-owner-merchant",
+          "step": 7,
+          "box": [
+            30,
+            605,
+            700,
+            235
+          ],
+          "quote": "Chargeback fee: $25 per dispute.",
+          "quote_in_record": true,
+          "crop": "evidence/F3-2.jpg"
+        },
+        {
+          "session": "cafe-owner-merchant-2",
+          "step": 5,
+          "box": [
+            285,
+            1262,
+            150,
+            62
+          ],
+          "quote": "Same day*",
+          "quote_in_record": true,
+          "crop": "evidence/F3-3.jpg"
+        }
+      ],
+      "recommendation": "Put the asterisk's footnote under the card ('*Into Alderwick business checking for batches closed by 9 p.m. ET; next business day to any other bank - no Alderwick account required'), show the PCI non-compliance fee next to 'Monthly fee $0' ('$0; $19.95/mo only if PCI not validated'), and add a worked example ('$15,000 a month in person = about $X, plus a terminal from $349 if you need one').",
+      "confidence": "high",
+      "exposure": {
+        "pages": [
+          "/business/merchant-services"
+        ],
+        "walks_reached": 2,
+        "walks_hit": 2,
+        "hit": [
+          "cafe-owner-merchant",
+          "cafe-owner-merchant-2"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F1",
+      "title": "The application doesn't say up front that funding can wait, so a switcher without her old bank's details may stop before she finds out",
+      "category": "ux",
+      "severity": "medium",
+      "page": "/open?product=everyday-checking",
+      "personas": [
+        "checking-switcher"
+      ],
+      "description": "Step 1 shows only 'About 10 minutes - Secure application' and a five-step bar ending in Funding; nothing lists what to have ready or says funding can be done later. The Funding step does solve the problem: 'Fund within 30 days - Your account opens now; add money any time in the next 30 days' sits beside bank transfer and mailed check, and the re-walk (checking-switcher-3) chose it, finished all five steps and reached Submit without a routing number. So the first walk's fear was unfounded, but the site gave no way to know that early: in walk 1 Dana stopped at the Address step and saved for later because she expected Funding to demand her old bank's routing number; in walk 3 she pressed on only on hope ('funding is step 4 - hopefully skippable') and afterwards asked for a warning that the routing number is optional. Switchers, the audience for 'no overdraft fees', are the people least likely to have funding details at hand.",
+      "evidence": [
+        {
+          "session": "checking-switcher",
+          "step": 5,
+          "box": [
+            217,
+            72,
+            280,
+            22
+          ],
+          "quote": "About 10 minutes",
+          "quote_in_record": true,
+          "crop": "evidence/F1-1.jpg"
+        },
+        {
+          "session": "checking-switcher",
+          "step": 23,
+          "box": [
+            723,
+            248,
+            100,
+            30
+          ],
+          "crop": "evidence/F1-2.jpg"
+        },
+        {
+          "session": "checking-switcher-3",
+          "step": 36,
+          "box": [
+            249,
+            694,
+            782,
+            68
+          ],
+          "crop": "evidence/F1-3.jpg"
+        }
+      ],
+      "recommendation": "On step 1, under 'About 10 minutes', add one line: 'You'll need ID and your SSN or ITIN. You can fund now or within 30 days, so no other bank details are needed to apply.' Show the 30-day option as a hint under Funding in the progress bar.",
+      "confidence": "high",
+      "exposure": {
+        "pages": [
+          "/open?product=everyday-checking"
+        ],
+        "walks_reached": 2,
+        "walks_hit": 2,
+        "hit": [
+          "checking-switcher",
+          "checking-switcher-3"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F2",
+      "title": "The checking comparison table leaves out conditions and fees the product page states",
+      "category": "copy",
+      "severity": "medium",
+      "page": "/compare/checking",
+      "personas": [
+        "checking-switcher"
+      ],
+      "description": "Both walks of Dana chose Everyday Checking from the comparison table alone and both asked whether the '$500 direct deposit' waiver is monthly; the table never says. The Everyday detail page (seen in recon, not by either walk) says 'each statement cycle' and lists a $3/month paper-statement fee that the table omits, so she twice left believing the waivable $10 fee was the only charge. The application's product card then summarises the waiver as 'or $0 with an easy waiver', which both walks called vague. People who decide from the table, which the home page sends them to, get a lossy version of the terms.",
+      "evidence": [
+        {
+          "session": "checking-switcher",
+          "step": 4,
+          "box": [
+            205,
+            222,
+            290,
+            48
+          ],
+          "quote": "$500 direct deposit",
+          "quote_in_record": true,
+          "crop": "evidence/F2-1.jpg"
+        },
+        {
+          "session": "checking-switcher",
+          "step": 5,
+          "box": [
+            262,
+            400,
+            300,
+            22
+          ],
+          "quote": "or $0 with an easy waiver",
+          "quote_in_record": true,
+          "crop": "evidence/F2-2.jpg"
+        },
+        {
+          "session": "checking-switcher-3",
+          "step": 4,
+          "box": [
+            217,
+            228,
+            240,
+            40
+          ],
+          "quote": "$500 direct deposit, or $1,500 daily balance",
+          "quote_in_record": true,
+          "crop": "evidence/F2-3.jpg"
+        }
+      ],
+      "recommendation": "Write the waiver row as '$500+ in direct deposits per statement cycle, or $1,500 daily balance, or age 17-24', add an 'Other fees' row (paper statements $3/month, $0 for e-statements or 65+), and replace 'easy waiver' on the application card with the actual waiver conditions.",
+      "confidence": "high",
+      "exposure": {
+        "pages": [
+          "/compare/checking",
+          "/open?product=everyday-checking"
+        ],
+        "walks_reached": 2,
+        "walks_hit": 2,
+        "hit": [
+          "checking-switcher",
+          "checking-switcher-3"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F4",
+      "title": "The CD early-withdrawal penalty sits at the bottom of the rates page, past mortgages, loans and cards",
+      "category": "friction",
+      "severity": "medium",
+      "page": "/rates",
+      "personas": [
+        "cd-rate-checker-phone"
+      ],
+      "description": "Marcus found the 12-month rate (4.15%) and the $1,000 minimum within five taps, but the CD section's intro only says 'Fixed for the term'. The penalty (90 days of interest for terms of 12 months or less) is in the Important information at the foot of the page, below mortgages, personal loans and credit cards. On a phone one scroll took him past the CD table into mortgages, and he left without the penalty, one of the three things he needed before acting.",
+      "evidence": [
+        {
+          "session": "cd-rate-checker-phone",
+          "step": 5,
+          "box": [
+            30,
+            728,
+            710,
+            75
+          ],
+          "quote": "Fixed for the term.",
+          "quote_in_record": true,
+          "crop": "evidence/F4-1.jpg"
+        },
+        {
+          "session": "cd-rate-checker-phone",
+          "step": 6,
+          "box": [
+            30,
+            585,
+            700,
+            55
+          ],
+          "crop": "evidence/F4-2.jpg"
+        }
+      ],
+      "recommendation": "Add the penalty to the CD intro line ('Fixed for the term. Early withdrawal: 90 days of interest for 12 months or less, 180 days for longer terms.') and link to /personal/cds.",
+      "confidence": "high",
+      "exposure": {
+        "pages": [
+          "/rates"
+        ],
+        "walks_reached": 1,
+        "walks_hit": 1,
+        "hit": [
+          "cd-rate-checker-phone"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F5",
+      "title": "The home page speaks only to personal checking; business, wealth and rate seekers must find the menu",
+      "category": "ux",
+      "severity": "medium",
+      "page": "/",
+      "personas": [
+        "cafe-owner-merchant",
+        "cd-rate-checker-phone",
+        "retiree-wealth-callback"
+      ],
+      "description": "Three of the four personas (four of the six walks) came for something other than checking (card processing, a CD rate, private banking) and each reported the first screen had nothing for them: the badge, hero and buttons are all personal checking. On a phone the hero fills the first screen and the cookie box covers about a third of it on arrival. All recovered by opening the hamburger menu, so the cost was a moment of doubt ('Does this bank even have a private banking team?') rather than lost visits in this run. Dana, who wanted checking, went straight to 'Compare checking' and was unaffected.",
+      "evidence": [
+        {
+          "session": "cafe-owner-merchant",
+          "step": 1,
+          "box": [
+            24,
+            978,
+            720,
+            560
+          ],
+          "quote": "We value your privacy",
+          "quote_in_record": true,
+          "crop": "evidence/F5-1.jpg"
+        },
+        {
+          "session": "cd-rate-checker-phone",
+          "step": 2,
+          "box": [
+            30,
+            320,
+            700,
+            600
+          ],
+          "crop": "evidence/F5-2.jpg"
+        },
+        {
+          "session": "retiree-wealth-callback",
+          "step": 2,
+          "box": [
+            24,
+            180,
+            830,
+            560
+          ],
+          "crop": "evidence/F5-3.jpg"
+        }
+      ],
+      "recommendation": "Add a row of entry points directly under the hero (Business banking and merchant services; Today's rates including the 12-month CD; Private banking, talk to a relationship manager), visible on the first phone screen once the cookie box is dismissed.",
+      "confidence": "medium",
+      "exposure": {
+        "pages": [
+          "/"
+        ],
+        "walks_reached": 6,
+        "walks_hit": 4,
+        "hit": [
+          "cafe-owner-merchant",
+          "cafe-owner-merchant-2",
+          "cd-rate-checker-phone",
+          "retiree-wealth-callback"
+        ],
+        "missed": [
+          "checking-switcher",
+          "checking-switcher-3"
+        ]
+      }
+    },
+    {
+      "id": "F6",
+      "title": "The required consent checkbox on the wealth form has a near-invisible border",
+      "category": "contrast",
+      "severity": "medium",
+      "page": "/wealth/contact",
+      "personas": [
+        "retiree-wealth-callback"
+      ],
+      "description": "The 'I agree to be contacted' box, which must be ticked to send the request, has a pale grey border measured at 1.52:1 against white and is about 17 CSS px square. Eleanor (reading glasses, browsing at 150%) called it small and pale compared with everything else and wasn't sure the label was clickable too. She managed it, but a low-vision user can miss a required control and then hit an error on submit.",
+      "measurement": "retiree-wealth-callback:M1",
+      "contrast_target": "ui_component",
+      "evidence": [
+        {
+          "session": "retiree-wealth-callback",
+          "step": 29,
+          "box": [
+            137,
+            481,
+            26,
+            26
+          ],
+          "crop": "evidence/F6-1.jpg"
+        }
+      ],
+      "recommendation": "Give unchecked checkboxes and radios a border of at least 3:1 (for example the body grey #5c6c6c), enlarge the box to 24 px, and make the whole label a visible click target.",
+      "confidence": "high",
+      "measured": {
+        "ratio": 1.52,
+        "foreground": "#ccd3cd",
+        "background": "#ffffff",
+        "target": 3.0
+      },
+      "exposure": {
+        "pages": [
+          "/wealth/contact"
+        ],
+        "walks_reached": 1,
+        "walks_hit": 1,
+        "hit": [
+          "retiree-wealth-callback"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F7",
+      "title": "Nothing on the wealth path says who qualifies for private banking",
+      "category": "copy",
+      "severity": "low",
+      "page": "/wealth/contact",
+      "personas": [
+        "retiree-wealth-callback"
+      ],
+      "description": "Eleanor, with about $2 million to move, asked repeatedly whether that was enough. The form asks for an asset band ('This helps us match you with the right team') but no screen she saw states a minimum or what happens below it. She completed the form anyway; the doubt lowered her confidence rather than stopping her.",
+      "evidence": [
+        {
+          "session": "retiree-wealth-callback",
+          "step": 11,
+          "box": [
+            138,
+            300,
+            1004,
+            100
+          ],
+          "quote": "This helps us match you with the right team.",
+          "quote_in_record": true,
+          "crop": "evidence/F7-1.jpg"
+        }
+      ],
+      "recommendation": "State the private banking threshold, or 'There's no minimum to talk to us', beside the asset question and on the Wealth menu promo.",
+      "confidence": "medium",
+      "exposure": {
+        "pages": [
+          "/wealth/contact"
+        ],
+        "walks_reached": 1,
+        "walks_hit": 1,
+        "hit": [
+          "retiree-wealth-callback"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F8",
+      "title": "Rate tables on a phone are cut off at the right edge with no sign they scroll",
+      "category": "ui",
+      "severity": "low",
+      "page": "/rates",
+      "personas": [
+        "cd-rate-checker-phone"
+      ],
+      "description": "At 412 px wide the mortgage table's points column, the HELOC rate ('then 7.7...') and the credit card APRs ('variab...') are clipped at the right edge with no visible scroll cue. Marcus's CD table fit, so it didn't affect his task, but anyone on a phone comparing loans or cards would read partial figures.",
+      "evidence": [
+        {
+          "session": "cd-rate-checker-phone",
+          "step": 6,
+          "box": [
+            690,
+            150,
+            60,
+            330
+          ],
+          "crop": "evidence/F8-1.jpg"
+        },
+        {
+          "session": "cd-rate-checker-phone",
+          "step": 6,
+          "box": [
+            410,
+            1040,
+            330,
+            40
+          ],
+          "crop": "evidence/F8-2.jpg"
+        }
+      ],
+      "recommendation": "Stack those tables into cards below 600 px, or add a visible scroll shadow or label and keep the APR column in view.",
+      "confidence": "medium",
+      "exposure": {
+        "pages": [
+          "/rates"
+        ],
+        "walks_reached": 1,
+        "walks_hit": 1,
+        "hit": [
+          "cd-rate-checker-phone"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F9",
+      "title": "The site header hides the comparison table's column names while scrolling",
+      "category": "ui",
+      "severity": "low",
+      "page": "/compare/checking",
+      "personas": [
+        "checking-switcher"
+      ],
+      "description": "When the comparison table is scrolled, its sticky column headings slide under the site's sticky header, so 'Interest Checking' and 'Student Checking' are half covered. Dana noticed and relied on column alignment to tell which 'Open an account' button was Everyday's. Only the first walk remarked on it; the re-walk scrolled the same table without comment.",
+      "evidence": [
+        {
+          "session": "checking-switcher",
+          "step": 4,
+          "box": [
+            200,
+            85,
+            1060,
+            55
+          ],
+          "crop": "evidence/F9-1.jpg"
+        }
+      ],
+      "recommendation": "Offset the table's sticky header by the site header's height (about 108 px on desktop) so column names stay fully visible.",
+      "confidence": "high",
+      "exposure": {
+        "pages": [
+          "/compare/checking"
+        ],
+        "walks_reached": 2,
+        "walks_hit": 2,
+        "hit": [
+          "checking-switcher",
+          "checking-switcher-3"
+        ],
+        "missed": []
+      }
+    },
+    {
+      "id": "F10",
+      "title": "The application page opens partway down and then jumps to the top, so the first tap misses",
+      "category": "ui",
+      "severity": "low",
+      "page": "/open?product=everyday-checking",
+      "personas": [
+        "checking-switcher"
+      ],
+      "description": "In both checking walks, arriving from the comparison table's 'Open an account' showed the application already scrolled, with the heading half under the site header; the first tap on 'No' landed on the moving layout and missed, and the page then sat at the top. Each walk lost one tap and reported that the page jumped. It happened the same way twice, but a screenshot taken mid smooth-scroll would look identical, so part of it may be capture timing.",
+      "evidence": [
+        {
+          "session": "checking-switcher-3",
+          "step": 5,
+          "box": [
+            216,
+            55,
+            640,
+            70
+          ],
+          "crop": "evidence/F10-1.jpg"
+        },
+        {
+          "session": "checking-switcher",
+          "step": 6,
+          "box": [
+            249,
+            685,
+            130,
+            30
+          ],
+          "crop": "evidence/F10-2.jpg"
+        }
+      ],
+      "recommendation": "Reset scroll to the top instantly (not smoothly) on route change, so /open first paints at the top.",
+      "confidence": "low",
+      "exposure": {
+        "pages": [
+          "/open?product=everyday-checking"
+        ],
+        "walks_reached": 2,
+        "walks_hit": 2,
+        "hit": [
+          "checking-switcher",
+          "checking-switcher-3"
+        ],
+        "missed": []
+      }
+    }
+  ],
+  "removed": [],
+  "rewalk": []
+}

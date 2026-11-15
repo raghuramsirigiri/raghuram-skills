@@ -1,0 +1,31 @@
+{
+  "headline": "People found their headline numbers fast, but the conditions that change them sit a page deeper or at the bottom: both merchant walks left unsure about 'Same day*' and unaware of the PCI fee, both checking walks missed the per-cycle wording and paper-statement fee, and the CD penalty sits below the loans.",
+  "insights": [
+    "Summary surfaces (comparison table, merchant overview card, rates table) answered each persona's headline question within 4-5 steps, and every persona stopped there. The conditions that change the answer live one page deeper or at the foot of the page, so the people who skim and decide quickly (Luis, Marcus, Dana); repeat walks of Luis and Dana stopped at the same places with the same doubts, which makes these patterns rather than flukes of one walk are the ones who carry away the incomplete version.",
+    "The application itself works for a switcher: the clean re-walk completed all five steps and reached Submit by choosing 'Fund within 30 days', with no routing number. The problem is that nothing says so before step 4: the first walk quit at Address for fear of Funding, and the second continued only on hope. A one-line note on step 1 is the cheap fix.",
+    "The home page serves the checking customer well (Dana went straight to Compare checking), but the three personas with other goals each had to open the hamburger menu; on phones the hero plus cookie box fill the first screen.",
+    "The wealth path worked best for the most cautious persona: an explicit 'within one business day' promise, a phone/morning choice with real hours and a narrowly worded consent made Eleanor comfortable. Her remaining doubts (whether she qualifies, a pale consent checkbox at 150% zoom) sit at the qualification and low-vision edges."
+  ],
+  "what_works": [
+    "Prices shown openly with no form: the merchant overview card gives percent plus cents and $0 monthly, which Luis called the best thing about the site.",
+    "The checking comparison table put monthly fees, waivers and $0 overdraft side by side; Dana picked her account from it on one screen.",
+    "The /rates page's section chips (CDs) took Marcus straight to the 12-month row in large green figures.",
+    "The wealth contact form says up front that a relationship manager will contact you within one business day, offers 'In the morning (8-11 a.m.)', and its consent covers only this request, which met Eleanor's 'not a sales trap' test.",
+    "The Funding step's 'Fund within 30 days - your account opens now' option let the switcher apply without her old bank's details, and the Review page summarised every step with Edit links."
+  ],
+  "research_questions": [
+    "Ask small-business owners on the merchant overview what they would pay per month on $15,000 of card sales and whether they expect any monthly fee; see whether anyone mentions PCI or the 9 p.m. cutoff.",
+    "Watch bank switchers start the checking application without their old bank's details: does a step-1 note that funding can wait 30 days prevent early exits like walk 1's?",
+    "Ask CD shoppers on phones, after using /rates, what it costs to withdraw early; check whether a penalty line next to the CD table is noticed.",
+    "Watch low-vision users at 150-200% zoom complete the wealth form and note whether the consent checkbox is missed before submit."
+  ],
+  "simulation_notes": [
+    "retiree-wealth-callback ended on the 30-step cap immediately after pressing 'Request a conversation'; checking-switcher-3 ended on the 45-step cap on 'Submit application'. Neither result screen was recorded, so whether either submission succeeded is unknown.",
+    "cafe-owner-merchant (walk 1) is marked claimed_goal_unverified only because goal_match then lacked /business/merchant-services; its step 5 screenshot shows the rates it reported, and the re-walk (cafe-owner-merchant-2) reached_goal on the same page.",
+    "checking-switcher-2 was discarded (its walker read the rendered report mid-walk) and is not used anywhere in this review.",
+    "/open's bottleneck score (53) is inflated by the walker: 30 steps per visitor come from one step per field click and typed value, and of its 8 dead clicks, steps 42-45 of checking-switcher-3 were checkbox ticks and the Submit press that did take effect (all three boxes are ticked at step 45) but changed too little of the screen for the change check. The other four are the two missed taps per walk in F10.",
+    "/wealth/contact's bottleneck score (30) likewise comes almost entirely from steps per visitor in field-by-field form filling; clarity averaged 4.7 and effort 1.2.",
+    "Exposure counts every walk of a named persona that reached the page as hit; for F9 only the first checking walk actually remarked on the problem.",
+    "The CD and wealth pages were each visited by one walk, so F4, F6, F7 and F8 rest on a single walk."
+  ]
+}

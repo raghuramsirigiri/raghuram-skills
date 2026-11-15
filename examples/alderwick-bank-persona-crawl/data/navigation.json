@@ -1,0 +1,2398 @@
+{
+  "cafe-owner-merchant": {
+    "persona": {
+      "id": "cafe-owner-merchant",
+      "name": "Luis, cafe owner",
+      "device": "mobile",
+      "browser_zoom": 100
+    },
+    "device": "mobile",
+    "outcome": "claimed_goal_unverified",
+    "claimed_outcome": "reached_goal",
+    "reason": "Found 2.65% + 10c in person, 3.40% + 15c online, $0 monthly fee; cheaper than my 2.9% + 30c.",
+    "steps_taken": 7,
+    "est_seconds": 41.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 4
+      },
+      {
+        "page": "/business/merchant-services",
+        "first_step": 5,
+        "steps": 3
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "product"
+    ],
+    "backtracks": [],
+    "dead_clicks": [],
+    "exit_page": "/business/merchant-services",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 383,
+          "y": 1372
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "impatient"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 699,
+          "y": 60
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 3,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "click",
+          "x": 480,
+          "y": 378
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 4,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 397,
+          "y": 714
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 5,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "interested"
+      },
+      {
+        "step": 6,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 3,
+        "emotion": ""
+      },
+      {
+        "step": 7,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-007.png",
+        "action": {
+          "type": "finish",
+          "outcome": "reached_goal",
+          "reason": "Found 2.65% + 10c in person, 3.40% + 15c online, $0 monthly fee; cheaper than my 2.9% + 30c."
+        },
+        "address_after": null,
+        "screen_changed": null,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "satisfied"
+      }
+    ]
+  },
+  "cafe-owner-merchant-2": {
+    "persona": {
+      "id": "cafe-owner-merchant",
+      "name": "Luis, cafe owner",
+      "device": "mobile",
+      "browser_zoom": 100
+    },
+    "device": "mobile",
+    "outcome": "reached_goal",
+    "claimed_outcome": "reached_goal",
+    "reason": "Found 2.65% + 10 cents in person and $0 monthly fee, cheaper than my 2.9% + 30 cents. Still unsure whether I must bank here for same-day funding.",
+    "steps_taken": 7,
+    "est_seconds": 61.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 4
+      },
+      {
+        "page": "/business/merchant-services",
+        "first_step": 5,
+        "steps": 3
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "product"
+    ],
+    "backtracks": [],
+    "dead_clicks": [],
+    "exit_page": "/business/merchant-services",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 383,
+          "y": 1372
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "impatient"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 699,
+          "y": 60
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "impatient"
+      },
+      {
+        "step": 3,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "click",
+          "x": 480,
+          "y": 379
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "hopeful"
+      },
+      {
+        "step": 4,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 397,
+          "y": 715
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "hopeful"
+      },
+      {
+        "step": 5,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "interested"
+      },
+      {
+        "step": 6,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/business/merchant-services",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 3,
+        "emotion": "wary"
+      },
+      {
+        "step": 7,
+        "page": "/business/merchant-services",
+        "url": "http://127.0.0.1:5188/business/merchant-services",
+        "screenshot": "step-007.png",
+        "action": {
+          "type": "finish",
+          "outcome": "reached_goal",
+          "reason": "Found 2.65% + 10 cents in person and $0 monthly fee, cheaper than my 2.9% + 30 cents. Still unsure whether I must bank here for same-day funding."
+        },
+        "address_after": null,
+        "screen_changed": null,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "satisfied but cautious"
+      }
+    ]
+  },
+  "cd-rate-checker-phone": {
+    "persona": {
+      "id": "cd-rate-checker-phone",
+      "name": "Marcus, saver checking rates",
+      "device": "mobile",
+      "browser_zoom": 100
+    },
+    "device": "mobile",
+    "outcome": "reached_goal",
+    "claimed_outcome": "reached_goal",
+    "reason": "Found 12-month CD at 4.15% APY and $1,000 minimum in under a minute; it's below the 4.25% elsewhere. Penalty info not seen.",
+    "steps_taken": 6,
+    "est_seconds": 61.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 3
+      },
+      {
+        "page": "/rates",
+        "first_step": 4,
+        "steps": 3
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "rates"
+    ],
+    "backtracks": [],
+    "dead_clicks": [],
+    "exit_page": "/rates",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 383,
+          "y": 1372
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "impatient"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 699,
+          "y": 60
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 3,
+        "emotion": ""
+      },
+      {
+        "step": 3,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "click",
+          "x": 272,
+          "y": 575
+        },
+        "address_after": "http://127.0.0.1:5188/rates",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 4,
+        "page": "/rates",
+        "url": "http://127.0.0.1:5188/rates",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 421,
+          "y": 719
+        },
+        "address_after": "http://127.0.0.1:5188/rates#cds",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 5,
+        "page": "/rates",
+        "url": "http://127.0.0.1:5188/rates#cds",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/rates#cds",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": "satisfied"
+      },
+      {
+        "step": 6,
+        "page": "/rates",
+        "url": "http://127.0.0.1:5188/rates#cds",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "finish",
+          "outcome": "reached_goal",
+          "reason": "Found 12-month CD at 4.15% APY and $1,000 minimum in under a minute; it's below the 4.25% elsewhere. Penalty info not seen."
+        },
+        "address_after": null,
+        "screen_changed": null,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "done"
+      }
+    ]
+  },
+  "checking-switcher": {
+    "persona": {
+      "id": "checking-switcher",
+      "name": "Dana, nurse switching banks",
+      "device": "desktop",
+      "browser_zoom": 100
+    },
+    "device": "desktop",
+    "outcome": "saved_for_later",
+    "claimed_outcome": "saved_for_later",
+    "reason": "I picked Everyday Checking and filled in my details, but the form is long and I know the funding step will want a routing number I don't have, so I'll come back with it.",
+    "steps_taken": 23,
+    "est_seconds": 216.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 2
+      },
+      {
+        "page": "/compare/checking",
+        "first_step": 3,
+        "steps": 2
+      },
+      {
+        "page": "/open?product=everyday-checking",
+        "first_step": 5,
+        "steps": 19
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "product",
+      "apply"
+    ],
+    "backtracks": [],
+    "dead_clicks": [
+      {
+        "step": 5,
+        "page": "/open?product=everyday-checking",
+        "x": 330,
+        "y": 565
+      },
+      {
+        "step": 6,
+        "page": "/open?product=everyday-checking",
+        "x": 330,
+        "y": 698
+      }
+    ],
+    "exit_page": "/open?product=everyday-checking",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 868,
+          "y": 739
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "hopeful"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 313,
+          "y": 588
+        },
+        "address_after": "http://127.0.0.1:5188/compare/checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 3,
+        "page": "/compare/checking",
+        "url": "http://127.0.0.1:5188/compare/checking",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/compare/checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "relieved"
+      },
+      {
+        "step": 4,
+        "page": "/compare/checking",
+        "url": "http://127.0.0.1:5188/compare/checking",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 355,
+          "y": 780
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 5,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "click",
+          "x": 330,
+          "y": 565
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "focused"
+      },
+      {
+        "step": 6,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "click",
+          "x": 330,
+          "y": 698
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 7,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-007.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 785
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 8,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-008.png",
+        "action": {
+          "type": "click",
+          "x": 372,
+          "y": 441
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 9,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-009.png",
+        "action": {
+          "type": "type",
+          "text": "test:first_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 10,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-010.png",
+        "action": {
+          "type": "click",
+          "x": 906,
+          "y": 441
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 11,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-011.png",
+        "action": {
+          "type": "type",
+          "text": "test:last_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 12,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-012.png",
+        "action": {
+          "type": "click",
+          "x": 290,
+          "y": 551
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 13,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-013.png",
+        "action": {
+          "type": "type",
+          "text": "test:dob",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 14,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-014.png",
+        "action": {
+          "type": "click",
+          "x": 820,
+          "y": 533
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 15,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-015.png",
+        "action": {
+          "type": "type",
+          "text": "test:ssn",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 16,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-016.png",
+        "action": {
+          "type": "click",
+          "x": 440,
+          "y": 671
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 17,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-017.png",
+        "action": {
+          "type": "type",
+          "text": "test:email",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 18,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-018.png",
+        "action": {
+          "type": "click",
+          "x": 840,
+          "y": 660
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 19,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-019.png",
+        "action": {
+          "type": "type",
+          "text": "test:phone",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 20,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-020.png",
+        "action": {
+          "type": "click",
+          "x": 270,
+          "y": 773
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 21,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-021.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 3,
+        "emotion": ""
+      },
+      {
+        "step": 22,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-022.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 195
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 3,
+        "emotion": ""
+      },
+      {
+        "step": 23,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-023.png",
+        "action": {
+          "type": "finish",
+          "outcome": "saved_for_later",
+          "reason": "I picked Everyday Checking and filled in my details, but the form is long and I know the funding step will want a routing number I don't have, so I'll come back with it."
+        },
+        "address_after": null,
+        "screen_changed": null,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 4,
+        "emotion": "tired"
+      }
+    ]
+  },
+  "checking-switcher-3": {
+    "persona": {
+      "id": "checking-switcher",
+      "name": "Dana, nurse switching banks",
+      "device": "desktop",
+      "browser_zoom": 100
+    },
+    "device": "desktop",
+    "outcome": "step_cap",
+    "claimed_outcome": "step_cap",
+    "reason": "Step limit reached",
+    "steps_taken": 45,
+    "est_seconds": 272.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 2
+      },
+      {
+        "page": "/compare/checking",
+        "first_step": 3,
+        "steps": 2
+      },
+      {
+        "page": "/open?product=everyday-checking",
+        "first_step": 5,
+        "steps": 41
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "product",
+      "apply"
+    ],
+    "backtracks": [],
+    "dead_clicks": [
+      {
+        "step": 5,
+        "page": "/open?product=everyday-checking",
+        "x": 329,
+        "y": 596
+      },
+      {
+        "step": 6,
+        "page": "/open?product=everyday-checking",
+        "x": 329,
+        "y": 698
+      },
+      {
+        "step": 42,
+        "page": "/open?product=everyday-checking",
+        "x": 277,
+        "y": 549
+      },
+      {
+        "step": 43,
+        "page": "/open?product=everyday-checking",
+        "x": 277,
+        "y": 584
+      },
+      {
+        "step": 44,
+        "page": "/open?product=everyday-checking",
+        "x": 277,
+        "y": 620
+      },
+      {
+        "step": 45,
+        "page": "/open?product=everyday-checking",
+        "x": 934,
+        "y": 750
+      }
+    ],
+    "exit_page": "/open?product=everyday-checking",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 869,
+          "y": 739
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "hopeful"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 313,
+          "y": 588
+        },
+        "address_after": "http://127.0.0.1:5188/compare/checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 1,
+        "emotion": "focused"
+      },
+      {
+        "step": 3,
+        "page": "/compare/checking",
+        "url": "http://127.0.0.1:5188/compare/checking",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/compare/checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "interested"
+      },
+      {
+        "step": 4,
+        "page": "/compare/checking",
+        "url": "http://127.0.0.1:5188/compare/checking",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 355,
+          "y": 780
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "satisfied"
+      },
+      {
+        "step": 5,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "click",
+          "x": 329,
+          "y": 596
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "ok"
+      },
+      {
+        "step": 6,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "click",
+          "x": 329,
+          "y": 698
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "mildly annoyed"
+      },
+      {
+        "step": 7,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-007.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 786
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 8,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-008.png",
+        "action": {
+          "type": "click",
+          "x": 372,
+          "y": 441
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 3,
+        "emotion": "ok"
+      },
+      {
+        "step": 9,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-009.png",
+        "action": {
+          "type": "type",
+          "text": "test:first_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 10,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-010.png",
+        "action": {
+          "type": "click",
+          "x": 906,
+          "y": 441
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 11,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-011.png",
+        "action": {
+          "type": "type",
+          "text": "test:last_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 12,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-012.png",
+        "action": {
+          "type": "click",
+          "x": 280,
+          "y": 551
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 13,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-013.png",
+        "action": {
+          "type": "type",
+          "text": "test:dob",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 14,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-014.png",
+        "action": {
+          "type": "click",
+          "x": 820,
+          "y": 533
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 15,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-015.png",
+        "action": {
+          "type": "type",
+          "text": "test:ssn",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 16,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-016.png",
+        "action": {
+          "type": "click",
+          "x": 440,
+          "y": 671
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 17,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-017.png",
+        "action": {
+          "type": "type",
+          "text": "test:email",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 18,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-018.png",
+        "action": {
+          "type": "click",
+          "x": 840,
+          "y": 660
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 19,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-019.png",
+        "action": {
+          "type": "type",
+          "text": "test:phone",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 20,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-020.png",
+        "action": {
+          "type": "click",
+          "x": 272,
+          "y": 773
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 21,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-021.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 22,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-022.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 475
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 23,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-023.png",
+        "action": {
+          "type": "click",
+          "x": 505,
+          "y": 441
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 24,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-024.png",
+        "action": {
+          "type": "type",
+          "text": "test:address",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 25,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-025.png",
+        "action": {
+          "type": "click",
+          "x": 440,
+          "y": 531
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 26,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-026.png",
+        "action": {
+          "type": "type",
+          "text": "test:city",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 27,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-027.png",
+        "action": {
+          "type": "click",
+          "x": 973,
+          "y": 531
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 28,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-028.png",
+        "action": {
+          "type": "type",
+          "text": "test:zip",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 29,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-029.png",
+        "action": {
+          "type": "click",
+          "x": 773,
+          "y": 531
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 30,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-030.png",
+        "action": {
+          "type": "click",
+          "x": 692,
+          "y": 644
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 31,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-031.png",
+        "action": {
+          "type": "click",
+          "x": 440,
+          "y": 621
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 32,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-032.png",
+        "action": {
+          "type": "click",
+          "x": 275,
+          "y": 650
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 33,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-033.png",
+        "action": {
+          "type": "click",
+          "x": 840,
+          "y": 621
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 34,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-034.png",
+        "action": {
+          "type": "click",
+          "x": 697,
+          "y": 678
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 35,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-035.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 725
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 3,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 36,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-036.png",
+        "action": {
+          "type": "click",
+          "x": 368,
+          "y": 446
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "relieved"
+      },
+      {
+        "step": 37,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-037.png",
+        "action": {
+          "type": "type",
+          "text": "25",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 38,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-038.png",
+        "action": {
+          "type": "click",
+          "x": 274,
+          "y": 720
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 39,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-039.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 40,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-040.png",
+        "action": {
+          "type": "click",
+          "x": 970,
+          "y": 443
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 41,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-041.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "screen"
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 42,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-042.png",
+        "action": {
+          "type": "click",
+          "x": 277,
+          "y": 549
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 43,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-043.png",
+        "action": {
+          "type": "click",
+          "x": 277,
+          "y": 584
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 44,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-044.png",
+        "action": {
+          "type": "click",
+          "x": 277,
+          "y": 620
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 45,
+        "page": "/open?product=everyday-checking",
+        "url": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screenshot": "step-045.png",
+        "action": {
+          "type": "click",
+          "x": 934,
+          "y": 750
+        },
+        "address_after": "http://127.0.0.1:5188/open?product=everyday-checking",
+        "screen_changed": false,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      }
+    ]
+  },
+  "retiree-wealth-callback": {
+    "persona": {
+      "id": "retiree-wealth-callback",
+      "name": "Eleanor, recently retired executive",
+      "device": "desktop",
+      "browser_zoom": 150
+    },
+    "device": "desktop",
+    "outcome": "step_cap",
+    "claimed_outcome": "step_cap",
+    "reason": "Step limit reached",
+    "steps_taken": 30,
+    "est_seconds": 301.0,
+    "path": [
+      {
+        "page": "/",
+        "first_step": 1,
+        "steps": 4
+      },
+      {
+        "page": "/wealth/contact",
+        "first_step": 5,
+        "steps": 26
+      }
+    ],
+    "stages_reached": [
+      "home",
+      "apply"
+    ],
+    "backtracks": [],
+    "dead_clicks": [],
+    "exit_page": "/wealth/contact",
+    "steps": [
+      {
+        "step": 1,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-001.png",
+        "action": {
+          "type": "click",
+          "x": 927,
+          "y": 708
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 1,
+        "emotion": "cautious"
+      },
+      {
+        "step": 2,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-002.png",
+        "action": {
+          "type": "click",
+          "x": 1225,
+          "y": 48
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 3,
+        "trust": 3,
+        "effort": 2,
+        "emotion": "slightly lost"
+      },
+      {
+        "step": 3,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-003.png",
+        "action": {
+          "type": "click",
+          "x": 990,
+          "y": 372
+        },
+        "address_after": "http://127.0.0.1:5188/",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 3,
+        "effort": 1,
+        "emotion": "hopeful"
+      },
+      {
+        "step": 4,
+        "page": "/",
+        "url": "http://127.0.0.1:5188/",
+        "screenshot": "step-004.png",
+        "action": {
+          "type": "click",
+          "x": 896,
+          "y": 706
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 1,
+        "emotion": "relieved"
+      },
+      {
+        "step": 5,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-005.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "reassured"
+      },
+      {
+        "step": 6,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-006.png",
+        "action": {
+          "type": "click",
+          "x": 384,
+          "y": 470
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "steady"
+      },
+      {
+        "step": 7,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-007.png",
+        "action": {
+          "type": "click",
+          "x": 896,
+          "y": 470
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 8,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-008.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 9,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-009.png",
+        "action": {
+          "type": "click",
+          "x": 1052,
+          "y": 643
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 10,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-010.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 11,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-011.png",
+        "action": {
+          "type": "click",
+          "x": 306,
+          "y": 547
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 12,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-012.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 13,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-013.png",
+        "action": {
+          "type": "click",
+          "x": 257,
+          "y": 458
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 14,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-014.png",
+        "action": {
+          "type": "click",
+          "x": 1052,
+          "y": 592
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 15,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-015.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": ""
+      },
+      {
+        "step": 16,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-016.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": "pleased"
+      },
+      {
+        "step": 17,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-017.png",
+        "action": {
+          "type": "scroll",
+          "direction": "up",
+          "amount": "little"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 4,
+        "trust": 4,
+        "effort": 2,
+        "emotion": "reassured"
+      },
+      {
+        "step": 18,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-018.png",
+        "action": {
+          "type": "click",
+          "x": 381,
+          "y": 284
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 19,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-019.png",
+        "action": {
+          "type": "type",
+          "text": "test:first_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 20,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-020.png",
+        "action": {
+          "type": "click",
+          "x": 898,
+          "y": 284
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 21,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-021.png",
+        "action": {
+          "type": "type",
+          "text": "test:last_name",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 22,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-022.png",
+        "action": {
+          "type": "click",
+          "x": 381,
+          "y": 419
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 23,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-023.png",
+        "action": {
+          "type": "type",
+          "text": "test:email",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 24,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-024.png",
+        "action": {
+          "type": "click",
+          "x": 898,
+          "y": 419
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 25,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-025.png",
+        "action": {
+          "type": "type",
+          "text": "test:phone",
+          "enter": false
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 26,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-026.png",
+        "action": {
+          "type": "click",
+          "x": 381,
+          "y": 650
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 27,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-027.png",
+        "action": {
+          "type": "click",
+          "x": 280,
+          "y": 637
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 5,
+        "effort": 1,
+        "emotion": "satisfied"
+      },
+      {
+        "step": 28,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-028.png",
+        "action": {
+          "type": "scroll",
+          "direction": "down",
+          "amount": "half"
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 29,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-029.png",
+        "action": {
+          "type": "click",
+          "x": 150,
+          "y": 493
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": ""
+      },
+      {
+        "step": 30,
+        "page": "/wealth/contact",
+        "url": "http://127.0.0.1:5188/wealth/contact",
+        "screenshot": "step-030.png",
+        "action": {
+          "type": "click",
+          "x": 952,
+          "y": 628
+        },
+        "address_after": "http://127.0.0.1:5188/wealth/contact",
+        "screen_changed": true,
+        "blocked": null,
+        "clarity": 5,
+        "trust": 4,
+        "effort": 1,
+        "emotion": "ready"
+      }
+    ]
+  }
+}
