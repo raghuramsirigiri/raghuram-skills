@@ -24,7 +24,8 @@ SKILL = Path(__file__).resolve().parent.parent
 EYES, REPORT = SKILL / "scripts" / "eyes.py", SKILL / "scripts" / "report.py"
 SERVER = SKILL / "evals" / "fixtures" / "demo-site" / "server.py"
 PY = sys.executable
-DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubts": [], "friction": [], "est_seconds": 5}
+DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubts": [], "friction": [], "est_seconds": 5,
+       "triggers_met": []}
 FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3, "one_word": "meh",
             "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q",
             "reasons": {k: "the offer button at step 2 did nothing" for k in
@@ -167,6 +168,30 @@ class Study(unittest.TestCase):
         self.assertNotIn("test:email", warned[0])
         self.assertNotIn("test:phone", warned[0])
 
+    def test_patience_costs_and_trigger_lint(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        self.assertEqual(driver.patience_budget({"traits": {"patience": 1}}, {}), 8)
+        self.assertEqual(driver.patience_budget({}, {"patience_scale": 1.5}), 33)
+        calm = dict(DEC, clarity=4)
+        cost, why = driver.step_cost(calm, {"type": "click"}, {"ok": True}, backtrack=False, scrolls_in_a_row=0, new_page=True)
+        self.assertEqual((cost, why), (0, ["getting somewhere"]))
+        bad = dict(DEC, clarity=2, effort=5, friction=[{"type": "dead_end", "severity": "critical"}])
+        cost, why = driver.step_cost(bad, {"type": "click"}, {"ok": True, "no_visible_response": True},
+                                     backtrack=True, scrolls_in_a_row=0, new_page=False)
+        self.assertEqual(cost, 1 + 2 + 1.5 + 1 + 1 + 2)
+        self.assertIn("something they pressed did nothing", why)
+        self.assertEqual(driver.patience_word(1, 22), "almost gone")
+        self.assertEqual(driver.patience_word(20, 22), "plenty")
+        self.assertEqual(driver.trigger_problems(["words", {"when": "w", "after": {"friction:surprise_requirement": 1}}]), [])
+        self.assertEqual(len(driver.trigger_problems([{"when": "w", "after": {"vibes": 1}}, {"when": "w", "after": {"steps": 0}},
+                                                      {"after": {"steps": 3}}])), 3)
+        d = study("trigger-lint")
+        p = personas(d, [{"id": "a", "gives_up_when": [{"when": "w", "after": {"vibes": 2}}]}])
+        rc, out = eyes("check", "--study", d / "study.json", "--personas", p)
+        self.assertNotEqual(rc, 0)
+        self.assertTrue(any("signal must be" in e for e in json.loads(out)["errors"]), out)
+
     def test_persona_lint(self):
         d = study("lint")
         bad = TMP / "lint" / "bad.json"
@@ -269,6 +294,51 @@ class Sessions(unittest.TestCase):
         finally:
             for s in started:
                 eyes("stop", "--session", s)
+
+    def test_driver_ends_walks_when_a_person_gives_up(self):
+        """A met condition ends the walk at once; a counted trigger and an empty patience budget end it without the walker."""
+        xy = dead_button_xy()
+        d = study("give-up", max_steps=20)
+        p = personas(d, [{"id": "judged", "gives_up_when": ["The price is unclear"]},
+                         {"id": "counted", "gives_up_when": [{"when": "Two presses do nothing", "after": {"dead_clicks": 2}}]},
+                         {"id": "impatient", "traits": {"patience": 1}}])
+        out = jrun("start", "--study", d / "study.json", "--personas", p, "--all")
+        s = {Path(r["session"]).name: r["session"] for r in out["sessions"]}
+        click = {"type": "click", **xy}
+        journey = lambda k: json.loads((Path(s[k]) / "journey.json").read_text(encoding="utf-8"))
+        try:
+            brief = (Path(s["judged"]) / "brief.md").read_text(encoding="utf-8")
+            self.assertIn("1. The price is unclear", brief)
+            self.assertIn("- Two presses do nothing", (Path(s["counted"]) / "brief.md").read_text(encoding="utf-8"))
+            no_check = {k: v for k, v in DEC.items() if k != "triggers_met"}
+            self.assertIn("triggers_met", jrun("act", "--session", s["judged"], payload={"decision": no_check, "action": click})["error"])
+            self.assertIn("1 to 1", jrun("act", "--session", s["judged"], payload={"decision": dict(DEC, triggers_met=[2]), "action": click})["error"])
+            r = jrun("act", "--session", s["judged"], payload={"decision": dict(DEC, triggers_met=[1]), "action": click})
+            self.assertEqual(r["ended"], "gave_up")
+            self.assertEqual(r["walk_recap"]["ended_by"], "gives_up_when")
+            j = journey("judged")
+            self.assertEqual((j["ended_by"], j["reason"]), ("gives_up_when", "Gave up: The price is unclear"))
+            self.assertEqual(j["steps"][-1]["action"]["instead_of"], click)   # the click was never made
+
+            first = jrun("act", "--session", s["counted"], payload={"decision": DEC, "action": click})
+            self.assertFalse(first.get("ended"))
+            self.assertIn(first["patience"], ("plenty", "some"))
+            second = jrun("act", "--session", s["counted"], payload={"decision": DEC, "action": click})
+            self.assertEqual(second["ended"], "gave_up")
+            self.assertEqual(journey("counted")["ended_by"], "gives_up_when")
+
+            results = [jrun("act", "--session", s["impatient"], payload={"decision": DEC, "action": click}) for _ in range(3)]
+            self.assertFalse(results[1].get("ended"))
+            self.assertEqual(results[2]["ended"], "gave_up")
+            j = journey("impatient")
+            self.assertEqual(j["ended_by"], "patience")
+            self.assertTrue(j["reason"].startswith("Patience ran out after something they pressed did nothing"), j["reason"])
+            self.assertEqual(j["patience"]["budget"], 8)
+            self.assertEqual(j["steps"][0]["patience"]["cost"], 3)
+            self.assertEqual(j["give_up_signals"]["dead_clicks"], 3)
+        finally:
+            for v in s.values():
+                eyes("stop", "--session", v)
 
     def test_recon_has_no_brief(self):
         d = study("recon")

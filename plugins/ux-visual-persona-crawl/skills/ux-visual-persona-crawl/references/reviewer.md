@@ -35,6 +35,8 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 - A persona misreading something that is plainly legible in the screenshot, or clicking a few pixels off a big target. Check the screenshot before blaming the site.
 - `blocked_by_site`: a CAPTCHA or login wall is not a UX finding.
 
+A walk the driver ended as `gave_up` is not a simulation problem: `ended_by` is `gives_up_when` (a condition the persona set out with was met) or `patience` (the budget their `traits.patience` set ran out). Those exits are what a real person of that kind would do, so treat them as data. Each step's `patience` record says what used it up; when the site's own problems (dead buttons, confusing screens, going back) spent most of it, the exit belongs in the finding about those problems.
+
 ## Write
 
 One root cause is one finding, even if several personas hit it. List every persona who hit it in `personas`, so `verify` can report how many of the walks that reached the page hit the problem (`exposure`). A walk that reached the page and sailed past it is evidence too: say why in the description, since it tells the reader who the problem affects. Every finding needs evidence: a session, a step, and a box `[x, y, width, height]` on that step's screenshot around the thing. `verify` crops each box into the report, and removes the finding if the step or box doesn't exist.

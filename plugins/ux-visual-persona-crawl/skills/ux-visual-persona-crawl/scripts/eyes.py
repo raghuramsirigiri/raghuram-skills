@@ -71,6 +71,100 @@ FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "
 FILL_MAX = 8  # fields one fill action may set; more than a screen's worth means the persona isn't looking
 LOW_IMAGE_EDGE = 1100  # study "image_budget": "low" caps the screenshot's long side here, about half the image tokens
 
+# ---------------------------------------------------------------- patience and giving up
+# A simulated person left to judge their own patience persists far longer than a real one, so the driver keeps
+# the account. traits.patience (1 to 5) sets how many points a walk may spend; each step costs a point plus
+# whatever went wrong on it, and a step that clearly moves the person forward gives a little back.
+PATIENCE_BUDGET = {1: 8, 2: 14, 3: 22, 4: 32, 5: 45}
+PATIENCE_WORDS = ((0.6, "plenty"), (0.35, "some"), (0.15, "running low"), (0.0, "almost gone"))
+# Driver-checked gives_up_when triggers: {"when": "...", "after": {"<signal>": n}} ends the walk once the
+# signal reaches n. "friction:<type>" counts the friction notes of that type the persona has recorded.
+TRIGGER_SIGNALS = {
+    "dead_clicks": "clicks or taps on something that gave no visible response",
+    "backtracks": "times they went back or returned to a page they had already left",
+    "scrolls_in_a_row": "scrolls in a row on one page without doing anything else",
+    "low_clarity_in_a_row": "screens in a row they found confusing (clarity 1 or 2)",
+    "steps": "actions taken",
+    "minutes": "minutes spent, from their own time estimates",
+}
+
+
+def patience_budget(persona: dict, study: dict) -> float:
+    level = (persona.get("traits") or {}).get("patience", 3)
+    level = min(5, max(1, round(level))) if isinstance(level, (int, float)) else 3
+    return PATIENCE_BUDGET[level] * float(study.get("patience_scale", 1))
+
+
+def patience_word(left: float, budget: float) -> str:
+    share = left / budget if budget else 0
+    return next(word for floor, word in PATIENCE_WORDS if share > floor or floor == 0)
+
+
+def step_cost(decision: dict, action: dict, result: dict, *, backtrack: bool, scrolls_in_a_row: int,
+              new_page: bool) -> tuple:
+    """What one step costs this person's patience, and why, in words they would recognise."""
+    cost, why = 1.0, []
+    if result.get("no_visible_response") and not result.get("on_blank_space"):
+        cost += 2
+        why.append("something they pressed did nothing")
+    elif result.get("on_blank_space"):
+        cost += 0.5
+        why.append("a missed tap")
+    if backtrack:
+        cost += 1.5
+        why.append("having to go back")
+    if action.get("type") == "scroll" and scrolls_in_a_row > 2:
+        cost += 0.5
+        why.append("still scrolling to find it")
+    effort, clarity = decision.get("effort"), decision.get("clarity")
+    if isinstance(effort, (int, float)) and effort > 3:
+        cost += (effort - 3) * 0.5
+        why.append("hard work")
+    if isinstance(clarity, (int, float)) and clarity <= 2:
+        cost += 1
+        why.append("not understanding the screen")
+    worst = {f.get("severity") for f in decision.get("friction", []) if isinstance(f, dict)}
+    if "critical" in worst:
+        cost += 2
+        why.append("a serious problem")
+    elif "high" in worst:
+        cost += 1
+        why.append("a real problem")
+    if isinstance(result.get("ms"), (int, float)) and result["ms"] > 4000:
+        cost += 1
+        why.append("waiting for the page")
+    est = decision.get("est_seconds")
+    if isinstance(est, (int, float)) and est > 30:
+        cost += min(2.0, (est - 30) / 60)
+        why.append("time going by")
+    if new_page and isinstance(clarity, (int, float)) and clarity >= 4 and not why:
+        cost -= 1
+        why.append("getting somewhere")
+    return cost, why
+
+
+def trigger_problems(triggers) -> list:
+    """Errors in a persona's gives_up_when: each item is a sentence the walker judges, or a driver-checked trigger."""
+    problems = []
+    for i, t in enumerate(triggers or [], 1):
+        if isinstance(t, str):
+            continue
+        if not isinstance(t, dict) or not isinstance(t.get("when"), str) or not isinstance(t.get("after"), dict) or len(t["after"]) != 1:
+            problems.append(f'gives_up_when {i}: a driver-checked trigger is {{"when": "...", "after": {{"<signal>": n}}}} with one signal')
+            continue
+        (signal, n), = t["after"].items()
+        known = signal in TRIGGER_SIGNALS or (signal.startswith("friction:") and signal[9:] in FRICTION_TYPES)
+        if not known:
+            problems.append(f"gives_up_when {i}: signal must be one of {sorted(TRIGGER_SIGNALS)} or friction:<type>")
+        if not isinstance(n, (int, float)) or n < 1:
+            problems.append(f"gives_up_when {i}: the count after {signal} must be 1 or more")
+    return problems
+
+
+def judged_triggers(persona: dict) -> list:
+    """The gives_up_when sentences the walker must check on every screen, numbered from 1 in the brief."""
+    return [t for t in persona.get("gives_up_when") or [] if isinstance(t, str)]
+
 
 LONG_PREFIX = "\\\\?\\"
 
@@ -344,6 +438,10 @@ class Session:
         self.visited = []
         self.est_total = 0.0
         self.counts = {"analytics_blocked": 0, "writes_blocked": 0, "off_site_refused": 0, "typing_refused": 0}
+        self.judged = [] if meta.get("recon") else judged_triggers(self.persona)
+        self.watched = [] if meta.get("recon") else [t for t in self.persona.get("gives_up_when") or [] if isinstance(t, dict)]
+        self.signals = Counter()
+        self.patience = None if meta.get("recon") else {"budget": patience_budget(self.persona, self.study), "spent": 0.0}
         self.done = asyncio.Event()
         self.last_seen = time.time()
         (self.dir / "shots").mkdir(exist_ok=True)
@@ -559,6 +657,20 @@ class Session:
         for f in decision["friction"]:
             if f.get("type") not in FRICTION_TYPES or f.get("severity") not in SEVERITIES:
                 return {"ok": False, "error": f"friction needs type in {sorted(FRICTION_TYPES)} and severity in {sorted(SEVERITIES)}"}
+        # Every screen, the walker says which of this person's give-up conditions it meets. Asked once in the
+        # brief, they were forgotten after a few screens; asked each time, a met one can't be walked past.
+        if self.judged and "triggers_met" not in decision:
+            return {"ok": False, "error": f"Missing decision field triggers_met: the numbers (1 to {len(self.judged)}) of your "
+                                          "gives_up_when conditions this screen meets, or [] if none"}
+        met = decision.setdefault("triggers_met", [])
+        if not isinstance(met, list) or any(not isinstance(n, int) or not 1 <= n <= len(self.judged) for n in met):
+            return {"ok": False, "error": f"triggers_met must be a list of numbers from 1 to {len(self.judged)}, or []"}
+        ended_by = None
+        if met and action["type"] != "finish":
+            # A condition this person gives up on is met: they leave now, whatever they were about to do.
+            reason = "; ".join(self.judged[n - 1] for n in sorted(set(met)))
+            action = {"type": "finish", "outcome": "gave_up", "reason": f"Gave up: {reason}", "instead_of": action}
+            ended_by = "gives_up_when"
 
         self.events.clear()
         url_before = self.page.url
@@ -581,7 +693,14 @@ class Session:
         except Exception:
             before_raw, restless = self.looked["raw"], None
         started = time.perf_counter()
+        if ended_by:
+            self.journey["ended_by"] = ended_by
+        elif action["type"] == "finish" and met:
+            self.journey["ended_by"] = "gives_up_when"
         result = await self.perform(action)
+        if ended_by:
+            result["gave_up_because"] = action["reason"]
+            result["note"] = "One of your gives_up_when conditions was met, so this person left instead of doing that."
         result["ms"] = round((time.perf_counter() - started) * 1000)
         self.step += 1
         self.est_total += float(decision.get("est_seconds") or 0)
@@ -614,6 +733,7 @@ class Session:
                     result["on_blank_space"] = True
             self.no_change = self.no_change + 1 if result.get("no_visible_response") else 0
         result["events"] = list(self.events)
+        spent = self.account(decision, action, result, url_before) if not self.ended else None
 
         logged = dict(action)
         if result.get("blocked") in ("typing_disabled_live_site", "use_test_value"):
@@ -625,19 +745,31 @@ class Session:
             "step": self.step, "at": time.strftime("%H:%M:%S"), "address_bar": self.looked["url"],
             "screenshot": Path(self.looked["shot"]).name, "image_size": self.looked["size"],
             "decision": decision, "action": logged, "result": result,
+            **({"patience": spent} if spent else {}),
         })
         if self.ended:
             self.journey["steps_taken"] = self.step
         self.save()
 
-        if self.step >= self.study["max_steps"] and not self.ended:
-            await self.finish("step_cap", "Step limit reached", auto=True)
+        stop = None
+        if not self.ended:
+            hit = next((t for t in self.watched if self.signals[next(iter(t["after"]))] >= next(iter(t["after"].values()))), None)
+            if self.step >= self.study["max_steps"]:
+                stop = ("step_cap", "Step limit reached", None)
+            elif self.no_change >= 5:
+                stop = ("harness_stall", "Five actions in a row produced no visible change", None)
+            elif hit:
+                stop = ("gave_up", f"Gave up: {hit['when']}", "gives_up_when")
+            elif self.patience and self.patience["spent"] >= self.patience["budget"]:
+                worn = [w for s in self.journey["steps"][-4:] for w in (s.get("patience") or {}).get("why", [])]
+                stop = ("gave_up", "Patience ran out" + (f" after {', '.join(dict.fromkeys(worn))}" if worn else ""), "patience")
+        if stop:
+            await self.finish(stop[0], stop[1], auto=True, by=stop[2])
             result["ended"] = self.ended
-            result["walk_recap"] = self.recap()
-            result["next"] = FEEDBACK_NEXT
-        elif self.no_change >= 5 and not self.ended:
-            await self.finish("harness_stall", "Five actions in a row produced no visible change", auto=True)
-            result["ended"] = self.ended
+            if stop[2]:
+                result["gave_up_because"] = stop[1]
+                result["note"] = ("This person has had enough and left the site. The walk is over; nothing more will "
+                                  "happen on screen.")
             result["walk_recap"] = self.recap()
             result["next"] = FEEDBACK_NEXT
         elif self.no_change >= 3:
@@ -648,6 +780,35 @@ class Session:
             except Exception as exc:
                 result["next_screen"] = {"error": f"Run look: {str(exc)[:200]}"}
         return result
+
+    def account(self, decision: dict, action: dict, result: dict, url_before: str):
+        """Count this step toward the driver-checked give-up signals and charge it to the person's patience.
+        Returns the step's patience record for the journey, or None for a recon session."""
+        if self.patience is None:
+            return None
+        kind, url_after = action.get("type"), self.page.url
+        moved = url_after != url_before
+        backtrack = kind == "back" or (moved and url_after in self.visited[:-1])
+        dead = bool(result.get("no_visible_response") and not result.get("on_blank_space"))
+        self.signals["steps"] += 1
+        self.signals["dead_clicks"] += dead and kind in ("click", "double_click")
+        self.signals["backtracks"] += backtrack
+        self.signals["scrolls_in_a_row"] = self.signals["scrolls_in_a_row"] + 1 if kind == "scroll" and not moved else 0
+        clarity = decision.get("clarity")
+        low = isinstance(clarity, (int, float)) and clarity <= 2
+        self.signals["low_clarity_in_a_row"] = self.signals["low_clarity_in_a_row"] + 1 if low else 0
+        self.signals["minutes"] = self.est_total / 60
+        for f in decision.get("friction", []):
+            if isinstance(f, dict) and f.get("type"):
+                self.signals["friction:" + f["type"]] += 1
+        cost, why = step_cost(decision, action, result, backtrack=backtrack,
+                              scrolls_in_a_row=self.signals["scrolls_in_a_row"], new_page=moved and not backtrack)
+        p = self.patience
+        p["spent"] = max(0.0, p["spent"] + cost)
+        left = max(0.0, p["budget"] - p["spent"])
+        # The walker gets a feeling, not a number: a person doesn't know they have 4 points left.
+        result["patience"] = patience_word(left, p["budget"])
+        return {"cost": round(cost, 2), "why": why, "left": round(left, 2), "budget": p["budget"]}
 
     async def perform(self, action: dict) -> dict:
         kind = action["type"]
@@ -761,7 +922,13 @@ class Session:
             out["note"] = "That would have sent information to the site, which is not allowed here. Say what you expected to happen next, then finish with reached_boundary."
         return out
 
-    async def finish(self, outcome: str, reason: str, auto: bool = False):
+    async def finish(self, outcome: str, reason: str, auto: bool = False, by: str = None):
+        # Who ended the walk: the walker ("walker"), a gives_up_when condition, patience, or the harness.
+        self.journey["ended_by"] = by or self.journey.get("ended_by") or ("harness" if auto else "walker")
+        if self.patience:
+            self.journey["patience"] = {"budget": self.patience["budget"], "spent": round(self.patience["spent"], 2),
+                                        "level": (self.persona.get("traits") or {}).get("patience", 3)}
+            self.journey["give_up_signals"] = {k: round(v, 2) for k, v in self.signals.items() if v}
         grounded = outcome
         goal = self.study.get("goal_match")
         # goal_match null means recon found no goal page at all, so no claim of reaching it can be checked.
@@ -791,6 +958,9 @@ class Session:
         goal = self.study.get("goal_match")
         return {
             "outcome": self.ended, "your_reason": self.journey.get("reason", ""), "steps_taken": self.step,
+            "ended_by": self.journey.get("ended_by"),
+            **({"patience_at_end": patience_word(max(0.0, self.patience["budget"] - self.patience["spent"]), self.patience["budget"])}
+               if self.patience else {}),
             "goal_page_reached": bool(goal and any(re.search(goal, u, re.I) for u in self.visited)),
             "in_the_moment_average": {"clarity": avg("clarity"), "trust": avg("trust"), "effort": avg("effort")},
             "friction_notes": {k: sev[k] for k in ("critical", "high", "medium", "low") if sev[k]},
@@ -1051,6 +1221,12 @@ def lint_personas(people) -> tuple:
                 errors.append(f"{who}: trait {t} must be 1 to 5")
         if not p.get("gives_up_when"):
             warnings.append(f"{who}: no gives_up_when, so this person will persist far longer than a real one")
+        elif not isinstance(p["gives_up_when"], list):
+            errors.append(f"{who}: gives_up_when must be a list")
+        else:
+            errors += [f"{who}: {e}" for e in trigger_problems(p["gives_up_when"])]
+        if "patience" not in (p.get("traits") or {}):
+            warnings.append(f"{who}: no traits.patience, so the driver gives this person average patience (3)")
         if not p.get("demographics"):
             warnings.append(f"{who}: no demographics block")
         if not p.get("lacks"):
@@ -1096,6 +1272,16 @@ def shared_test_values(study: dict, people: list) -> list:
             if "{persona}" not in str(v) and not any(k in (p.get("test_data") or {}) for p in people)]
 
 
+def gives_up_text(persona: dict) -> str:
+    judged = judged_triggers(persona)
+    watched = [t["when"] for t in persona.get("gives_up_when") or [] if isinstance(t, dict)]
+    lines = [f"{i}. {t}" for i, t in enumerate(judged, 1)] or ["(none: put `\"triggers_met\": []` in every decision)"]
+    if watched:
+        lines += ["", "You would also leave when any of these happens. The driver counts them and ends the walk for you:", ""]
+        lines += [f"- {w}" for w in watched]
+    return "\n".join(lines)
+
+
 def build_brief(session_dir: Path) -> str:
     meta = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
     if meta.get("recon"):
@@ -1113,6 +1299,7 @@ def build_brief(session_dir: Path) -> str:
     text = re.sub(r"\[TYPING RULE:[^\n]*\]", lambda _: typing, text)
     text = (text.replace("[PASTE THE PERSONA JSON]", "```json\n" + json.dumps(persona, indent=2, ensure_ascii=False) + "\n```")
                 .replace("[THE PERSONA'S TASK]", str(persona.get("task", "")))
+                .replace("[GIVES UP WHEN]", gives_up_text(persona))
                 .replace("[DRIVER]", str(Path(__file__).resolve()))
                 .replace("[SESSION]", shown(session_dir)))
     left = re.findall(r"\[[A-Z][A-Z' ]+\]", text)
@@ -1219,6 +1406,9 @@ def cmd_start(args):
     for persona in chosen:
         if persona.get("vision") and persona["vision"] not in VISION:
             raise SystemExit(f"{persona['id']}: vision must be one of {sorted(VISION)}")
+        bad = trigger_problems(persona.get("gives_up_when") if isinstance(persona.get("gives_up_when"), list) else [])
+        if bad:
+            raise SystemExit(f"{persona['id']}: {bad[0]}")
         start_url = persona.get("start_url") or study["start_url"]
         if (urlsplit(start_url).hostname or "").lower() not in {h.lower() for h in study["allowed_hosts"]}:
             raise SystemExit(f"{persona['id']}: the start_url is not on an allowed host")

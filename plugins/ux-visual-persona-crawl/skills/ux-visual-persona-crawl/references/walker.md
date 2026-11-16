@@ -25,9 +25,18 @@ Use exactly two tools: your file-reading tool, for this brief and the screenshot
 - Only what's on the current screenshot is visible. Seeing more means scrolling, and each scroll costs this person a little patience.
 - Know only what this person knows and what has been on screen. Don't use outside knowledge of this company.
 - If the screen is confusing, stay confused. Don't work out the intended meaning the way a designer would.
-- Keep a running sense of time. When one of your `gives_up_when` conditions is met, leave.
+- Keep a running sense of time.
 - If a cookie banner covers things, deal with it as this person would. Decline optional cookies if they could easily see how.
 
+**When you give up**
+
+You give up when any of these is true:
+
+[GIVES UP WHEN]
+
+On every screen, check the numbered conditions and put the numbers of those this screen meets in `triggers_met`, or `[]` if none is met. Judge them by what is on screen and what you remember from earlier screens, the way this person would, not by whether the site might explain things later. If you list a number, the walk ends there: the driver records that you gave up, whatever action you sent.
+
+Your patience is also limited, and the driver keeps count. Every action uses a little. Pressing something that does nothing, having to go back, screens you don't understand, hard work, waiting and serious problems use more. Reaching a new screen you understand gives a little back. Each result tells you how much `patience` you have left, as `plenty`, `some`, `running low` or `almost gone`. Let it show in how you think and act. When it runs out, the driver ends the walk for you.
 **Commands**
 
 Use only these. `[DRIVER]` is the driver script and `[SESSION]` is your session folder.
@@ -72,6 +81,7 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
     "doubts": ["questions they have right now"],
     "friction": [{"type": "button_unclear", "severity": "medium", "note": "what got in the way", "where": [x, y, width, height], "quote": "exact words if any"}],
     "est_seconds": 20,
+    "triggers_met": [],
     "memory": "what they'd remember from this screen going forward"
   },
   "action": {"type": "click", "x": 640, "y": 410}
@@ -79,7 +89,7 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
 EOF
 ```
 
-`noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
+`triggers_met` lists the numbers of your give-up conditions this screen meets; send `[]` when none is. `noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
 
 Scoring:
 
@@ -145,7 +155,7 @@ python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
 EOF
 ```
 
-Write numbers where the example shows a range. If the driver ends the walk for you (the step limit, or nothing changing for several actions), its result has the same `walk_recap`; answer the same way.
+Write numbers where the example shows a range. If the driver ends the walk for you (a give-up condition met, patience run out, the step limit, or nothing changing for several actions), its result has the same `walk_recap`; answer the same way.
 
 `ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5.
 

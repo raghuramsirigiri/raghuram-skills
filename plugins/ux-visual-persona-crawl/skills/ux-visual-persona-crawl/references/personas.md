@@ -53,7 +53,8 @@ If the user supplied real customer data (segments, survey results, an analytics 
   "assumptions_not_allowed": ["Knows this company's prices", "Knows what an exit fee is on this plan"],
   "traits": {"tech_confidence": 2, "patience": 3, "domain_knowledge": 1, "risk_aversion": 4, "reading": "careful", "eyesight": 2},
   "behaviour": ["Reads every word near a button before pressing it", "Avoids anything that looks like it costs money"],
-  "gives_up_when": ["She can't tell the total monthly price", "Something asks for a number she doesn't have"],
+  "gives_up_when": ["She can't tell the total monthly price", "Something asks for a number she doesn't have",
+                    {"when": "She presses two things that do nothing", "after": {"dead_clicks": 2}}],
   "must_know_before_acting": ["The real monthly cost", "Whether she can leave without a fee"]
 }
 ```
@@ -70,8 +71,21 @@ If the user supplied real customer data (segments, survey results, an analytics 
 | `task` | What they came to do, in their own terms. The walker brief gives them this, so it's their goal and not the study's |
 | `traits` | 1 to 5, where 5 is highest. `reading` is `skims` or `careful`. `eyesight` 1 to 5 tells the persona how hard faint or small text is for them |
 | `assumptions_not_allowed` | Things this person must not know unless they see them on screen. This stops the model's general knowledge leaking in |
-| `gives_up_when` | Concrete triggers. Without these, simulated people persist far longer than real ones |
+| `gives_up_when` | Concrete triggers. Without these, simulated people persist far longer than real ones. The driver enforces them; see below |
 | `test_data` | Optional, `test_env` only: this persona's own test values, overriding the study's of the same name. Use it for values that must differ per person but can't take `{persona}`, such as a digits-only phone number |
 | `start_url` | Optional, if this persona arrives somewhere other than the study's start page (say, an ad landing page) |
+
+## Giving up: what the driver enforces
+
+Left to judge for themselves, simulated people persist far longer than real ones. So `eyes.py` holds two of the fields to account:
+
+**`gives_up_when`** takes two kinds of item, mixed freely:
+
+- A sentence, such as `"She can't tell the total monthly price"`. The brief numbers these, and every step the walker must send `triggers_met` with the numbers this screen meets. Listing one ends the walk as `gave_up` at that step, with that sentence as the reason, whatever action came with it. A step without `triggers_met` is refused.
+- A counted trigger, `{"when": "Two buttons in a row do nothing", "after": {"dead_clicks": 2}}`, which the driver checks itself, with no judgement from the walker. Signals: `dead_clicks` (presses with no visible response, excluding taps on blank space), `backtracks` (Back, or returning to a page already left), `scrolls_in_a_row` (on one page), `low_clarity_in_a_row` (clarity 1 or 2), `steps`, `minutes` (from the persona's own time estimates), and `friction:<type>` (how many friction notes of that type the persona has recorded, such as `friction:surprise_requirement`). One signal per trigger.
+
+Use counted triggers for anything the recording can measure, and sentences for things only the person can judge, such as not finding a price.
+
+**`traits.patience`** sets a budget the driver spends down: 8, 14, 22, 32 or 45 points for patience 1 to 5 (3 when left out), multiplied by the study's optional `patience_scale` (say 1.5 for a long application form people expect to take a while). Each action costs 1. It costs more for a press that does nothing (+2), going back (+1.5), a fourth scroll in a row (+0.5), effort 4 or 5 (+0.5 or +1), clarity 1 or 2 (+1), a high or critical friction note (+1 or +2), a page taking over 4 seconds (+1), and time over 30 seconds on one screen. Reaching a new page the persona finds clear, with nothing else wrong, gives 1 back. The walker sees only a word (`plenty`, `some`, `running low`, `almost gone`). When the budget runs out, the driver ends the walk as `gave_up`. Each step's cost and its reasons are in `journey.json`, and `ended_by` says who stopped the walk: `walker`, `gives_up_when`, `patience` or `harness`.
 
 Never use a real person's details, and invent no real business names or identifiers.
