@@ -146,6 +146,8 @@ def analyze(study_dir: Path) -> dict:
         navigation[name] = {
             "persona": j["persona"], "device": j["persona"].get("device"), "outcome": outcome,
             "claimed_outcome": j.get("claimed_outcome"), "reason": j.get("reason"),
+            # walker, gives_up_when, patience or harness: whether the persona chose to stop or the driver stopped them
+            "ended_by": j.get("ended_by"), "patience": j.get("patience"), "give_up_signals": j.get("give_up_signals"),
             "steps_taken": j.get("steps_taken", len(steps)), "est_seconds": j.get("est_seconds"),
             "path": path, "stages_reached": stages, "backtracks": backtracks, "dead_clicks": dead,
             "exit_page": exit_page,
