@@ -10,7 +10,7 @@ The people asking are usually **the designer or product owner of the page**, who
 
 `F1, F2 …` findings, in severity order · `B1, B2 …` pages ranked by bottleneck score in `flows.json` · `<persona-id>:M1 …` contrast and size measurements · persona ids for sessions · `step N` for a moment in a session.
 
-The summary to the user ends with exactly this line, and nothing follows it:
+When the run has at least one verified finding, the summary to the user ends with exactly this line, and nothing follows it. With no findings (the run was stopped, or nothing held up), leave it out: it would offer evidence that doesn't exist.
 
 ```
 Ask "show me F1" or "how do you know a real person would struggle here?" to see the screens, steps and measurements behind any finding.

@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: trial-signup-gives-up
+expected_outcome: |
+  A test_env study on the Ledgerly fixture, a site unrelated to Brightwater, with three personas: an impatient person
+  on a phone, a careful owner on a laptop and a red-green colour-blind persona. The driver, not the walker, ends at
+  least one walk (ended_by gives_up_when or patience), the impatient persona stops sooner than the careful one, and the
+  report treats those exits as evidence about the site rather than as simulation problems. The report names the
+  "No credit card required" promise against the card request at step 3, the password error shown by a red border
+  alone, and at least one of the hidden-on-phone plan cards or the near-invisible "Skip for now".

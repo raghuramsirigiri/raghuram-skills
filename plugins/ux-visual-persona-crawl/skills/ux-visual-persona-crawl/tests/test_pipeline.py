@@ -110,6 +110,27 @@ def dead_button_xy():
 
 
 class Pixels(unittest.TestCase):
+    def test_shrunk_frame_is_spotted(self):
+        import io
+        from PIL import Image, ImageDraw
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+
+        def png(draw):
+            img = Image.new("RGB", (770, 1565), "white")
+            draw(ImageDraw.Draw(img))
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            return buf.getvalue()
+
+        glitch = png(lambda d: (d.rectangle([0, 0, 216, 60], fill="navy"), d.rectangle([0, 300, 216, 440], fill="black")))
+        page = png(lambda d: (d.rectangle([0, 0, 769, 60], fill="navy"), d.rectangle([40, 300, 300, 440], fill="black")))
+        short = png(lambda d: d.rectangle([0, 0, 769, 60], fill="navy"))
+        self.assertTrue(driver.shrunk_frame(glitch))
+        self.assertFalse(driver.shrunk_frame(page))
+        self.assertFalse(driver.shrunk_frame(short))
+        self.assertFalse(driver.shrunk_frame(png(lambda d: None)))
+
     def test_a_tick_next_to_the_pointer_counts_as_a_response(self):
         import importlib.util
         import io
@@ -144,7 +165,7 @@ class Study(unittest.TestCase):
         self.assertEqual(c["treated_as"], "test system")
         self.assertEqual(c["pace_ms"], 300)
         live = study("live-hosts", start_url="https://www.example.com/x", allowed_hosts=["https://www.example.com:443/x"])
-        c = jrun("check", "--study", live / "study.json")
+        c = jrun("check", "--study", live / "study.json", "--no-robots")
         self.assertTrue(c["treated_as"].startswith("live"))
         self.assertEqual(c["pace_ms"], 1200)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vision-only browser driver for persona crawls.
 
-  check     validate a study file
+  check     validate a study file, and report what each live host's robots.txt allows
   start     open a persona's browser on the study's start page
   look      screenshot what is on screen, with a light coordinate grid (a clean copy is kept on disk)
   zoom      lean in: an enlarged crop of part of the last screenshot
@@ -248,6 +248,24 @@ def find_env() -> dict:
 
 
 # ---------------------------------------------------------------- pixels
+
+def shrunk_frame(raw: bytes) -> bool:
+    """True when the picture's content fills only its top-left corner and the rest is one blank colour.
+
+    That is a rendering glitch, not a page: a real page's header, background or fixed bars reach across the
+    screen. Judged on a small thumbnail, so it costs a few milliseconds per screenshot.
+    """
+    import io
+    from PIL import Image, ImageChops
+
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    w, h = img.size
+    small = img.resize((max(1, w // 8), max(1, h // 8)))
+    bg = small.getpixel((small.width - 1, small.height - 1))
+    diff = ImageChops.difference(small, Image.new("RGB", small.size, bg)).convert("L").point(lambda v: 255 if v > 24 else 0)
+    box = diff.getbbox()
+    return bool(box) and box[2] < small.width * 0.5 and box[3] < small.height * 0.5
+
 
 def luminance(rgb) -> float:
     def ch(c):
@@ -571,7 +589,19 @@ class Session:
         await self.page.wait_for_timeout(self.study["pace_ms"])
 
     async def shot_bytes(self) -> bytes:
-        return await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        raw = await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        # Right after a navigation, Chromium's mobile emulation can hand back a frame drawn at the wrong scale: the
+        # whole screen shrunk into the top-left corner of a blank image. A walker aims its taps from that picture,
+        # so every tap misses. Seen only from pixels (the driver reads nothing from the page): retake a few times.
+        for _ in range(4):
+            if not shrunk_frame(raw):
+                return raw
+            await self.page.wait_for_timeout(400)
+            raw = await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        if shrunk_frame(raw):
+            self.events.append({"kind": "render_glitch", "url": self.page.url,
+                                "note": "screen drawn shrunk into the top-left corner after retakes; taps may miss"})
+        return raw
 
     def to_css(self, v) -> float:
         return float(v) / self.k
@@ -1308,6 +1338,53 @@ def build_brief(session_dir: Path) -> str:
     return text
 
 
+ROBOTS_AGENT = "*"  # the driver sends Chromium's own user agent, so the rules for every crawler are the ones that apply
+
+
+def robots_verdict(url: str, timeout: float = 5.0) -> dict:
+    """What the host's robots.txt says about crawling this address: allowed, disallowed, none or unreachable.
+
+    robots.txt is the site's own notice to automated visitors, not page content, so reading it doesn't
+    break the sight-only rule: nothing in it reaches a persona or the report's findings.
+    """
+    import urllib.error
+    import urllib.request
+    from urllib.robotparser import RobotFileParser
+
+    parts = urlsplit(url)
+    robots_url = f"{parts.scheme or 'https'}://{parts.netloc}/robots.txt"
+    out = {"robots_url": robots_url, "checked": url}
+    try:
+        req = urllib.request.Request(robots_url, headers={"User-Agent": "Mozilla/5.0 (ux-visual-persona-crawl check)"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read(200_000).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        # The robots.txt convention: a missing file (4xx) means no rules; a server error means don't assume.
+        out["verdict"] = "none" if 400 <= exc.code < 500 else "unreachable"
+        out["status"] = exc.code
+        return out
+    except (OSError, ValueError) as exc:
+        out.update(verdict="unreachable", error=str(exc)[:200])
+        return out
+    rp = RobotFileParser()
+    rp.parse(text.splitlines())
+    out["verdict"] = "allowed" if rp.can_fetch(ROBOTS_AGENT, url) else "disallowed"
+    return out
+
+
+def robots_report(study: dict, timeout: float = 5.0) -> dict:
+    """robots.txt verdicts for every live host in the study; test systems are skipped."""
+    start = study["start_url"]
+    start_host = (urlsplit(start).hostname or "").lower()
+    scheme = urlsplit(start).scheme or "https"
+    report = {}
+    for host in study.get("allowed_hosts", []):
+        if is_test_host(host):
+            continue
+        report[host] = robots_verdict(start if host == start_host else f"{scheme}://{host}/", timeout)
+    return report
+
+
 def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
@@ -1315,10 +1392,20 @@ def cmd_check(args):
            "treated_as": "test system" if study["local_pace"] else f"live site (at most {MAX_LIVE_SESSIONS} sessions at a time)",
            "pace_ms": study["pace_ms"],
            "report_command": report_command()}
+    warnings = []
+    if not study["local_pace"] and not args.no_robots:
+        out["robots"] = robots_report(study)
+        for host, r in out["robots"].items():
+            if r["verdict"] == "disallowed":
+                warnings.append(f"{host}'s robots.txt disallows crawling {r['checked']}: ask the user to confirm they own "
+                                "the site or have permission before any walk, or use a staging copy")
+            elif r["verdict"] == "unreachable":
+                warnings.append(f"couldn't read {r['robots_url']}: check the site's terms by sight in recon before walking")
     if args.personas:
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
-        errors, warnings = lint_personas(people)
+        errors, persona_warnings = lint_personas(people)
+        warnings += persona_warnings
         shared = shared_test_values(study, people) if isinstance(people, list) else []
         if shared:
             warnings.append(f"every persona types the same {', '.join('test:' + k for k in shared)}: a site that saves "
@@ -1327,8 +1414,8 @@ def cmd_check(args):
         out.update({"personas": len(people) if isinstance(people, list) else 0, "ok": not errors})
         if errors:
             out["errors"] = errors
-        if warnings:
-            out["warnings"] = warnings
+    if warnings:
+        out["warnings"] = warnings
     print(json.dumps(out, ensure_ascii=False, indent=1))
     if not out["ok"]:
         raise SystemExit(1)
@@ -1493,6 +1580,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("check"); p.add_argument("--study", required=True); p.add_argument("--personas", help="also check this personas.json")
+    p.add_argument("--no-robots", action="store_true", help="skip reading live hosts' robots.txt (offline checks)")
     p = sub.add_parser("start")
     p.add_argument("--study", required=True); p.add_argument("--personas")
     p.add_argument("--persona", help="a persona id, or several separated by commas")

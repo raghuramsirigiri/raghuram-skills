@@ -32,6 +32,7 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 
 - Anything the driver refused (`blocked`): those are this test's limits.
 - Sessions ended by `step_cap`, `harness_stall` or `harness_stopped`, and outcomes marked `claimed_*_unverified`.
+- Steps whose journey `events` include `render_glitch`: the screenshot was drawn shrunk into a corner, so the persona's taps from it may have missed. Dead clicks and give-ups that follow from such a step belong here, not in findings.
 - A persona misreading something that is plainly legible in the screenshot, or clicking a few pixels off a big target. Check the screenshot before blaming the site.
 - `blocked_by_site`: a CAPTCHA or login wall is not a UX finding.
 

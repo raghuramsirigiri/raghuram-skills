@@ -1,0 +1,18 @@
+{
+  "description": "Keeps the screen-walker agent's shell to the eyes.py driver, so a walk works by sight alone.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/walker_guard.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
