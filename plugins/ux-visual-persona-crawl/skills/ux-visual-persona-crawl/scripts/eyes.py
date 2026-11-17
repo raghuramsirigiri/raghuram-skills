@@ -69,6 +69,9 @@ MAX_EDGE = 1568  # longest screenshot side a vision model takes without resizing
 FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
 FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
 FILL_MAX = 8  # fields one fill action may set; more than a screen's worth means the persona isn't looking
+# After an action shows no response, keep watching this long for a late one before calling it dead.
+LATE_RESPONSE_MS = int(os.environ.get("UXCRAWL_LATE_MS", "6000"))  # tests shorten it
+LATE_POLL_MS = 500
 LOW_IMAGE_EDGE = 1100  # study "image_budget": "low" caps the screenshot's long side here, about half the image tokens
 
 # ---------------------------------------------------------------- patience and giving up
@@ -702,6 +705,21 @@ class Session:
             action = {"type": "finish", "outcome": "gave_up", "reason": f"Gave up: {reason}", "instead_of": action}
             ended_by = "gives_up_when"
 
+        if not ended_by and action["type"] != "finish" and self.page.url != self.looked["url"]:
+            # The site moved on by itself after the persona's last screenshot (a slow button finally responding, a
+            # timed redirect). Acting now would aim at a screen they never saw and credit the change to this action.
+            # Show them the new screen instead and let them decide again; nothing is done and no step is spent.
+            try:
+                await self.settle()
+                screen = await self.look()
+            except Exception as exc:
+                screen = {"error": f"Run look: {str(exc)[:200]}"}
+            return {"ok": False, "screen_changed_before_action": True,
+                    "note": ("The page changed by itself after your last screenshot, so your action was not done. "
+                             "This is the screen now: react to it and decide again. If you were left waiting with no "
+                             "sign anything was happening, that is worth a friction note."),
+                    "next_screen": screen}
+
         self.events.clear()
         url_before = self.page.url
         # A screen that moves by itself would make every click look like it did something.
@@ -761,6 +779,36 @@ class Session:
                 if action["type"] in ("click", "double_click") and "x" in action and blank_at(self.looked["raw"], action["x"], action["y"], self.k):
                     # Nothing drawn under the pointer: a missed click, not a control that ignored the person.
                     result["on_blank_space"] = True
+            if (result.get("no_visible_response") and not result.get("on_blank_space")
+                    and action["type"] in ("click", "double_click", "key", "fill")):
+                # Some controls answer seconds later with nothing in between (no spinner, no pressed state). Keep
+                # watching for a while, so a slow response is credited to the press that caused it rather than to
+                # whatever the persona does next, and record how long they were left waiting.
+                waited = 0
+                while waited < LATE_RESPONSE_MS:
+                    await self.page.wait_for_timeout(LATE_POLL_MS)
+                    waited += LATE_POLL_MS
+                    try:
+                        shot = await self.shot_bytes()
+                    except Exception:
+                        break
+                    if self.page.url != url_before or visible_change(before_raw, shot, restless):
+                        try:
+                            await self.settle()
+                            shot = await self.shot_bytes()
+                        except Exception:
+                            pass
+                        after_raw = shot
+                        result.pop("no_visible_response", None)
+                        result.update(screen_changed=True, late_response=True,
+                                      address_changed=self.page.url != url_before, address_after=self.page.url)
+                        break
+                result["ms"] += waited
+                if result.get("late_response"):
+                    result["late_response_ms"] = result["ms"]
+                    result["note"] = (f"Nothing visible happened for about {round(result['ms'] / 1000)} seconds after "
+                                      "your action, then the screen changed. That wait is part of what this person "
+                                      "experienced.")
             self.no_change = self.no_change + 1 if result.get("no_visible_response") else 0
         result["events"] = list(self.events)
         spent = self.account(decision, action, result, url_before) if not self.ended else None
