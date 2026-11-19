@@ -61,6 +61,11 @@ def page_of(url: str) -> str:
     return (p.path.rstrip("/") or "/") + (("?" + p.query) if p.query else "")
 
 
+def path_of(page: str) -> str:
+    """A page key without its query string."""
+    return page.split("?", 1)[0]
+
+
 def norm(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip().lower()
 
@@ -103,16 +108,23 @@ def analyze(study_dir: Path) -> dict:
         j = s["journey"]
         steps = j.get("steps", [])
         path, seen, backtracks, dead = [], [], [], []
+        prev_action = None
         for st in steps:
             page = page_of(st["address_bar"])
             PAGE_URLS.setdefault(page, st["address_bar"])
             d, a, r = st["decision"], st["action"], st["result"]
             if not path or path[-1]["page"] != page:
-                if page in seen and path:
-                    backtracks.append({"step": st["step"], "returned_to": page, "from": path[-1]["page"], "via": a["type"]})
+                # The same rule as the driver's patience: Back, or arriving at a path already left for another.
+                # A change of query string on one path (a dialog, a filter, a tab) is not going back.
+                same_path = bool(path) and path_of(path[-1]["page"]) == path_of(page)
+                returned = path_of(page) in {path_of(x) for x in seen} and not same_path
+                if path and (returned or (prev_action or {}).get("type") == "back"):
+                    backtracks.append({"step": st["step"], "returned_to": page, "from": path[-1]["page"],
+                                       "via": (prev_action or {}).get("type")})
                 path.append({"page": page, "first_step": st["step"], "steps": 0})
                 seen.append(page)
             path[-1]["steps"] += 1
+            prev_action = a
             ps = page_stats[page]
             page_personas[page].add(name)
             ps["steps"] += 1

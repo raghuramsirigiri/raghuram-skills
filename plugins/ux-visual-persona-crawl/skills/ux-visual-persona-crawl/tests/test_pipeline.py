@@ -195,6 +195,37 @@ class Study(unittest.TestCase):
         self.assertNotIn("test:email", warned[0])
         self.assertNotIn("test:phone", warned[0])
 
+    def test_shared_test_data_is_not_warned_about(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        st = {"mode": "test_env", "test_data": {"card": "4242", "meter": "0"}, "shared_test_data": ["card"]}
+        self.assertEqual(driver.shared_test_values(st, [{"id": "a"}, {"id": "b"}]), ["meter"])
+
+    def test_going_back_is_the_path_not_the_query(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        seen = ["http://h/", "http://h/store/a", "http://h/store/a?item=x", "http://h/store/a"]
+        # Closing a dialog or reopening a dish edits only the query: no going back.
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a", "http://h/store/a?item=x", seen))
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a?item=x", "http://h/store/a", seen))
+        # Returning to a page left for another, or pressing Back, is.
+        self.assertTrue(driver.is_backtrack("click", "http://h/store/a", "http://h/", seen))
+        self.assertTrue(driver.is_backtrack("back", "http://h/store/a?item=x", "http://h/store/a", seen))
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a", "http://h/stores", seen))
+
+    def test_a_press_that_worked_gives_patience_back(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        calm = dict(DEC, clarity=4)
+        same = dict(backtrack=False, scrolls_in_a_row=0, new_page=False)
+        self.assertEqual(driver.step_cost(calm, {"type": "click"}, {"ok": True}, **same), (1.0, []))
+        self.assertEqual(driver.step_cost(calm, {"type": "click"}, {"ok": True}, last_press_worked=True, **same),
+                         (0, ["getting somewhere"]))
+        # Not when anything else went wrong on the step.
+        cost, why = driver.step_cost(dict(calm, friction=[{"type": "dead_end", "severity": "high"}]), {"type": "click"},
+                                     {"ok": True}, last_press_worked=True, **same)
+        self.assertEqual((cost, why), (2.0, ["a real problem"]))
+
     def test_patience_costs_and_trigger_lint(self):
         sys.path.insert(0, str(EYES.parent))
         import eyes as driver

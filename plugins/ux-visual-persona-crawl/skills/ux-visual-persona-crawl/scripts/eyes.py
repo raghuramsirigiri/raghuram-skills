@@ -113,14 +113,30 @@ def patience_budget(persona: dict, study: dict) -> float:
     return PATIENCE_BUDGET[level] * float(study.get("patience_scale", 1))
 
 
+def is_backtrack(kind: str, url_before: str, url_after: str, visited: list) -> bool:
+    """Going back: the Back action, or arriving at a page (path) already left for another page.
+    Only the path counts. Many sites keep screen state in the query string (an open dialog, a filter, a tab), so
+    closing a dialog or reopening a dish changes the address without the person going anywhere. A site that
+    routes whole pages by query string under-counts here; the Back action still counts there."""
+    if kind == "back":
+        return True
+    before, after = urlsplit(url_before).path.rstrip("/") or "/", urlsplit(url_after).path.rstrip("/") or "/"
+    if before == after:
+        return False
+    return after in {urlsplit(u).path.rstrip("/") or "/" for u in visited[:-1]}
+
+
 def patience_word(left: float, budget: float) -> str:
     share = left / budget if budget else 0
     return next(word for floor, word in PATIENCE_WORDS if share > floor or floor == 0)
 
 
 def step_cost(decision: dict, action: dict, result: dict, *, backtrack: bool, scrolls_in_a_row: int,
-              new_page: bool) -> tuple:
-    """What one step costs this person's patience, and why, in words they would recognise."""
+              new_page: bool, last_press_worked: bool = False) -> tuple:
+    """What one step costs this person's patience, and why, in words they would recognise.
+    Progress gives back what the step cost: reaching a new page, or (where the site works in dialogs, drawers
+    and panels on one address) a press that did what the person expected, on a screen they understand.
+    Patience drains from friction, not from the number of steps a working flow takes."""
     cost, why = 1.0, []
     if result.get("no_visible_response") and not result.get("on_blank_space"):
         cost += 2
@@ -155,7 +171,7 @@ def step_cost(decision: dict, action: dict, result: dict, *, backtrack: bool, sc
     if isinstance(est, (int, float)) and est > 30:
         cost += min(2.0, (est - 30) / 60)
         why.append("time going by")
-    if new_page and isinstance(clarity, (int, float)) and clarity >= 4 and not why:
+    if (new_page or last_press_worked) and isinstance(clarity, (int, float)) and clarity >= 4 and not why:
         cost -= 1
         why.append("getting somewhere")
     return cost, why
@@ -472,6 +488,7 @@ class Session:
         self.ended = None
         self.boundary_hit = False
         self.visited = []
+        self.last_kind = None
         self.est_total = 0.0
         self.counts = {"analytics_blocked": 0, "writes_blocked": 0, "off_site_refused": 0, "typing_refused": 0}
         self.judged = [] if meta.get("recon") else judged_triggers(self.persona)
@@ -530,7 +547,17 @@ class Session:
         self.page = await self.context.new_page()
         self.watch(self.page)
         await self.throttle(self.page)
-        await self.page.goto(self.meta["start_url"], wait_until="domcontentloaded", timeout=30000)
+        # A page that is still loading after the wait is what this person sees first, not a failed start:
+        # a slow connection on a heavy page is exactly what a slow-network persona is there to show.
+        # Errors other than the wait running out (refused connection, bad address) still fail the start.
+        from playwright.async_api import TimeoutError as PlaywrightTimeout
+        wait_s = 90 if self.persona.get("network") == "slow" else 30
+        try:
+            await self.page.goto(self.meta["start_url"], wait_until="domcontentloaded", timeout=wait_s * 1000)
+        except PlaywrightTimeout:
+            if not self.page.url.startswith("http"):
+                raise
+            self.journey["start_load"] = f"still loading after {wait_s} s; the first screen shows it as it was"
 
     async def throttle(self, page):
         """A slow connection or an old, slow phone, applied to every tab this person opens."""
@@ -903,7 +930,7 @@ class Session:
             return None
         kind, url_after = action.get("type"), self.page.url
         moved = url_after != url_before
-        backtrack = kind == "back" or (moved and url_after in self.visited[:-1])
+        backtrack = is_backtrack(kind, url_before, url_after, self.visited)
         dead = bool(result.get("no_visible_response") and not result.get("on_blank_space"))
         self.signals["steps"] += 1
         self.signals["dead_clicks"] += dead and kind in ("click", "double_click")
@@ -916,14 +943,33 @@ class Session:
         for f in decision.get("friction", []):
             if isinstance(f, dict) and f.get("type"):
                 self.signals["friction:" + f["type"]] += 1
+        # This step's decision judges the press before it (as_expected), so the refund for a press that worked
+        # without changing the address lands one step after the press.
+        worked = self.last_kind in ("click", "double_click") and decision.get("as_expected") == "yes"
+        self.last_kind = kind
         cost, why = step_cost(decision, action, result, backtrack=backtrack,
-                              scrolls_in_a_row=self.signals["scrolls_in_a_row"], new_page=moved and not backtrack)
+                              scrolls_in_a_row=self.signals["scrolls_in_a_row"], new_page=moved and not backtrack,
+                              last_press_worked=worked)
         p = self.patience
         p["spent"] = max(0.0, p["spent"] + cost)
         left = max(0.0, p["budget"] - p["spent"])
         # The walker gets a feeling, not a number: a person doesn't know they have 4 points left.
         result["patience"] = patience_word(left, p["budget"])
         return {"cost": round(cost, 2), "why": why, "left": round(left, 2), "budget": p["budget"]}
+
+    def test_data(self) -> dict:
+        """This session's test values. A recon session re-reads the study each time, because the author is
+        still writing it; a persona's session keeps the values it started with, so a walk can't change mid-way."""
+        if self.meta.get("recon"):
+            try:
+                self.study = load_study(Path(self.meta["study_path"]))
+            except (OSError, ValueError, SystemExit):
+                pass
+        return test_values(self.study, self.persona, self.dir.name)
+
+    def missing_value_hint(self) -> str:
+        return "" if self.meta.get("recon") else (" Test values are read when the session starts; a value added to "
+                                                  "the study since then needs a new session.")
 
     async def perform(self, action: dict) -> dict:
         kind = action["type"]
@@ -958,7 +1004,7 @@ class Session:
                     return {"ok": False, "error": f"fill needs fields: a list of 1 to {FILL_MAX} items such as "
                                                   '{"x": 400, "y": 300, "text": "test:email"} or {"x": 40, "y": 520} for a tick'}
                 w, h = self.looked["size"]
-                data = test_values(self.study, self.persona, self.dir.name)
+                data = self.test_data()
                 for f in fields:
                     if not isinstance(f, dict) or "x" not in f or "y" not in f or not (0 <= f["x"] < w and 0 <= f["y"] < h):
                         return {"ok": False, "error": f"each fill field needs x,y inside the {w}x{h} screenshot"}
@@ -968,7 +1014,7 @@ class Session:
                             self.counts["typing_refused"] += 1
                             return {"ok": False, "blocked": refused, "note": TYPING_NOTES[refused] + " Nothing in this fill was done."}
                         if str(f["text"]).startswith("test:") and str(f["text"])[5:] not in data:
-                            return {"ok": False, "error": f"No test value named {str(f['text'])[5:]} in this study. Nothing in this fill was done."}
+                            return {"ok": False, "error": f"No test value named {str(f['text'])[5:]} in this study. Nothing in this fill was done." + self.missing_value_hint()}
                 url_at_start = page.url
                 for i, f in enumerate(fields):
                     x, y = self.to_css(f["x"]), self.to_css(f["y"])
@@ -994,9 +1040,9 @@ class Session:
                     return {"ok": False, "blocked": refused, "note": TYPING_NOTES[refused]}
                 text = str(action.get("text", ""))
                 if text.startswith("test:"):
-                    data = test_values(self.study, self.persona, self.dir.name)
+                    data = self.test_data()
                     if text[5:] not in data:
-                        return {"ok": False, "error": f"No test value named {text[5:]} in this study."}
+                        return {"ok": False, "error": f"No test value named {text[5:]} in this study." + self.missing_value_hint()}
                     text = str(data[text[5:]])
                 await page.keyboard.type(text, delay=35)
                 if action.get("enter"):
@@ -1394,8 +1440,9 @@ def shared_test_values(study: dict, people: list) -> list:
     """Test value names every persona would type identically."""
     if study.get("mode") != "test_env" or len(people) < 2:
         return []
+    meant = set(study.get("shared_test_data") or [])
     return [k for k, v in (study.get("test_data") or {}).items()
-            if "{persona}" not in str(v) and not any(k in (p.get("test_data") or {}) for p in people)]
+            if k not in meant and "{persona}" not in str(v) and not any(k in (p.get("test_data") or {}) for p in people)]
 
 
 def gives_up_text(persona: dict) -> str:
@@ -1507,7 +1554,8 @@ def cmd_check(args):
         if shared:
             warnings.append(f"every persona types the same {', '.join('test:' + k for k in shared)}: a site that saves "
                             "applications or accounts by these will show one persona's to the next. Put {persona} in the "
-                            "value (test+{persona}@example.com) or give each persona its own test_data")
+                            "value (test+{persona}@example.com) or give each persona its own test_data. A value meant to be the same for "
+                            "everyone, such as the test card the site itself publishes, goes in the study's shared_test_data list")
         out.update({"personas": len(people) if isinstance(people, list) else 0, "ok": not errors})
         if errors:
             out["errors"] = errors
@@ -1562,6 +1610,24 @@ def cmd_status(args):
     if len(blocked) >= 2:
         out["stop"] = f"{len(blocked)} sessions were stopped by the site ({', '.join(blocked)}): tell the user before running more."
     print(json.dumps(out, ensure_ascii=False, indent=1))
+
+
+def set_aside(session_dir: Path, study_dir: Path) -> str:
+    """Move a session whose browser failed to start to failed-starts/, keeping its log. Returns a note."""
+    import shutil
+    dest_root = lp(study_dir) / "failed-starts"
+    dest, n = dest_root / session_dir.name, 1
+    while dest.exists():
+        n += 1
+        dest = dest_root / f"{session_dir.name}-{n}"
+    for _ in range(20):  # the failed daemon may take a moment to exit and release its log
+        try:
+            dest_root.mkdir(exist_ok=True)
+            shutil.move(str(session_dir), str(dest))
+            return f" (set aside in {shown(dest)}, with its log)"
+        except OSError:
+            time.sleep(0.25)
+    return f" (could not move {shown(session_dir)}; delete it before analysis)"
 
 
 RECON_PERSONA = {"id": "recon", "name": "Study author (recon)", "device": "desktop"}
@@ -1621,14 +1687,15 @@ def cmd_start(args):
         meta = {"study_path": str(study_path), "persona": persona, "start_url": start_url, "headed": args.headed,
                 "recon": bool(args.recon)}
         (session_dir / "session.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-        log = open(session_dir / "daemon.log", "ab")
-        subprocess.Popen(
-            [runtime["python"], str(Path(__file__).resolve()), "_daemon", "--session", str(session_dir)],
-            stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=runtime["env"], creationflags=flags,
-            start_new_session=os.name != "nt", close_fds=True,
-        )
+        with open(session_dir / "daemon.log", "ab") as log:  # the daemon keeps its own handle
+            subprocess.Popen(
+                [runtime["python"], str(Path(__file__).resolve()), "_daemon", "--session", str(session_dir)],
+                stdout=log, stderr=log, stdin=subprocess.DEVNULL, env=runtime["env"], creationflags=flags,
+                start_new_session=os.name != "nt", close_fds=True,
+            )
         launched.append((session_dir, start_url))
-    deadline = time.time() + 90
+    # A slow-network persona may wait up to 90 s for its first page (Session.boot), on top of the browser starting.
+    deadline = time.time() + (150 if any(p.get("network") == "slow" for p in chosen) else 90)
     while time.time() < deadline and not all((d / "daemon.json").exists() for d, _ in launched):
         time.sleep(0.25)
 
@@ -1637,7 +1704,9 @@ def cmd_start(args):
         info_path = session_dir / "daemon.json"
         info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {"error": f"did not start, see {shown(session_dir / 'daemon.log')}"}
         if "error" in info:
-            failed.append(f"{session_dir.name}: {info['error']}")
+            # A browser that never opened leaves no walk. Out of sessions/ it can't hold up `status` as a walk
+            # still waiting, and the persona's next start gets the plain id again.
+            failed.append(f"{session_dir.name}: {info['error']}" + set_aside(session_dir, study_path.parent))
             continue
         row = {"session": shown(session_dir), "start_url": start_url, "mode": study["mode"]}
         if not args.recon:
