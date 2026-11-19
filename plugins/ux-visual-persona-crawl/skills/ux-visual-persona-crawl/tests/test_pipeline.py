@@ -25,7 +25,9 @@ EYES, REPORT = SKILL / "scripts" / "eyes.py", SKILL / "scripts" / "report.py"
 SERVER = SKILL / "evals" / "fixtures" / "demo-site" / "server.py"
 PY = sys.executable
 DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubts": [], "friction": [], "est_seconds": 5,
-       "triggers_met": []}
+       "triggers_met": [], "expects": "shows the offer", "as_expected": "yes",
+       "first_impression": {"what_is_this": "an offers page", "first_move": "press the big button"}}
+SCENT_KEYS = ("first_impression", "expects", "as_expected")
 FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3, "one_word": "meh",
             "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q",
             "reasons": {k: "the offer button at step 2 did nothing" for k in
@@ -424,6 +426,24 @@ class Sessions(unittest.TestCase):
                 eyes("stop", "--session", sid)
             srv.terminate()
 
+    def test_walker_must_state_first_impression_and_expectations(self):
+        d = study("scent")
+        p = personas(d, [{"id": "s"}])
+        s = jrun("start", "--study", d / "study.json", "--personas", p, "--persona", "s")["session"]
+        try:
+            bare = {k: v for k, v in DEC.items() if k not in SCENT_KEYS}
+            fi = {"first_impression": DEC["first_impression"]}
+            click = {"type": "click", "x": 5, "y": 5}
+            act = lambda dec: jrun("act", "--session", s, payload={"decision": dec, "action": click})
+            self.assertIn("first_impression", act(bare)["error"])
+            self.assertIn("expects", act(dict(bare, **fi))["error"])
+            self.assertTrue(act(dict(bare, **fi, expects="opens the menu")).get("ok"))
+            self.assertIn("as_expected", act(dict(bare, expects="e"))["error"])   # the screen after a press
+            self.assertIn("as_expected", act(dict(bare, expects="e", as_expected="maybe"))["error"])
+            self.assertTrue(act(dict(bare, expects="e", as_expected="no")).get("ok"))
+        finally:
+            eyes("stop", "--session", s)
+
     def test_recon_has_no_brief(self):
         d = study("recon")
         s = jrun("start", "--study", d / "study.json", "--recon")
@@ -599,6 +619,19 @@ class WalkAndReport(unittest.TestCase):
         self.assertEqual(html.count("<div class='sd-who'>"), 2)
         ticket = (d / "issues" / "F1.md").read_text(encoding="utf-8")
         self.assertIn("**Severity in parts:** frequency 1 of 2", ticket)
+        # Context pictures: F2's two boxes on one step share one numbered whole screen; F1 has a filmstrip.
+        f2 = next(x for x in v["kept"] if x["id"] == "F2")
+        self.assertEqual([(s["step"], s["marks"]) for s in f2["screens"]], [(1, [1, 2])])
+        self.assertEqual(f1["filmstrip"]["focus"], 2)
+        self.assertEqual(f1["filmstrip"]["steps"][:2], [1, 2])
+        self.assertTrue((d / f1["filmstrip"]["image"]).exists())
+        self.assertIn("class='strip'", html)
+        self.assertIn("F1 filmstrip", ticket)
+        # First impressions and expectations, from the scripted walks.
+        self.assertIn("id='first'", html)
+        self.assertIn("an offers page", html)
+        flows = json.loads((d / "flows.json").read_text(encoding="utf-8"))
+        self.assertEqual(next(r for r in flows["scent"] if r["page"] == "/offers")["yes"], 2)
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
@@ -650,6 +683,34 @@ class SuccessLevels(unittest.TestCase):
         self.assertIsNone(rows["wander"]["gap"])
         self.assertIsNone(rows["capped"]["gap"])
         self.assertEqual(rows["quit"]["umux_lite"], 83)
+
+    def test_first_clicks_and_scent(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod2", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        study = {"goal_match": "/join", "stages": [{"id": "home", "match": "^/$"}, {"id": "plans", "match": "/plans"}]}
+        u = lambda p: "http://shop.test" + p
+        step = lambda n, page, dec, action, result: {"step": n, "address_bar": u(page), "decision": dict(dec), "action": action, "result": result}
+        click = {"type": "click", "x": 1, "y": 1}
+        steps = [
+            step(1, "/", {"expects": "see plans", "first_impression": {"what_is_this": "a shop", "first_move": "plans"}}, click,
+                 {"address_after": u("/plans")}),
+            step(2, "/plans", {"as_expected": "no", "expects": "price detail", "thought": "that wasn't plans"}, click,
+                 {"no_visible_response": True}),
+            step(3, "/plans", {"as_expected": "no", "expects": "sign up"}, click, {"address_after": u("/join")}),
+            step(4, "/join", {"as_expected": "yes"}, {"type": "finish"}, {}),
+        ]
+        data = {"w": {"journey": {"steps": steps}}}
+        nav = {"w": {}}
+        out = mod.first_clicks_and_scent(study, data, nav)
+        self.assertEqual([(c["page"], c["grade"]) for c in nav["w"]["first_clicks"]], [("/", "toward"), ("/plans", "nothing")])
+        self.assertEqual(nav["w"]["first_impression"]["what_is_this"], "a shop")
+        scent = {r["page"]: r for r in out["scent"]}
+        self.assertEqual((scent["/"]["presses"], scent["/"]["no"]), (1, 1))
+        self.assertEqual((scent["/plans"]["presses"], scent["/plans"]["no"], scent["/plans"]["yes"]), (2, 1, 1))
+        self.assertEqual(scent["/"]["misses"][0]["next_thought"], "that wasn't plans")
+        self.assertEqual(out["scent"][0]["page"], "/")   # worst first: 1 of 1 missed beats 1 of 2
 
 
 if __name__ == "__main__":

@@ -82,12 +82,22 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
     "friction": [{"type": "button_unclear", "severity": "medium", "note": "what got in the way", "where": [x, y, width, height], "quote": "exact words if any"}],
     "est_seconds": 20,
     "triggers_met": [],
-    "memory": "what they'd remember from this screen going forward"
+    "memory": "what they'd remember from this screen going forward",
+    "as_expected": "yes",
+    "expects": "what this press will do: where it goes, or what appears"
   },
   "action": {"type": "click", "x": 640, "y": 410}
 }
 EOF
 ```
+
+On your **first screen only**, before you scroll or read closely, add `"first_impression": {"what_is_this": "...", "first_move": "..."}`: `what_is_this`, what this person takes the site to be for from a first glance, and `first_move`, what they would do first and where. Write the glance, not a study of the page: if it isn't clear what the site is for, say so.
+
+Every **click or double-click** needs `expects`: in this person's words, what they think pressing it will do ("shows the prices", "opens a form", "not sure, maybe more detail"). Write it before you see the result.
+
+On the screen **after a click**, give `as_expected`: `yes` if the press did what you expected, `partly` if it went roughly the right way but not quite, `no` if it did something else or nothing. Judge it from this screen, not from what you hope the site will do next. If it was `partly` or `no`, say what surprised you in `thought`.
+
+The driver refuses a step that leaves out any of these three where it's needed, and says which.
 
 `triggers_met` lists the numbers of your give-up conditions this screen meets; send `[]` when none is. `noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
 

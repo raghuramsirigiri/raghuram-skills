@@ -666,6 +666,24 @@ class Session:
             return "use_test_value"
         return None
 
+    def scent_fields(self, decision: dict, action: dict):
+        """The three things a persona must say that only they can: a first impression of the first screen (a
+        five-second test), what they expect a press to do before making it, and whether the press did that.
+        Asked in the brief alone, these were dropped after a few screens, like give-up conditions were."""
+        if self.step == 0:
+            fi = decision.get("first_impression")
+            if not (isinstance(fi, dict) and all(str(fi.get(k) or "").strip() for k in ("what_is_this", "first_move"))):
+                return ("Missing first_impression on this first screen: {\"what_is_this\": \"what this site is for, from a "
+                        "first glance\", \"first_move\": \"what you would do first, and where\"}")
+        prev = self.journey["steps"][-1] if self.journey["steps"] else None
+        if (prev and prev["action"].get("type") in ("click", "double_click") and (prev.get("decision") or {}).get("expects")
+                and not prev["result"].get("blocked") and decision.get("as_expected") not in ("yes", "partly", "no")):
+            return ("Missing as_expected: did your last press do what you expected (\"" + str(prev["decision"]["expects"])[:80]
+                    + "\")? Answer yes, partly or no, from this screen.")
+        if action.get("type") in ("click", "double_click") and not str(decision.get("expects") or "").strip():
+            return "Missing expects: in a few words, what you think this press will do (where it takes you, or what appears)."
+        return None
+
     async def act(self, payload: dict) -> dict:
         from PIL import ImageChops
 
@@ -698,6 +716,10 @@ class Session:
         met = decision.setdefault("triggers_met", [])
         if not isinstance(met, list) or any(not isinstance(n, int) or not 1 <= n <= len(self.judged) for n in met):
             return {"ok": False, "error": f"triggers_met must be a list of numbers from 1 to {len(self.judged)}, or []"}
+        if not self.meta.get("recon"):
+            problem = self.scent_fields(decision, action)
+            if problem:
+                return {"ok": False, "error": problem}
         ended_by = None
         if met and action["type"] != "finish":
             # A condition this person gives up on is met: they leave now, whatever they were about to do.

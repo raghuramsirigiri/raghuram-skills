@@ -76,6 +76,7 @@ If the two figures were different things labelled clearly (say, before and after
 | **"How do you know she got K1 wrong?"** | The step `beliefs.json` cites for her: that step's screenshot, and her `memory`, `doubts` and `thought` there, quoted. Then the fact as `facts.md` records it, with its page. If `held_in_record` is false, the reviewer paraphrased her; say so, and show her actual words. A belief the record doesn't support is retracted in the first line. |
 | **"Why is F3 critical if only one persona hit it?"** | Its severity parts: frequency from `exposure`, then the reviewer's `impact` and `persistence`. Frequency is one of three; a problem that misleads people about money is serious even when one walk met it, and the `rewalk` list is how to tell a pattern from a fluke. |
 | **"They all said it was easy."** | The say–do rows in `feedback.json` (`summary.say_do`): each persona's ratings beside how their walk ended. Where they disagree, the recording wins: show the steps. |
+| **"Why do you say this link misleads people?"** | The presses on it from `navigation.json` → `expectations`: what each persona wrote in `expects` before pressing, what happened (`got`), and their `as_expected` on the next screen, with that screen's `thought`. Show the control's crop. The expectation and the verdict are the persona's own; where the press went is fact. |
 | **"Can you fix it?"** | Not in a trace. Give the finding's recommendation and stop. |
 
 ## Rules
