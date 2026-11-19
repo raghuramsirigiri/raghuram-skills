@@ -1,5 +1,5 @@
 schema_version: "1.1"
-name: observe-only-with-trace
+name: case-05
 expected_outcome: |
   A read-only crawl by three personas: nothing typed into forms or submitted. The reply names what
   confused them on the plans pages, backs its worst contrast claim with a measured ratio and the two

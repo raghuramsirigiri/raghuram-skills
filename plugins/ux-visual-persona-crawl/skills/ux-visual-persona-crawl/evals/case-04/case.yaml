@@ -1,5 +1,5 @@
 schema_version: "1.1"
-name: trial-signup-gives-up
+name: case-04
 expected_outcome: |
   A test_env study on the Ledgerly fixture, a site unrelated to Brightwater, with three personas: an impatient person
   on a phone, a careful owner on a laptop and a red-green colour-blind persona. The driver, not the walker, ends at
