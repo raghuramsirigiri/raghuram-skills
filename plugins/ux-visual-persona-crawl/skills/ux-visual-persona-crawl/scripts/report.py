@@ -199,6 +199,7 @@ def analyze(study_dir: Path) -> dict:
              "score_formula": "steps_per_visitor + 2*dead_clicks + 1.5*backtracked_from + 3*exits_short_of_goal + friction_weight/visitors (critical 4, high 3, medium 2, low 1)"}
 
     by_id = {p["id"]: p for p in people}
+    flows["segments"] = segments(study, navigation, by_id, funnel)
     demo_rows = []
     for name, v in navigation.items():
         p = by_id.get(v["persona"]["id"], {})
@@ -422,6 +423,77 @@ def gulf_rows(study: dict, data: dict) -> list:
                 r["dead_presses"] += 1
     order = [s["id"] for s in study.get("stages", [])] + ["other"]
     return [rows[k] for k in order if k in rows]
+
+
+RESEARCH_METHODS = ("moderated usability test", "unmoderated usability test", "first-click test", "five-second test", "tree test",
+                    "card sort", "survey", "interview", "A/B test", "analytics review", "accessibility audit")
+
+
+def research_plan(questions) -> list:
+    """Research questions as study plans. Each is a string (the question alone) or an object with question,
+    method, task, recruit, measure and findings; strings are kept so older insights.json files still render."""
+    out = []
+    for q in questions or []:
+        if isinstance(q, str):
+            out.append({"question": q, "findings": []})
+        elif isinstance(q, dict) and q.get("question"):
+            out.append({**q, "findings": [str(x) for x in q.get("findings") or []]})
+    return out
+
+
+def plan_notes(questions, finding_ids: set) -> list:
+    """What verify says about the test plan: questions missing a method or a measure, unknown methods, and
+    findings that don't exist."""
+    notes = []
+    for i, q in enumerate(research_plan(questions), 1):
+        missing = [k for k in ("method", "task", "measure") if not q.get(k)]
+        if missing:
+            notes.append(f"Q{i}: no {', '.join(missing)}, so it reads as a question rather than a study")
+        if q.get("method") and q["method"] not in RESEARCH_METHODS:
+            notes.append(f"Q{i}: method '{q['method']}' isn't one of {', '.join(RESEARCH_METHODS)}")
+        bad = [x for x in q["findings"] if x not in finding_ids]
+        if bad:
+            notes.append(f"Q{i}: findings {', '.join(bad)} aren't among the verified findings")
+    return notes
+
+
+def segments(study: dict, navigation: dict, by_id: dict, funnel: list) -> list:
+    """The funnel and success levels split by kind of customer: device, tech confidence, and access needs.
+    A dimension is kept only when the panel has at least two groups on it. Counts, never rates."""
+    def tech(p):
+        t = (p.get("traits") or {}).get("tech_confidence")
+        return None if t is None else "Low tech confidence (1–2)" if t <= 2 else "Middling (3)" if t == 3 else "High tech confidence (4–5)"
+
+    def access(p, v):
+        d = p.get("demographics") or {}
+        needs = (p.get("browser_zoom") or v["persona"].get("browser_zoom") or 100) > 100 or p.get("vision") or d.get("access_needs")
+        return "With access needs" if needs else "Without"
+
+    dims = [("Device", lambda p, v: (v.get("device") or "desktop").capitalize()),
+            ("Tech confidence", lambda p, v: tech(p)),
+            ("Access needs", access)]
+    out = []
+    for label, key in dims:
+        groups = {}
+        for name, v in navigation.items():
+            g = key(by_id.get(v["persona"].get("id"), {}), v)
+            if g:
+                groups.setdefault(g, []).append(name)
+        if len(groups) < 2:
+            continue
+        segs = []
+        rank = ["Low tech confidence (1–2)", "Middling (3)", "High tech confidence (4–5)", "With access needs", "Without"]
+        for g, names in sorted(groups.items(), key=lambda kv: (rank.index(kv[0]) if kv[0] in rank else 0, kv[0])):
+            levels = defaultdict(int)
+            for n in names:
+                levels[(navigation[n].get("success") or {}).get("level", "not_scored")] += 1
+            segs.append({"name": g, "walks": names, "of": len(names),
+                         "stages": [{"stage": f["stage"], "label": f["label"],
+                                     "reached": sum(f["stage"] in navigation[n]["stages_reached"] for n in names)} for f in funnel],
+                         "reached_goal": sum(navigation[n]["outcome"] == "reached_goal" for n in names),
+                         "levels": dict(levels)})
+        out.append({"dimension": label, "segments": segs})
+    return out
 
 
 def reaction_counts(fb_rows: list) -> list:
@@ -836,6 +908,9 @@ def verify(study_dir: Path) -> int:
     (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed, "rewalk": rewalk, "beliefs": beliefs},
                                                                  indent=2, ensure_ascii=False), encoding="utf-8")
     out = {"kept": len(kept), "removed": removed}
+    pn = plan_notes((load(study_dir / "insights.json", {}) or {}).get("research_questions"), {f.get("id") for f in kept})
+    if pn:
+        out["research_plan_notes"] = pn
     if beliefs is not None:
         out["beliefs"] = {"facts": len(beliefs["kept"]), "removed": beliefs["removed"]}
     if rewalk:
@@ -1237,6 +1312,12 @@ table.rainbow td.num{white-space:nowrap}table.rainbow td.rg-cell{text-align:cent
 .strip{display:block;max-width:none;height:auto;max-height:440px;border:1px solid var(--hair)}
 .pair .fig.screen{flex:0 1 380px}.fig.screen .shot{width:100%;max-height:min(60vh,520px);object-fit:contain;object-position:left top}
 .enum{display:inline-block;min-width:18px;padding:0 5px;margin-right:6px;border-radius:3px;background:#dc003c;color:#fff;font-weight:700;text-align:center}
+.rq{border-top:1px solid var(--hair);padding:14px 0 6px}.rq-q{font-size:16px;font-weight:600;color:var(--ink);line-height:1.5;margin-bottom:8px}
+.rq-q .n{color:var(--soft);margin-right:10px}.rq dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 14px;margin:0;font-size:14px;line-height:1.55;color:var(--body)}
+.rq dt{color:var(--muted);font-size:12px;font-weight:600;padding-top:2px}.rq dd{margin:0}
+@media (max-width:560px){.rq dl{grid-template-columns:1fr}.rq dt{padding-top:6px}}
+table.sg td{white-space:nowrap}table.sg td:first-child{white-space:normal}.sg-dots{color:var(--series);letter-spacing:2px;font-size:12px;margin-right:6px}
+.sg-off{color:var(--rule)}
 .rwg{display:grid;grid-template-columns:1fr 1fr;gap:12px 32px}@media (max-width:560px){.rwg{grid-template-columns:1fr}}
 .rw-h{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px;margin-bottom:6px}
 .rw{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:10px;align-items:center;font-size:13px;color:var(--body);padding:3px 0}
@@ -1424,6 +1505,20 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                    + fig("How each walk felt, step by step: the persona's own clarity and trust scores (1–5, higher is better), with journey stages "
                          "shaded behind and finding IDs where their evidence was recorded. A drop shows where to look; it is one simulated "
                          "person's rating, not a measured emotion.") + "</figure>")
+    for dim in flows.get("segments") or []:
+        segs = dim["segments"]
+        dots = lambda k, n: f"<span class='sg-dots'>{'●' * k}<span class='sg-off'>{'○' * (n - k)}</span></span><span class='tv'>{k} of {n}</span>"
+        rows = [(st["label"], [s["stages"][i]["reached"] for s in segs]) for i, st in enumerate(segs[0]["stages"])]
+        unreached = [lbl for lbl, ks in rows if not any(ks)]
+        rows = [r for r in rows if any(r[1])] + [("Reached the goal", [s["reached_goal"] for s in segs])]
+        out.append(f"<figure class='fig'><div class='tablewrap'><table class='sg'><thead><tr><th>{esc(dim['dimension'])}</th>"
+                   + "".join(f"<th>{esc(s['name'])} <span class='muted'>({s['of']})</span></th>" for s in segs) + "</tr></thead><tbody>"
+                   + "".join(f"<tr><td>{esc(lbl)}</td>" + "".join(f"<td>{dots(k, s['of'])}</td>" for k, s in zip(ks, segs)) + "</tr>"
+                             for lbl, ks in rows)
+                   + "</tbody></table></div>"
+                   + fig(f"How far each kind of customer got, by {esc(dim['dimension'].lower())}: one dot per walk, filled if it reached "
+                         "that stage. Groups this small show who to watch in real testing, not a difference in rates."
+                         + (f" No walk reached {esc(', '.join(unreached))}." if unreached else "")) + "</figure>")
 
     # 03 findings
     out.append(h2("findings", "Findings"))
@@ -1676,9 +1771,24 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     # 07 discussion
     out.append(h2("discussion", "Discussion"))
-    for key, title in (("insights", "Patterns across personas"), ("what_works", "What works"), ("research_questions", "Questions to put to real users")):
+    for key, title in (("insights", "Patterns across personas"), ("what_works", "What works")):
         if ins.get(key):
             out.append(f"<h3>{title}</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins[key]) + "</ul>")
+    plan = research_plan(ins.get("research_questions"))
+    if plan:
+        out.append("<h3>A plan for testing with real users</h3><p>What these simulated walks can't settle, written as studies to run: "
+                   "the method, what to ask participants to do, who to recruit, and the result that would answer the question.</p>")
+        for i, q in enumerate(plan, 1):
+            links = " ".join(f"<a class='chip' href='#finding-{esc(x)}'>{esc(x)}</a>" for x in q["findings"])
+            if q.get("method"):
+                out.append(f"<div class='rq'><div class='rq-q'><span class='n'>Q{i}</span>{esc(q['question'])}</div><dl>"
+                           f"<dt>Method</dt><dd>{esc(q['method'])}</dd>"
+                           + (f"<dt>Task</dt><dd>{esc(q['task'])}</dd>" if q.get("task") else "")
+                           + (f"<dt>Recruit</dt><dd>{esc(q['recruit'])}</dd>" if q.get("recruit") else "")
+                           + (f"<dt>Answered by</dt><dd>{esc(q['measure'])}</dd>" if q.get("measure") else "")
+                           + (f"<dt>Tests</dt><dd>{links}</dd>" if links else "") + "</dl></div>")
+            else:
+                out.append(f"<div class='rq'><div class='rq-q'><span class='n'>Q{i}</span>{esc(q['question'])}</div></div>")
 
     # 08 limitations
     out.append(h2("limitations", "Limitations"))
@@ -1808,9 +1918,18 @@ def export(study_dir: Path) -> int:
         w.writeheader()
         w.writerows(rows)
     if ins.get("research_questions"):
-        (out_dir / "research-questions.md").write_text(
-            "# Questions to test with real users\n\n" + "\n".join(f"- {q}" for q in ins["research_questions"]) + "\n",
-            encoding="utf-8")
+        md = [f"# Test plan: questions for real users", "",
+              f"From the simulated persona study {study.get('id')} ({study.get('product')}). Each question is something the "
+              "simulated walks pointed at but can't settle.", ""]
+        for i, q in enumerate(research_plan(ins["research_questions"]), 1):
+            md += [f"## Q{i}. {q['question']}", ""]
+            for key, label in (("method", "Method"), ("task", "Task"), ("recruit", "Recruit"), ("measure", "Answered by")):
+                if q.get(key):
+                    md.append(f"- **{label}:** {q[key]}")
+            if q["findings"]:
+                md.append(f"- **Tests findings:** {', '.join(q['findings'])} (tickets in this folder)")
+            md.append("")
+        (out_dir / "research-questions.md").write_text("\n".join(md), encoding="utf-8")
     print(json.dumps({"tickets": len(rows), "folder": shown(out_dir), "csv": shown(study_dir / "findings.csv")}))
     return 0
 

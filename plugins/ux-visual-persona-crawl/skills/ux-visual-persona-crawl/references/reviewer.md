@@ -94,7 +94,16 @@ One root cause is one finding, even if several personas hit it. List every perso
   "headline": "One sentence on the most important thing learned.",
   "insights": ["Patterns across personas, including who is most affected and how that relates to their demographics."],
   "what_works": ["Things that helped, with the reason."],
-  "research_questions": ["What to ask or watch real users do to confirm the top findings."],
+  "research_questions": [
+    {
+      "question": "Do people who see the plans list and then the plan page know what they'd pay each month?",
+      "method": "unmoderated usability test",
+      "task": "Choose the cheapest plan for a two-bedroom flat and say what you'd pay each month and to leave early.",
+      "recruit": "People switching supplier in the next three months, half on phones",
+      "measure": "How many state the right monthly price and exit fee; how many continue to sign-up",
+      "findings": ["F1", "F2"]
+    }
+  ],
   "simulation_notes": ["Things that went wrong with the test, not the site."]
 }
 ```
@@ -121,5 +130,15 @@ One root cause is one finding, even if several personas hit it. List every perso
 - `belief`: `correct`, `wrong` (came away believing something else), `unsure` (saw it and doubted it), `not_seen` (never reached it). Every one but `not_seen` cites the `step` where the belief shows, the last such step if it changed. A `wrong` one needs `held`: what they believed, in their own words where the record has them. `verify` notes whether `held` appears in that step's record.
 - Use the session ids under `sessions/` as keys, so a re-walk (`<id>-2`) gets its own entry.
 - A `wrong` belief about something consequential is usually also a finding. Write it as both.
+
+Write each research question as a study someone could run next week, for the top findings and for anything the simulation couldn't settle (screen readers, real timing, whether people would actually pay):
+
+- `method`: one of `moderated usability test`, `unmoderated usability test`, `first-click test`, `five-second test`, `tree test`, `card sort`, `survey`, `interview`, `A/B test`, `analytics review`, `accessibility audit`. Choose the cheapest one that answers it: a first-click test for "do people find the button", a moderated test for "do they understand the fee".
+- `task`: what participants are asked to do, in the customer's words, without naming the control under test.
+- `recruit`: who to test with, from the personas whose walks showed the problem.
+- `measure`: the observable result that would answer the question.
+- `findings`: the finding IDs it tests.
+
+`verify` notes any question missing a method, task or measure, or naming a finding that wasn't kept. `export` writes the plan to `issues/research-questions.md`.
 
 Then run `[VENV_PYTHON] "[REPORT]" verify --study-dir "[STUDY_DIR]"` and fix any finding it removed for a wrong step or box by checking the recording again. Prefer a few well-supported findings to a long list. Don't turn persona counts into percentages or forecasts: "3 of 5 personas" says what to check next, not how many customers would leave.

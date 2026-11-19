@@ -590,9 +590,16 @@ class WalkAndReport(unittest.TestCase):
                           sess["phone"]: {"belief": "correct", "step": 99}}},               # no such step: dropped
             {"id": "K2", "fact": "Delivery is free", "personas": {sess["desk"]: {"belief": "wrong", "step": 1}}},  # no 'held'
         ]), encoding="utf-8")
-        (d / "insights.json").write_text(json.dumps({"research_questions": [], "simulation_notes": []}), encoding="utf-8")
+        (d / "insights.json").write_text(json.dumps({"research_questions": [
+            {"question": "Do people see the offer button?", "method": "first-click test", "task": "Claim this week's offer",
+             "recruit": "Bargain hunters on phones", "measure": "How many click the offer button first", "findings": ["F1", "F9"]},
+            "Would people trust the offer?",
+        ], "simulation_notes": []}), encoding="utf-8")
         rc, out = report("verify", "--study-dir", d)
         self.assertEqual(rc, 0, out)
+        notes = json.loads(out)["research_plan_notes"]
+        self.assertIn("Q1: findings F9 aren't among the verified findings", notes)
+        self.assertTrue(any(n.startswith("Q2: no method, task, measure") for n in notes), notes)
         v = json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["id"] for x in v["kept"]), ["F1", "F2"])
         self.assertIn("impact must be one of", next(r for r in v["removed"] if r["id"] == "F5")["reasons"][0])
@@ -658,6 +665,18 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("<span>Confusing</span>", html)
         self.assertIn("**Tags:** breaks H1", ticket)
         self.assertIn("gulfs", flows)
+        # Segments: desk and phone split by device, as dots and counts.
+        dev = next(x for x in flows["segments"] if x["dimension"] == "Device")
+        self.assertEqual(sorted(s["name"] for s in dev["segments"]), ["Desktop", "Mobile"])
+        self.assertIn("<table class='sg'>", html)
+        self.assertIn("1 of 1", html)
+        # The test plan in the report and in the export.
+        self.assertIn("A plan for testing with real users", html)
+        self.assertIn("<dt>Method</dt><dd>first-click test</dd>", html)
+        rq = (d / "issues" / "research-questions.md").read_text(encoding="utf-8")
+        self.assertIn("## Q1. Do people see the offer button?", rq)
+        self.assertIn("- **Recruit:** Bargain hunters on phones", rq)
+        self.assertIn("## Q2. Would people trust the offer?", rq)
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
