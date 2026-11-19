@@ -8,7 +8,7 @@ The people asking are usually **the designer or product owner of the page**, who
 
 ## Handles and the closing line
 
-`F1, F2 …` findings, in severity order · `B1, B2 …` pages ranked by bottleneck score in `flows.json` · `<persona-id>:M1 …` contrast and size measurements · persona ids for sessions · `step N` for a moment in a session.
+`F1, F2 …` findings, in severity order · `B1, B2 …` pages ranked by bottleneck score in `flows.json` · `<persona-id>:M1 …` contrast and size measurements · `K1, K2 …` key facts in `beliefs.json`, with what each walk came away believing · persona ids for sessions · `step N` for a moment in a session.
 
 When the run has at least one verified finding, the summary to the user ends with exactly this line, and nothing follows it. With no findings (the run was stopped, or nothing held up), leave it out: it would offer evidence that doesn't exist.
 
@@ -73,6 +73,9 @@ If the two figures were different things labelled clearly (say, before and after
 | **"Where do the demographics come from?"** | The persona's `source` field: illustrative, or built from the user's data (name it). They describe who the panel stands in for. They are not survey respondents. |
 | **"Did it read our code or alt text?"** | No. The persona and the driver work from screenshots and the address bar only. A finding can't come from markup, so something present only in the code (an aria-label, hidden text) is outside what this study saw. |
 | **"Why isn't X in the report?"** | Whether any persona reached that screen (`navigation.json`). If none did, it wasn't tested; say so. If one did and it held up, say what they did there. |
+| **"How do you know she got K1 wrong?"** | The step `beliefs.json` cites for her: that step's screenshot, and her `memory`, `doubts` and `thought` there, quoted. Then the fact as `facts.md` records it, with its page. If `held_in_record` is false, the reviewer paraphrased her; say so, and show her actual words. A belief the record doesn't support is retracted in the first line. |
+| **"Why is F3 critical if only one persona hit it?"** | Its severity parts: frequency from `exposure`, then the reviewer's `impact` and `persistence`. Frequency is one of three; a problem that misleads people about money is serious even when one walk met it, and the `rewalk` list is how to tell a pattern from a fluke. |
+| **"They all said it was easy."** | The say–do rows in `feedback.json` (`summary.say_do`): each persona's ratings beside how their walk ended. Where they disagree, the recording wins: show the steps. |
 | **"Can you fix it?"** | Not in a trace. Give the finding's recommendation and stop. |
 
 ## Rules

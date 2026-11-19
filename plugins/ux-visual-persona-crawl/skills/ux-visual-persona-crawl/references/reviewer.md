@@ -62,7 +62,10 @@ One root cause is one finding, even if several personas hit it. List every perso
       {"session": "retired-teacher-mobile", "step": 5, "box": [140, 190, 160, 50]}
     ],
     "recommendation": "A specific change, not 'improve clarity'.",
-    "confidence": "high"
+    "confidence": "high",
+    "impact": "misleads",
+    "persistence": "repeats",
+    "fix_effort": "small"
   }
 ]
 ```
@@ -73,6 +76,7 @@ One root cause is one finding, even if several personas hit it. List every perso
 - `bottleneck` needs `page` to be a page from `flows.json`.
 - `quote`, if given, should be words a persona recorded at that step. Verify marks quotes it can't find in the record as read from the screenshot by you.
 - `severity`: `critical` (blocks people or misleads them on something consequential), `high` (likely to lose people), `medium` (slows or worries people), `low` (polish).
+- Severity weighs three things (Nielsen): how often people hit it, how badly, and whether it keeps getting in the way. `verify` computes how often from the walks. State the other two so the rating can be traced: `impact` is `blocks`, `misleads`, `slows` or `annoys`; `persistence` is `once` (people get past it after one encounter) or `repeats` (it gets in the way every time, or on every visit). Add `fix_effort`: `small` (copy, style or a setting), `medium` (one component or page), `large` (a flow, the back end or several teams). The report places each finding on a severity × fix-effort matrix, so judge effort from what the recommendation asks for. A finding without these is kept, with a note.
 
 `insights.json`:
 
@@ -85,5 +89,28 @@ One root cause is one finding, even if several personas hit it. List every perso
   "simulation_notes": ["Things that went wrong with the test, not the site."]
 }
 ```
+
+`beliefs.json`: what each walk came away believing about the site's key facts. Take 3 to 8 facts from `facts.md` that matter to the task (prices, fees, conditions, requirements, promises), then, for every session, read its `memory`, `doubts` and `thought` and record what that persona ended up believing:
+
+```json
+[
+  {
+    "id": "K1",
+    "fact": "Green Saver prices exclude an $8 monthly service charge",
+    "page": "/plans",
+    "personas": {
+      "retired-teacher-mobile": {"belief": "wrong", "step": 2, "held": "Green Saver $49/mo"},
+      "new-mover-desktop": {"belief": "correct", "step": 3},
+      "student-phone": {"belief": "unsure", "step": 4, "held": "not sure if $49 or $57"},
+      "budget-dad-desktop": {"belief": "not_seen"}
+    }
+  }
+]
+```
+
+- `fact` is what the site states, in `facts.md`'s words. Where the site contradicts itself, write the fact as the version the customer is held to (the plan page, the terms) and say so in a contradiction finding.
+- `belief`: `correct`, `wrong` (came away believing something else), `unsure` (saw it and doubted it), `not_seen` (never reached it). Every one but `not_seen` cites the `step` where the belief shows, the last such step if it changed. A `wrong` one needs `held`: what they believed, in their own words where the record has them. `verify` notes whether `held` appears in that step's record.
+- Use the session ids under `sessions/` as keys, so a re-walk (`<id>-2`) gets its own entry.
+- A `wrong` belief about something consequential is usually also a finding. Write it as both.
 
 Then run `[VENV_PYTHON] "[REPORT]" verify --study-dir "[STUDY_DIR]"` and fix any finding it removed for a wrong step or box by checking the recording again. Prefer a few well-supported findings to a long list. Don't turn persona counts into percentages or forecasts: "3 of 5 personas" says what to check next, not how many customers would leave.

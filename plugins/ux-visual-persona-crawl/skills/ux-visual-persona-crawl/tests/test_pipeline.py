@@ -540,17 +540,35 @@ class WalkAndReport(unittest.TestCase):
                     "personas": [], "description": "d", "conflict": ["a", "b"], "recommendation": "r", "evidence": ev, **kw}
         one = lambda step, box: {"session": "desk", "step": step, "box": box}
         findings = [
-            f("F1", [one(2, [10, 10, 100, 40])], category="button", personas=["desk"]),
+            f("F1", [one(2, [10, 10, 100, 40])], category="button", personas=["desk"],
+              impact="blocks", persistence="repeats", fix_effort="small"),
             f("F2", [one(1, [10, 10, 100, 40]), one(1, [10, 300, 100, 40])]),   # one screen, two places: kept
             f("F3", [one(1, [10, 10, 100, 40]), one(1, [20, 15, 100, 40])]),    # same place twice: removed
             f("F4", [one(9, [10, 10, 100, 40])], category="button"),            # no such step: removed
+            f("F5", [one(2, [10, 10, 100, 40])], category="button", impact="catastrophic"),  # not an impact: removed
         ]
         (d / "findings.json").write_text(json.dumps(findings), encoding="utf-8")
+        sess = {p: next(d.glob(f"sessions/{p}*")).name for p in ("desk", "phone")}
+        (d / "beliefs.json").write_text(json.dumps([
+            {"id": "K1", "fact": "The offer ends Friday", "page": "/offers",
+             "personas": {sess["desk"]: {"belief": "wrong", "step": 1, "held": "t"},        # 't' is DEC's thought
+                          sess["phone"]: {"belief": "correct", "step": 99}}},               # no such step: dropped
+            {"id": "K2", "fact": "Delivery is free", "personas": {sess["desk"]: {"belief": "wrong", "step": 1}}},  # no 'held'
+        ]), encoding="utf-8")
         (d / "insights.json").write_text(json.dumps({"research_questions": [], "simulation_notes": []}), encoding="utf-8")
         rc, out = report("verify", "--study-dir", d)
         self.assertEqual(rc, 0, out)
         v = json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["id"] for x in v["kept"]), ["F1", "F2"])
+        self.assertIn("impact must be one of", next(r for r in v["removed"] if r["id"] == "F5")["reasons"][0])
+        f2 = next(x for x in v["kept"] if x["id"] == "F2")
+        self.assertTrue(any("severity can't be broken" in n for n in f2["verification_notes"]))
+        # Beliefs: the step that exists is kept and checked against the record; the bad ones are dropped and listed.
+        self.assertEqual([k["id"] for k in v["beliefs"]["kept"]], ["K1"])
+        k1 = v["beliefs"]["kept"][0]["personas"]
+        self.assertEqual(list(k1), [sess["desk"]])
+        self.assertTrue(k1[sess["desk"]]["held_in_record"])
+        self.assertEqual({r["id"] for r in v["beliefs"]["removed"]}, {"K1", "K2"})
         f1 = next(x for x in v["kept"] if x["id"] == "F1")
         self.assertEqual((f1["exposure"]["walks_reached"], f1["exposure"]["walks_hit"]), (2, 1))
         self.assertEqual({r["persona"] for r in v["rewalk"]}, {"desk"})
@@ -569,7 +587,18 @@ class WalkAndReport(unittest.TestCase):
         self.assertRegex(html, r"class='mlabel'[^>]*>F1 F2|class='mlabel'[^>]*>F1<")
         nav = json.loads((d / "navigation.json").read_text(encoding="utf-8"))
         self.assertEqual({v["success"]["level"] for v in nav.values()}, {"failure"})
-        self.assertIn("Who hit what", (d / "report.md").read_text(encoding="utf-8"))
+        md = (d / "report.md").read_text(encoding="utf-8")
+        self.assertIn("Who hit what", md)
+        # Severity parts on the finding, F1 top left of the matrix, the beliefs grid, the say-do rows.
+        self.assertIn("frequency 1 of 2 walks · impact: blocks · gets in the way every time · fix effort small", html)
+        self.assertRegex(html, r"<div class='pm-c hot'><a class='chip' href='#finding-F1'")
+        self.assertIn("No fix effort given", html)
+        self.assertIn("id='beliefs'", html)
+        self.assertRegex(html, r"believed “t” \(step 1\); the site says The offer ends Friday")
+        self.assertIn("believed \"t\" (step 1)", md)
+        self.assertEqual(html.count("<div class='sd-who'>"), 2)
+        ticket = (d / "issues" / "F1.md").read_text(encoding="utf-8")
+        self.assertIn("**Severity in parts:** frequency 1 of 2", ticket)
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
@@ -610,6 +639,17 @@ class SuccessLevels(unittest.TestCase):
         self.assertIsNone(nav["quit"]["success"]["lostness"])   # never reached the goal: no lostness
         mod.success_levels({"optimal_path_pages": 3}, nav)
         self.assertEqual(nav["straight"]["success"]["fewest_pages"], 3)
+
+        # Say-do: a walk that failed but was rated easy, one that succeeded but was rated hard, an honest one,
+        # and one the test ended, which gets no flag either way.
+        rate = lambda s, ease, agree: {"session": s, "ease": ease, "meets_needs": agree, "easy_to_use": agree}
+        rows = {r["session"]: r for r in mod.say_do([rate("quit", 6, 6), rate("straight", 2, 2), rate("wander", 5, 5),
+                                                      rate("capped", 7, 7)], nav)}
+        self.assertEqual(rows["quit"]["gap"], "rated it easy but didn't get what they came for")
+        self.assertEqual(rows["straight"]["gap"], "got there but rated it hard")
+        self.assertIsNone(rows["wander"]["gap"])
+        self.assertIsNone(rows["capped"]["gap"])
+        self.assertEqual(rows["quit"]["umux_lite"], 83)
 
 
 if __name__ == "__main__":
