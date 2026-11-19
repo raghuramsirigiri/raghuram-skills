@@ -560,6 +560,16 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("walks that reached the page", (d / "issues" / "F1.md").read_text(encoding="utf-8"))
         html = (d / "report.html").read_text(encoding="utf-8")
         self.assertIn("finding F1", html)
+        # Who hit what: F1's row has desk as hit and phone as reached-but-past, from verify's exposure.
+        row = re.search(r"<tr><td><a href='#finding-F1'>.*?</tr>", html, re.S).group(0)
+        self.assertEqual(re.findall(r"class='rg (hit|past|none)'", row), ["hit", "past"])
+        self.assertIn("1 of 2", row)
+        # One experience curve per walk, with F1 pinned to the step its evidence sits on.
+        self.assertEqual(html.count("<div class='xc'>"), 2)
+        self.assertRegex(html, r"class='mlabel'[^>]*>F1 F2|class='mlabel'[^>]*>F1<")
+        nav = json.loads((d / "navigation.json").read_text(encoding="utf-8"))
+        self.assertEqual({v["success"]["level"] for v in nav.values()}, {"failure"})
+        self.assertIn("Who hit what", (d / "report.md").read_text(encoding="utf-8"))
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
@@ -577,6 +587,29 @@ class WalkAndReport(unittest.TestCase):
         rc, out = report("compare", "--study-dir", d, "--baseline", other)
         self.assertEqual(rc, 0, out)
         self.assertEqual(json.loads(out)["new"], 1)
+
+
+class SuccessLevels(unittest.TestCase):
+    """Direct and indirect success, and Smith's lostness, on paths worked out by hand."""
+
+    def test_levels_and_lostness(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        walk = lambda outcome, pages, back: {"outcome": outcome, "path": [{"page": p} for p in pages], "backtracks": [1] * back}
+        nav = {"straight": walk("reached_goal", ["/", "/join"], 0),
+               "wander": walk("reached_goal", ["/", "/plans", "/", "/join"], 1),
+               "quit": walk("gave_up", ["/", "/plans"], 0),
+               "capped": walk("step_cap", ["/"], 0)}
+        summary = mod.success_levels({}, nav)
+        self.assertEqual(summary["levels"], {"direct_success": 1, "indirect_success": 1, "partial": 0, "failure": 1, "not_scored": 1})
+        self.assertEqual((nav["straight"]["success"]["lostness"], nav["straight"]["success"]["lost"]), (0.0, "not lost"))
+        # S=4 visits, N=3 pages, R=2 (the straight walk): sqrt((3/4-1)^2 + (2/3-1)^2) = 0.42
+        self.assertEqual((nav["wander"]["success"]["lostness"], nav["wander"]["success"]["lost"]), (0.42, "borderline"))
+        self.assertIsNone(nav["quit"]["success"]["lostness"])   # never reached the goal: no lostness
+        mod.success_levels({"optimal_path_pages": 3}, nav)
+        self.assertEqual(nav["straight"]["success"]["fewest_pages"], 3)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ Study folder: `[STUDY_DIR]`. Driver: `[DRIVER]` (for `measure` and `zoom` only).
 
 - `study.json` and `facts.md`: what the site visibly offers and claims. `facts.md` was written from the screen; don't add to it from the page source.
 - `personas.json`: who each person is, including what they lacked.
-- `flows.json`: pages ranked by bottleneck score, with the parts of each score, and the funnel. `navigation.json`: every persona's path, backtracks and dead clicks.
+- `flows.json`: pages ranked by bottleneck score, with the parts of each score, and the funnel. `navigation.json`: every persona's path, backtracks and dead clicks, and under `success` the walk's grade (`direct_success`, `indirect_success`, `partial`, `failure`, `not_scored`) and, for walks that reached the goal, lostness (over 0.5 means the persona was going round in circles). An indirect success or a high lostness is a reached goal that still cost the person something: look at the backtrack for its cause.
 - `sessions/<id>/journey.json`: each step's screenshot, what the persona thought, read and reported, the action and its result. `feedback.json` beside it is their exit interview.
 - `hot_steps.json`: the steps where something went wrong for a persona (dead clicks, low clarity or trust, sharp drops, high-severity friction, backtracks, the steps before an exit), each with the reasons and an excerpt of the persona's thought. It also lists each session's contact sheets.
 - `sessions/<id>/contact-N.jpg`: every step of a walk as a numbered thumbnail, with clicks circled and hot steps outlined in red. Start each session here: one image shows the whole walk.

@@ -155,8 +155,15 @@ def analyze(study_dir: Path) -> dict:
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
-                       "effort": st["decision"]["effort"], "emotion": st["decision"].get("emotion", "")} for st in steps],
+                       "effort": st["decision"]["effort"], "emotion": st["decision"].get("emotion", ""),
+                       "dead_click": st["action"]["type"] in CLICKS and bool(st["result"].get("no_visible_response"))
+                       and not st["result"].get("on_blank_space"),
+                       "worst_friction": min((f.get("severity") for f in st["decision"].get("friction", []) if f.get("severity") in SEV_ORDER),
+                                             key=SEV_ORDER.index, default=None),
+                       "stage": stage_of(study, page_of(st["address_bar"]))} for st in steps],
         }
+
+    success = success_levels(study, navigation)
 
     pages = []
     for page, ps in page_stats.items():
@@ -186,7 +193,7 @@ def analyze(study_dir: Path) -> dict:
         funnel.append({"stage": stage["id"], "label": stage.get("label", stage["id"]), "reached": len(reached),
                        "of": len(navigation), "personas": reached})
 
-    flows = {"study": study.get("id"), "personas": len(navigation), "pages": pages, "funnel": funnel,
+    flows = {"study": study.get("id"), "personas": len(navigation), "pages": pages, "funnel": funnel, "success": success,
              "score_formula": "steps_per_visitor + 2*dead_clicks + 1.5*backtracked_from + 3*exits_short_of_goal + friction_weight/visitors (critical 4, high 3, medium 2, low 1)"}
 
     by_id = {p["id"]: p for p in people}
@@ -228,6 +235,57 @@ def analyze(study_dir: Path) -> dict:
                       "top_bottlenecks": [(p["handle"], p["page"], p["bottleneck_score"]) for p in pages[:3]],
                       "feedback_missing": summary.get("missing", list(navigation))}, ensure_ascii=False))
     return flows
+
+
+SUCCESS_LEVELS = {
+    "direct_success": "Direct success",      # reached the goal page without going back on itself
+    "indirect_success": "Indirect success",  # reached it after backtracking
+    "partial": "Stopped short",              # chose to stop with a next step in mind: saved, would call, stopped at a form
+    "failure": "Failure",                    # gave up or left
+    "not_scored": "Not scored",              # the test, not the person, ended it, or the goal claim couldn't be checked
+}
+LOST_BELOW, LOST_ABOVE = 0.4, 0.5  # Smith (1996): under 0.4 shows no sign of being lost, over 0.5 does
+
+
+def success_levels(study: dict, navigation: dict) -> dict:
+    """Task success the way tree-testing tools grade it (direct or indirect), and Smith's (1996) lostness,
+    L = sqrt((N/S - 1)^2 + (R/N - 1)^2): S page visits, N different pages, R the fewest pages the task needs.
+    R is study.json's optimal_path_pages when given, else the fewest pages any walk from the same start page
+    needed to reach the goal. Lostness is computed only for walks that reached the goal: for one that stopped
+    early, R describes a path it never finished, so the number would mean nothing. Writes each walk's result
+    into navigation[name]['success'] and returns the panel summary."""
+    def level(v):
+        o = v["outcome"]
+        if o == "reached_goal":
+            return "indirect_success" if v["backtracks"] else "direct_success"
+        if o in ("reached_boundary", "saved_for_later", "would_call_or_visit"):
+            return "partial"
+        if o in ("gave_up", "left_site"):
+            return "failure"
+        return "not_scored"
+
+    fixed = study.get("optimal_path_pages")
+    shortest = {}
+    for v in navigation.values():
+        if v["outcome"] == "reached_goal" and v["path"]:
+            start, n_pages = v["path"][0]["page"], len({p["page"] for p in v["path"]})
+            shortest[start] = min(shortest.get(start, n_pages), n_pages)
+    counts = {k: 0 for k in SUCCESS_LEVELS}
+    for v in navigation.values():
+        s_visits = len(v["path"])
+        n_unique = len({p["page"] for p in v["path"]})
+        lv = level(v)
+        counts[lv] += 1
+        r_min = fixed or (shortest.get(v["path"][0]["page"]) if v["path"] else None)
+        lost = None
+        if lv in ("direct_success", "indirect_success") and r_min and s_visits:
+            lost = round(((n_unique / s_visits - 1) ** 2 + (r_min / n_unique - 1) ** 2) ** 0.5, 2)
+        v["success"] = {"level": lv, "page_visits": s_visits, "different_pages": n_unique, "fewest_pages": r_min,
+                        "lostness": lost,
+                        "lost": None if lost is None else ("lost" if lost > LOST_ABOVE else "not lost" if lost < LOST_BELOW else "borderline")}
+    return {"levels": counts, "fewest_pages_from": "study.json optimal_path_pages" if fixed else "the shortest walk that reached the goal",
+            "lostness_formula": "sqrt((N/S - 1)^2 + (R/N - 1)^2); S page visits, N different pages, R fewest pages needed; "
+                                f"under {LOST_BELOW} not lost, over {LOST_ABOVE} lost (Smith 1996)"}
 
 
 def hot_steps(data: dict) -> dict:
@@ -581,6 +639,81 @@ sel.onchange=pick;pick();})();
 """
 
 
+RAINBOW_WORDS = {"hit": "hit it", "past": "reached the page, got past it", "none": "never reached the page"}
+
+
+def rainbow_labels(cols: list, names: dict) -> dict:
+    """Short column heads: the persona's first name, numbered when a persona was walked more than once."""
+    first = {c: str(names[c]).split(",")[0].strip() or c for c in cols}
+    seen, out = defaultdict(int), {}
+    for c in cols:
+        seen[first[c]] += 1
+        out[c] = first[c] if list(first.values()).count(first[c]) == 1 else f"{first[c]} {seen[first[c]]}"
+    return out
+
+
+def rainbow_row(f: dict, cols: list, nav: dict) -> list:
+    """One finding across every walk, from verify's exposure: hit, reached the page and got past, or never there."""
+    ex = f.get("exposure") or {}
+    hit = set(ex.get("hit") or []) | {e.get("session") for e in f.get("evidence", [])}
+    past = set(ex.get("missed") or [])
+    if not ex:  # an older verified_findings.json without exposure: reached means visited the finding's page
+        past = {c for c in cols if any(p["page"] == f.get("page") for p in nav[c]["path"])}
+    return ["hit" if c in hit else "past" if c in past else "none" for c in cols]
+
+
+def experience_curve(name: str, v: dict, marks: dict, stage_label: dict, outcome: str) -> str:
+    """One walk's clarity and trust, step by step, as a small inline SVG: stages shaded behind, presses that did
+    nothing and high or critical friction marked, and finding IDs at the steps their evidence comes from."""
+    steps = v["steps"]
+    W, H, L, R, T, B = 736, 120, 26, 10, 20, 18
+    pw, ph = W - L - R, H - T - B
+    n = len(steps)
+    x = (lambda i: L + pw / 2) if n == 1 else (lambda i: L + pw * i / (n - 1))
+    y = lambda s: T + ph * (5 - max(1, min(5, s or 1))) / 4
+    half = pw / max(n - 1, 1) / 2
+    g = []
+    # stage bands: one per run of steps in the same stage
+    runs, band = [], 0
+    for i, st in enumerate(steps):
+        if runs and runs[-1][0] == st.get("stage"):
+            runs[-1][2] = i
+        else:
+            runs.append([st.get("stage"), i, i])
+    for sid, a, b in runs:
+        x0, x1 = max(L, x(a) - half), min(W - R, x(b) + half)
+        if sid:
+            band += 1
+            if band % 2:
+                g.append(f"<rect class='band' x='{x0:.1f}' y='{T}' width='{x1 - x0:.1f}' height='{ph}'/>")
+            g.append(f"<text class='blabel' x='{x0 + 3:.1f}' y='{T + ph - 4}'>{esc(stage_label.get(sid, sid))}</text>")
+    for s in (1, 3, 5):
+        g.append(f"<line class='grid' x1='{L}' x2='{W - R}' y1='{y(s):.1f}' y2='{y(s):.1f}'/><text class='tick' x='{L - 6}' y='{y(s) + 4:.1f}'>{s}</text>")
+    for key, cls in (("trust", "tr"), ("clarity", "cl")):
+        pts = " ".join(f"{x(i):.1f},{y(st.get(key)):.1f}" for i, st in enumerate(steps))
+        g.append(f"<polyline class='{cls}' points='{pts}'/>" if n > 1 else f"<circle class='{cls}d' cx='{x(0):.1f}' cy='{y(steps[0].get(key)):.1f}' r='3'/>")
+    for i, st in enumerate(steps):
+        if st.get("worst_friction") in ("critical", "high"):
+            g.append(f"<circle class='fr' cx='{x(i):.1f}' cy='{y(st.get('clarity')):.1f}' r='4'/>")
+        if st.get("dead_click"):
+            cx, cy = x(i), H - B + 6
+            g.append(f"<path class='dead' d='M{cx - 4:.1f},{cy - 4:.1f}L{cx + 4:.1f},{cy + 4:.1f}M{cx + 4:.1f},{cy - 4:.1f}L{cx - 4:.1f},{cy + 4:.1f}'/>")
+        if marks.get(st["step"]):
+            anchor = "start" if n > 1 and i == 0 else "end" if n > 1 and i == n - 1 else "middle"
+            g.append(f"<line class='mk' x1='{x(i):.1f}' x2='{x(i):.1f}' y1='{T - 4}' y2='{T + ph}'/>"
+                     f"<text class='mlabel' x='{x(i):.1f}' y='{T - 7}' style='text-anchor:{anchor}'>{esc(' '.join(marks[st['step']]))}</text>")
+    cl = [st.get("clarity") for st in steps]
+    dead = [str(st["step"]) for st in steps if st.get("dead_click")]
+    label = (f"{name}: clarity from {cl[0]} to {cl[-1]}, lowest {min(cl)}, over {n} steps"
+             + (f"; presses that did nothing at steps {', '.join(dead)}" if dead else ""))
+    sv = v.get("success") or {}
+    span = f"step {steps[0]['step']}" if n == 1 else f"steps {steps[0]['step']}–{steps[-1]['step']}"
+    head = f"<b>{esc(name)}</b> · {esc(v.get('device') or 'desktop')} · {span} · {outcome}" + (
+        f" · {esc(SUCCESS_LEVELS.get(sv.get('level'), '').lower())}" if sv.get("level") and sv["level"] != "not_scored" else "")
+    return (f"<div class='xc'><div class='xc-h'>{head}</div><div class='xc-s'><svg viewBox='0 0 {W} {H}' role='img' aria-label='{esc(label)}'>"
+            + "".join(g) + "</svg></div></div>")
+
+
 def img_data(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
@@ -661,6 +794,23 @@ select,button{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(
 .maps{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;align-items:start}.maps .fig{margin:0}
 ol.refs{font-size:13px;line-height:1.6;color:var(--body);padding-left:24px}ol.refs li{margin:0 0 6px;overflow-wrap:anywhere}
 sup.ref{font-size:11px;line-height:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rg{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;box-sizing:border-box}
+.rg.hit{background:var(--series)}.rg.past{border:1.5px solid var(--muted)}
+table.rainbow th.rg-col{text-align:center;font-weight:600;font-size:11px;padding:8px 4px;white-space:nowrap}
+table.rainbow td.num{white-space:nowrap}table.rainbow td.rg-cell{text-align:center;padding:8px 4px;vertical-align:middle}
+.xc{margin:0 0 14px}.xc-h{font-size:13px;color:var(--muted);margin:0 0 2px}.xc-h b{color:var(--ink)}
+.xc-s{overflow-x:auto;padding-top:2px}.xc svg{display:block;width:100%;min-width:560px;height:auto;overflow:visible}
+.xc .band{fill:var(--surface-soft)}.xc .blabel{fill:var(--soft);font-size:10px}
+.xc .grid{stroke:var(--hair);stroke-width:1}.xc .tick{fill:var(--soft);font-size:10px;text-anchor:end}
+.xc .cl{fill:none;stroke:var(--series);stroke-width:2;stroke-linejoin:round}.xc .cld{fill:var(--series)}
+.xc .tr{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3;stroke-linejoin:round}.xc .trd{fill:var(--muted)}
+.xc .fr{fill:var(--paper);stroke:var(--annotation);stroke-width:2}.xc .dead{stroke:var(--annotation);stroke-width:2}
+.xc .mk{stroke:var(--ink);stroke-width:1;stroke-dasharray:2 2}.xc .mlabel{fill:var(--ink);font-size:10px;font-weight:700;text-anchor:middle}
+.xc-key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--muted);margin:0 0 12px}.xc-key span{display:inline-flex;align-items:center;gap:6px}
+.xc-key i{display:inline-block}.k-cl{width:18px;height:2px;background:var(--series)}.k-tr{width:18px;border-top:1.5px dashed var(--muted)}
+.k-dead{width:9px;height:9px;background:linear-gradient(45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%),linear-gradient(-45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%)}
+.k-fr{width:9px;height:9px;border-radius:50%;border:2px solid var(--annotation)}
 footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;font-size:12px;color:var(--soft);line-height:1.6}footer.notes b{color:var(--ink)}
 @media print{body{background:#fff}.paper{box-shadow:none;padding:0}#appendix-replay{display:none}.fig,blockquote{break-inside:avoid}}"""
 
@@ -683,6 +833,8 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
             ("wcag-258", "W3C (2023). <i>WCAG 2.2</i>, Success Criterion 2.5.8 Target Size (Minimum). https://www.w3.org/TR/WCAG22/#target-size-minimum"),
             ("umux", "Lewis, J. R., Utesch, B. S., &amp; Maher, D. E. (2013). UMUX-LITE: When there's no time for the SUS. "
              "<i>Proceedings of CHI 2013</i>, 2099–2102. ACM."),
+            ("lostness", "Smith, P. A. (1996). Towards a practical measure of hypertext usability. <i>Interacting with Computers</i>, 8(4), 365–381."),
+            ("rainbow", "Sharon, T. (2013). The rainbow spreadsheet: a collaborative lean UX research tool. <i>Smashing Magazine</i>."),
             ("artefacts", "Study record, in the study folder: study.json, personas.json, navigation.json, flows.json, verified_findings.json, "
              "feedback.json, insights.json, and each session's journey.json and screenshots under sessions/.")]
     ref_no = {k: i for i, (k, _) in enumerate(refs, 1)}
@@ -748,28 +900,69 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     # 02 outcomes
     out.append(h2("outcomes", "Outcomes"))
-    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Outcome</th><th class='num'>Steps</th><th>Pages, in order</th></tr></thead><tbody>")
+    succ = flows.get("success") or {}
+    if succ.get("levels"):
+        lv = succ["levels"]
+        phrase = {"direct_success": "{} reached the goal directly", "indirect_success": "{} reached it after backtracking",
+                  "partial": "{} stopped short with a next step in mind", "failure": "{} gave up or left", "not_scored": "{} not scored"}
+        said = [phrase[k].format(lv[k]) for k in SUCCESS_LEVELS if lv.get(k)]
+        out.append(f"<p>Graded the way tree tests grade a task: a <b>direct success</b> reached the goal page without going back on itself, an "
+                   f"<b>indirect success</b> got there after backtracking. Of {n} walks: {esc(', '.join(said))}. For walks that reached the goal, "
+                   f"<b>lostness</b> compares the pages they went through with the fewest the task needs ({esc(succ.get('fewest_pages_from'))}): "
+                   f"0 is a perfect path, under {LOST_BELOW} shows no sign of being lost, over {LOST_ABOVE} does.{cite('lostness')}</p>")
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Outcome</th><th>Success</th><th class='num'>Steps</th>"
+               "<th>Pages, in order</th></tr></thead><tbody>")
     for name, v in nav.items():
         path = " → ".join(f"{esc(p['page'])} ({p['steps']})" for p in v["path"])
+        sv = v.get("success") or {}
+        lost = (f"<br><span class='muted'>lostness {sv['lostness']}, {esc(sv['lost'])}; {sv['different_pages']} pages, "
+                f"{sv['page_visits']} visits, fewest {sv['fewest_pages']}</span>") if sv.get("lostness") is not None else ""
         out.append(f"<tr><td><b>{esc(names[name])}</b><br><span class='muted'>{esc(v['device'])}</span></td>"
-                   f"<td>{ol(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td><td class='num'>{v['steps_taken']}</td><td>{path}</td></tr>")
-    out.append("</tbody></table></div>" + fig("Every walk, with the steps spent on each page in brackets.") + "</figure>")
+                   f"<td>{ol(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td>"
+                   f"<td>{esc(SUCCESS_LEVELS.get(sv.get('level'), '—'))}{lost}</td><td class='num'>{v['steps_taken']}</td><td>{path}</td></tr>")
+    out.append("</tbody></table></div>" + fig("Every walk, with the steps spent on each page in brackets. Not scored: the test ended the walk, "
+                                              "or the goal claim couldn't be checked.") + "</figure>")
     if flows["funnel"]:
         out.append("<figure class='fig'><div class='bars'>")
         for f in flows["funnel"]:
             out.append(f"<div>{esc(f['label'])}</div><div class='track'><div class='fill' style='width:{100 * f['reached'] / max(f['of'], 1):.0f}%'></div></div>"
                        f"<div class='cnt'>{f['reached']} of {f['of']}</div>")
         out.append("</div>" + fig("Personas reaching each journey stage. Counts of simulated personas, not conversion rates.") + "</figure>")
+    marks = defaultdict(lambda: defaultdict(list))  # session -> step -> finding ids whose evidence sits there
+    for f in findings:
+        for e in f.get("evidence", []):
+            if f.get("id") not in marks[e.get("session")][e.get("step")]:
+                marks[e.get("session")][e.get("step")].append(f.get("id"))
+    stage_label = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    curves = [experience_curve(names[k], v, marks.get(k, {}), stage_label, ol(v["outcome"])) for k, v in nav.items() if v.get("steps")]
+    if curves:
+        out.append("<figure class='fig'><div class='xc-key'><span><i class='k-cl'></i>Clarity</span><span><i class='k-tr'></i>Trust</span>"
+                   "<span><i class='k-dead'></i>Press that did nothing</span><span><i class='k-fr'></i>High or critical friction</span></div>"
+                   + "".join(curves)
+                   + fig("How each walk felt, step by step: the persona's own clarity and trust scores (1–5, higher is better), with journey stages "
+                         "shaded behind and finding IDs where their evidence was recorded. A drop shows where to look; it is one simulated "
+                         "person's rating, not a measured emotion.") + "</figure>")
 
     # 03 findings
     out.append(h2("findings", "Findings"))
     out.append("<p>Ranked by severity. Every finding was checked against the recorded screenshots; the evidence shown is cropped from the cited steps.</p>")
     if findings:
-        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>Severity</th><th>Page</th><th>Finding</th></tr></thead><tbody>")
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        out.append("<figure class='fig'><div class='tablewrap'><table class='rainbow'><thead><tr><th>ID</th><th>Finding</th><th>Severity</th>"
+                   + "".join(f"<th class='rg-col' title='{esc(names[c])}'>{esc(short[c])}</th>" for c in cols)
+                   + "<th class='num'>Hit</th></tr></thead><tbody>")
         for f in findings:
-            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td><td>{cap(f.get('severity'))}</td>"
-                       f"<td>{esc(f.get('page'))}</td><td>{esc(f.get('title'))}</td></tr>")
-        out.append("</tbody></table></div>" + fig("Index of verified findings.") + "</figure>")
+            state = rainbow_row(f, cols, nav)
+            cells = "".join(f"<td class='rg-cell'><span class='rg {s}' title='{esc(names[c])}: {RAINBOW_WORDS[s]}'></span>"
+                            f"<span class='sr'>{RAINBOW_WORDS[s]}</span></td>" for c, s in zip(cols, state))
+            hit, could = state.count("hit"), state.count("hit") + state.count("past")
+            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td>"
+                       f"<td>{esc(f.get('title'))}<br><span class='muted'>{esc(f.get('page'))}</span></td><td>{cap(f.get('severity'))}</td>"
+                       f"{cells}<td class='num'>{hit} of {could}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Who hit what, after Sharon's rainbow spreadsheet: one row per finding, one column per walk. "
+                   "<span class='rg hit'></span> hit it, <span class='rg past'></span> reached the page and got past it, blank: never reached the page. "
+                   f"A full row is a problem for everyone; a short one belongs to a kind of customer.{cite('rainbow')}") + "</figure>")
     for f in findings:
         fid = esc(f.get("id"))
         out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
@@ -890,13 +1083,22 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     md = [f"# {study.get('product')}: visual persona crawl", "", f"Study {study.get('id')} · {n} simulated personas · mode {study.get('mode')}", ""]
     if ins.get("headline"):
         md += [f"**{ins['headline']}**", ""]
-    md += ["## Outcomes", "", "| Persona | Device | Outcome | Steps | Path |", "|---|---|---|---|---|"]
-    md += [f"| {v['persona'].get('name')} | {v['device']} | {v['outcome']} | {v['steps_taken']} | {' → '.join(p['page'] for p in v['path'])} |" for v in nav.values()]
+    md += ["## Outcomes", "", "| Persona | Device | Outcome | Success | Lostness | Steps | Path |", "|---|---|---|---|---|---|---|"]
+    md += [f"| {v['persona'].get('name')} | {v['device']} | {v['outcome']} | {SUCCESS_LEVELS.get((v.get('success') or {}).get('level'), '')} | "
+           f"{'' if (v.get('success') or {}).get('lostness') is None else v['success']['lostness']} | {v['steps_taken']} | "
+           f"{' → '.join(p['page'] for p in v['path'])} |" for v in nav.values()]
     md += ["", "## Bottlenecks", "", "| | Page | Score | Dead clicks | Backtracked from | Left short of goal |", "|---|---|---|---|---|---|"]
     md += [f"| {p['handle']} | {p['page']} | {p['bottleneck_score']} | {p['score_parts']['dead_clicks']} | {p['score_parts']['backtracked_from']} | {p['score_parts']['exits_short_of_goal']} |" for p in flows["pages"][:6]]
     md += ["", "## Findings", ""]
     for f in findings:
         md.append(f"- **{f['id']}** [{f['severity']} · {f['category']}] {f['title']}: {f.get('recommendation', '')}")
+    if findings:
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        mark = {"hit": "●", "past": "○", "none": ""}
+        md += ["", "## Who hit what", "", "● hit it · ○ reached the page and got past it · blank: never reached the page", "",
+               "| | " + " | ".join(short[c] for c in cols) + " |", "|---|" + "---|" * len(cols)]
+        md += [f"| {f['id']} | " + " | ".join(mark[s] for s in rainbow_row(f, cols, nav)) + " |" for f in findings]
     md += ["", 'Ask "show me F1" or "how do you know a real person would struggle here?" to see the screens, steps and measurements behind any finding.']
     (study_dir / "report.md").write_text("\n".join(md), encoding="utf-8")
     print(json.dumps({"report": shown(study_dir / "report.html"), "findings": len(findings), "removed": len(vf["removed"])}))
