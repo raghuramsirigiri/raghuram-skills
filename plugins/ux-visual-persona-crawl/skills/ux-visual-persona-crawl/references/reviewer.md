@@ -36,6 +36,7 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 - Steps whose journey `events` include `render_glitch`: the screenshot was drawn shrunk into a corner, so the persona's taps from it may have missed. Dead clicks and give-ups that follow from such a step belong here, not in findings.
 - A persona misreading something that is plainly legible in the screenshot, or clicking a few pixels off a big target. Check the screenshot before blaming the site.
 - `blocked_by_site`: a CAPTCHA or login wall is not a UX finding.
+- Each `setup_notes` entry in `study.json`: a test value, persona or start page the orchestrator chose because recon showed what it would trigger. List it here. A finding that rests only on walks it shaped drops to `low` severity and says so in its description; one that other walks also hit keeps its severity, with those walks as its evidence.
 
 A walk the driver ended as `gave_up` is not a simulation problem: `ended_by` is `gives_up_when` (a condition the persona set out with was met) or `patience` (the budget their `traits.patience` set ran out). Those exits are what a real person of that kind would do, so treat them as data. Each step's `patience` record says what used it up; when the site's own problems (dead buttons, confusing screens, going back) spent most of it, the exit belongs in the finding about those problems.
 

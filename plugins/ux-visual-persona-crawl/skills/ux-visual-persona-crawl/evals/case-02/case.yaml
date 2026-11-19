@@ -1,5 +1,5 @@
 schema_version: "1.1"
-name: moving-screen-dead-button
+name: case-02
 expected_outcome: |
   Two personas on a page whose banner rotates by itself. The report flags that "Get this offer" does nothing when pressed,
   even though the screen around it keeps changing, and does not call "See offer details" unresponsive. It notes that the

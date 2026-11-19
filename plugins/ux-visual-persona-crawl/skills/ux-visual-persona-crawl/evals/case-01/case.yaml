@@ -1,5 +1,5 @@
 schema_version: "1.1"
-name: staging-signup-crawl
+name: case-01
 expected_outcome: |
   A test_env study on the local site with four personas carrying demographics, one of them an older
   mobile user at a larger zoom. Each persona's navigation is stored as JSON step by step, each has an
