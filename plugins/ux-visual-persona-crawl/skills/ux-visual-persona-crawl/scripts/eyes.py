@@ -67,7 +67,22 @@ REAL_LOOKING = re.compile(
 )
 MAX_EDGE = 1568  # longest screenshot side a vision model takes without resizing
 FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
-FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
+FEEDBACK_TEXT = ("best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
+# Product reaction cards, after Microsoft's Desirability Toolkit (Benedek & Miner, 2002): a fixed list people pick
+# from, so answers can be counted across a panel and compared between runs, which a free "one word" can't.
+# Adapted from the original 118: mostly a subset, with Misleading and Untrustworthy added for the trust problems
+# this skill looks for, and balanced between positive and negative so the list doesn't lead.
+REACTION_WORDS = {w: "positive" for w in (
+    "Accessible", "Appealing", "Approachable", "Clean", "Clear", "Comprehensive", "Consistent", "Controllable",
+    "Convenient", "Credible", "Easy to use", "Effective", "Efficient", "Familiar", "Fast", "Flexible", "Friendly",
+    "Helpful", "Intuitive", "Organized", "Predictable", "Professional", "Relevant", "Reliable", "Secure", "Simple",
+    "Straightforward", "Time-saving", "Trustworthy", "Understandable", "Useful", "Valuable")}
+REACTION_WORDS.update({w: "negative" for w in (
+    "Annoying", "Boring", "Busy", "Complex", "Confusing", "Dated", "Difficult", "Distracting", "Frustrating",
+    "Gets in the way", "Hard to use", "Impersonal", "Inconsistent", "Ineffective", "Intimidating", "Irrelevant",
+    "Misleading", "Not valuable", "Obscure", "Old", "Overwhelming", "Patronizing", "Rigid", "Slow", "Stressful",
+    "Time-consuming", "Too technical", "Unapproachable", "Uncontrollable", "Unpredictable", "Untrustworthy", "Unattractive")})
+REACTION_PICK = (3, 5)
 FILL_MAX = 8  # fields one fill action may set; more than a screen's worth means the persona isn't looking
 # After an action shows no response, keep watching this long for a late one before calling it dead.
 LATE_RESPONSE_MS = int(os.environ.get("UXCRAWL_LATE_MS", "6000"))  # tests shorten it
@@ -1238,6 +1253,14 @@ def feedback_problems(data) -> list:
     for key in FEEDBACK_TEXT:
         if not str(data.get(key, "")).strip():
             problems.append(f"{key} is required")
+    words = data.get("reaction_words")
+    lo, hi = REACTION_PICK
+    known = {w.lower() for w in REACTION_WORDS}
+    if not (isinstance(words, list) and lo <= len(words) <= hi and len({str(w).lower() for w in words}) == len(words)):
+        problems.append(f"reaction_words must be a list of {lo} to {hi} different words from the list in your brief")
+    elif any(str(w).strip().lower() not in known for w in words):
+        problems.append("reaction_words must come from the list in your brief, spelled as shown: "
+                        + ", ".join(str(w) for w in words if str(w).strip().lower() not in known) + " is not on it")
     # A number with no reason drifts to a polite middle; a reason has to point at something that happened.
     reasons = data.get("reasons") if isinstance(data.get("reasons"), dict) else {}
     short = [k for k in FEEDBACK_SCALES if len(str(reasons.get(k, "")).strip()) < 12]
@@ -1251,7 +1274,10 @@ def save_feedback(session_dir: Path, data: dict) -> Path:
     journey = json.loads(journey_path.read_text(encoding="utf-8")) if journey_path.exists() else {}
     if not journey.get("outcome"):
         raise SystemExit("The session has not ended. Finish it first, then give the exit interview.")
-    data = dict(data, persona=journey["persona"]["id"], outcome=journey["outcome"])
+    canon = {w.lower(): w for w in REACTION_WORDS}
+    words = [canon[str(w).strip().lower()] for w in data.get("reaction_words", [])]
+    data = dict(data, persona=journey["persona"]["id"], outcome=journey["outcome"], reaction_words=words,
+                reaction_tones={w: REACTION_WORDS[w] for w in words})
     out = session_dir / "feedback.json"
     out.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return out
@@ -1400,6 +1426,7 @@ def build_brief(session_dir: Path) -> str:
     text = (text.replace("[PASTE THE PERSONA JSON]", "```json\n" + json.dumps(persona, indent=2, ensure_ascii=False) + "\n```")
                 .replace("[THE PERSONA'S TASK]", str(persona.get("task", "")))
                 .replace("[GIVES UP WHEN]", gives_up_text(persona))
+                .replace("[REACTION WORDS]", ", ".join(sorted(REACTION_WORDS, key=str.lower)))
                 .replace("[DRIVER]", str(Path(__file__).resolve()))
                 .replace("[SESSION]", shown(session_dir)))
     left = re.findall(r"\[[A-Z][A-Z' ]+\]", text)

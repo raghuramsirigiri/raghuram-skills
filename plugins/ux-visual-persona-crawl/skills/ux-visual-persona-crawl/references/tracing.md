@@ -77,6 +77,9 @@ If the two figures were different things labelled clearly (say, before and after
 | **"Why is F3 critical if only one persona hit it?"** | Its severity parts: frequency from `exposure`, then the reviewer's `impact` and `persistence`. Frequency is one of three; a problem that misleads people about money is serious even when one walk met it, and the `rewalk` list is how to tell a pattern from a fluke. |
 | **"They all said it was easy."** | The say–do rows in `feedback.json` (`summary.say_do`): each persona's ratings beside how their walk ended. Where they disagree, the recording wins: show the steps. |
 | **"Why do you say this link misleads people?"** | The presses on it from `navigation.json` → `expectations`: what each persona wrote in `expects` before pressing, what happened (`got`), and their `as_expected` on the next screen, with that screen's `thought`. Show the control's crop. The expectation and the verdict are the persona's own; where the press went is fact. |
+| **"Does this mean we fail WCAG?"** | No, not on this evidence. The `wcag` tags are criteria a finding *may* fail, judged from screenshots. Contrast tags rest on a measurement (give it); the rest are leads for an audit with assistive technology. Name what wasn't tested: screen readers, keyboard focus order, the markup. |
+| **"Why is F4 tagged H5?"** | The heuristic's name and what on screen breaks it, at the cited step. If another heuristic fits better, say so and retag; a tag is the reviewer's judgement, not a measurement. |
+| **"Everyone picked *Misleading*. Why?"** | The personas who picked it (`summary.reaction_words` in `feedback.json`), each one's `worst_thing` and `reasons`, and the findings their walks hit. A word is their summary, not evidence on its own. |
 | **"Can you fix it?"** | Not in a trace. Give the finding's recommendation and stop. |
 
 ## Rules

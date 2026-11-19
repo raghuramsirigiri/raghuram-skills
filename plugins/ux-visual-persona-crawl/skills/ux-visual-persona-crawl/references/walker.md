@@ -155,7 +155,7 @@ python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
   "recommend": "...",
   "satisfaction": "..."
  },
- "one_word": "...",
+ "reaction_words": ["...", "...", "..."],
  "best_thing": "...",
  "worst_thing": "...",
  "what_would_fix_it": "...",
@@ -166,6 +166,8 @@ EOF
 ```
 
 Write numbers where the example shows a range. If the driver ends the walk for you (a give-up condition met, patience run out, the step limit, or nothing changing for several actions), its result has the same `walk_recap`; answer the same way.
+
+`reaction_words`: the 3 to 5 words from this list that best describe the site to this person after this walk, spelled as shown. Pick from the whole list, not only the side you expect: [REACTION WORDS].
 
 `ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5.
 

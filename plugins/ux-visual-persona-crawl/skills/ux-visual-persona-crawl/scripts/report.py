@@ -195,6 +195,7 @@ def analyze(study_dir: Path) -> dict:
                        "of": len(navigation), "personas": reached})
 
     flows = {"study": study.get("id"), "personas": len(navigation), "pages": pages, "funnel": funnel, "success": success, **scent,
+             "gulfs": gulf_rows(study, data),
              "score_formula": "steps_per_visitor + 2*dead_clicks + 1.5*backtracked_from + 3*exits_short_of_goal + friction_weight/visitors (critical 4, high 3, medium 2, low 1)"}
 
     by_id = {p["id"]: p for p in people}
@@ -216,6 +217,7 @@ def analyze(study_dir: Path) -> dict:
             "recommend_counts": {"9-10": sum(r >= 9 for r in rec), "7-8": sum(7 <= r <= 8 for r in rec), "0-6": sum(r <= 6 for r in rec)},
             "missing": [n for n in navigation if not data[n]["feedback"]],
             "say_do": say_do(fb_rows, navigation),
+            "reaction_words": reaction_counts(fb_rows),
         }
     hot = hot_steps(data)
     sheets = {}
@@ -374,6 +376,64 @@ def first_clicks_and_scent(study: dict, data: dict, navigation: dict) -> dict:
     return {"first_clicks": first_click_pages, "scent": scent_pages,
             "first_click_grades": "toward: reached a later journey stage or the goal page; away: an earlier stage or a page "
                                   "outside the journey; stayed: changed the screen without leaving the page; nothing: no visible change"}
+
+
+# Norman's two gulfs, plus the content itself. Execution: working out what to do and how to do it. Evaluation:
+# telling what happened, and whether it worked. Content: seeing and understanding what the site says, which is
+# neither gulf but is where most money-and-conditions problems sit, so it gets its own column.
+GULFS = {"execution": "Working out what to do", "evaluation": "Telling what happened", "content": "Seeing and understanding the content"}
+GULF_OF_FRICTION = {
+    **{t: "execution" for t in ("button_unclear", "button_hard_to_find", "navigation", "small_target", "dead_end", "form_burden",
+                                "surprise_requirement", "layout_or_overlap", "visual_hierarchy")},
+    **{t: "evaluation" for t in ("no_feedback", "error_handling", "performance")},
+    **{t: "content" for t in ("unclear_copy", "missing_information", "contradiction", "hidden_cost_or_condition", "trust_concern",
+                              "low_contrast", "small_text", "accessibility")},
+}
+HEURISTICS = {
+    "H1": "Visibility of system status", "H2": "Match between system and the real world", "H3": "User control and freedom",
+    "H4": "Consistency and standards", "H5": "Error prevention", "H6": "Recognition rather than recall",
+    "H7": "Flexibility and efficiency of use", "H8": "Aesthetic and minimalist design",
+    "H9": "Help users recognize, diagnose, and recover from errors", "H10": "Help and documentation",
+}
+WCAG_NAMES = {
+    "1.1.1": "Non-text Content", "1.3.1": "Info and Relationships", "1.4.1": "Use of Color", "1.4.3": "Contrast (Minimum)",
+    "1.4.4": "Resize Text", "1.4.10": "Reflow", "1.4.11": "Non-text Contrast", "1.4.12": "Text Spacing",
+    "1.4.13": "Content on Hover or Focus", "2.1.1": "Keyboard", "2.2.2": "Pause, Stop, Hide", "2.4.3": "Focus Order",
+    "2.4.4": "Link Purpose (In Context)", "2.4.6": "Headings and Labels", "2.4.7": "Focus Visible",
+    "2.4.11": "Focus Not Obscured (Minimum)", "2.5.8": "Target Size (Minimum)", "3.2.2": "On Input", "3.2.3": "Consistent Navigation",
+    "3.2.6": "Consistent Help", "3.3.1": "Error Identification", "3.3.2": "Labels or Instructions", "3.3.3": "Error Suggestion",
+    "3.3.7": "Redundant Entry", "3.3.8": "Accessible Authentication (Minimum)",
+}
+
+
+def gulf_rows(study: dict, data: dict) -> list:
+    """Friction notes by journey stage and by gulf, with presses that did nothing beside them."""
+    rows = {}
+    labels = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    for s in data.values():
+        for st in s["journey"].get("steps", []):
+            sid = stage_of(study, page_of(st["address_bar"])) or "other"
+            r = rows.setdefault(sid, {"stage": sid, "label": labels.get(sid, "Other pages"), **{g: 0 for g in GULFS}, "dead_presses": 0})
+            for f in st["decision"].get("friction", []):
+                g = GULF_OF_FRICTION.get(f.get("type"))
+                if g:
+                    r[g] += 1
+            if st["action"].get("type") in CLICKS and st["result"].get("no_visible_response") and not st["result"].get("on_blank_space"):
+                r["dead_presses"] += 1
+    order = [s["id"] for s in study.get("stages", [])] + ["other"]
+    return [rows[k] for k in order if k in rows]
+
+
+def reaction_counts(fb_rows: list) -> list:
+    """How many personas picked each reaction word, with its tone and who picked it, most picked first."""
+    words = {}
+    for f in fb_rows:
+        tones = f.get("reaction_tones") or {}
+        for w in f.get("reaction_words") or []:
+            r = words.setdefault(w, {"word": w, "tone": tones.get(w, ""), "count": 0, "sessions": []})
+            r["count"] += 1
+            r["sessions"].append(f["session"])
+    return sorted(words.values(), key=lambda r: (-r["count"], r["word"].lower()))
 
 
 def say_do(fb_rows: list, navigation: dict) -> list:
@@ -740,6 +800,21 @@ def verify(study_dir: Path) -> int:
         missing = [k for k in SEVERITY_PARTS if k not in f]
         if missing:
             notes.append(f"no {', '.join(missing)}: severity can't be broken into its parts")
+        # Where the problem sits in Norman's cycle, which heuristics it breaks, and which WCAG criteria it may fail.
+        if "gulf" in f and f["gulf"] not in GULFS:
+            problems.append(f"gulf must be one of {', '.join(GULFS)}")
+        hs = f.get("heuristics", [])
+        if not isinstance(hs, list) or any(h not in HEURISTICS for h in hs):
+            problems.append("heuristics must be a list of H1 to H10")
+        elif not hs:
+            notes.append("no heuristics: the finding stays out of the heuristic scorecard")
+        sc = f.get("wcag", [])
+        if not isinstance(sc, list) or any(not re.fullmatch(r"[1-4]\.\d{1,2}\.\d{1,2}", str(x)) for x in sc):
+            problems.append("wcag must be a list of success criterion numbers such as 1.4.3")
+        elif f.get("category") == "contrast":
+            auto = "1.4.11" if f.get("contrast_target") == "ui_component" else "1.4.3"
+            if auto not in sc:
+                f["wcag"] = [*sc, auto]
         if problems:
             removed.append({"id": f.get("id"), "title": f.get("title"), "reasons": problems})
         else:
@@ -937,6 +1012,42 @@ def severity_parts(f: dict) -> str:
     return " · ".join(bits) if len(bits) > 1 else ""
 
 
+def finding_tags(f: dict) -> str:
+    """The finding's heuristics, WCAG criteria and gulf, in words."""
+    bits = []
+    if f.get("heuristics"):
+        bits.append("breaks " + "; ".join(f"{h} {HEURISTICS[h]}" for h in f["heuristics"] if h in HEURISTICS))
+    if f.get("wcag"):
+        bits.append("may fail WCAG " + "; ".join(f"{x} {WCAG_NAMES.get(x, '')}".strip() for x in f["wcag"]))
+    if f.get("gulf") in GULFS:
+        bits.append(f"gulf: {GULFS[f['gulf']].lower()}")
+    return " · ".join(bits)
+
+
+def heuristic_scorecard(findings: list, study: dict) -> str:
+    """Nielsen's ten heuristics down the side, journey stages across, finding IDs where a heuristic broke."""
+    labels = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    cell, used = defaultdict(list), []
+    for f in findings:
+        sid = stage_of(study, f.get("page") or "") or "other"
+        for h in f.get("heuristics") or []:
+            if h in HEURISTICS:
+                cell[(h, sid)].append(f)
+                if sid not in used:
+                    used.append(sid)
+    order = [s["id"] for s in study.get("stages", [])] + ["other"]
+    cols = [s for s in order if s in used]
+    h = ["<figure class='fig'><div class='tablewrap'><table class='hs'><thead><tr><th>Heuristic</th>"
+         + "".join(f"<th>{esc(labels.get(c, 'Other pages'))}</th>" for c in cols) + "</tr></thead><tbody>"]
+    for hid, name in HEURISTICS.items():
+        row = [cell[(hid, c)] for c in cols]
+        empty = not any(row)
+        h.append(f"<tr{' class=muted' if empty else ''}><td>{hid} {esc(name)}</td>" + "".join(
+            "<td class='hc'>" + "".join(f"<a class='chip' href='#finding-{esc(f.get('id'))}' title='{esc(f.get('title'))}'>{esc(f.get('id'))}</a>"
+                                        for f in fs) + "</td>" for fs in row) + "</tr>")
+    return "".join(h) + "</tbody></table></div>"
+
+
 def priority_matrix(findings: list) -> str:
     """Severity down the side, fix effort across: the impact/effort matrix product teams plan from."""
     efforts = SEVERITY_PARTS["fix_effort"]
@@ -1126,6 +1237,12 @@ table.rainbow td.num{white-space:nowrap}table.rainbow td.rg-cell{text-align:cent
 .strip{display:block;max-width:none;height:auto;max-height:440px;border:1px solid var(--hair)}
 .pair .fig.screen{flex:0 1 380px}.fig.screen .shot{width:100%;max-height:min(60vh,520px);object-fit:contain;object-position:left top}
 .enum{display:inline-block;min-width:18px;padding:0 5px;margin-right:6px;border-radius:3px;background:#dc003c;color:#fff;font-weight:700;text-align:center}
+.rwg{display:grid;grid-template-columns:1fr 1fr;gap:12px 32px}@media (max-width:560px){.rwg{grid-template-columns:1fr}}
+.rw-h{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px;margin-bottom:6px}
+.rw{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:10px;align-items:center;font-size:13px;color:var(--body);padding:3px 0}
+.rw-dots{letter-spacing:2px;font-size:11px}.rw-dots.negative{color:var(--annotation)}.rw-dots.positive{color:var(--series)}
+.gb{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:4px}
+.hs td.hc{text-align:left;font-size:12px}.hs td.hc a{margin-right:4px}
 .bf{display:inline-block;width:16px;font-weight:700;color:var(--muted)}.bf.correct{color:var(--series)}.bf.wrong{color:var(--annotation)}
 .pm{display:grid;grid-template-columns:72px repeat(3,minmax(0,1fr));gap:4px;font-size:13px}
 .pm-x{font-size:12px;font-weight:600;color:var(--muted);padding:0 0 4px 8px;border-bottom:1px solid var(--ink)}
@@ -1179,6 +1296,11 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
             ("firstclick", "Bailey, R. W., Wolfson, C. A., Nall, J., &amp; Koyani, S. (2009). Performance-based usability testing: metrics "
              "that have the greatest impact for improving a system's usability. <i>Human Centered Design, HCII 2009</i>, LNCS 5619, 3–12. Springer."),
             ("scent", "Pirolli, P., &amp; Card, S. (1999). Information foraging. <i>Psychological Review</i>, 106(4), 643–675."),
+            ("reaction", "Benedek, J., &amp; Miner, T. (2002). Measuring desirability: new methods for evaluating desirability in a "
+             "usability lab setting. <i>Proceedings of the Usability Professionals' Association 2002 Conference</i>."),
+            ("gulfs", "Norman, D. A. (2013). <i>The Design of Everyday Things</i> (revised and expanded edition), chapter 2. Basic Books."),
+            ("heuristics", "Nielsen, J. (1994, updated 2020). 10 usability heuristics for user interface design. Nielsen Norman Group. "
+             "https://www.nngroup.com/articles/ten-usability-heuristics/"),
             ("saydo","Nielsen, J. (2001). First rule of usability? Don't listen to users. Nielsen Norman Group. "
              "https://www.nngroup.com/articles/first-rule-of-usability-dont-listen-to-users/"),
             ("artefacts", "Study record, in the study folder: study.json, personas.json, navigation.json, flows.json, verified_findings.json, "
@@ -1206,8 +1328,13 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         toc.append(("first", "First impressions and first clicks"))
     if flows.get("scent"):
         toc.append(("scent", "Did presses do what people expected?"))
-    if measurements:
-        toc.append(("accessibility", "Accessibility measurements"))
+    by_sc = defaultdict(list)
+    for f in findings:
+        for x in f.get("wcag") or []:
+            by_sc[str(x)].append(f)
+    wcag_rows = sorted(by_sc.items(), key=lambda kv: [int(n) for n in kv[0].split(".")])
+    if measurements or wcag_rows:
+        toc.append(("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
     toc += [("feedback", "Participant feedback"), ("discussion", "Discussion"), ("limitations", "Limitations"), ("references", "References")]
     appendix = ([("appendix-replay", "Walk replay")] if walks else []) + ([("appendix-clicks", "Click maps")] if maps else []) \
         + ([("appendix-removed", "Removed in verification")] if vf["removed"] else [])
@@ -1323,6 +1450,11 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 "Where to start: each finding by severity and by how much work the fix is, as the reviewer judged it. Small fixes to "
                 f"serious problems sit top left. Severity weighs how often, how badly and how persistently it gets in the way.{cite('severity')}")
                 + "</figure>")
+        if any(f.get("heuristics") for f in findings):
+            out.append(heuristic_scorecard(findings, study) + fig(
+                "Which of Nielsen's ten usability heuristics each finding breaks, by the journey stage its page belongs to. "
+                f"A row that fills across stages is a habit of the site, not one page's slip; an empty row means no finding broke it.{cite('heuristics')}")
+                + "</figure>")
     for f in findings:
         fid = esc(f.get("id"))
         out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
@@ -1363,6 +1495,9 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         parts = severity_parts(f)
         if parts:
             out.append(f"<p class='sub' style='margin-top:4px'>Severity in parts: {esc(parts)}.</p>")
+        tags = finding_tags(f)
+        if tags:
+            out.append(f"<p class='sub' style='margin-top:4px'>{esc(tags[0].upper() + tags[1:])}.</p>")
         out.append(f"<div class='note'><b class='k'>Recommendation</b>{esc(f.get('recommendation'))}</div></section>")
     if beliefs:
         cols = list(nav)
@@ -1411,6 +1546,21 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                    f"<td class='num'>{sp['dead_clicks']}</td><td class='num'>{sp['backtracked_from']}</td><td class='num'>{sp['exits_short_of_goal']}</td>"
                    f"<td class='num'>{p['avg_clarity']} / {p['avg_trust']} / {p['avg_effort']}</td><td class='num'><b>{p['bottleneck_score']}</b></td></tr>")
     out.append("</tbody></table></div>" + fig(f"Score = {esc(flows['score_formula'])}. Clarity and trust 1–5, higher is better; effort 1–5, higher is worse.") + "</figure>")
+    if any(any(r[g] for g in GULFS) or r["dead_presses"] for r in flows.get("gulfs") or []):
+        out.append("<p>Where the friction sits in Norman's cycle of action: <b>working out what to do</b> (the gulf of execution: "
+                   "finding the control, knowing what to press), <b>telling what happened</b> (the gulf of evaluation: no feedback, "
+                   "unclear errors, slow responses), or <b>seeing and understanding the content</b> (copy, prices, conditions, legibility). "
+                   f"The fixes differ: the first needs clearer controls, the second feedback, the third better words.{cite('gulfs')}</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Stage</th>"
+                   + "".join(f"<th class='num'>{esc(t)}</th>" for t in GULFS.values())
+                   + "<th class='num'>Presses that did nothing</th></tr></thead><tbody>")
+        for r in flows["gulfs"]:
+            top = max(r[g] for g in GULFS)
+            out.append(f"<tr><td>{esc(r['label'])}</td>" + "".join(
+                f"<td class='num'>{'<b>' if r[g] and r[g] == top else ''}{r[g]}{'</b>' if r[g] and r[g] == top else ''}</td>" for g in GULFS)
+                + f"<td class='num'>{r['dead_presses']}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Friction notes the personas recorded, by journey stage and by kind, each friction type "
+                                                  "assigned to one column; the largest in each row is bold.") + "</figure>")
 
     grade_word = {"toward": "toward the goal", "away": "away from it", "stayed": "stayed on the page", "nothing": "nothing happened",
                   "unknown": "can't tell"}
@@ -1465,8 +1615,18 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 + (f" <span class='muted'>Next: “{esc(m['next_thought'])}”</span>" if m.get("next_thought") else "") + "</li>"
                 for p, m in misses[:20]) + "</ul>")
     # 05 accessibility
+    if measurements or wcag_rows:
+        out.append(h2("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
+    if wcag_rows:
+        out.append("<p>WCAG 2.2 success criteria the findings may fail. Personas saw only the screen, so these are leads for a proper "
+                   "accessibility audit with assistive technology, not a conformance result; contrast ones rest on the measurements below.</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Criterion</th><th>Findings</th></tr></thead><tbody>")
+        for sc_id, fs in wcag_rows:
+            out.append(f"<tr><td><b>{esc(sc_id)}</b> {esc(WCAG_NAMES.get(sc_id, ''))}</td><td>"
+                       + "".join(f"<a class='chip' href='#finding-{esc(f.get('id'))}' title='{esc(f.get('title'))}'>{esc(f.get('id'))}</a> " for f in fs)
+                       + "</td></tr>")
+        out.append("</tbody></table></div>" + fig("Findings by the WCAG success criterion the reviewer tagged them with.") + "</figure>")
     if measurements:
-        out.append(h2("accessibility", "Accessibility measurements"))
         out.append(f"<p>Contrast and size were measured from screenshot pixels, not from the page's styles, and checked against WCAG 2.2: 4.5:1 for body "
                    f"text{cite('wcag-143')}, 3:1 for large text and interface components{cite('wcag-1411')}, and a 24 × 24 CSS px minimum target{cite('wcag-258')}.</p>")
         out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>What</th><th>Colours</th><th class='num'>Ratio</th>"
@@ -1487,6 +1647,19 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         out.append(f"<p>{s['responses']} of {s['of']} personas gave an exit interview. Ease averaged {s['ease_avg_1_7']} of 7, UMUX-Lite "
                    f"{s['umux_lite_avg_0_100']} of 100{cite('umux')}, satisfaction {s['satisfaction_avg_1_5']} of 5. On likelihood to recommend, "
                    f"{rc['9-10']} scored 9–10, {rc['7-8']} scored 7–8 and {rc['0-6']} scored 0–6. These are simulated answers, not a benchmark.</p>")
+        if s.get("reaction_words"):
+            rw = s["reaction_words"]
+            cols = []
+            for tone, title in (("negative", "Negative words"), ("positive", "Positive words")):
+                rows = [r for r in rw if r["tone"] == tone]
+                picks = sum(r["count"] for r in rows)
+                cols.append(f"<div><div class='rw-h'>{title} <span class='muted'>· {picks} picks</span></div>"
+                            + ("".join(f"<div class='rw' title='{esc(', '.join(names.get(x, x) for x in r['sessions']))}'><span>{esc(r['word'])}</span>"
+                                       f"<span class='rw-dots {tone}'>{'●' * r['count']}</span><span class='tv'>{r['count']}</span></div>" for r in rows)
+                               or "<div class='muted'>none picked</div>") + "</div>")
+            out.append("<figure class='fig'><div class='rwg'>" + "".join(cols) + "</div>" + fig(
+                f"The words each persona picked to describe the site after their walk, 3 to 5 each from a fixed, balanced list of "
+                f"product reaction cards, so they can be counted and compared between runs. One dot per persona.{cite('reaction')}") + "</figure>")
         if s.get("say_do"):
             out.append(say_do_chart(s["say_do"], names) + fig(
                 "What each persona said beside what they did: their ease rating (1–7) and UMUX-Lite (0–100) against how the walk ended. "
@@ -1598,6 +1771,8 @@ def export(study_dir: Path) -> int:
                     if (f.get("exposure") or {}).get("walks_reached") else ""), ""]
         if severity_parts(f):
             lines += [f"**Severity in parts:** {severity_parts(f)}", ""]
+        if finding_tags(f):
+            lines += [f"**Tags:** {finding_tags(f)}", ""]
         lines += ["## What happens", "", str(f.get("description", "")), ""]
         if f.get("conflict"):
             lines += ["## The two statements", ""] + [f"- {c}" for c in f["conflict"]] + [""]
@@ -1625,6 +1800,7 @@ def export(study_dir: Path) -> int:
                      "walks_hit": (f.get("exposure") or {}).get("walks_hit", ""),
                      "walks_reached": (f.get("exposure") or {}).get("walks_reached", ""),
                      "impact": f.get("impact", ""), "persistence": f.get("persistence", ""), "fix_effort": f.get("fix_effort", ""),
+                     "gulf": f.get("gulf", ""), "heuristics": "; ".join(f.get("heuristics") or []), "wcag": "; ".join(f.get("wcag") or []),
                      "evidence": "; ".join(f"{e.get('session')}#{e.get('step')}" for e in f.get("evidence", [])),
                      "ticket": f"issues/{fid}.md"})
     with (study_dir / "findings.csv").open("w", encoding="utf-8-sig", newline="") as fh:

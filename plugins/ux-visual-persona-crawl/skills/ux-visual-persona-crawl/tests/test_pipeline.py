@@ -28,7 +28,8 @@ DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubt
        "triggers_met": [], "expects": "shows the offer", "as_expected": "yes",
        "first_impression": {"what_is_this": "an offers page", "first_move": "press the big button"}}
 SCENT_KEYS = ("first_impression", "expects", "as_expected")
-FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3, "one_word": "meh",
+FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3,
+            "reaction_words": ["confusing", "Slow", "Clean"],
             "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q",
             "reasons": {k: "the offer button at step 2 did nothing" for k in
                         ("ease", "meets_needs", "easy_to_use", "recommend", "satisfaction")}}
@@ -479,6 +480,8 @@ class WalkAndReport(unittest.TestCase):
                 cls.status_before = jrun("status", "--study", d / "study.json")
                 cls.finished = jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
                 cls.no_reasons = eyes("feedback", "--session", s, payload={k: v for k, v in FEEDBACK.items() if k != "reasons"})
+                cls.bad_words = eyes("feedback", "--session", s, payload=dict(FEEDBACK, reaction_words=["Nice", "Clean", "Slow"]))
+                cls.few_words = eyes("feedback", "--session", s, payload=dict(FEEDBACK, reaction_words=["Clean"]))
                 cls.saved = jrun("feedback", "--session", s, payload=FEEDBACK)
             else:
                 jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
@@ -502,6 +505,17 @@ class WalkAndReport(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertIn("reasons needs a sentence", out)
         self.assertTrue(self.saved["saved"].endswith("feedback.json"))
+        # Reaction words come from the brief's list, 3 to 5 of them, and are saved spelled as listed, with their tone.
+        rc, out = self.bad_words
+        self.assertNotEqual(rc, 0)
+        self.assertIn("Nice is not on it", out)
+        rc, out = self.few_words
+        self.assertNotEqual(rc, 0)
+        self.assertIn("3 to 5 different words", out)
+        fb = json.loads(Path(self.saved["saved"]).read_text(encoding="utf-8"))
+        self.assertEqual(fb["reaction_words"], ["Confusing", "Slow", "Clean"])
+        self.assertEqual(fb["reaction_tones"]["Clean"], "positive")
+        self.assertIn("Untrustworthy", (Path(self.saved["saved"]).parent / "brief.md").read_text(encoding="utf-8"))
 
     def test_fill_is_one_step(self):
         self.assertTrue(self.fill.get("ok"), self.fill)
@@ -561,11 +575,12 @@ class WalkAndReport(unittest.TestCase):
         one = lambda step, box: {"session": "desk", "step": step, "box": box}
         findings = [
             f("F1", [one(2, [10, 10, 100, 40])], category="button", personas=["desk"],
-              impact="blocks", persistence="repeats", fix_effort="small"),
+              impact="blocks", persistence="repeats", fix_effort="small", gulf="evaluation", heuristics=["H1"], wcag=["2.5.8"]),
             f("F2", [one(1, [10, 10, 100, 40]), one(1, [10, 300, 100, 40])]),   # one screen, two places: kept
             f("F3", [one(1, [10, 10, 100, 40]), one(1, [20, 15, 100, 40])]),    # same place twice: removed
             f("F4", [one(9, [10, 10, 100, 40])], category="button"),            # no such step: removed
             f("F5", [one(2, [10, 10, 100, 40])], category="button", impact="catastrophic"),  # not an impact: removed
+            f("F6", [one(2, [10, 10, 100, 40])], category="button", heuristics=["H11"], gulf="sideways"),  # removed
         ]
         (d / "findings.json").write_text(json.dumps(findings), encoding="utf-8")
         sess = {p: next(d.glob(f"sessions/{p}*")).name for p in ("desk", "phone")}
@@ -581,6 +596,9 @@ class WalkAndReport(unittest.TestCase):
         v = json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["id"] for x in v["kept"]), ["F1", "F2"])
         self.assertIn("impact must be one of", next(r for r in v["removed"] if r["id"] == "F5")["reasons"][0])
+        f6 = " ".join(next(r for r in v["removed"] if r["id"] == "F6")["reasons"])
+        self.assertIn("gulf must be one of", f6)
+        self.assertIn("heuristics must be a list of H1 to H10", f6)
         f2 = next(x for x in v["kept"] if x["id"] == "F2")
         self.assertTrue(any("severity can't be broken" in n for n in f2["verification_notes"]))
         # Beliefs: the step that exists is kept and checked against the record; the bad ones are dropped and listed.
@@ -632,6 +650,14 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("an offers page", html)
         flows = json.loads((d / "flows.json").read_text(encoding="utf-8"))
         self.assertEqual(next(r for r in flows["scent"] if r["page"] == "/offers")["yes"], 2)
+        # Heuristic scorecard, gulfs, reaction words and the WCAG list.
+        self.assertRegex(html, r"<td>H1 Visibility of system status</td><td class='hc'><a class='chip' href='#finding-F1'")
+        self.assertIn("Breaks H1 Visibility of system status · may fail WCAG 2.5.8 Target Size (Minimum) · gulf: telling what happened", html)
+        self.assertIn("2.5.8</b> Target Size (Minimum)", html)
+        self.assertIn("class='rwg'", html)
+        self.assertIn("<span>Confusing</span>", html)
+        self.assertIn("**Tags:** breaks H1", ticket)
+        self.assertIn("gulfs", flows)
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
@@ -683,6 +709,17 @@ class SuccessLevels(unittest.TestCase):
         self.assertIsNone(rows["wander"]["gap"])
         self.assertIsNone(rows["capped"]["gap"])
         self.assertEqual(rows["quit"]["umux_lite"], 83)
+
+    def test_every_friction_type_has_a_gulf(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod3", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        src = EYES.read_text(encoding="utf-8")
+        block = src[src.index("FRICTION_TYPES = {"):]
+        types = set(re.findall(r'"([a-z_]+)"', block[:block.index("}")]))
+        self.assertGreater(len(types), 15)
+        self.assertEqual(types - set(mod.GULF_OF_FRICTION), set())
 
     def test_first_clicks_and_scent(self):
         import importlib.util
