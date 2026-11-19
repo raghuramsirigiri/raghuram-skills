@@ -688,8 +688,8 @@ class Session:
         if self.step == 0:
             fi = decision.get("first_impression")
             if not (isinstance(fi, dict) and all(str(fi.get(k) or "").strip() for k in ("what_is_this", "first_move"))):
-                return ("Missing first_impression on this first screen: {\"what_is_this\": \"what this site is for, from a "
-                        "first glance\", \"first_move\": \"what you would do first, and where\"}")
+                return ("Missing first_impression inside decision on this first screen: \"first_impression\": {\"what_is_this\": "
+                        "\"what this site is for, from a first glance\", \"first_move\": \"what you would do first, and where\"}")
         prev = self.journey["steps"][-1] if self.journey["steps"] else None
         if (prev and prev["action"].get("type") in ("click", "double_click") and (prev.get("decision") or {}).get("expects")
                 and not prev["result"].get("blocked") and decision.get("as_expected") not in ("yes", "partly", "no")):

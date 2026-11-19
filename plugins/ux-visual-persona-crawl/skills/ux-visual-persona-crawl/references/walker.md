@@ -91,7 +91,7 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
 EOF
 ```
 
-On your **first screen only**, before you scroll or read closely, add `"first_impression": {"what_is_this": "...", "first_move": "..."}`: `what_is_this`, what this person takes the site to be for from a first glance, and `first_move`, what they would do first and where. Write the glance, not a study of the page: if it isn't clear what the site is for, say so.
+On your **first screen only**, before you scroll or read closely, add `"first_impression": {"what_is_this": "...", "first_move": "..."}` inside `decision`, beside `thought`: `what_is_this`, what this person takes the site to be for from a first glance, and `first_move`, what they would do first and where. Write the glance, not a study of the page: if it isn't clear what the site is for, say so.
 
 Every **click or double-click** needs `expects`: in this person's words, what they think pressing it will do ("shows the prices", "opens a form", "not sure, maybe more detail"). Write it before you see the result.
 
