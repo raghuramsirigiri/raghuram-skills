@@ -19,6 +19,7 @@ Study folder: `[STUDY_DIR]`. Driver: `[DRIVER]` (for `measure` and `zoom` only).
 - **Bottlenecks:** the top pages in `flows.json`. Explain what on screen causes the score: steps piling up, dead clicks, people bouncing back, people leaving.
 - **Friction points:** moments where clarity or trust fell, effort rose or people backtracked, including the step before someone left.
 - **Contradictions:** the site saying two different things, such as a price, a fee, a time or a promise, on different screens or in the headline and the fine print. Compare what personas believed (`memory`, `doubts`) with `facts.md`. Someone confidently wrong is often the most valuable finding, and they won't report it themselves.
+- **Slow responses:** a step whose result has `late_response` (with `late_response_ms`) is a control that answered seconds later with nothing on screen in between; `screen_changed_before_action` means the page moved on by itself while the persona looked. Both are evidence of missing feedback (`button` or `performance`), and the change belongs to the earlier press, not to the step after it.
 - **Buttons and controls:** primary actions that look secondary or disabled, secondary actions styled as primary (a big "Back" beside a faint "Continue"), things that look clickable and aren't, controls that gave no visible response, icon-only controls nobody understood, targets too small for a thumb.
 - **Contrast and legibility:** faint text, grey fine print, text on busy images. Measure before claiming:
   `python "[DRIVER]" measure --session <session folder> --step N --box "x,y,w,h" --what "..."`. Use the box tightly around one piece of text or one control. Body text needs 4.5:1; large text (about 24px, or 19px bold) and the edges of buttons and fields need 3:1.
@@ -32,6 +33,7 @@ Leave these out of findings (list them under `simulation_notes` in `insights.jso
 
 - Anything the driver refused (`blocked`): those are this test's limits.
 - Sessions ended by `step_cap`, `harness_stall` or `harness_stopped`, and outcomes marked `claimed_*_unverified`.
+- Steps whose journey `events` include `render_glitch`: the screenshot was drawn shrunk into a corner, so the persona's taps from it may have missed. Dead clicks and give-ups that follow from such a step belong here, not in findings.
 - A persona misreading something that is plainly legible in the screenshot, or clicking a few pixels off a big target. Check the screenshot before blaming the site.
 - `blocked_by_site`: a CAPTCHA or login wall is not a UX finding.
 

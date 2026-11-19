@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vision-only browser driver for persona crawls.
 
-  check     validate a study file
+  check     validate a study file, and report what each live host's robots.txt allows
   start     open a persona's browser on the study's start page
   look      screenshot what is on screen, with a light coordinate grid (a clean copy is kept on disk)
   zoom      lean in: an enlarged crop of part of the last screenshot
@@ -69,6 +69,9 @@ MAX_EDGE = 1568  # longest screenshot side a vision model takes without resizing
 FEEDBACK_SCALES = {"ease": (1, 7), "meets_needs": (1, 7), "easy_to_use": (1, 7), "recommend": (0, 10), "satisfaction": (1, 5)}
 FEEDBACK_TEXT = ("one_word", "best_thing", "worst_thing", "what_would_fix_it", "would_return", "quote")
 FILL_MAX = 8  # fields one fill action may set; more than a screen's worth means the persona isn't looking
+# After an action shows no response, keep watching this long for a late one before calling it dead.
+LATE_RESPONSE_MS = int(os.environ.get("UXCRAWL_LATE_MS", "6000"))  # tests shorten it
+LATE_POLL_MS = 500
 LOW_IMAGE_EDGE = 1100  # study "image_budget": "low" caps the screenshot's long side here, about half the image tokens
 
 # ---------------------------------------------------------------- patience and giving up
@@ -248,6 +251,24 @@ def find_env() -> dict:
 
 
 # ---------------------------------------------------------------- pixels
+
+def shrunk_frame(raw: bytes) -> bool:
+    """True when the picture's content fills only its top-left corner and the rest is one blank colour.
+
+    That is a rendering glitch, not a page: a real page's header, background or fixed bars reach across the
+    screen. Judged on a small thumbnail, so it costs a few milliseconds per screenshot.
+    """
+    import io
+    from PIL import Image, ImageChops
+
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    w, h = img.size
+    small = img.resize((max(1, w // 8), max(1, h // 8)))
+    bg = small.getpixel((small.width - 1, small.height - 1))
+    diff = ImageChops.difference(small, Image.new("RGB", small.size, bg)).convert("L").point(lambda v: 255 if v > 24 else 0)
+    box = diff.getbbox()
+    return bool(box) and box[2] < small.width * 0.5 and box[3] < small.height * 0.5
+
 
 def luminance(rgb) -> float:
     def ch(c):
@@ -571,7 +592,19 @@ class Session:
         await self.page.wait_for_timeout(self.study["pace_ms"])
 
     async def shot_bytes(self) -> bytes:
-        return await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        raw = await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        # Right after a navigation, Chromium's mobile emulation can hand back a frame drawn at the wrong scale: the
+        # whole screen shrunk into the top-left corner of a blank image. A walker aims its taps from that picture,
+        # so every tap misses. Seen only from pixels (the driver reads nothing from the page): retake a few times.
+        for _ in range(4):
+            if not shrunk_frame(raw):
+                return raw
+            await self.page.wait_for_timeout(400)
+            raw = await self.page.screenshot(type="png", scale="device", animations="disabled", caret="initial")
+        if shrunk_frame(raw):
+            self.events.append({"kind": "render_glitch", "url": self.page.url,
+                                "note": "screen drawn shrunk into the top-left corner after retakes; taps may miss"})
+        return raw
 
     def to_css(self, v) -> float:
         return float(v) / self.k
@@ -672,6 +705,21 @@ class Session:
             action = {"type": "finish", "outcome": "gave_up", "reason": f"Gave up: {reason}", "instead_of": action}
             ended_by = "gives_up_when"
 
+        if not ended_by and action["type"] != "finish" and self.page.url != self.looked["url"]:
+            # The site moved on by itself after the persona's last screenshot (a slow button finally responding, a
+            # timed redirect). Acting now would aim at a screen they never saw and credit the change to this action.
+            # Show them the new screen instead and let them decide again; nothing is done and no step is spent.
+            try:
+                await self.settle()
+                screen = await self.look()
+            except Exception as exc:
+                screen = {"error": f"Run look: {str(exc)[:200]}"}
+            return {"ok": False, "screen_changed_before_action": True,
+                    "note": ("The page changed by itself after your last screenshot, so your action was not done. "
+                             "This is the screen now: react to it and decide again. If you were left waiting with no "
+                             "sign anything was happening, that is worth a friction note."),
+                    "next_screen": screen}
+
         self.events.clear()
         url_before = self.page.url
         # A screen that moves by itself would make every click look like it did something.
@@ -731,6 +779,36 @@ class Session:
                 if action["type"] in ("click", "double_click") and "x" in action and blank_at(self.looked["raw"], action["x"], action["y"], self.k):
                     # Nothing drawn under the pointer: a missed click, not a control that ignored the person.
                     result["on_blank_space"] = True
+            if (result.get("no_visible_response") and not result.get("on_blank_space")
+                    and action["type"] in ("click", "double_click", "key", "fill")):
+                # Some controls answer seconds later with nothing in between (no spinner, no pressed state). Keep
+                # watching for a while, so a slow response is credited to the press that caused it rather than to
+                # whatever the persona does next, and record how long they were left waiting.
+                waited = 0
+                while waited < LATE_RESPONSE_MS:
+                    await self.page.wait_for_timeout(LATE_POLL_MS)
+                    waited += LATE_POLL_MS
+                    try:
+                        shot = await self.shot_bytes()
+                    except Exception:
+                        break
+                    if self.page.url != url_before or visible_change(before_raw, shot, restless):
+                        try:
+                            await self.settle()
+                            shot = await self.shot_bytes()
+                        except Exception:
+                            pass
+                        after_raw = shot
+                        result.pop("no_visible_response", None)
+                        result.update(screen_changed=True, late_response=True,
+                                      address_changed=self.page.url != url_before, address_after=self.page.url)
+                        break
+                result["ms"] += waited
+                if result.get("late_response"):
+                    result["late_response_ms"] = result["ms"]
+                    result["note"] = (f"Nothing visible happened for about {round(result['ms'] / 1000)} seconds after "
+                                      "your action, then the screen changed. That wait is part of what this person "
+                                      "experienced.")
             self.no_change = self.no_change + 1 if result.get("no_visible_response") else 0
         result["events"] = list(self.events)
         spent = self.account(decision, action, result, url_before) if not self.ended else None
@@ -1308,6 +1386,53 @@ def build_brief(session_dir: Path) -> str:
     return text
 
 
+ROBOTS_AGENT = "*"  # the driver sends Chromium's own user agent, so the rules for every crawler are the ones that apply
+
+
+def robots_verdict(url: str, timeout: float = 5.0) -> dict:
+    """What the host's robots.txt says about crawling this address: allowed, disallowed, none or unreachable.
+
+    robots.txt is the site's own notice to automated visitors, not page content, so reading it doesn't
+    break the sight-only rule: nothing in it reaches a persona or the report's findings.
+    """
+    import urllib.error
+    import urllib.request
+    from urllib.robotparser import RobotFileParser
+
+    parts = urlsplit(url)
+    robots_url = f"{parts.scheme or 'https'}://{parts.netloc}/robots.txt"
+    out = {"robots_url": robots_url, "checked": url}
+    try:
+        req = urllib.request.Request(robots_url, headers={"User-Agent": "Mozilla/5.0 (ux-visual-persona-crawl check)"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read(200_000).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        # The robots.txt convention: a missing file (4xx) means no rules; a server error means don't assume.
+        out["verdict"] = "none" if 400 <= exc.code < 500 else "unreachable"
+        out["status"] = exc.code
+        return out
+    except (OSError, ValueError) as exc:
+        out.update(verdict="unreachable", error=str(exc)[:200])
+        return out
+    rp = RobotFileParser()
+    rp.parse(text.splitlines())
+    out["verdict"] = "allowed" if rp.can_fetch(ROBOTS_AGENT, url) else "disallowed"
+    return out
+
+
+def robots_report(study: dict, timeout: float = 5.0) -> dict:
+    """robots.txt verdicts for every live host in the study; test systems are skipped."""
+    start = study["start_url"]
+    start_host = (urlsplit(start).hostname or "").lower()
+    scheme = urlsplit(start).scheme or "https"
+    report = {}
+    for host in study.get("allowed_hosts", []):
+        if is_test_host(host):
+            continue
+        report[host] = robots_verdict(start if host == start_host else f"{scheme}://{host}/", timeout)
+    return report
+
+
 def cmd_check(args):
     path = Path(args.study).resolve()
     study = load_study(path)
@@ -1315,10 +1440,20 @@ def cmd_check(args):
            "treated_as": "test system" if study["local_pace"] else f"live site (at most {MAX_LIVE_SESSIONS} sessions at a time)",
            "pace_ms": study["pace_ms"],
            "report_command": report_command()}
+    warnings = []
+    if not study["local_pace"] and not args.no_robots:
+        out["robots"] = robots_report(study)
+        for host, r in out["robots"].items():
+            if r["verdict"] == "disallowed":
+                warnings.append(f"{host}'s robots.txt disallows crawling {r['checked']}: ask the user to confirm they own "
+                                "the site or have permission before any walk, or use a staging copy")
+            elif r["verdict"] == "unreachable":
+                warnings.append(f"couldn't read {r['robots_url']}: check the site's terms by sight in recon before walking")
     if args.personas:
         people = json.loads(lp(args.personas).read_text(encoding="utf-8"))
         people = people["personas"] if isinstance(people, dict) else people
-        errors, warnings = lint_personas(people)
+        errors, persona_warnings = lint_personas(people)
+        warnings += persona_warnings
         shared = shared_test_values(study, people) if isinstance(people, list) else []
         if shared:
             warnings.append(f"every persona types the same {', '.join('test:' + k for k in shared)}: a site that saves "
@@ -1327,8 +1462,8 @@ def cmd_check(args):
         out.update({"personas": len(people) if isinstance(people, list) else 0, "ok": not errors})
         if errors:
             out["errors"] = errors
-        if warnings:
-            out["warnings"] = warnings
+    if warnings:
+        out["warnings"] = warnings
     print(json.dumps(out, ensure_ascii=False, indent=1))
     if not out["ok"]:
         raise SystemExit(1)
@@ -1493,6 +1628,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("check"); p.add_argument("--study", required=True); p.add_argument("--personas", help="also check this personas.json")
+    p.add_argument("--no-robots", action="store_true", help="skip reading live hosts' robots.txt (offline checks)")
     p = sub.add_parser("start")
     p.add_argument("--study", required=True); p.add_argument("--personas")
     p.add_argument("--persona", help="a persona id, or several separated by commas")

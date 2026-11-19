@@ -73,6 +73,9 @@ def setUpModule():
         except OSError:
             time.sleep(0.2)
     TMP = Path(tempfile.mkdtemp(prefix="uxcrawl-test-"))
+    # Dead buttons are watched for a late response before being called dead; keep that short here, except in the
+    # test that needs the full wait (it starts its own session with the real value).
+    os.environ["UXCRAWL_LATE_MS"] = "1000"
 
 
 def tearDownModule():
@@ -110,6 +113,27 @@ def dead_button_xy():
 
 
 class Pixels(unittest.TestCase):
+    def test_shrunk_frame_is_spotted(self):
+        import io
+        from PIL import Image, ImageDraw
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+
+        def png(draw):
+            img = Image.new("RGB", (770, 1565), "white")
+            draw(ImageDraw.Draw(img))
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            return buf.getvalue()
+
+        glitch = png(lambda d: (d.rectangle([0, 0, 216, 60], fill="navy"), d.rectangle([0, 300, 216, 440], fill="black")))
+        page = png(lambda d: (d.rectangle([0, 0, 769, 60], fill="navy"), d.rectangle([40, 300, 300, 440], fill="black")))
+        short = png(lambda d: d.rectangle([0, 0, 769, 60], fill="navy"))
+        self.assertTrue(driver.shrunk_frame(glitch))
+        self.assertFalse(driver.shrunk_frame(page))
+        self.assertFalse(driver.shrunk_frame(short))
+        self.assertFalse(driver.shrunk_frame(png(lambda d: None)))
+
     def test_a_tick_next_to_the_pointer_counts_as_a_response(self):
         import importlib.util
         import io
@@ -144,7 +168,7 @@ class Study(unittest.TestCase):
         self.assertEqual(c["treated_as"], "test system")
         self.assertEqual(c["pace_ms"], 300)
         live = study("live-hosts", start_url="https://www.example.com/x", allowed_hosts=["https://www.example.com:443/x"])
-        c = jrun("check", "--study", live / "study.json")
+        c = jrun("check", "--study", live / "study.json", "--no-robots")
         self.assertTrue(c["treated_as"].startswith("live"))
         self.assertEqual(c["pace_ms"], 1200)
 
@@ -339,6 +363,66 @@ class Sessions(unittest.TestCase):
         finally:
             for v in s.values():
                 eyes("stop", "--session", v)
+
+    def test_slow_response_is_credited_to_the_press_that_caused_it(self):
+        """Ledgerly's plan-step Continue moves on 4.5 s later with nothing in between. The press gets the credit
+        (late_response), and a screen that moved on by itself before the next action is shown, not acted on."""
+        trial = SKILL / "evals" / "fixtures" / "trial-site" / "server.py"
+        with socket.socket() as sk:
+            sk.bind(("127.0.0.1", 0))
+            port = sk.getsockname()[1]
+        srv = subprocess.Popen([PY, str(trial), "--port", str(port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        base = f"http://localhost:{port}"
+        sessions = []
+        try:
+            for _ in range(50):
+                try:
+                    urllib.request.urlopen(base + "/", timeout=1)
+                    break
+                except OSError:
+                    time.sleep(0.2)
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as pw:
+                b = pw.chromium.launch()
+                pg = b.new_page(viewport={"width": 1280, "height": 800})
+                pg.goto(base + "/signup/plan?plan=team")
+                bb = pg.locator("#cont").bounding_box()
+                b.close()
+            click = {"type": "click", "x": round(bb["x"] + bb["width"] / 2), "y": round(bb["y"] + bb["height"] / 2)}
+            d = study("late", start_url=base + "/signup/plan?plan=team", stages=[], max_steps=10)
+            p = personas(d, [{"id": "waits"}, {"id": "moves-on"}])
+
+            def start(pid, late_ms):
+                env = dict(os.environ, UXCRAWL_LATE_MS=str(late_ms))
+                out = subprocess.run([PY, str(EYES), "start", "--study", str(d / "study.json"), "--personas", str(p),
+                                      "--persona", pid], capture_output=True, text=True, encoding="utf-8", env=env)
+                self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+                o = json.loads(out.stdout)
+                sid = o["sessions"][0]["session"] if "sessions" in o else o["session"]
+                sessions.append(sid)
+                return sid
+
+            waits = start("waits", 6000)
+            r = jrun("act", "--session", waits, payload={"decision": DEC, "action": click})
+            self.assertTrue(r.get("late_response"), r)
+            self.assertNotIn("no_visible_response", r)
+            self.assertIn("/signup/billing", r["address_after"])
+            self.assertGreaterEqual(r["late_response_ms"], 4000)
+            self.assertIn("/signup/billing", r["next_screen"]["address_bar"])
+
+            moves_on = start("moves-on", 0)
+            r = jrun("act", "--session", moves_on, payload={"decision": DEC, "action": click})
+            self.assertTrue(r.get("no_visible_response"), r)
+            time.sleep(5)
+            r = jrun("act", "--session", moves_on, payload={"decision": DEC, "action": click})
+            self.assertTrue(r.get("screen_changed_before_action"), r)
+            self.assertIn("/signup/billing", r["next_screen"]["address_bar"])
+            j = json.loads((Path(moves_on) / "journey.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(j["steps"]), 1)   # the refused action spent no step
+        finally:
+            for sid in sessions:
+                eyes("stop", "--session", sid)
+            srv.terminate()
 
     def test_recon_has_no_brief(self):
         d = study("recon")
