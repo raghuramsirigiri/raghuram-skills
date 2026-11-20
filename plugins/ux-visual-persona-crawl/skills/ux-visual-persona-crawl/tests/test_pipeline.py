@@ -201,6 +201,27 @@ class Study(unittest.TestCase):
         st = {"mode": "test_env", "test_data": {"card": "4242", "meter": "0"}, "shared_test_data": ["card"]}
         self.assertEqual(driver.shared_test_values(st, [{"id": "a"}, {"id": "b"}]), ["meter"])
 
+    def test_stances_are_checked_and_split_in_the_report(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        good = {"stance": "privacy", "level": 4, "looks_for": ["What is asked for"], "acts_by": ["Declines cookies"]}
+        self.assertEqual(driver.stance_problems([good, dict(good, stance="eco", level=2)]), [])
+        bad = driver.stance_problems([good, good, {"stance": "sceptic", "level": 9, "looks_for": []}, "eco"])
+        self.assertTrue(any("twice" in e for e in bad))
+        self.assertTrue(any("level must be 1 to 5" in e for e in bad))
+        self.assertTrue(any("looks_for" in e for e in bad) and any("acts_by" in e for e in bad))
+        self.assertTrue(any("needs a 'stance'" in e for e in bad))
+        errors, warnings = driver.lint_personas([{"id": "a", "name": "A", "task": "t", "stances": [good]},
+                                                 {"id": "b", "name": "B", "task": "t"}])
+        self.assertEqual(errors, [])
+        self.assertTrue(any("decision stance" in w for w in warnings))
+        sys.path.insert(0, str(EYES.parent))
+        import report
+        by_id = {"a": {"stances": [good]}, "b": {"stances": [dict(good, level=2)]}}
+        nav = {n: {"persona": {"id": n}, "device": "desktop", "stages_reached": [], "outcome": "gave_up"} for n in by_id}
+        seg = next(x for x in report.segments({}, nav, by_id, []) if x["dimension"] == "Stance: privacy")
+        self.assertEqual([s["name"] for s in seg["segments"]], ["Strongly privacy (4–5)", "Others"])
+
     def test_going_back_is_the_path_not_the_query(self):
         sys.path.insert(0, str(EYES.parent))
         import eyes as driver

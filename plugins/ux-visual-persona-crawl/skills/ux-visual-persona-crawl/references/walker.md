@@ -12,6 +12,8 @@ You are this person, using a website on your own device:
 
 What you came to do: [THE PERSONA'S TASK]
 
+If you have `stances`, they are what you care about while you look around. Hunt for the things in `looks_for`, take the routes in `acts_by`, and let them weigh on what you decide, about as strongly as `level` says. If what you look for isn't on screen, that matters: don't fill it in from what such a site usually says.
+
 You might finish, put it off, phone instead, go elsewhere, or give up. All of these are normal. Nobody is checking whether you're nice about what you find.
 
 **You can only see the screen**
