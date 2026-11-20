@@ -25,8 +25,11 @@ EYES, REPORT = SKILL / "scripts" / "eyes.py", SKILL / "scripts" / "report.py"
 SERVER = SKILL / "evals" / "fixtures" / "demo-site" / "server.py"
 PY = sys.executable
 DEC = {"thought": "t", "read": [], "clarity": 3, "trust": 3, "effort": 2, "doubts": [], "friction": [], "est_seconds": 5,
-       "triggers_met": []}
-FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3, "one_word": "meh",
+       "triggers_met": [], "expects": "shows the offer", "as_expected": "yes",
+       "first_impression": {"what_is_this": "an offers page", "first_move": "press the big button"}}
+SCENT_KEYS = ("first_impression", "expects", "as_expected")
+FEEDBACK = {"ease": 3, "meets_needs": 3, "easy_to_use": 3, "recommend": 5, "satisfaction": 3,
+            "reaction_words": ["confusing", "Slow", "Clean"],
             "best_thing": "b", "worst_thing": "w", "what_would_fix_it": "f", "would_return": "maybe", "quote": "q",
             "reasons": {k: "the offer button at step 2 did nothing" for k in
                         ("ease", "meets_needs", "easy_to_use", "recommend", "satisfaction")}}
@@ -191,6 +194,46 @@ class Study(unittest.TestCase):
         self.assertIn("test:meter", warned[0])
         self.assertNotIn("test:email", warned[0])
         self.assertNotIn("test:phone", warned[0])
+
+    def test_shared_test_data_is_not_warned_about(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        st = {"mode": "test_env", "test_data": {"card": "4242", "meter": "0"}, "shared_test_data": ["card"]}
+        self.assertEqual(driver.shared_test_values(st, [{"id": "a"}, {"id": "b"}]), ["meter"])
+
+    def test_going_back_is_the_path_not_the_query(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        seen = ["http://h/", "http://h/store/a", "http://h/store/a?item=x", "http://h/store/a"]
+        # Closing a dialog or reopening a dish edits only the query: no going back.
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a", "http://h/store/a?item=x", seen))
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a?item=x", "http://h/store/a", seen))
+        # Returning to a page left for another, or pressing Back, is.
+        self.assertTrue(driver.is_backtrack("click", "http://h/store/a", "http://h/", seen))
+        self.assertTrue(driver.is_backtrack("back", "http://h/store/a?item=x", "http://h/store/a", seen))
+        self.assertFalse(driver.is_backtrack("click", "http://h/store/a", "http://h/stores", seen))
+
+    def test_select_all_lets_a_walker_replace_what_a_box_holds(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        self.assertEqual(driver.key_to_press("SelectAll", "win32"), "Control+a")
+        self.assertEqual(driver.key_to_press("SelectAll", "linux"), "Control+a")
+        self.assertEqual(driver.key_to_press("SelectAll", "darwin"), "Meta+a")
+        self.assertEqual(driver.key_to_press("Tab"), "Tab")
+        self.assertIsNone(driver.key_to_press("Control+a"))  # raw chords stay out of the walker's reach
+
+    def test_a_press_that_worked_gives_patience_back(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        calm = dict(DEC, clarity=4)
+        same = dict(backtrack=False, scrolls_in_a_row=0, new_page=False)
+        self.assertEqual(driver.step_cost(calm, {"type": "click"}, {"ok": True}, **same), (1.0, []))
+        self.assertEqual(driver.step_cost(calm, {"type": "click"}, {"ok": True}, last_press_worked=True, **same),
+                         (0, ["getting somewhere"]))
+        # Not when anything else went wrong on the step.
+        cost, why = driver.step_cost(dict(calm, friction=[{"type": "dead_end", "severity": "high"}]), {"type": "click"},
+                                     {"ok": True}, last_press_worked=True, **same)
+        self.assertEqual((cost, why), (2.0, ["a real problem"]))
 
     def test_patience_costs_and_trigger_lint(self):
         sys.path.insert(0, str(EYES.parent))
@@ -424,6 +467,24 @@ class Sessions(unittest.TestCase):
                 eyes("stop", "--session", sid)
             srv.terminate()
 
+    def test_walker_must_state_first_impression_and_expectations(self):
+        d = study("scent")
+        p = personas(d, [{"id": "s"}])
+        s = jrun("start", "--study", d / "study.json", "--personas", p, "--persona", "s")["session"]
+        try:
+            bare = {k: v for k, v in DEC.items() if k not in SCENT_KEYS}
+            fi = {"first_impression": DEC["first_impression"]}
+            click = {"type": "click", "x": 5, "y": 5}
+            act = lambda dec: jrun("act", "--session", s, payload={"decision": dec, "action": click})
+            self.assertIn("first_impression", act(bare)["error"])
+            self.assertIn("expects", act(dict(bare, **fi))["error"])
+            self.assertTrue(act(dict(bare, **fi, expects="opens the menu")).get("ok"))
+            self.assertIn("as_expected", act(dict(bare, expects="e"))["error"])   # the screen after a press
+            self.assertIn("as_expected", act(dict(bare, expects="e", as_expected="maybe"))["error"])
+            self.assertTrue(act(dict(bare, expects="e", as_expected="no")).get("ok"))
+        finally:
+            eyes("stop", "--session", s)
+
     def test_recon_has_no_brief(self):
         d = study("recon")
         s = jrun("start", "--study", d / "study.json", "--recon")
@@ -459,6 +520,8 @@ class WalkAndReport(unittest.TestCase):
                 cls.status_before = jrun("status", "--study", d / "study.json")
                 cls.finished = jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
                 cls.no_reasons = eyes("feedback", "--session", s, payload={k: v for k, v in FEEDBACK.items() if k != "reasons"})
+                cls.bad_words = eyes("feedback", "--session", s, payload=dict(FEEDBACK, reaction_words=["Nice", "Clean", "Slow"]))
+                cls.few_words = eyes("feedback", "--session", s, payload=dict(FEEDBACK, reaction_words=["Clean"]))
                 cls.saved = jrun("feedback", "--session", s, payload=FEEDBACK)
             else:
                 jrun("act", "--session", s, payload={"decision": DEC, "action": finish})
@@ -482,6 +545,17 @@ class WalkAndReport(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertIn("reasons needs a sentence", out)
         self.assertTrue(self.saved["saved"].endswith("feedback.json"))
+        # Reaction words come from the brief's list, 3 to 5 of them, and are saved spelled as listed, with their tone.
+        rc, out = self.bad_words
+        self.assertNotEqual(rc, 0)
+        self.assertIn("Nice is not on it", out)
+        rc, out = self.few_words
+        self.assertNotEqual(rc, 0)
+        self.assertIn("3 to 5 different words", out)
+        fb = json.loads(Path(self.saved["saved"]).read_text(encoding="utf-8"))
+        self.assertEqual(fb["reaction_words"], ["Confusing", "Slow", "Clean"])
+        self.assertEqual(fb["reaction_tones"]["Clean"], "positive")
+        self.assertIn("Untrustworthy", (Path(self.saved["saved"]).parent / "brief.md").read_text(encoding="utf-8"))
 
     def test_fill_is_one_step(self):
         self.assertTrue(self.fill.get("ok"), self.fill)
@@ -540,17 +614,46 @@ class WalkAndReport(unittest.TestCase):
                     "personas": [], "description": "d", "conflict": ["a", "b"], "recommendation": "r", "evidence": ev, **kw}
         one = lambda step, box: {"session": "desk", "step": step, "box": box}
         findings = [
-            f("F1", [one(2, [10, 10, 100, 40])], category="button", personas=["desk"]),
+            f("F1", [one(2, [10, 10, 100, 40])], category="button", personas=["desk"],
+              impact="blocks", persistence="repeats", fix_effort="small", gulf="evaluation", heuristics=["H1"], wcag=["2.5.8"]),
             f("F2", [one(1, [10, 10, 100, 40]), one(1, [10, 300, 100, 40])]),   # one screen, two places: kept
             f("F3", [one(1, [10, 10, 100, 40]), one(1, [20, 15, 100, 40])]),    # same place twice: removed
             f("F4", [one(9, [10, 10, 100, 40])], category="button"),            # no such step: removed
+            f("F5", [one(2, [10, 10, 100, 40])], category="button", impact="catastrophic"),  # not an impact: removed
+            f("F6", [one(2, [10, 10, 100, 40])], category="button", heuristics=["H11"], gulf="sideways"),  # removed
         ]
         (d / "findings.json").write_text(json.dumps(findings), encoding="utf-8")
-        (d / "insights.json").write_text(json.dumps({"research_questions": [], "simulation_notes": []}), encoding="utf-8")
+        sess = {p: next(d.glob(f"sessions/{p}*")).name for p in ("desk", "phone")}
+        (d / "beliefs.json").write_text(json.dumps([
+            {"id": "K1", "fact": "The offer ends Friday", "page": "/offers",
+             "personas": {sess["desk"]: {"belief": "wrong", "step": 1, "held": "t"},        # 't' is DEC's thought
+                          sess["phone"]: {"belief": "correct", "step": 99}}},               # no such step: dropped
+            {"id": "K2", "fact": "Delivery is free", "personas": {sess["desk"]: {"belief": "wrong", "step": 1}}},  # no 'held'
+        ]), encoding="utf-8")
+        (d / "insights.json").write_text(json.dumps({"research_questions": [
+            {"question": "Do people see the offer button?", "method": "first-click test", "task": "Claim this week's offer",
+             "recruit": "Bargain hunters on phones", "measure": "How many click the offer button first", "findings": ["F1", "F9"]},
+            "Would people trust the offer?",
+        ], "simulation_notes": []}), encoding="utf-8")
         rc, out = report("verify", "--study-dir", d)
         self.assertEqual(rc, 0, out)
+        notes = json.loads(out)["research_plan_notes"]
+        self.assertIn("Q1: findings F9 aren't among the verified findings", notes)
+        self.assertTrue(any(n.startswith("Q2: no method, task, measure") for n in notes), notes)
         v = json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["id"] for x in v["kept"]), ["F1", "F2"])
+        self.assertIn("impact must be one of", next(r for r in v["removed"] if r["id"] == "F5")["reasons"][0])
+        f6 = " ".join(next(r for r in v["removed"] if r["id"] == "F6")["reasons"])
+        self.assertIn("gulf must be one of", f6)
+        self.assertIn("heuristics must be a list of H1 to H10", f6)
+        f2 = next(x for x in v["kept"] if x["id"] == "F2")
+        self.assertTrue(any("severity can't be broken" in n for n in f2["verification_notes"]))
+        # Beliefs: the step that exists is kept and checked against the record; the bad ones are dropped and listed.
+        self.assertEqual([k["id"] for k in v["beliefs"]["kept"]], ["K1"])
+        k1 = v["beliefs"]["kept"][0]["personas"]
+        self.assertEqual(list(k1), [sess["desk"]])
+        self.assertTrue(k1[sess["desk"]]["held_in_record"])
+        self.assertEqual({r["id"] for r in v["beliefs"]["removed"]}, {"K1", "K2"})
         f1 = next(x for x in v["kept"] if x["id"] == "F1")
         self.assertEqual((f1["exposure"]["walks_reached"], f1["exposure"]["walks_hit"]), (2, 1))
         self.assertEqual({r["persona"] for r in v["rewalk"]}, {"desk"})
@@ -560,6 +663,60 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("walks that reached the page", (d / "issues" / "F1.md").read_text(encoding="utf-8"))
         html = (d / "report.html").read_text(encoding="utf-8")
         self.assertIn("finding F1", html)
+        # Who hit what: F1's row has desk as hit and phone as reached-but-past, from verify's exposure.
+        row = re.search(r"<tr><td><a href='#finding-F1'>.*?</tr>", html, re.S).group(0)
+        self.assertEqual(re.findall(r"class='rg (hit|past|none)'", row), ["hit", "past"])
+        self.assertIn("1 of 2", row)
+        # One experience curve per walk, with F1 pinned to the step its evidence sits on.
+        self.assertEqual(html.count("<div class='xc'>"), 2)
+        self.assertRegex(html, r"class='mlabel'[^>]*>F1 F2|class='mlabel'[^>]*>F1<")
+        nav = json.loads((d / "navigation.json").read_text(encoding="utf-8"))
+        self.assertEqual({v["success"]["level"] for v in nav.values()}, {"failure"})
+        md = (d / "report.md").read_text(encoding="utf-8")
+        self.assertIn("Who hit what", md)
+        # Severity parts on the finding, F1 top left of the matrix, the beliefs grid, the say-do rows.
+        self.assertIn("frequency 1 of 2 walks · impact: blocks · gets in the way every time · fix effort small", html)
+        self.assertRegex(html, r"<div class='pm-c hot'><a class='chip' href='#finding-F1'")
+        self.assertIn("No fix effort given", html)
+        self.assertIn("id='beliefs'", html)
+        self.assertRegex(html, r"believed “t” \(step 1\); the site says The offer ends Friday")
+        self.assertIn("believed \"t\" (step 1)", md)
+        self.assertEqual(html.count("<div class='sd-who'>"), 2)
+        ticket = (d / "issues" / "F1.md").read_text(encoding="utf-8")
+        self.assertIn("**Severity in parts:** frequency 1 of 2", ticket)
+        # Context pictures: F2's two boxes on one step share one numbered whole screen; F1 has a filmstrip.
+        f2 = next(x for x in v["kept"] if x["id"] == "F2")
+        self.assertEqual([(s["step"], s["marks"]) for s in f2["screens"]], [(1, [1, 2])])
+        self.assertEqual(f1["filmstrip"]["focus"], 2)
+        self.assertEqual(f1["filmstrip"]["steps"][:2], [1, 2])
+        self.assertTrue((d / f1["filmstrip"]["image"]).exists())
+        self.assertIn("class='strip'", html)
+        self.assertIn("F1 filmstrip", ticket)
+        # First impressions and expectations, from the scripted walks.
+        self.assertIn("id='first'", html)
+        self.assertIn("an offers page", html)
+        flows = json.loads((d / "flows.json").read_text(encoding="utf-8"))
+        self.assertEqual(next(r for r in flows["scent"] if r["page"] == "/offers")["yes"], 2)
+        # Heuristic scorecard, gulfs, reaction words and the WCAG list.
+        self.assertRegex(html, r"<td>H1 Visibility of system status</td><td class='hc'><a class='chip' href='#finding-F1'")
+        self.assertIn("Breaks H1 Visibility of system status · may fail WCAG 2.5.8 Target Size (Minimum) · gulf: telling what happened", html)
+        self.assertIn("2.5.8</b> Target Size (Minimum)", html)
+        self.assertIn("class='rwg'", html)
+        self.assertIn("<span>Confusing</span>", html)
+        self.assertIn("**Tags:** breaks H1", ticket)
+        self.assertIn("gulfs", flows)
+        # Segments: desk and phone split by device, as dots and counts.
+        dev = next(x for x in flows["segments"] if x["dimension"] == "Device")
+        self.assertEqual(sorted(s["name"] for s in dev["segments"]), ["Desktop", "Mobile"])
+        self.assertIn("<table class='sg'>", html)
+        self.assertIn("1 of 1", html)
+        # The test plan in the report and in the export.
+        self.assertIn("A plan for testing with real users", html)
+        self.assertIn("<dt>Method</dt><dd>first-click test</dd>", html)
+        rq = (d / "issues" / "research-questions.md").read_text(encoding="utf-8")
+        self.assertIn("## Q1. Do people see the offer button?", rq)
+        self.assertIn("- **Recruit:** Bargain hunters on phones", rq)
+        self.assertIn("## Q2. Would people trust the offer?", rq)
 
         # The same panel on "another site": a copy of this study in which nobody hit F2, with F1 found on a
         # different page of the same stage under a different wording.
@@ -577,6 +734,79 @@ class WalkAndReport(unittest.TestCase):
         rc, out = report("compare", "--study-dir", d, "--baseline", other)
         self.assertEqual(rc, 0, out)
         self.assertEqual(json.loads(out)["new"], 1)
+
+
+class SuccessLevels(unittest.TestCase):
+    """Direct and indirect success, and Smith's lostness, on paths worked out by hand."""
+
+    def test_levels_and_lostness(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        walk = lambda outcome, pages, back: {"outcome": outcome, "path": [{"page": p} for p in pages], "backtracks": [1] * back}
+        nav = {"straight": walk("reached_goal", ["/", "/join"], 0),
+               "wander": walk("reached_goal", ["/", "/plans", "/", "/join"], 1),
+               "quit": walk("gave_up", ["/", "/plans"], 0),
+               "capped": walk("step_cap", ["/"], 0)}
+        summary = mod.success_levels({}, nav)
+        self.assertEqual(summary["levels"], {"direct_success": 1, "indirect_success": 1, "partial": 0, "failure": 1, "not_scored": 1})
+        self.assertEqual((nav["straight"]["success"]["lostness"], nav["straight"]["success"]["lost"]), (0.0, "not lost"))
+        # S=4 visits, N=3 pages, R=2 (the straight walk): sqrt((3/4-1)^2 + (2/3-1)^2) = 0.42
+        self.assertEqual((nav["wander"]["success"]["lostness"], nav["wander"]["success"]["lost"]), (0.42, "borderline"))
+        self.assertIsNone(nav["quit"]["success"]["lostness"])   # never reached the goal: no lostness
+        mod.success_levels({"optimal_path_pages": 3}, nav)
+        self.assertEqual(nav["straight"]["success"]["fewest_pages"], 3)
+
+        # Say-do: a walk that failed but was rated easy, one that succeeded but was rated hard, an honest one,
+        # and one the test ended, which gets no flag either way.
+        rate = lambda s, ease, agree: {"session": s, "ease": ease, "meets_needs": agree, "easy_to_use": agree}
+        rows = {r["session"]: r for r in mod.say_do([rate("quit", 6, 6), rate("straight", 2, 2), rate("wander", 5, 5),
+                                                      rate("capped", 7, 7)], nav)}
+        self.assertEqual(rows["quit"]["gap"], "rated it easy but didn't get what they came for")
+        self.assertEqual(rows["straight"]["gap"], "got there but rated it hard")
+        self.assertIsNone(rows["wander"]["gap"])
+        self.assertIsNone(rows["capped"]["gap"])
+        self.assertEqual(rows["quit"]["umux_lite"], 83)
+
+    def test_every_friction_type_has_a_gulf(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod3", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        src = EYES.read_text(encoding="utf-8")
+        block = src[src.index("FRICTION_TYPES = {"):]
+        types = set(re.findall(r'"([a-z_]+)"', block[:block.index("}")]))
+        self.assertGreater(len(types), 15)
+        self.assertEqual(types - set(mod.GULF_OF_FRICTION), set())
+
+    def test_first_clicks_and_scent(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("report_mod2", REPORT)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        study = {"goal_match": "/join", "stages": [{"id": "home", "match": "^/$"}, {"id": "plans", "match": "/plans"}]}
+        u = lambda p: "http://shop.test" + p
+        step = lambda n, page, dec, action, result: {"step": n, "address_bar": u(page), "decision": dict(dec), "action": action, "result": result}
+        click = {"type": "click", "x": 1, "y": 1}
+        steps = [
+            step(1, "/", {"expects": "see plans", "first_impression": {"what_is_this": "a shop", "first_move": "plans"}}, click,
+                 {"address_after": u("/plans")}),
+            step(2, "/plans", {"as_expected": "no", "expects": "price detail", "thought": "that wasn't plans"}, click,
+                 {"no_visible_response": True}),
+            step(3, "/plans", {"as_expected": "no", "expects": "sign up"}, click, {"address_after": u("/join")}),
+            step(4, "/join", {"as_expected": "yes"}, {"type": "finish"}, {}),
+        ]
+        data = {"w": {"journey": {"steps": steps}}}
+        nav = {"w": {}}
+        out = mod.first_clicks_and_scent(study, data, nav)
+        self.assertEqual([(c["page"], c["grade"]) for c in nav["w"]["first_clicks"]], [("/", "toward"), ("/plans", "nothing")])
+        self.assertEqual(nav["w"]["first_impression"]["what_is_this"], "a shop")
+        scent = {r["page"]: r for r in out["scent"]}
+        self.assertEqual((scent["/"]["presses"], scent["/"]["no"]), (1, 1))
+        self.assertEqual((scent["/plans"]["presses"], scent["/plans"]["no"], scent["/plans"]["yes"]), (2, 1, 1))
+        self.assertEqual(scent["/"]["misses"][0]["next_thought"], "that wasn't plans")
+        self.assertEqual(out["scent"][0]["page"], "/")   # worst first: 1 of 1 missed beats 1 of 2
 
 
 if __name__ == "__main__":

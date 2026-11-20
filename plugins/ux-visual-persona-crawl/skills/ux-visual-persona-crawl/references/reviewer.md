@@ -8,8 +8,11 @@ Study folder: `[STUDY_DIR]`. Driver: `[DRIVER]` (for `measure` and `zoom` only).
 
 - `study.json` and `facts.md`: what the site visibly offers and claims. `facts.md` was written from the screen; don't add to it from the page source.
 - `personas.json`: who each person is, including what they lacked.
-- `flows.json`: pages ranked by bottleneck score, with the parts of each score, and the funnel. `navigation.json`: every persona's path, backtracks and dead clicks.
+- `flows.json`: pages ranked by bottleneck score, with the parts of each score, and the funnel. `navigation.json`: every persona's path, backtracks and dead clicks, and under `success` the walk's grade (`direct_success`, `indirect_success`, `partial`, `failure`, `not_scored`) and, for walks that reached the goal, lostness (over 0.5 means the persona was going round in circles). An indirect success or a high lostness is a reached goal that still cost the person something: look at the backtrack for its cause.
 - `sessions/<id>/journey.json`: each step's screenshot, what the persona thought, read and reported, the action and its result. `feedback.json` beside it is their exit interview.
+- First impressions and expectations. Each walk's step 1 has `first_impression` (what the persona took the site to be, and their first move); compare it with what the site is for. `flows.json` → `first_clicks` grades the first press on each page by where it led, and `scent` counts, per page, presses that did or didn't do what the persona said they `expects`ed (the next step's `as_expected`), with each miss quoted. A control that keeps doing something other than what people expected is a `button` or `copy` finding: its label or look promises the wrong thing. Cite the press's step, with a box around the control.
+- `flows.json` → `gulfs`: the personas' friction notes by journey stage, split into working out what to do, telling what happened, and understanding the content. A stage heavy in one column points at the kind of fix it needs.
+- `feedback.json` → `summary.reaction_words`: the 3 to 5 words each persona picked from a fixed list. A word most of the panel picked (say *Misleading*) is a theme to check against the findings.
 - `hot_steps.json`: the steps where something went wrong for a persona (dead clicks, low clarity or trust, sharp drops, high-severity friction, backtracks, the steps before an exit), each with the reasons and an excerpt of the persona's thought. It also lists each session's contact sheets.
 - `sessions/<id>/contact-N.jpg`: every step of a walk as a numbered thumbnail, with clicks circled and hot steps outlined in red. Start each session here: one image shows the whole walk.
 - `sessions/<id>/shots/step-NNN.png`: the full screens. Open them for the hot steps, for anything a contact sheet makes you curious about, and for every step you cite as evidence, since boxes must be placed on the full screenshot. There's no need to open every step. Judge layout, hierarchy and visibility from the pixels, the way the personas did. Don't open the site, fetch its pages or read its source: the findings must be about what is on screen.
@@ -62,7 +65,13 @@ One root cause is one finding, even if several personas hit it. List every perso
       {"session": "retired-teacher-mobile", "step": 5, "box": [140, 190, 160, 50]}
     ],
     "recommendation": "A specific change, not 'improve clarity'.",
-    "confidence": "high"
+    "confidence": "high",
+    "impact": "misleads",
+    "persistence": "repeats",
+    "fix_effort": "small",
+    "gulf": "content",
+    "heuristics": ["H4"],
+    "wcag": []
   }
 ]
 ```
@@ -73,6 +82,10 @@ One root cause is one finding, even if several personas hit it. List every perso
 - `bottleneck` needs `page` to be a page from `flows.json`.
 - `quote`, if given, should be words a persona recorded at that step. Verify marks quotes it can't find in the record as read from the screenshot by you.
 - `severity`: `critical` (blocks people or misleads them on something consequential), `high` (likely to lose people), `medium` (slows or worries people), `low` (polish).
+- Severity weighs three things (Nielsen): how often people hit it, how badly, and whether it keeps getting in the way. `verify` computes how often from the walks. State the other two so the rating can be traced: `impact` is `blocks`, `misleads`, `slows` or `annoys`; `persistence` is `once` (people get past it after one encounter) or `repeats` (it gets in the way every time, or on every visit). Add `fix_effort`: `small` (copy, style or a setting), `medium` (one component or page), `large` (a flow, the back end or several teams). The report places each finding on a severity × fix-effort matrix, so judge effort from what the recommendation asks for. A finding without these is kept, with a note.
+- `gulf`, where the problem sits in Norman's cycle of action: `execution` (people can't work out what to do or how: the control is hidden, unclear or too small), `evaluation` (they can't tell what happened or whether it worked: no feedback, a vague error, a slow response), or `content` (they can't see or understand what the site says: copy, prices, conditions, legibility). Pick the one the fix would address.
+- `heuristics`: which of Nielsen's ten the finding breaks, as `H1` to `H10`: H1 visibility of system status, H2 match between system and the real world, H3 user control and freedom, H4 consistency and standards, H5 error prevention, H6 recognition rather than recall, H7 flexibility and efficiency of use, H8 aesthetic and minimalist design, H9 help users recognise, diagnose and recover from errors, H10 help and documentation. Usually one, at most three. The report's scorecard shows them by journey stage, so a heuristic broken on every stage stands out as a habit of the site.
+- `wcag`: WCAG 2.2 success criteria the finding may fail, as numbers (`"1.4.3"`, `"2.5.8"`, `"3.3.1"`), or `[]`. Tag only what the screen shows; screen-reader and keyboard behaviour weren't tested, so these are leads for an audit. A `contrast` finding gets 1.4.3 or 1.4.11 added from its `contrast_target` if you leave it out.
 
 `insights.json`:
 
@@ -81,9 +94,51 @@ One root cause is one finding, even if several personas hit it. List every perso
   "headline": "One sentence on the most important thing learned.",
   "insights": ["Patterns across personas, including who is most affected and how that relates to their demographics."],
   "what_works": ["Things that helped, with the reason."],
-  "research_questions": ["What to ask or watch real users do to confirm the top findings."],
+  "research_questions": [
+    {
+      "question": "Do people who see the plans list and then the plan page know what they'd pay each month?",
+      "method": "unmoderated usability test",
+      "task": "Choose the cheapest plan for a two-bedroom flat and say what you'd pay each month and to leave early.",
+      "recruit": "People switching supplier in the next three months, half on phones",
+      "measure": "How many state the right monthly price and exit fee; how many continue to sign-up",
+      "findings": ["F1", "F2"]
+    }
+  ],
   "simulation_notes": ["Things that went wrong with the test, not the site."]
 }
 ```
+
+`beliefs.json`: what each walk came away believing about the site's key facts. Take 3 to 8 facts from `facts.md` that matter to the task (prices, fees, conditions, requirements, promises), then, for every session, read its `memory`, `doubts` and `thought` and record what that persona ended up believing:
+
+```json
+[
+  {
+    "id": "K1",
+    "fact": "Green Saver prices exclude an $8 monthly service charge",
+    "page": "/plans",
+    "personas": {
+      "retired-teacher-mobile": {"belief": "wrong", "step": 2, "held": "Green Saver $49/mo"},
+      "new-mover-desktop": {"belief": "correct", "step": 3},
+      "student-phone": {"belief": "unsure", "step": 4, "held": "not sure if $49 or $57"},
+      "budget-dad-desktop": {"belief": "not_seen"}
+    }
+  }
+]
+```
+
+- `fact` is what the site states, in `facts.md`'s words. Where the site contradicts itself, write the fact as the version the customer is held to (the plan page, the terms) and say so in a contradiction finding.
+- `belief`: `correct`, `wrong` (came away believing something else), `unsure` (saw it and doubted it), `not_seen` (never reached it). Every one but `not_seen` cites the `step` where the belief shows, the last such step if it changed. A `wrong` one needs `held`: what they believed, in their own words where the record has them. `verify` notes whether `held` appears in that step's record.
+- Use the session ids under `sessions/` as keys, so a re-walk (`<id>-2`) gets its own entry.
+- A `wrong` belief about something consequential is usually also a finding. Write it as both.
+
+Write each research question as a study someone could run next week, for the top findings and for anything the simulation couldn't settle (screen readers, real timing, whether people would actually pay):
+
+- `method`: one of `moderated usability test`, `unmoderated usability test`, `first-click test`, `five-second test`, `tree test`, `card sort`, `survey`, `interview`, `A/B test`, `analytics review`, `accessibility audit`. Choose the cheapest one that answers it: a first-click test for "do people find the button", a moderated test for "do they understand the fee".
+- `task`: what participants are asked to do, in the customer's words, without naming the control under test.
+- `recruit`: who to test with, from the personas whose walks showed the problem.
+- `measure`: the observable result that would answer the question.
+- `findings`: the finding IDs it tests.
+
+`verify` notes any question missing a method, task or measure, or naming a finding that wasn't kept. `export` writes the plan to `issues/research-questions.md`.
 
 Then run `[VENV_PYTHON] "[REPORT]" verify --study-dir "[STUDY_DIR]"` and fix any finding it removed for a wrong step or box by checking the recording again. Prefer a few well-supported findings to a long list. Don't turn persona counts into percentages or forecasts: "3 of 5 personas" says what to check next, not how many customers would leave.

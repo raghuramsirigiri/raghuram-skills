@@ -10,7 +10,7 @@ If the user tracks work in an issue tracker or a spreadsheet:
 <venv-python> <skill>/scripts/report.py export --study-dir <study-dir>
 ```
 
-It writes one Markdown ticket per verified finding to `issues/`, `findings.csv`, and `issues/research-questions.md`. Each ticket carries its evidence crops, the fix, how many walks hit the problem, and the simulated-study caveat.
+It writes one Markdown ticket per verified finding to `issues/`, `findings.csv`, and `issues/research-questions.md`, a test plan for real users with each study's method, task, recruit and measure. Each ticket carries its evidence crops, the fix, how many walks hit the problem, and the simulated-study caveat.
 
 ## Walking a persona again
 

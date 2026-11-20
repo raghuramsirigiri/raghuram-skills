@@ -8,7 +8,7 @@ The people asking are usually **the designer or product owner of the page**, who
 
 ## Handles and the closing line
 
-`F1, F2 …` findings, in severity order · `B1, B2 …` pages ranked by bottleneck score in `flows.json` · `<persona-id>:M1 …` contrast and size measurements · persona ids for sessions · `step N` for a moment in a session.
+`F1, F2 …` findings, in severity order · `B1, B2 …` pages ranked by bottleneck score in `flows.json` · `<persona-id>:M1 …` contrast and size measurements · `K1, K2 …` key facts in `beliefs.json`, with what each walk came away believing · persona ids for sessions · `step N` for a moment in a session.
 
 When the run has at least one verified finding, the summary to the user ends with exactly this line, and nothing follows it. With no findings (the run was stopped, or nothing held up), leave it out: it would offer evidence that doesn't exist.
 
@@ -62,7 +62,8 @@ If the two figures were different things labelled clearly (say, before and after
 | They ask | Answer with |
 |---|---|
 | **"Show me F1."** | The full block, crops first, since that is what they'll look at. |
-| **"How do you know a real person would struggle here?"** | We don't. Say so plainly. Show what the simulated person saw (the crop), what they did (the steps), and what doesn't depend on the persona at all: the measured ratio, the dead click (nothing on screen changed), the two contradicting screens. Separate the parts that are fact about the page from the parts that are a simulated reaction. Then give the research question in `insights.json` that would test it with real users. |
+| **"How do you know a real person would struggle here?"** | We don't. Say so plainly. Show what the simulated person saw (the crop), what they did (the steps), and what doesn't depend on the persona at all: the measured ratio, the dead click (nothing on screen changed), the two contradicting screens. Separate the parts that are fact about the page from the parts that are a simulated reaction. Then give the research question in `insights.json` that would test it with real users: its method, task, who to recruit and what result would settle it. |
+| **"Is this only a problem for older people?"** | The segment tables in `flows.json` (`segments`): how far each group got, as counts. Then the walks themselves, since groups of one or two show who to watch in real testing, not a difference between groups. |
 | **"It looks fine on my screen."** | The measurement: the hex colours, the ratio, the target. Pixels were read from the rendered screenshot at the persona's device and zoom, which may differ from theirs. If their claim is about a different size or state, measure that state if it's in the recording; if not, say it wasn't captured. |
 | **"What's our drop-off rate at sign-up?"** / "How many customers will we lose?" | Refuse the number. These were N simulated personas, and "3 of 5 stopped" says where to look, not a rate. Give the counts, the pages they stopped on and why, and say what data would answer the question (analytics funnel, a real usability test). Never convert to a percentage or forecast. |
 | **"Why did Margaret give up?"** | Only her recorded words: the `thought` and `reason` at her last steps, and the `gives_up_when` condition it matches in her profile. `ended_by` in her `journey.json` says whether she chose to stop, a condition was met, or her patience ran out; for patience, quote the last steps' `patience.why`. Don't add a motive she didn't record. |
@@ -73,6 +74,13 @@ If the two figures were different things labelled clearly (say, before and after
 | **"Where do the demographics come from?"** | The persona's `source` field: illustrative, or built from the user's data (name it). They describe who the panel stands in for. They are not survey respondents. |
 | **"Did it read our code or alt text?"** | No. The persona and the driver work from screenshots and the address bar only. A finding can't come from markup, so something present only in the code (an aria-label, hidden text) is outside what this study saw. |
 | **"Why isn't X in the report?"** | Whether any persona reached that screen (`navigation.json`). If none did, it wasn't tested; say so. If one did and it held up, say what they did there. |
+| **"How do you know she got K1 wrong?"** | The step `beliefs.json` cites for her: that step's screenshot, and her `memory`, `doubts` and `thought` there, quoted. Then the fact as `facts.md` records it, with its page. If `held_in_record` is false, the reviewer paraphrased her; say so, and show her actual words. A belief the record doesn't support is retracted in the first line. |
+| **"Why is F3 critical if only one persona hit it?"** | Its severity parts: frequency from `exposure`, then the reviewer's `impact` and `persistence`. Frequency is one of three; a problem that misleads people about money is serious even when one walk met it, and the `rewalk` list is how to tell a pattern from a fluke. |
+| **"They all said it was easy."** | The say–do rows in `feedback.json` (`summary.say_do`): each persona's ratings beside how their walk ended. Where they disagree, the recording wins: show the steps. |
+| **"Why do you say this link misleads people?"** | The presses on it from `navigation.json` → `expectations`: what each persona wrote in `expects` before pressing, what happened (`got`), and their `as_expected` on the next screen, with that screen's `thought`. Show the control's crop. The expectation and the verdict are the persona's own; where the press went is fact. |
+| **"Does this mean we fail WCAG?"** | No, not on this evidence. The `wcag` tags are criteria a finding *may* fail, judged from screenshots. Contrast tags rest on a measurement (give it); the rest are leads for an audit with assistive technology. Name what wasn't tested: screen readers, keyboard focus order, the markup. |
+| **"Why is F4 tagged H5?"** | The heuristic's name and what on screen breaks it, at the cited step. If another heuristic fits better, say so and retag; a tag is the reviewer's judgement, not a measurement. |
+| **"Everyone picked *Misleading*. Why?"** | The personas who picked it (`summary.reaction_words` in `feedback.json`), each one's `worst_thing` and `reasons`, and the findings their walks hit. A word is their summary, not evidence on its own. |
 | **"Can you fix it?"** | Not in a trace. Give the finding's recommendation and stop. |
 
 ## Rules

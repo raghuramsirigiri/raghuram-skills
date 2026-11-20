@@ -61,6 +61,11 @@ def page_of(url: str) -> str:
     return (p.path.rstrip("/") or "/") + (("?" + p.query) if p.query else "")
 
 
+def path_of(page: str) -> str:
+    """A page key without its query string."""
+    return page.split("?", 1)[0]
+
+
 def norm(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip().lower()
 
@@ -103,16 +108,23 @@ def analyze(study_dir: Path) -> dict:
         j = s["journey"]
         steps = j.get("steps", [])
         path, seen, backtracks, dead = [], [], [], []
+        prev_action = None
         for st in steps:
             page = page_of(st["address_bar"])
             PAGE_URLS.setdefault(page, st["address_bar"])
             d, a, r = st["decision"], st["action"], st["result"]
             if not path or path[-1]["page"] != page:
-                if page in seen and path:
-                    backtracks.append({"step": st["step"], "returned_to": page, "from": path[-1]["page"], "via": a["type"]})
+                # The same rule as the driver's patience: Back, or arriving at a path already left for another.
+                # A change of query string on one path (a dialog, a filter, a tab) is not going back.
+                same_path = bool(path) and path_of(path[-1]["page"]) == path_of(page)
+                returned = path_of(page) in {path_of(x) for x in seen} and not same_path
+                if path and (returned or (prev_action or {}).get("type") == "back"):
+                    backtracks.append({"step": st["step"], "returned_to": page, "from": path[-1]["page"],
+                                       "via": (prev_action or {}).get("type")})
                 path.append({"page": page, "first_step": st["step"], "steps": 0})
                 seen.append(page)
             path[-1]["steps"] += 1
+            prev_action = a
             ps = page_stats[page]
             page_personas[page].add(name)
             ps["steps"] += 1
@@ -155,8 +167,16 @@ def analyze(study_dir: Path) -> dict:
                        "action": st["action"], "address_after": st["result"].get("address_after"),
                        "screen_changed": st["result"].get("screen_changed"), "blocked": st["result"].get("blocked"),
                        "clarity": st["decision"]["clarity"], "trust": st["decision"]["trust"],
-                       "effort": st["decision"]["effort"], "emotion": st["decision"].get("emotion", "")} for st in steps],
+                       "effort": st["decision"]["effort"], "emotion": st["decision"].get("emotion", ""),
+                       "dead_click": st["action"]["type"] in CLICKS and bool(st["result"].get("no_visible_response"))
+                       and not st["result"].get("on_blank_space"),
+                       "worst_friction": min((f.get("severity") for f in st["decision"].get("friction", []) if f.get("severity") in SEV_ORDER),
+                                             key=SEV_ORDER.index, default=None),
+                       "stage": stage_of(study, page_of(st["address_bar"]))} for st in steps],
         }
+
+    success = success_levels(study, navigation)
+    scent = first_clicks_and_scent(study, data, navigation)
 
     pages = []
     for page, ps in page_stats.items():
@@ -186,10 +206,12 @@ def analyze(study_dir: Path) -> dict:
         funnel.append({"stage": stage["id"], "label": stage.get("label", stage["id"]), "reached": len(reached),
                        "of": len(navigation), "personas": reached})
 
-    flows = {"study": study.get("id"), "personas": len(navigation), "pages": pages, "funnel": funnel,
+    flows = {"study": study.get("id"), "personas": len(navigation), "pages": pages, "funnel": funnel, "success": success, **scent,
+             "gulfs": gulf_rows(study, data),
              "score_formula": "steps_per_visitor + 2*dead_clicks + 1.5*backtracked_from + 3*exits_short_of_goal + friction_weight/visitors (critical 4, high 3, medium 2, low 1)"}
 
     by_id = {p["id"]: p for p in people}
+    flows["segments"] = segments(study, navigation, by_id, funnel)
     demo_rows = []
     for name, v in navigation.items():
         p = by_id.get(v["persona"]["id"], {})
@@ -207,6 +229,8 @@ def analyze(study_dir: Path) -> dict:
             "satisfaction_avg_1_5": round(sum(f["satisfaction"] for f in fb_rows) / len(fb_rows), 1),
             "recommend_counts": {"9-10": sum(r >= 9 for r in rec), "7-8": sum(7 <= r <= 8 for r in rec), "0-6": sum(r <= 6 for r in rec)},
             "missing": [n for n in navigation if not data[n]["feedback"]],
+            "say_do": say_do(fb_rows, navigation),
+            "reaction_words": reaction_counts(fb_rows),
         }
     hot = hot_steps(data)
     sheets = {}
@@ -228,6 +252,296 @@ def analyze(study_dir: Path) -> dict:
                       "top_bottlenecks": [(p["handle"], p["page"], p["bottleneck_score"]) for p in pages[:3]],
                       "feedback_missing": summary.get("missing", list(navigation))}, ensure_ascii=False))
     return flows
+
+
+SUCCESS_LEVELS = {
+    "direct_success": "Direct success",      # reached the goal page without going back on itself
+    "indirect_success": "Indirect success",  # reached it after backtracking
+    "partial": "Stopped short",              # chose to stop with a next step in mind: saved, would call, stopped at a form
+    "failure": "Failure",                    # gave up or left
+    "not_scored": "Not scored",              # the test, not the person, ended it, or the goal claim couldn't be checked
+}
+LOST_BELOW, LOST_ABOVE = 0.4, 0.5  # Smith (1996): under 0.4 shows no sign of being lost, over 0.5 does
+
+
+def success_levels(study: dict, navigation: dict) -> dict:
+    """Task success the way tree-testing tools grade it (direct or indirect), and Smith's (1996) lostness,
+    L = sqrt((N/S - 1)^2 + (R/N - 1)^2): S page visits, N different pages, R the fewest pages the task needs.
+    R is study.json's optimal_path_pages when given, else the fewest pages any walk from the same start page
+    needed to reach the goal. Lostness is computed only for walks that reached the goal: for one that stopped
+    early, R describes a path it never finished, so the number would mean nothing. Writes each walk's result
+    into navigation[name]['success'] and returns the panel summary."""
+    def level(v):
+        o = v["outcome"]
+        if o == "reached_goal":
+            return "indirect_success" if v["backtracks"] else "direct_success"
+        if o in ("reached_boundary", "saved_for_later", "would_call_or_visit"):
+            return "partial"
+        if o in ("gave_up", "left_site"):
+            return "failure"
+        return "not_scored"
+
+    fixed = study.get("optimal_path_pages")
+    shortest = {}
+    for v in navigation.values():
+        if v["outcome"] == "reached_goal" and v["path"]:
+            start, n_pages = v["path"][0]["page"], len({p["page"] for p in v["path"]})
+            shortest[start] = min(shortest.get(start, n_pages), n_pages)
+    counts = {k: 0 for k in SUCCESS_LEVELS}
+    for v in navigation.values():
+        s_visits = len(v["path"])
+        n_unique = len({p["page"] for p in v["path"]})
+        lv = level(v)
+        counts[lv] += 1
+        r_min = fixed or (shortest.get(v["path"][0]["page"]) if v["path"] else None)
+        lost = None
+        if lv in ("direct_success", "indirect_success") and r_min and s_visits:
+            lost = round(((n_unique / s_visits - 1) ** 2 + (r_min / n_unique - 1) ** 2) ** 0.5, 2)
+        v["success"] = {"level": lv, "page_visits": s_visits, "different_pages": n_unique, "fewest_pages": r_min,
+                        "lostness": lost,
+                        "lost": None if lost is None else ("lost" if lost > LOST_ABOVE else "not lost" if lost < LOST_BELOW else "borderline")}
+    return {"levels": counts, "fewest_pages_from": "study.json optimal_path_pages" if fixed else "the shortest walk that reached the goal",
+            "lostness_formula": "sqrt((N/S - 1)^2 + (R/N - 1)^2); S page visits, N different pages, R fewest pages needed; "
+                                f"under {LOST_BELOW} not lost, over {LOST_ABOVE} lost (Smith 1996)"}
+
+
+def first_clicks_and_scent(study: dict, data: dict, navigation: dict) -> dict:
+    """Three things the walker states and the recording checks.
+    First impression: what the persona took the site to be, and their first move, from the first screen.
+    First clicks: the first press on each page visited, graded by where it led. 'toward' reached a later journey
+    stage or the goal page; 'away' left for an earlier stage or a page outside the journey; 'stayed' changed the
+    screen without leaving the page (a menu, a tab); 'nothing' changed nothing on screen. Without stages only the
+    goal page can be judged, and the rest is 'unknown'.
+    Expectations: each press's 'expects', and the next screen's 'as_expected' (yes, partly, no). A link that
+    keeps doing something other than what people expected has poor information scent."""
+    order = {s["id"]: i for i, s in enumerate(study.get("stages", []))}
+    goal = study.get("goal_match")
+
+    def rank(url, page):
+        sid = stage_of(study, page) if page else None
+        return order.get(sid) if sid in order else None
+
+    def grade(st, nxt):
+        r = st["result"]
+        if r.get("blocked"):
+            return None
+        if r.get("no_visible_response"):
+            return "nothing"
+        after = r.get("address_after") or (nxt["address_bar"] if nxt else st["address_bar"])
+        page, page_after = page_of(st["address_bar"]), page_of(after)
+        if page_after == page:
+            return "stayed"
+        if goal and re.search(goal, after, re.I):
+            return "toward"
+        a, b = rank(st["address_bar"], page), rank(after, page_after)
+        if b is not None and (a is None or b > a):
+            return "toward"
+        if b is None and not order:
+            return "unknown"
+        return "away"
+
+    per_page = defaultdict(lambda: defaultdict(int))
+    scent = defaultdict(lambda: {"presses": 0, "yes": 0, "partly": 0, "no": 0, "misses": []})
+    for name, s in data.items():
+        steps = s["journey"].get("steps", [])
+        v = navigation[name]
+        fi = (steps[0]["decision"].get("first_impression") if steps else None) or None
+        firsts, seen_pages, prev_page = [], set(), None
+        expectations = []
+        for i, st in enumerate(steps):
+            page = page_of(st["address_bar"])
+            if page != prev_page:
+                waiting, prev_page = True, page
+            a = st["action"]
+            nxt = steps[i + 1] if i + 1 < len(steps) else None
+            if a.get("type") in CLICKS and waiting:
+                waiting = False
+                g = grade(st, nxt)
+                if g:
+                    revisit = page in seen_pages
+                    firsts.append({"step": st["step"], "page": page, "grade": g, "revisit": revisit,
+                                   "led_to": page_of(st["result"].get("address_after") or st["address_bar"])})
+                    if not revisit:
+                        per_page[page][g] += 1
+                seen_pages.add(page)
+            if a.get("type") in CLICKS and st["decision"].get("expects") and not st["result"].get("blocked"):
+                said = (nxt or {}).get("decision", {}).get("as_expected") if nxt else None
+                after = st["result"].get("address_after") or st["address_bar"]
+                got = ("nothing visible happened" if st["result"].get("no_visible_response")
+                       else f"went to {page_of(after)}" if page_of(after) != page else "the same page changed")
+                expectations.append({"step": st["step"], "page": page, "expects": st["decision"]["expects"],
+                                     "as_expected": said, "got": got})
+                if said in ("yes", "partly", "no"):
+                    sc = scent[page]
+                    sc["presses"] += 1
+                    sc[said] += 1
+                    if said != "yes":
+                        sc["misses"].append({"session": name, "step": st["step"], "expects": st["decision"]["expects"],
+                                             "as_expected": said, "got": got,
+                                             "next_thought": str((nxt or {}).get("decision", {}).get("thought", ""))[:240]})
+        v["first_impression"] = fi
+        v["first_clicks"] = firsts
+        v["expectations"] = expectations
+    first_click_pages = sorted(({"page": p, **dict(c), "first_visits": sum(c.values())} for p, c in per_page.items()),
+                               key=lambda r: -r["first_visits"])
+    scent_pages = sorted(({"page": p, **c} for p, c in scent.items() if c["presses"]),
+                         key=lambda r: (-(r["no"] + 0.5 * r["partly"]) / r["presses"], -r["presses"]))
+    return {"first_clicks": first_click_pages, "scent": scent_pages,
+            "first_click_grades": "toward: reached a later journey stage or the goal page; away: an earlier stage or a page "
+                                  "outside the journey; stayed: changed the screen without leaving the page; nothing: no visible change"}
+
+
+# Norman's two gulfs, plus the content itself. Execution: working out what to do and how to do it. Evaluation:
+# telling what happened, and whether it worked. Content: seeing and understanding what the site says, which is
+# neither gulf but is where most money-and-conditions problems sit, so it gets its own column.
+GULFS = {"execution": "Working out what to do", "evaluation": "Telling what happened", "content": "Seeing and understanding the content"}
+GULF_OF_FRICTION = {
+    **{t: "execution" for t in ("button_unclear", "button_hard_to_find", "navigation", "small_target", "dead_end", "form_burden",
+                                "surprise_requirement", "layout_or_overlap", "visual_hierarchy")},
+    **{t: "evaluation" for t in ("no_feedback", "error_handling", "performance")},
+    **{t: "content" for t in ("unclear_copy", "missing_information", "contradiction", "hidden_cost_or_condition", "trust_concern",
+                              "low_contrast", "small_text", "accessibility")},
+}
+HEURISTICS = {
+    "H1": "Visibility of system status", "H2": "Match between system and the real world", "H3": "User control and freedom",
+    "H4": "Consistency and standards", "H5": "Error prevention", "H6": "Recognition rather than recall",
+    "H7": "Flexibility and efficiency of use", "H8": "Aesthetic and minimalist design",
+    "H9": "Help users recognize, diagnose, and recover from errors", "H10": "Help and documentation",
+}
+WCAG_NAMES = {
+    "1.1.1": "Non-text Content", "1.3.1": "Info and Relationships", "1.4.1": "Use of Color", "1.4.3": "Contrast (Minimum)",
+    "1.4.4": "Resize Text", "1.4.10": "Reflow", "1.4.11": "Non-text Contrast", "1.4.12": "Text Spacing",
+    "1.4.13": "Content on Hover or Focus", "2.1.1": "Keyboard", "2.2.2": "Pause, Stop, Hide", "2.4.3": "Focus Order",
+    "2.4.4": "Link Purpose (In Context)", "2.4.6": "Headings and Labels", "2.4.7": "Focus Visible",
+    "2.4.11": "Focus Not Obscured (Minimum)", "2.5.8": "Target Size (Minimum)", "3.2.2": "On Input", "3.2.3": "Consistent Navigation",
+    "3.2.6": "Consistent Help", "3.3.1": "Error Identification", "3.3.2": "Labels or Instructions", "3.3.3": "Error Suggestion",
+    "3.3.7": "Redundant Entry", "3.3.8": "Accessible Authentication (Minimum)",
+}
+
+
+def gulf_rows(study: dict, data: dict) -> list:
+    """Friction notes by journey stage and by gulf, with presses that did nothing beside them."""
+    rows = {}
+    labels = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    for s in data.values():
+        for st in s["journey"].get("steps", []):
+            sid = stage_of(study, page_of(st["address_bar"])) or "other"
+            r = rows.setdefault(sid, {"stage": sid, "label": labels.get(sid, "Other pages"), **{g: 0 for g in GULFS}, "dead_presses": 0})
+            for f in st["decision"].get("friction", []):
+                g = GULF_OF_FRICTION.get(f.get("type"))
+                if g:
+                    r[g] += 1
+            if st["action"].get("type") in CLICKS and st["result"].get("no_visible_response") and not st["result"].get("on_blank_space"):
+                r["dead_presses"] += 1
+    order = [s["id"] for s in study.get("stages", [])] + ["other"]
+    return [rows[k] for k in order if k in rows]
+
+
+RESEARCH_METHODS = ("moderated usability test", "unmoderated usability test", "first-click test", "five-second test", "tree test",
+                    "card sort", "survey", "interview", "A/B test", "analytics review", "accessibility audit")
+
+
+def research_plan(questions) -> list:
+    """Research questions as study plans. Each is a string (the question alone) or an object with question,
+    method, task, recruit, measure and findings; strings are kept so older insights.json files still render."""
+    out = []
+    for q in questions or []:
+        if isinstance(q, str):
+            out.append({"question": q, "findings": []})
+        elif isinstance(q, dict) and q.get("question"):
+            out.append({**q, "findings": [str(x) for x in q.get("findings") or []]})
+    return out
+
+
+def plan_notes(questions, finding_ids: set) -> list:
+    """What verify says about the test plan: questions missing a method or a measure, unknown methods, and
+    findings that don't exist."""
+    notes = []
+    for i, q in enumerate(research_plan(questions), 1):
+        missing = [k for k in ("method", "task", "measure") if not q.get(k)]
+        if missing:
+            notes.append(f"Q{i}: no {', '.join(missing)}, so it reads as a question rather than a study")
+        if q.get("method") and q["method"] not in RESEARCH_METHODS:
+            notes.append(f"Q{i}: method '{q['method']}' isn't one of {', '.join(RESEARCH_METHODS)}")
+        bad = [x for x in q["findings"] if x not in finding_ids]
+        if bad:
+            notes.append(f"Q{i}: findings {', '.join(bad)} aren't among the verified findings")
+    return notes
+
+
+def segments(study: dict, navigation: dict, by_id: dict, funnel: list) -> list:
+    """The funnel and success levels split by kind of customer: device, tech confidence, and access needs.
+    A dimension is kept only when the panel has at least two groups on it. Counts, never rates."""
+    def tech(p):
+        t = (p.get("traits") or {}).get("tech_confidence")
+        return None if t is None else "Low tech confidence (1–2)" if t <= 2 else "Middling (3)" if t == 3 else "High tech confidence (4–5)"
+
+    def access(p, v):
+        d = p.get("demographics") or {}
+        needs = (p.get("browser_zoom") or v["persona"].get("browser_zoom") or 100) > 100 or p.get("vision") or d.get("access_needs")
+        return "With access needs" if needs else "Without"
+
+    dims = [("Device", lambda p, v: (v.get("device") or "desktop").capitalize()),
+            ("Tech confidence", lambda p, v: tech(p)),
+            ("Access needs", access)]
+    out = []
+    for label, key in dims:
+        groups = {}
+        for name, v in navigation.items():
+            g = key(by_id.get(v["persona"].get("id"), {}), v)
+            if g:
+                groups.setdefault(g, []).append(name)
+        if len(groups) < 2:
+            continue
+        segs = []
+        rank = ["Low tech confidence (1–2)", "Middling (3)", "High tech confidence (4–5)", "With access needs", "Without"]
+        for g, names in sorted(groups.items(), key=lambda kv: (rank.index(kv[0]) if kv[0] in rank else 0, kv[0])):
+            levels = defaultdict(int)
+            for n in names:
+                levels[(navigation[n].get("success") or {}).get("level", "not_scored")] += 1
+            segs.append({"name": g, "walks": names, "of": len(names),
+                         "stages": [{"stage": f["stage"], "label": f["label"],
+                                     "reached": sum(f["stage"] in navigation[n]["stages_reached"] for n in names)} for f in funnel],
+                         "reached_goal": sum(navigation[n]["outcome"] == "reached_goal" for n in names),
+                         "levels": dict(levels)})
+        out.append({"dimension": label, "segments": segs})
+    return out
+
+
+def reaction_counts(fb_rows: list) -> list:
+    """How many personas picked each reaction word, with its tone and who picked it, most picked first."""
+    words = {}
+    for f in fb_rows:
+        tones = f.get("reaction_tones") or {}
+        for w in f.get("reaction_words") or []:
+            r = words.setdefault(w, {"word": w, "tone": tones.get(w, ""), "count": 0, "sessions": []})
+            r["count"] += 1
+            r["sessions"].append(f["session"])
+    return sorted(words.values(), key=lambda r: (-r["count"], r["word"].lower()))
+
+
+def say_do(fb_rows: list, navigation: dict) -> list:
+    """What each persona said in the exit interview beside what the recording shows they did. People rate a task
+    they failed as easy, or one they finished as hard, often enough that usability researchers trust behaviour over
+    ratings; a gap here is a reason to read that walk, and says the scores alone would mislead."""
+    out = []
+    for f in fb_rows:
+        v = navigation.get(f["session"])
+        if not v:
+            continue
+        level = (v.get("success") or {}).get("level")
+        umux = round(((f["meets_needs"] - 1) + (f["easy_to_use"] - 1)) / 12 * 100)
+        dead = len(v.get("dead_clicks") or [])
+        gap = None
+        if level in ("failure", "partial") and (f["ease"] >= 5 or umux >= 67):
+            gap = "rated it easy but didn't get what they came for"
+        elif level in ("direct_success", "indirect_success") and (f["ease"] <= 3 or umux <= 33):
+            gap = "got there but rated it hard"
+        elif dead >= 2 and f["ease"] >= 6:
+            gap = f"rated it very easy after {dead} presses that did nothing"
+        out.append({"session": f["session"], "level": level, "outcome": v["outcome"], "ease_1_7": f["ease"], "umux_lite": umux,
+                    "dead_clicks": dead, "backtracks": len(v.get("backtracks") or []), "gap": gap})
+    return out
 
 
 def hot_steps(data: dict) -> dict:
@@ -325,6 +639,73 @@ def contact_sheets(session_dir: Path, steps: list, hot: set, per_sheet: int = 12
 
 # ---------------------------------------------------------------- verify
 
+def _font(size: int):
+    from PIL import ImageFont
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:  # Pillow older than 10.1
+        return ImageFont.load_default()
+
+
+def annotate_screen(src: Path, marks: list, out: Path, width: int = 760):
+    """The whole screen with each evidence box outlined and numbered, so a crop can be seen in its place.
+    marks: [(number, [x, y, w, h])]."""
+    from PIL import Image, ImageDraw
+    im = Image.open(src).convert("RGB")
+    d = ImageDraw.Draw(im)
+    line = max(3, im.width // 300)
+    font = _font(max(16, im.width // 45))
+    for n, (x, y, w, h) in marks:
+        d.rectangle([x - line, y - line, x + w + line, y + h + line], outline=(220, 0, 60), width=line)
+        tag = str(n)
+        tw = d.textlength(tag, font=font) if hasattr(d, "textlength") else 10 * len(tag)
+        th = font.size if hasattr(font, "size") else 12
+        tx, ty = max(0, x - line), max(0, y - line - th - 10)
+        d.rectangle([tx, ty, tx + tw + 12, ty + th + 8], fill=(220, 0, 60))
+        d.text((tx + 6, ty + 3), tag, fill=(255, 255, 255), font=font)
+    if im.width > width:
+        im = im.resize((width, round(im.height * width / im.width)))
+    im.save(out, quality=72)
+
+
+def filmstrip(session_dir: Path, steps: list, focus: int, out: Path, before: int = 2, after: int = 1):
+    """The steps leading to an evidence step and the one after it, side by side with the clicks circled:
+    how the persona got to the problem and what they did next, in one picture."""
+    from PIL import Image, ImageDraw
+    idx = next((i for i, st in enumerate(steps) if st["step"] == focus), None)
+    if idx is None:
+        return None
+    frames = []
+    for st in steps[max(0, idx - before): idx + after + 1]:
+        src = session_dir / "shots" / st["screenshot"]
+        if src.exists():
+            im = Image.open(src).convert("RGB")
+            k = min(280 / im.width, 400 / im.height)
+            frames.append((st, im.resize((round(im.width * k), round(im.height * k))), k))
+    if not frames:
+        return None
+    label, gap = 24, 14
+    sheet = Image.new("RGB", (sum(im.width for _, im, _ in frames) + gap * (len(frames) + 1),
+                              max(im.height for _, im, _ in frames) + label + 2 * gap), (245, 246, 248))
+    d = ImageDraw.Draw(sheet)
+    font = _font(15)
+    x = gap
+    for st, im, k in frames:
+        mark = st["step"] == focus
+        did = st["action"].get("type", "")
+        d.text((x, gap - 2), f"step {st['step']} · {did}", fill=(200, 0, 50) if mark else (60, 60, 60), font=font)
+        sheet.paste(im, (x, gap + label))
+        if mark:
+            d.rectangle([x - 4, gap + label - 4, x + im.width + 3, gap + label + im.height + 3], outline=(220, 0, 60), width=4)
+        a = st["action"]
+        if a.get("type") in CLICKS + ("hover",) and "x" in a:
+            cx, cy = x + a["x"] * k, gap + label + a["y"] * k
+            d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], outline=(35, 35, 255), width=3)
+        x += im.width + gap
+    sheet.save(out, quality=75)
+    return [st["step"] for st, _, _ in frames]
+
+
 def crop_evidence(src: Path, box, out: Path):
     from PIL import Image, ImageDraw
 
@@ -342,6 +723,52 @@ def crop_evidence(src: Path, box, out: Path):
 
 def slug_id(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+
+
+SEVERITY_PARTS = {
+    "impact": ("blocks", "misleads", "slows", "annoys"),
+    "persistence": ("once", "repeats"),           # repeats: it gets in the way every time, or on every visit
+    "fix_effort": ("small", "medium", "large"),   # copy or style change / one component / a flow or back end
+}
+BELIEF_STATES = ("correct", "wrong", "unsure", "not_seen")
+
+
+def verify_beliefs(beliefs, data: dict):
+    """Check beliefs.json, the reviewer's record of what each walk came away believing about the site's key facts.
+    Every belief other than not_seen must cite a step of that session; a wrong one must say what was believed.
+    Entries that don't hold are dropped and listed, as findings are."""
+    if beliefs is None:
+        return None
+    kept, removed = [], []
+    for k in beliefs if isinstance(beliefs, list) else []:
+        ok, why = {}, []
+        for sess, b in (k.get("personas") or {}).items():
+            state = (b or {}).get("belief")
+            s = data.get(sess)
+            if state not in BELIEF_STATES:
+                why.append(f"{sess}: belief must be one of {', '.join(BELIEF_STATES)}")
+            elif not s:
+                why.append(f"{sess}: no such session")
+            elif state != "not_seen" and not any(st["step"] == b.get("step") for st in s["journey"].get("steps", [])):
+                why.append(f"{sess}: needs a step that exists in the walk")
+            elif state == "wrong" and not b.get("held"):
+                why.append(f"{sess}: a wrong belief needs 'held', what they believed instead")
+            else:
+                b = dict(b)
+                if state != "not_seen" and b.get("held"):
+                    st = next(st for st in s["journey"]["steps"] if st["step"] == b["step"])
+                    d = st["decision"]
+                    said = " | ".join([str(d.get("memory", "")), str(d.get("thought", "")), *map(str, d.get("doubts", [])),
+                                       *map(str, d.get("read", []))])
+                    b["held_in_record"] = norm(b["held"]) in norm(said)
+                ok[sess] = b
+        if not k.get("id") or not k.get("fact"):
+            why.append("each fact needs an id and the fact as the site states it")
+        if why:
+            removed.append({"id": k.get("id"), "fact": k.get("fact"), "reasons": why})
+        if ok and k.get("id") and k.get("fact"):
+            kept.append(dict(k, personas=ok))
+    return {"kept": kept, "removed": removed}
 
 
 def verify(study_dir: Path) -> int:
@@ -389,6 +816,25 @@ def verify(study_dir: Path) -> int:
             out = ev_dir / f"{f.get('id', 'F')}-{i}.jpg"
             crop_evidence(shot, box, out)
             e["crop"] = f"evidence/{out.name}"
+            e["n"] = i
+        # Context for the crops: each evidence screen whole, boxes numbered to match the crops, and a filmstrip of
+        # how the first evidence walk reached the problem.
+        placed = [e for e in evidence if e.get("crop")]
+        screens = defaultdict(list)
+        for e in placed:
+            screens[(e["session"], e["step"])].append(e)
+        f["screens"] = []
+        for j, ((sess, step_no), es) in enumerate(screens.items(), 1):
+            st = next(st for st in data[sess]["journey"]["steps"] if st["step"] == step_no)
+            out = ev_dir / f"{f.get('id', 'F')}-screen-{j}.jpg"
+            annotate_screen(data[sess]["dir"] / "shots" / st["screenshot"], [(e["n"], e["box"]) for e in es], out)
+            f["screens"].append({"session": sess, "step": step_no, "image": f"evidence/{out.name}", "marks": [e["n"] for e in es]})
+        if placed:
+            first = placed[0]
+            out = ev_dir / f"{f.get('id', 'F')}-strip.jpg"
+            shown_steps = filmstrip(data[first["session"]]["dir"], data[first["session"]]["journey"]["steps"], first["step"], out)
+            if shown_steps:
+                f["filmstrip"] = {"session": first["session"], "steps": shown_steps, "focus": first["step"], "image": f"evidence/{out.name}"}
         if f.get("category") == "contrast":
             ids = {m["id"]: m for s in data.values() for m in s["measurements"]}
             m = ids.get(f.get("measurement"))
@@ -430,6 +876,29 @@ def verify(study_dir: Path) -> int:
                      | {n for n in reached if slug_id(data[n]["journey"]["persona"].get("id", "")) in named})
         f["exposure"] = {"pages": sorted(fpages), "walks_reached": len(reached), "walks_hit": len(hit), "hit": hit,
                          "missed": [n for n in reached if n not in hit]}
+        # Nielsen's severity is frequency x impact x persistence. Frequency comes from exposure; the reviewer states
+        # the other two, and the fix effort, so the rating can be traced and the impact/effort matrix drawn.
+        for key, allowed in SEVERITY_PARTS.items():
+            if key in f and f[key] not in allowed:
+                problems.append(f"{key} must be one of {', '.join(allowed)}")
+        missing = [k for k in SEVERITY_PARTS if k not in f]
+        if missing:
+            notes.append(f"no {', '.join(missing)}: severity can't be broken into its parts")
+        # Where the problem sits in Norman's cycle, which heuristics it breaks, and which WCAG criteria it may fail.
+        if "gulf" in f and f["gulf"] not in GULFS:
+            problems.append(f"gulf must be one of {', '.join(GULFS)}")
+        hs = f.get("heuristics", [])
+        if not isinstance(hs, list) or any(h not in HEURISTICS for h in hs):
+            problems.append("heuristics must be a list of H1 to H10")
+        elif not hs:
+            notes.append("no heuristics: the finding stays out of the heuristic scorecard")
+        sc = f.get("wcag", [])
+        if not isinstance(sc, list) or any(not re.fullmatch(r"[1-4]\.\d{1,2}\.\d{1,2}", str(x)) for x in sc):
+            problems.append("wcag must be a list of success criterion numbers such as 1.4.3")
+        elif f.get("category") == "contrast":
+            auto = "1.4.11" if f.get("contrast_target") == "ui_component" else "1.4.3"
+            if auto not in sc:
+                f["wcag"] = [*sc, auto]
         if problems:
             removed.append({"id": f.get("id"), "title": f.get("title"), "reasons": problems})
         else:
@@ -447,9 +916,15 @@ def verify(study_dir: Path) -> int:
             if pid:
                 rewalk.setdefault(pid, []).append(f.get("id"))
     rewalk = [{"persona": p, "findings": ids} for p, ids in rewalk.items()]
-    (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed, "rewalk": rewalk},
+    beliefs = verify_beliefs(load(study_dir / "beliefs.json"), data)
+    (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed, "rewalk": rewalk, "beliefs": beliefs},
                                                                  indent=2, ensure_ascii=False), encoding="utf-8")
     out = {"kept": len(kept), "removed": removed}
+    pn = plan_notes((load(study_dir / "insights.json", {}) or {}).get("research_questions"), {f.get("id") for f in kept})
+    if pn:
+        out["research_plan_notes"] = pn
+    if beliefs is not None:
+        out["beliefs"] = {"facts": len(beliefs["kept"]), "removed": beliefs["removed"]}
     if rewalk:
         out["rewalk"] = rewalk
         out["note"] = "These serious findings each rest on one walk. Walking the persona again tells a pattern from a fluke."
@@ -581,6 +1056,185 @@ sel.onchange=pick;pick();})();
 """
 
 
+RAINBOW_WORDS = {"hit": "hit it", "past": "reached the page, got past it", "none": "never reached the page"}
+
+
+def rainbow_labels(cols: list, names: dict) -> dict:
+    """Short column heads: the persona's first name, numbered when a persona was walked more than once."""
+    first = {c: str(names[c]).split(",")[0].strip() or c for c in cols}
+    seen, out = defaultdict(int), {}
+    for c in cols:
+        seen[first[c]] += 1
+        out[c] = first[c] if list(first.values()).count(first[c]) == 1 else f"{first[c]} {seen[first[c]]}"
+    return out
+
+
+def rainbow_row(f: dict, cols: list, nav: dict) -> list:
+    """One finding across every walk, from verify's exposure: hit, reached the page and got past, or never there."""
+    ex = f.get("exposure") or {}
+    hit = set(ex.get("hit") or []) | {e.get("session") for e in f.get("evidence", [])}
+    past = set(ex.get("missed") or [])
+    if not ex:  # an older verified_findings.json without exposure: reached means visited the finding's page
+        past = {c for c in cols if any(p["page"] == f.get("page") for p in nav[c]["path"])}
+    return ["hit" if c in hit else "past" if c in past else "none" for c in cols]
+
+
+BELIEF_WORDS = {"correct": "believed it correctly", "wrong": "believed something else", "unsure": "saw it, unsure",
+                "not_seen": "never saw it", "none": "not recorded"}
+BELIEF_MARK = {"correct": "✓", "wrong": "✗", "unsure": "?"}
+
+
+def severity_parts(f: dict) -> str:
+    """Nielsen's three parts of a severity rating, in words: frequency from exposure, impact and persistence from the reviewer."""
+    ex = f.get("exposure") or {}
+    bits = []
+    if ex.get("walks_reached"):
+        bits.append(f"frequency {ex['walks_hit']} of {ex['walks_reached']} walks")
+    if f.get("impact"):
+        bits.append(f"impact: {f['impact']}")
+    if f.get("persistence"):
+        bits.append("gets in the way every time" if f["persistence"] == "repeats" else "gets in the way once")
+    if f.get("fix_effort"):
+        bits.append(f"fix effort {f['fix_effort']}")
+    return " · ".join(bits) if len(bits) > 1 else ""
+
+
+def finding_tags(f: dict) -> str:
+    """The finding's heuristics, WCAG criteria and gulf, in words."""
+    bits = []
+    if f.get("heuristics"):
+        bits.append("breaks " + "; ".join(f"{h} {HEURISTICS[h]}" for h in f["heuristics"] if h in HEURISTICS))
+    if f.get("wcag"):
+        bits.append("may fail WCAG " + "; ".join(f"{x} {WCAG_NAMES.get(x, '')}".strip() for x in f["wcag"]))
+    if f.get("gulf") in GULFS:
+        bits.append(f"gulf: {GULFS[f['gulf']].lower()}")
+    return " · ".join(bits)
+
+
+def heuristic_scorecard(findings: list, study: dict) -> str:
+    """Nielsen's ten heuristics down the side, journey stages across, finding IDs where a heuristic broke."""
+    labels = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    cell, used = defaultdict(list), []
+    for f in findings:
+        sid = stage_of(study, f.get("page") or "") or "other"
+        for h in f.get("heuristics") or []:
+            if h in HEURISTICS:
+                cell[(h, sid)].append(f)
+                if sid not in used:
+                    used.append(sid)
+    order = [s["id"] for s in study.get("stages", [])] + ["other"]
+    cols = [s for s in order if s in used]
+    h = ["<figure class='fig'><div class='tablewrap'><table class='hs'><thead><tr><th>Heuristic</th>"
+         + "".join(f"<th>{esc(labels.get(c, 'Other pages'))}</th>" for c in cols) + "</tr></thead><tbody>"]
+    for hid, name in HEURISTICS.items():
+        row = [cell[(hid, c)] for c in cols]
+        empty = not any(row)
+        h.append(f"<tr{' class=muted' if empty else ''}><td>{hid} {esc(name)}</td>" + "".join(
+            "<td class='hc'>" + "".join(f"<a class='chip' href='#finding-{esc(f.get('id'))}' title='{esc(f.get('title'))}'>{esc(f.get('id'))}</a>"
+                                        for f in fs) + "</td>" for fs in row) + "</tr>")
+    return "".join(h) + "</tbody></table></div>"
+
+
+def priority_matrix(findings: list) -> str:
+    """Severity down the side, fix effort across: the impact/effort matrix product teams plan from."""
+    efforts = SEVERITY_PARTS["fix_effort"]
+    cell = defaultdict(list)
+    unrated = []
+    for f in findings:
+        if f.get("fix_effort") in efforts and f.get("severity") in SEV_ORDER:
+            cell[(f["severity"], f["fix_effort"])].append(f)
+        else:
+            unrated.append(f)
+
+    def chip(f):
+        ex = f.get("exposure") or {}
+        n = f" <span class='muted'>{ex['walks_hit']}/{ex['walks_reached']}</span>" if ex.get("walks_reached") else ""
+        return f"<a class='chip' href='#finding-{esc(f.get('id'))}' title='{esc(f.get('title'))}'>{esc(f.get('id'))}{n}</a>"
+
+    h = ["<figure class='fig'><div class='pm'><div></div>" + "".join(f"<div class='pm-x'>{e.capitalize()} fix</div>" for e in efforts)]
+    for s in SEV_ORDER:
+        h.append(f"<div class='pm-y'>{s.capitalize()}</div>")
+        for e in efforts:
+            hot = " hot" if s in ("critical", "high") and e == "small" else ""
+            h.append(f"<div class='pm-c{hot}'>" + "".join(chip(f) for f in cell[(s, e)]) + "</div>")
+    h.append("</div>")
+    if unrated:
+        h.append("<p class='sub' style='margin-top:8px'>No fix effort given: " + ", ".join(chip(f) for f in unrated) + "</p>")
+    return "".join(h)
+
+
+def say_do_chart(rows: list, names: dict) -> str:
+    """One row per walk: how it ended, then the ease and UMUX-Lite ratings as dots on their scales."""
+    def track(v, lo, hi):
+        pct = 100 * (v - lo) / (hi - lo)
+        return f"<div class='trk'><span class='dot' style='left:{pct:.0f}%'></span></div><span class='tv'>{v}</span>"
+
+    h = ["<figure class='fig'><div class='sd'><div class='sd-hd'>Walk</div><div class='sd-hd'>Ease, 1–7</div><div class='sd-hd'>UMUX-Lite, 0–100</div>"]
+    order = list(SUCCESS_LEVELS)
+    for r in sorted(rows, key=lambda r: (order.index(r["level"]) if r["level"] in order else 9, r["session"])):
+        did = SUCCESS_LEVELS.get(r["level"], r["outcome"])
+        plural = lambda k, one, many: f"{r[k]} {one if r[k] == 1 else many}" if r[k] else ""
+        extra = ", ".join(x for x in (plural("dead_clicks", "dead press", "dead presses"),
+                                      plural("backtracks", "backtrack", "backtracks")) if x)
+        h.append(f"<div class='sd-who'><b>{esc(names.get(r['session'], r['session']))}</b><br><span class='muted'>{esc(did)}"
+                 + (f" · {esc(extra)}" if extra else "") + "</span>"
+                 + (f"<br><span class='fail'>Said ≠ did: {esc(r['gap'])}</span>" if r.get("gap") else "") + "</div>"
+                 f"<div class='sd-v'>{track(r['ease_1_7'], 1, 7)}</div><div class='sd-v'>{track(r['umux_lite'], 0, 100)}</div>")
+    return "".join(h) + "</div>"
+
+
+def experience_curve(name: str, v: dict, marks: dict, stage_label: dict, outcome: str) -> str:
+    """One walk's clarity and trust, step by step, as a small inline SVG: stages shaded behind, presses that did
+    nothing and high or critical friction marked, and finding IDs at the steps their evidence comes from."""
+    steps = v["steps"]
+    W, H, L, R, T, B = 736, 120, 26, 10, 20, 18
+    pw, ph = W - L - R, H - T - B
+    n = len(steps)
+    x = (lambda i: L + pw / 2) if n == 1 else (lambda i: L + pw * i / (n - 1))
+    y = lambda s: T + ph * (5 - max(1, min(5, s or 1))) / 4
+    half = pw / max(n - 1, 1) / 2
+    g = []
+    # stage bands: one per run of steps in the same stage
+    runs, band = [], 0
+    for i, st in enumerate(steps):
+        if runs and runs[-1][0] == st.get("stage"):
+            runs[-1][2] = i
+        else:
+            runs.append([st.get("stage"), i, i])
+    for sid, a, b in runs:
+        x0, x1 = max(L, x(a) - half), min(W - R, x(b) + half)
+        if sid:
+            band += 1
+            if band % 2:
+                g.append(f"<rect class='band' x='{x0:.1f}' y='{T}' width='{x1 - x0:.1f}' height='{ph}'/>")
+            g.append(f"<text class='blabel' x='{x0 + 3:.1f}' y='{T + ph - 4}'>{esc(stage_label.get(sid, sid))}</text>")
+    for s in (1, 3, 5):
+        g.append(f"<line class='grid' x1='{L}' x2='{W - R}' y1='{y(s):.1f}' y2='{y(s):.1f}'/><text class='tick' x='{L - 6}' y='{y(s) + 4:.1f}'>{s}</text>")
+    for key, cls in (("trust", "tr"), ("clarity", "cl")):
+        pts = " ".join(f"{x(i):.1f},{y(st.get(key)):.1f}" for i, st in enumerate(steps))
+        g.append(f"<polyline class='{cls}' points='{pts}'/>" if n > 1 else f"<circle class='{cls}d' cx='{x(0):.1f}' cy='{y(steps[0].get(key)):.1f}' r='3'/>")
+    for i, st in enumerate(steps):
+        if st.get("worst_friction") in ("critical", "high"):
+            g.append(f"<circle class='fr' cx='{x(i):.1f}' cy='{y(st.get('clarity')):.1f}' r='4'/>")
+        if st.get("dead_click"):
+            cx, cy = x(i), H - B + 6
+            g.append(f"<path class='dead' d='M{cx - 4:.1f},{cy - 4:.1f}L{cx + 4:.1f},{cy + 4:.1f}M{cx + 4:.1f},{cy - 4:.1f}L{cx - 4:.1f},{cy + 4:.1f}'/>")
+        if marks.get(st["step"]):
+            anchor = "start" if n > 1 and i == 0 else "end" if n > 1 and i == n - 1 else "middle"
+            g.append(f"<line class='mk' x1='{x(i):.1f}' x2='{x(i):.1f}' y1='{T - 4}' y2='{T + ph}'/>"
+                     f"<text class='mlabel' x='{x(i):.1f}' y='{T - 7}' style='text-anchor:{anchor}'>{esc(' '.join(marks[st['step']]))}</text>")
+    cl = [st.get("clarity") for st in steps]
+    dead = [str(st["step"]) for st in steps if st.get("dead_click")]
+    label = (f"{name}: clarity from {cl[0]} to {cl[-1]}, lowest {min(cl)}, over {n} steps"
+             + (f"; presses that did nothing at steps {', '.join(dead)}" if dead else ""))
+    sv = v.get("success") or {}
+    span = f"step {steps[0]['step']}" if n == 1 else f"steps {steps[0]['step']}–{steps[-1]['step']}"
+    head = f"<b>{esc(name)}</b> · {esc(v.get('device') or 'desktop')} · {span} · {outcome}" + (
+        f" · {esc(SUCCESS_LEVELS.get(sv.get('level'), '').lower())}" if sv.get("level") and sv["level"] != "not_scored" else "")
+    return (f"<div class='xc'><div class='xc-h'>{head}</div><div class='xc-s'><svg viewBox='0 0 {W} {H}' role='img' aria-label='{esc(label)}'>"
+            + "".join(g) + "</svg></div></div>")
+
+
 def img_data(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
@@ -661,6 +1315,51 @@ select,button{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(
 .maps{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;align-items:start}.maps .fig{margin:0}
 ol.refs{font-size:13px;line-height:1.6;color:var(--body);padding-left:24px}ol.refs li{margin:0 0 6px;overflow-wrap:anywhere}
 sup.ref{font-size:11px;line-height:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rg{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;box-sizing:border-box}
+.rg.hit{background:var(--series)}.rg.past{border:1.5px solid var(--muted)}
+table.rainbow th.rg-col{text-align:center;font-weight:600;font-size:11px;padding:8px 4px;white-space:nowrap}
+table.rainbow td.num{white-space:nowrap}table.rainbow td.rg-cell{text-align:center;padding:8px 4px;vertical-align:middle}
+.xc{margin:0 0 14px}.xc-h{font-size:13px;color:var(--muted);margin:0 0 2px}.xc-h b{color:var(--ink)}
+.strip{display:block;max-width:none;height:auto;max-height:440px;border:1px solid var(--hair)}
+.pair .fig.screen{flex:0 1 380px}.fig.screen .shot{width:100%;max-height:min(60vh,520px);object-fit:contain;object-position:left top}
+.enum{display:inline-block;min-width:18px;padding:0 5px;margin-right:6px;border-radius:3px;background:#dc003c;color:#fff;font-weight:700;text-align:center}
+.rq{border-top:1px solid var(--hair);padding:14px 0 6px}.rq-q{font-size:16px;font-weight:600;color:var(--ink);line-height:1.5;margin-bottom:8px}
+.rq-q .n{color:var(--soft);margin-right:10px}.rq dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 14px;margin:0;font-size:14px;line-height:1.55;color:var(--body)}
+.rq dt{color:var(--muted);font-size:12px;font-weight:600;padding-top:2px}.rq dd{margin:0}
+@media (max-width:560px){.rq dl{grid-template-columns:1fr}.rq dt{padding-top:6px}}
+table.sg td{white-space:nowrap}table.sg td:first-child{white-space:normal}.sg-dots{color:var(--series);letter-spacing:2px;font-size:12px;margin-right:6px}
+.sg-off{color:var(--rule)}
+.rwg{display:grid;grid-template-columns:1fr 1fr;gap:12px 32px}@media (max-width:560px){.rwg{grid-template-columns:1fr}}
+.rw-h{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px;margin-bottom:6px}
+.rw{display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:10px;align-items:center;font-size:13px;color:var(--body);padding:3px 0}
+.rw-dots{letter-spacing:2px;font-size:11px}.rw-dots.negative{color:var(--annotation)}.rw-dots.positive{color:var(--series)}
+.gb{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:4px}
+.hs td.hc{text-align:left;font-size:12px}.hs td.hc a{margin-right:4px}
+.bf{display:inline-block;width:16px;font-weight:700;color:var(--muted)}.bf.correct{color:var(--series)}.bf.wrong{color:var(--annotation)}
+.pm{display:grid;grid-template-columns:72px repeat(3,minmax(0,1fr));gap:4px;font-size:13px}
+.pm-x{font-size:12px;font-weight:600;color:var(--muted);padding:0 0 4px 8px;border-bottom:1px solid var(--ink)}
+.pm-y{font-size:12px;font-weight:600;color:var(--muted);padding:10px 0}
+.pm-c{background:var(--surface-soft);border-radius:var(--radius);padding:8px;min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start}
+.pm-c.hot{outline:2px solid var(--series);outline-offset:-2px}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--rule);border-radius:999px;background:var(--paper);text-decoration:none;font-weight:600;font-size:12px}
+.sd{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:10px 18px;align-items:center;font-size:13px;color:var(--body)}
+.sd-hd{font-size:12px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px}
+.sd-v{display:flex;align-items:center;gap:8px}.trk{position:relative;flex:1;height:2px;background:var(--rule)}
+.trk .dot{position:absolute;top:-5px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--series)}
+.tv{min-width:24px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+@media (max-width:560px){.sd{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.sd-who{grid-column:1/-1}.sd-hd:first-child{display:none}}
+.xc-s{overflow-x:auto;padding-top:2px}.xc svg{display:block;width:100%;min-width:560px;height:auto;overflow:visible}
+.xc .band{fill:var(--surface-soft)}.xc .blabel{fill:var(--soft);font-size:10px}
+.xc .grid{stroke:var(--hair);stroke-width:1}.xc .tick{fill:var(--soft);font-size:10px;text-anchor:end}
+.xc .cl{fill:none;stroke:var(--series);stroke-width:2;stroke-linejoin:round}.xc .cld{fill:var(--series)}
+.xc .tr{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3;stroke-linejoin:round}.xc .trd{fill:var(--muted)}
+.xc .fr{fill:var(--paper);stroke:var(--annotation);stroke-width:2}.xc .dead{stroke:var(--annotation);stroke-width:2}
+.xc .mk{stroke:var(--ink);stroke-width:1;stroke-dasharray:2 2}.xc .mlabel{fill:var(--ink);font-size:10px;font-weight:700;text-anchor:middle}
+.xc-key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--muted);margin:0 0 12px}.xc-key span{display:inline-flex;align-items:center;gap:6px}
+.xc-key i{display:inline-block}.k-cl{width:18px;height:2px;background:var(--series)}.k-tr{width:18px;border-top:1.5px dashed var(--muted)}
+.k-dead{width:9px;height:9px;background:linear-gradient(45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%),linear-gradient(-45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%)}
+.k-fr{width:9px;height:9px;border-radius:50%;border:2px solid var(--annotation)}
 footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;font-size:12px;color:var(--soft);line-height:1.6}footer.notes b{color:var(--ink)}
 @media print{body{background:#fff}.paper{box-shadow:none;padding:0}#appendix-replay{display:none}.fig,blockquote{break-inside:avoid}}"""
 
@@ -683,6 +1382,20 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
             ("wcag-258", "W3C (2023). <i>WCAG 2.2</i>, Success Criterion 2.5.8 Target Size (Minimum). https://www.w3.org/TR/WCAG22/#target-size-minimum"),
             ("umux", "Lewis, J. R., Utesch, B. S., &amp; Maher, D. E. (2013). UMUX-LITE: When there's no time for the SUS. "
              "<i>Proceedings of CHI 2013</i>, 2099–2102. ACM."),
+            ("lostness", "Smith, P. A. (1996). Towards a practical measure of hypertext usability. <i>Interacting with Computers</i>, 8(4), 365–381."),
+            ("rainbow", "Sharon, T. (2013). The rainbow spreadsheet: a collaborative lean UX research tool. <i>Smashing Magazine</i>."),
+            ("severity", "Nielsen, J. (1994). Severity ratings for usability problems. Nielsen Norman Group. "
+             "https://www.nngroup.com/articles/how-to-rate-the-severity-of-usability-problems/"),
+            ("firstclick", "Bailey, R. W., Wolfson, C. A., Nall, J., &amp; Koyani, S. (2009). Performance-based usability testing: metrics "
+             "that have the greatest impact for improving a system's usability. <i>Human Centered Design, HCII 2009</i>, LNCS 5619, 3–12. Springer."),
+            ("scent", "Pirolli, P., &amp; Card, S. (1999). Information foraging. <i>Psychological Review</i>, 106(4), 643–675."),
+            ("reaction", "Benedek, J., &amp; Miner, T. (2002). Measuring desirability: new methods for evaluating desirability in a "
+             "usability lab setting. <i>Proceedings of the Usability Professionals' Association 2002 Conference</i>."),
+            ("gulfs", "Norman, D. A. (2013). <i>The Design of Everyday Things</i> (revised and expanded edition), chapter 2. Basic Books."),
+            ("heuristics", "Nielsen, J. (1994, updated 2020). 10 usability heuristics for user interface design. Nielsen Norman Group. "
+             "https://www.nngroup.com/articles/ten-usability-heuristics/"),
+            ("saydo","Nielsen, J. (2001). First rule of usability? Don't listen to users. Nielsen Norman Group. "
+             "https://www.nngroup.com/articles/first-rule-of-usability-dont-listen-to-users/"),
             ("artefacts", "Study record, in the study folder: study.json, personas.json, navigation.json, flows.json, verified_findings.json, "
              "feedback.json, insights.json, and each session's journey.json and screenshots under sessions/.")]
     ref_no = {k: i for i, (k, _) in enumerate(refs, 1)}
@@ -698,9 +1411,23 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     walks = replay_data(data)
     maps = click_heatmaps(study_dir, data)
-    toc = [("design", "Study design"), ("outcomes", "Outcomes"), ("findings", "Findings"), ("bottlenecks", "Flow bottlenecks")]
-    if measurements:
-        toc.append(("accessibility", "Accessibility measurements"))
+    beliefs = (vf.get("beliefs") or {}).get("kept") or []
+    toc = [("design", "Study design"), ("outcomes", "Outcomes"), ("findings", "Findings")]
+    if beliefs:
+        toc.append(("beliefs", "What people came away believing"))
+    toc.append(("bottlenecks", "Flow bottlenecks"))
+    has_first = any(v.get("first_impression") for v in nav.values()) or bool(flows.get("first_clicks"))
+    if has_first:
+        toc.append(("first", "First impressions and first clicks"))
+    if flows.get("scent"):
+        toc.append(("scent", "Did presses do what people expected?"))
+    by_sc = defaultdict(list)
+    for f in findings:
+        for x in f.get("wcag") or []:
+            by_sc[str(x)].append(f)
+    wcag_rows = sorted(by_sc.items(), key=lambda kv: [int(n) for n in kv[0].split(".")])
+    if measurements or wcag_rows:
+        toc.append(("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
     toc += [("feedback", "Participant feedback"), ("discussion", "Discussion"), ("limitations", "Limitations"), ("references", "References")]
     appendix = ([("appendix-replay", "Walk replay")] if walks else []) + ([("appendix-clicks", "Click maps")] if maps else []) \
         + ([("appendix-removed", "Removed in verification")] if vf["removed"] else [])
@@ -748,28 +1475,93 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     # 02 outcomes
     out.append(h2("outcomes", "Outcomes"))
-    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Outcome</th><th class='num'>Steps</th><th>Pages, in order</th></tr></thead><tbody>")
+    succ = flows.get("success") or {}
+    if succ.get("levels"):
+        lv = succ["levels"]
+        phrase = {"direct_success": "{} reached the goal directly", "indirect_success": "{} reached it after backtracking",
+                  "partial": "{} stopped short with a next step in mind", "failure": "{} gave up or left", "not_scored": "{} not scored"}
+        said = [phrase[k].format(lv[k]) for k in SUCCESS_LEVELS if lv.get(k)]
+        out.append(f"<p>Graded the way tree tests grade a task: a <b>direct success</b> reached the goal page without going back on itself, an "
+                   f"<b>indirect success</b> got there after backtracking. Of {n} walks: {esc(', '.join(said))}. For walks that reached the goal, "
+                   f"<b>lostness</b> compares the pages they went through with the fewest the task needs ({esc(succ.get('fewest_pages_from'))}): "
+                   f"0 is a perfect path, under {LOST_BELOW} shows no sign of being lost, over {LOST_ABOVE} does.{cite('lostness')}</p>")
+    out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Outcome</th><th>Success</th><th class='num'>Steps</th>"
+               "<th>Pages, in order</th></tr></thead><tbody>")
     for name, v in nav.items():
         path = " → ".join(f"{esc(p['page'])} ({p['steps']})" for p in v["path"])
+        sv = v.get("success") or {}
+        lost = (f"<br><span class='muted'>lostness {sv['lostness']}, {esc(sv['lost'])}; {sv['different_pages']} pages, "
+                f"{sv['page_visits']} visits, fewest {sv['fewest_pages']}</span>") if sv.get("lostness") is not None else ""
         out.append(f"<tr><td><b>{esc(names[name])}</b><br><span class='muted'>{esc(v['device'])}</span></td>"
-                   f"<td>{ol(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td><td class='num'>{v['steps_taken']}</td><td>{path}</td></tr>")
-    out.append("</tbody></table></div>" + fig("Every walk, with the steps spent on each page in brackets.") + "</figure>")
+                   f"<td>{ol(v['outcome'])}<br><span class='muted'>{esc(v.get('reason'))}</span></td>"
+                   f"<td>{esc(SUCCESS_LEVELS.get(sv.get('level'), '—'))}{lost}</td><td class='num'>{v['steps_taken']}</td><td>{path}</td></tr>")
+    out.append("</tbody></table></div>" + fig("Every walk, with the steps spent on each page in brackets. Not scored: the test ended the walk, "
+                                              "or the goal claim couldn't be checked.") + "</figure>")
     if flows["funnel"]:
         out.append("<figure class='fig'><div class='bars'>")
         for f in flows["funnel"]:
             out.append(f"<div>{esc(f['label'])}</div><div class='track'><div class='fill' style='width:{100 * f['reached'] / max(f['of'], 1):.0f}%'></div></div>"
                        f"<div class='cnt'>{f['reached']} of {f['of']}</div>")
         out.append("</div>" + fig("Personas reaching each journey stage. Counts of simulated personas, not conversion rates.") + "</figure>")
+    marks = defaultdict(lambda: defaultdict(list))  # session -> step -> finding ids whose evidence sits there
+    for f in findings:
+        for e in f.get("evidence", []):
+            if f.get("id") not in marks[e.get("session")][e.get("step")]:
+                marks[e.get("session")][e.get("step")].append(f.get("id"))
+    stage_label = {s["id"]: s.get("label", s["id"]) for s in study.get("stages", [])}
+    curves = [experience_curve(names[k], v, marks.get(k, {}), stage_label, ol(v["outcome"])) for k, v in nav.items() if v.get("steps")]
+    if curves:
+        out.append("<figure class='fig'><div class='xc-key'><span><i class='k-cl'></i>Clarity</span><span><i class='k-tr'></i>Trust</span>"
+                   "<span><i class='k-dead'></i>Press that did nothing</span><span><i class='k-fr'></i>High or critical friction</span></div>"
+                   + "".join(curves)
+                   + fig("How each walk felt, step by step: the persona's own clarity and trust scores (1–5, higher is better), with journey stages "
+                         "shaded behind and finding IDs where their evidence was recorded. A drop shows where to look; it is one simulated "
+                         "person's rating, not a measured emotion.") + "</figure>")
+    for dim in flows.get("segments") or []:
+        segs = dim["segments"]
+        dots = lambda k, n: f"<span class='sg-dots'>{'●' * k}<span class='sg-off'>{'○' * (n - k)}</span></span><span class='tv'>{k} of {n}</span>"
+        rows = [(st["label"], [s["stages"][i]["reached"] for s in segs]) for i, st in enumerate(segs[0]["stages"])]
+        unreached = [lbl for lbl, ks in rows if not any(ks)]
+        rows = [r for r in rows if any(r[1])] + [("Reached the goal", [s["reached_goal"] for s in segs])]
+        out.append(f"<figure class='fig'><div class='tablewrap'><table class='sg'><thead><tr><th>{esc(dim['dimension'])}</th>"
+                   + "".join(f"<th>{esc(s['name'])} <span class='muted'>({s['of']})</span></th>" for s in segs) + "</tr></thead><tbody>"
+                   + "".join(f"<tr><td>{esc(lbl)}</td>" + "".join(f"<td>{dots(k, s['of'])}</td>" for k, s in zip(ks, segs)) + "</tr>"
+                             for lbl, ks in rows)
+                   + "</tbody></table></div>"
+                   + fig(f"How far each kind of customer got, by {esc(dim['dimension'].lower())}: one dot per walk, filled if it reached "
+                         "that stage. Groups this small show who to watch in real testing, not a difference in rates."
+                         + (f" No walk reached {esc(', '.join(unreached))}." if unreached else "")) + "</figure>")
 
     # 03 findings
     out.append(h2("findings", "Findings"))
     out.append("<p>Ranked by severity. Every finding was checked against the recorded screenshots; the evidence shown is cropped from the cited steps.</p>")
     if findings:
-        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>Severity</th><th>Page</th><th>Finding</th></tr></thead><tbody>")
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        out.append("<figure class='fig'><div class='tablewrap'><table class='rainbow'><thead><tr><th>ID</th><th>Finding</th><th>Severity</th>"
+                   + "".join(f"<th class='rg-col' title='{esc(names[c])}'>{esc(short[c])}</th>" for c in cols)
+                   + "<th class='num'>Hit</th></tr></thead><tbody>")
         for f in findings:
-            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td><td>{cap(f.get('severity'))}</td>"
-                       f"<td>{esc(f.get('page'))}</td><td>{esc(f.get('title'))}</td></tr>")
-        out.append("</tbody></table></div>" + fig("Index of verified findings.") + "</figure>")
+            state = rainbow_row(f, cols, nav)
+            cells = "".join(f"<td class='rg-cell'><span class='rg {s}' title='{esc(names[c])}: {RAINBOW_WORDS[s]}'></span>"
+                            f"<span class='sr'>{RAINBOW_WORDS[s]}</span></td>" for c, s in zip(cols, state))
+            hit, could = state.count("hit"), state.count("hit") + state.count("past")
+            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td>"
+                       f"<td>{esc(f.get('title'))}<br><span class='muted'>{esc(f.get('page'))}</span></td><td>{cap(f.get('severity'))}</td>"
+                       f"{cells}<td class='num'>{hit} of {could}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Who hit what, after Sharon's rainbow spreadsheet: one row per finding, one column per walk. "
+                   "<span class='rg hit'></span> hit it, <span class='rg past'></span> reached the page and got past it, blank: never reached the page. "
+                   f"A full row is a problem for everyone; a short one belongs to a kind of customer.{cite('rainbow')}") + "</figure>")
+        if any(f.get("fix_effort") for f in findings):
+            out.append(priority_matrix(findings) + fig(
+                "Where to start: each finding by severity and by how much work the fix is, as the reviewer judged it. Small fixes to "
+                f"serious problems sit top left. Severity weighs how often, how badly and how persistently it gets in the way.{cite('severity')}")
+                + "</figure>")
+        if any(f.get("heuristics") for f in findings):
+            out.append(heuristic_scorecard(findings, study) + fig(
+                "Which of Nielsen's ten usability heuristics each finding breaks, by the journey stage its page belongs to. "
+                f"A row that fills across stages is a habit of the site, not one page's slip; an empty row means no finding broke it.{cite('heuristics')}")
+                + "</figure>")
     for f in findings:
         fid = esc(f.get("id"))
         out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
@@ -782,19 +1574,72 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
             m = f["measured"]
             out.append(f"<p>Measured {m['ratio']}:1 ({esc(m['foreground'])} on {esc(m['background'])}) against a target of {m['target']}:1, "
                        f"measurement {esc(f.get('measurement'))}.{cite('wcag-143', 'wcag-1411')}</p>")
+        strip = f.get("filmstrip") or {}
+        if strip.get("image") and (study_dir / strip["image"]).exists():
+            out.append(f"<figure class='fig'><div class='tablewrap'><img class='strip' alt='Steps {esc(', '.join(map(str, strip['steps'])))} of "
+                       f"{esc(names.get(strip['session'], strip['session']))}' src='{img_data(study_dir / strip['image'])}'></div>"
+                       + fig(f"How {esc(names.get(strip['session'], strip['session']))} got there: steps "
+                             f"{esc(', '.join(map(str, strip['steps'])))}, the evidence step outlined, presses circled in blue.") + "</figure>")
+        screens = [s for s in f.get("screens", []) if (study_dir / s["image"]).exists()]
         crops = [e for e in f.get("evidence", []) if e.get("crop") and (study_dir / e["crop"]).exists()]
         if crops:
             out.append("<div class='pair'>")
+            for s in screens:
+                out.append(f"<figure class='fig screen'><img class='shot' alt='Whole screen, {esc(s['session'])} step {s['step']}' "
+                           f"src='{img_data(study_dir / s['image'])}'>"
+                           + fig(f"The whole screen: {esc(names.get(s['session'], s['session']))}, step {s['step']}, "
+                                 f"evidence {esc(', '.join(map(str, s['marks'])))} outlined.") + "</figure>")
             for e in crops:
                 q = f", “{esc(e['quote'])}”" if e.get("quote") else ""
+                badge = f"<span class='enum'>{e['n']}</span>" if e.get("n") else ""
                 out.append(f"<figure class='fig'><img class='shot' alt='{esc(f.get('title'))}, {esc(e['session'])} step {e['step']}' src='{img_data(study_dir / e['crop'])}'>"
-                           + fig(f"{esc(names.get(e['session'], e['session']))}, step {e['step']}{q}.") + "</figure>")
+                           + fig(f"{badge}{esc(names.get(e['session'], e['session']))}, step {e['step']}{q}.") + "</figure>")
             out.append("</div>")
         ex = f.get("exposure") or {}
         if ex.get("walks_reached"):
             out.append(f"<p class='sub' style='margin-top:4px'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached {esc(', '.join(ex['pages']))}"
                        + (f"; not by {esc(', '.join(ex['missed']))}" if ex.get("missed") else "") + ".</p>")
+        parts = severity_parts(f)
+        if parts:
+            out.append(f"<p class='sub' style='margin-top:4px'>Severity in parts: {esc(parts)}.</p>")
+        tags = finding_tags(f)
+        if tags:
+            out.append(f"<p class='sub' style='margin-top:4px'>{esc(tags[0].upper() + tags[1:])}.</p>")
         out.append(f"<div class='note'><b class='k'>Recommendation</b>{esc(f.get('recommendation'))}</div></section>")
+    if beliefs:
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        out.append(h2("beliefs", "What people came away believing"))
+        out.append("<p>The site's key facts, as it states them, against what each walk ended up believing, read from the personas' own notes "
+                   "at the step cited. Someone confidently wrong won't report a problem, so these misreadings are easy to miss in the "
+                   "findings above.</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table class='rainbow'><thead><tr><th>ID</th><th>The site says</th>"
+                   + "".join(f"<th class='rg-col' title='{esc(names[c])}'>{esc(short[c])}</th>" for c in cols)
+                   + "<th class='num'>Wrong</th></tr></thead><tbody>")
+        wrong_notes = []
+        for k in beliefs:
+            cells, wrong, knew = [], 0, 0
+            for c in cols:
+                b = k["personas"].get(c)
+                state = (b or {}).get("belief", "none")
+                if state == "wrong":
+                    wrong += 1
+                    wrong_notes.append((k, c, b))
+                if state != "none" and state != "not_seen":
+                    knew += 1
+                tip = BELIEF_WORDS.get(state, "not recorded") + (f": {b['held']}" if b and b.get("held") else "")
+                cells.append(f"<td class='rg-cell'><span class='bf {esc(state)}' title='{esc(names[c])}, {esc(tip)}'>{BELIEF_MARK.get(state, '')}</span>"
+                             f"<span class='sr'>{esc(tip)}</span></td>")
+            out.append(f"<tr><td>{esc(k['id'])}</td><td>{esc(k['fact'])}" + (f"<br><span class='muted'>{esc(k.get('page'))}</span>" if k.get("page") else "")
+                       + "</td>" + "".join(cells) + f"<td class='num'>{wrong} of {knew}</td></tr>")
+        out.append("</tbody></table></div>" + fig("<span class='bf correct'>✓</span> believed it correctly, <span class='bf wrong'>✗</span> came away "
+                   "believing something else, <span class='bf unsure'>?</span> saw it and was unsure, blank: never saw it. "
+                   "Wrong counts walks that formed a belief at all.") + "</figure>")
+        if wrong_notes:
+            out.append("<ul class='plain'>" + "".join(
+                f"<li><b>{esc(k['id'])}</b> {esc(names[c])} believed “{esc(b['held'])}” (step {esc(b.get('step'))}); the site says {esc(k['fact'])}."
+                + ("" if b.get("held_in_record", True) else " <span class='muted'>Paraphrased by the reviewer.</span>") + "</li>"
+                for k, c, b in wrong_notes) + "</ul>")
 
     # 04 bottlenecks
     out.append(h2("bottlenecks", "Flow bottlenecks"))
@@ -808,10 +1653,87 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                    f"<td class='num'>{sp['dead_clicks']}</td><td class='num'>{sp['backtracked_from']}</td><td class='num'>{sp['exits_short_of_goal']}</td>"
                    f"<td class='num'>{p['avg_clarity']} / {p['avg_trust']} / {p['avg_effort']}</td><td class='num'><b>{p['bottleneck_score']}</b></td></tr>")
     out.append("</tbody></table></div>" + fig(f"Score = {esc(flows['score_formula'])}. Clarity and trust 1–5, higher is better; effort 1–5, higher is worse.") + "</figure>")
+    if any(any(r[g] for g in GULFS) or r["dead_presses"] for r in flows.get("gulfs") or []):
+        out.append("<p>Where the friction sits in Norman's cycle of action: <b>working out what to do</b> (the gulf of execution: "
+                   "finding the control, knowing what to press), <b>telling what happened</b> (the gulf of evaluation: no feedback, "
+                   "unclear errors, slow responses), or <b>seeing and understanding the content</b> (copy, prices, conditions, legibility). "
+                   f"The fixes differ: the first needs clearer controls, the second feedback, the third better words.{cite('gulfs')}</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Stage</th>"
+                   + "".join(f"<th class='num'>{esc(t)}</th>" for t in GULFS.values())
+                   + "<th class='num'>Presses that did nothing</th></tr></thead><tbody>")
+        for r in flows["gulfs"]:
+            top = max(r[g] for g in GULFS)
+            out.append(f"<tr><td>{esc(r['label'])}</td>" + "".join(
+                f"<td class='num'>{'<b>' if r[g] and r[g] == top else ''}{r[g]}{'</b>' if r[g] and r[g] == top else ''}</td>" for g in GULFS)
+                + f"<td class='num'>{r['dead_presses']}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Friction notes the personas recorded, by journey stage and by kind, each friction type "
+                                                  "assigned to one column; the largest in each row is bold.") + "</figure>")
 
+    grade_word = {"toward": "toward the goal", "away": "away from it", "stayed": "stayed on the page", "nothing": "nothing happened",
+                  "unknown": "can't tell"}
+    if has_first:
+        said = any(v.get("first_impression") for v in nav.values())
+        out.append(h2("first", "First impressions and first clicks"))
+        out.append("<p>" + ("On their first screen, before acting, each persona said what they took the site to be and what they'd do first, "
+                            "as in a five-second test. " if said else "")
+                   + "The first press on a page is a strong early sign: in Bailey and colleagues' testing, people whose first click was "
+                   f"on the right path went on to succeed far more often than those whose first click was not.{cite('firstclick')}</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th>"
+                   + ("<th>What is this?</th><th>First move</th>" if said else "") + "<th>First press on the first page</th></tr></thead><tbody>")
+        for k, v in nav.items():
+            fi = v.get("first_impression") or {}
+            fc = next(iter(v.get("first_clicks") or []), None)
+            press = (f"step {fc['step']}: {esc(grade_word.get(fc['grade'], fc['grade']))}"
+                     + (f" ({esc(fc['led_to'])})" if fc["grade"] in ("toward", "away") else "")) if fc else "<span class='muted'>no press</span>"
+            out.append(f"<tr><td><b>{esc(names[k])}</b><br><span class='muted'>{esc(v['device'])}</span></td>"
+                       + (f"<td>{esc(fi.get('what_is_this') or '—')}</td><td>{esc(fi.get('first_move') or '—')}</td>" if said else "")
+                       + f"<td>{press}</td></tr>")
+        out.append("</tbody></table></div>" + fig(("First impressions in each persona's words, and where their first press led. "
+                                                   "Compare “What is this?” with what the site is for.") if said else
+                                                  "Where each persona's first press led. These walks were recorded before first impressions "
+                                                  "were asked for.") + "</figure>")
+        if flows.get("first_clicks"):
+            out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Page</th><th class='num'>First visits with a press</th>"
+                       "<th class='num'>Toward the goal</th><th class='num'>Away</th><th class='num'>Stayed</th><th class='num'>Nothing</th></tr></thead><tbody>")
+            for r in flows["first_clicks"]:
+                out.append(f"<tr><td>{esc(r['page'])}</td><td class='num'>{r['first_visits']}</td><td class='num'><b>{r.get('toward', 0)}</b></td>"
+                           f"<td class='num'>{r.get('away', 0)}</td><td class='num'>{r.get('stayed', 0)}</td><td class='num'>{r.get('nothing', 0)}</td></tr>")
+            out.append("</tbody></table></div>" + fig(
+                "The first press on each page, the first time a persona saw it. Toward: reached a later journey stage or the goal page. "
+                "Away: an earlier stage or a page outside the journey. Stayed: the screen changed without leaving the page, such as a menu. "
+                "Nothing: no visible change. A page where first presses go away or do nothing is hiding its next step.") + "</figure>")
+    if flows.get("scent"):
+        out.append(h2("scent", "Did presses do what people expected?"))
+        out.append("<p>Before each press, the persona said what they expected it to do; on the next screen, whether it did. Links and "
+                   "buttons that keep surprising people have weak <i>information scent</i>: their wording or look promises something the "
+                   f"next screen doesn't deliver.{cite('scent')}</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Page pressed on</th><th class='num'>Presses</th>"
+                   "<th class='num'>As expected</th><th class='num'>Partly</th><th class='num'>Not</th></tr></thead><tbody>")
+        for r in flows["scent"]:
+            out.append(f"<tr><td>{esc(r['page'])}</td><td class='num'>{r['presses']}</td><td class='num'>{r['yes']}</td>"
+                       f"<td class='num'>{r['partly']}</td><td class='num'><b>{r['no']}</b></td></tr>")
+        out.append("</tbody></table></div>" + fig("Presses by the page they were made on, with the persona's own verdict on the next screen. "
+                                                  "Worst first.") + "</figure>")
+        misses = [(r["page"], m) for r in flows["scent"] for m in r["misses"]]
+        if misses:
+            out.append("<ul class='plain'>" + "".join(
+                f"<li><b>{esc(names.get(m['session'], m['session']))}</b>, step {m['step']} on {esc(p)}: expected “{esc(m['expects'])}”; "
+                f"{esc(m['got'])} ({'partly' if m['as_expected'] == 'partly' else 'not'} what they expected)."
+                + (f" <span class='muted'>Next: “{esc(m['next_thought'])}”</span>" if m.get("next_thought") else "") + "</li>"
+                for p, m in misses[:20]) + "</ul>")
     # 05 accessibility
+    if measurements or wcag_rows:
+        out.append(h2("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
+    if wcag_rows:
+        out.append("<p>WCAG 2.2 success criteria the findings may fail. Personas saw only the screen, so these are leads for a proper "
+                   "accessibility audit with assistive technology, not a conformance result; contrast ones rest on the measurements below.</p>")
+        out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Criterion</th><th>Findings</th></tr></thead><tbody>")
+        for sc_id, fs in wcag_rows:
+            out.append(f"<tr><td><b>{esc(sc_id)}</b> {esc(WCAG_NAMES.get(sc_id, ''))}</td><td>"
+                       + "".join(f"<a class='chip' href='#finding-{esc(f.get('id'))}' title='{esc(f.get('title'))}'>{esc(f.get('id'))}</a> " for f in fs)
+                       + "</td></tr>")
+        out.append("</tbody></table></div>" + fig("Findings by the WCAG success criterion the reviewer tagged them with.") + "</figure>")
     if measurements:
-        out.append(h2("accessibility", "Accessibility measurements"))
         out.append(f"<p>Contrast and size were measured from screenshot pixels, not from the page's styles, and checked against WCAG 2.2: 4.5:1 for body "
                    f"text{cite('wcag-143')}, 3:1 for large text and interface components{cite('wcag-1411')}, and a 24 × 24 CSS px minimum target{cite('wcag-258')}.</p>")
         out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>ID</th><th>What</th><th>Colours</th><th class='num'>Ratio</th>"
@@ -832,6 +1754,24 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         out.append(f"<p>{s['responses']} of {s['of']} personas gave an exit interview. Ease averaged {s['ease_avg_1_7']} of 7, UMUX-Lite "
                    f"{s['umux_lite_avg_0_100']} of 100{cite('umux')}, satisfaction {s['satisfaction_avg_1_5']} of 5. On likelihood to recommend, "
                    f"{rc['9-10']} scored 9–10, {rc['7-8']} scored 7–8 and {rc['0-6']} scored 0–6. These are simulated answers, not a benchmark.</p>")
+        if s.get("reaction_words"):
+            rw = s["reaction_words"]
+            cols = []
+            for tone, title in (("negative", "Negative words"), ("positive", "Positive words")):
+                rows = [r for r in rw if r["tone"] == tone]
+                picks = sum(r["count"] for r in rows)
+                cols.append(f"<div><div class='rw-h'>{title} <span class='muted'>· {picks} picks</span></div>"
+                            + ("".join(f"<div class='rw' title='{esc(', '.join(names.get(x, x) for x in r['sessions']))}'><span>{esc(r['word'])}</span>"
+                                       f"<span class='rw-dots {tone}'>{'●' * r['count']}</span><span class='tv'>{r['count']}</span></div>" for r in rows)
+                               or "<div class='muted'>none picked</div>") + "</div>")
+            out.append("<figure class='fig'><div class='rwg'>" + "".join(cols) + "</div>" + fig(
+                f"The words each persona picked to describe the site after their walk, 3 to 5 each from a fixed, balanced list of "
+                f"product reaction cards, so they can be counted and compared between runs. One dot per persona.{cite('reaction')}") + "</figure>")
+        if s.get("say_do"):
+            out.append(say_do_chart(s["say_do"], names) + fig(
+                "What each persona said beside what they did: their ease rating (1–7) and UMUX-Lite (0–100) against how the walk ended. "
+                "A flagged row is a rating the recording contradicts; trust the recording, and read the walk."
+                f"{cite('saydo')}") + "</figure>")
     for r in fb.get("responses", []):
         if r.get("quote"):
             out.append(f"<blockquote>“{esc(r.get('quote'))}”<cite>{esc(names.get(r.get('session'), r.get('session')))}</cite></blockquote>")
@@ -843,9 +1783,24 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     # 07 discussion
     out.append(h2("discussion", "Discussion"))
-    for key, title in (("insights", "Patterns across personas"), ("what_works", "What works"), ("research_questions", "Questions to put to real users")):
+    for key, title in (("insights", "Patterns across personas"), ("what_works", "What works")):
         if ins.get(key):
             out.append(f"<h3>{title}</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins[key]) + "</ul>")
+    plan = research_plan(ins.get("research_questions"))
+    if plan:
+        out.append("<h3>A plan for testing with real users</h3><p>What these simulated walks can't settle, written as studies to run: "
+                   "the method, what to ask participants to do, who to recruit, and the result that would answer the question.</p>")
+        for i, q in enumerate(plan, 1):
+            links = " ".join(f"<a class='chip' href='#finding-{esc(x)}'>{esc(x)}</a>" for x in q["findings"])
+            if q.get("method"):
+                out.append(f"<div class='rq'><div class='rq-q'><span class='n'>Q{i}</span>{esc(q['question'])}</div><dl>"
+                           f"<dt>Method</dt><dd>{esc(q['method'])}</dd>"
+                           + (f"<dt>Task</dt><dd>{esc(q['task'])}</dd>" if q.get("task") else "")
+                           + (f"<dt>Recruit</dt><dd>{esc(q['recruit'])}</dd>" if q.get("recruit") else "")
+                           + (f"<dt>Answered by</dt><dd>{esc(q['measure'])}</dd>" if q.get("measure") else "")
+                           + (f"<dt>Tests</dt><dd>{links}</dd>" if links else "") + "</dl></div>")
+            else:
+                out.append(f"<div class='rq'><div class='rq-q'><span class='n'>Q{i}</span>{esc(q['question'])}</div></div>")
 
     # 08 limitations
     out.append(h2("limitations", "Limitations"))
@@ -890,13 +1845,26 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     md = [f"# {study.get('product')}: visual persona crawl", "", f"Study {study.get('id')} · {n} simulated personas · mode {study.get('mode')}", ""]
     if ins.get("headline"):
         md += [f"**{ins['headline']}**", ""]
-    md += ["## Outcomes", "", "| Persona | Device | Outcome | Steps | Path |", "|---|---|---|---|---|"]
-    md += [f"| {v['persona'].get('name')} | {v['device']} | {v['outcome']} | {v['steps_taken']} | {' → '.join(p['page'] for p in v['path'])} |" for v in nav.values()]
+    md += ["## Outcomes", "", "| Persona | Device | Outcome | Success | Lostness | Steps | Path |", "|---|---|---|---|---|---|---|"]
+    md += [f"| {v['persona'].get('name')} | {v['device']} | {v['outcome']} | {SUCCESS_LEVELS.get((v.get('success') or {}).get('level'), '')} | "
+           f"{'' if (v.get('success') or {}).get('lostness') is None else v['success']['lostness']} | {v['steps_taken']} | "
+           f"{' → '.join(p['page'] for p in v['path'])} |" for v in nav.values()]
     md += ["", "## Bottlenecks", "", "| | Page | Score | Dead clicks | Backtracked from | Left short of goal |", "|---|---|---|---|---|---|"]
     md += [f"| {p['handle']} | {p['page']} | {p['bottleneck_score']} | {p['score_parts']['dead_clicks']} | {p['score_parts']['backtracked_from']} | {p['score_parts']['exits_short_of_goal']} |" for p in flows["pages"][:6]]
     md += ["", "## Findings", ""]
     for f in findings:
         md.append(f"- **{f['id']}** [{f['severity']} · {f['category']}] {f['title']}: {f.get('recommendation', '')}")
+    if findings:
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        mark = {"hit": "●", "past": "○", "none": ""}
+        md += ["", "## Who hit what", "", "● hit it · ○ reached the page and got past it · blank: never reached the page", "",
+               "| | " + " | ".join(short[c] for c in cols) + " |", "|---|" + "---|" * len(cols)]
+        md += [f"| {f['id']} | " + " | ".join(mark[s] for s in rainbow_row(f, cols, nav)) + " |" for f in findings]
+    wrong = [(k, c, b) for k in beliefs for c, b in k["personas"].items() if b.get("belief") == "wrong"]
+    if wrong:
+        md += ["", "## What people came away believing wrongly", ""]
+        md += [f"- **{k['id']}** {names.get(c, c)} believed \"{b['held']}\" (step {b.get('step')}); the site says {k['fact']}." for k, c, b in wrong]
     md += ["", 'Ask "show me F1" or "how do you know a real person would struggle here?" to see the screens, steps and measurements behind any finding.']
     (study_dir / "report.md").write_text("\n".join(md), encoding="utf-8")
     print(json.dumps({"report": shown(study_dir / "report.html"), "findings": len(findings), "removed": len(vf["removed"])}))
@@ -922,8 +1890,12 @@ def export(study_dir: Path) -> int:
                  f"**Confidence:** {f.get('confidence', '')}", "",
                  f"**Seen by simulated personas:** {', '.join(f.get('personas', []))}"
                  + (f" (hit in {f['exposure']['walks_hit']} of {f['exposure']['walks_reached']} walks that reached the page)"
-                    if (f.get("exposure") or {}).get("walks_reached") else ""), "",
-                 "## What happens", "", str(f.get("description", "")), ""]
+                    if (f.get("exposure") or {}).get("walks_reached") else ""), ""]
+        if severity_parts(f):
+            lines += [f"**Severity in parts:** {severity_parts(f)}", ""]
+        if finding_tags(f):
+            lines += [f"**Tags:** {finding_tags(f)}", ""]
+        lines += ["## What happens", "", str(f.get("description", "")), ""]
         if f.get("conflict"):
             lines += ["## The two statements", ""] + [f"- {c}" for c in f["conflict"]] + [""]
         if f.get("measurement"):
@@ -934,6 +1906,12 @@ def export(study_dir: Path) -> int:
             quote = f' — "{e["quote"]}"' if e.get("quote") else ""
             pic = f"\n\n  ![{fid} evidence](../{e['crop']})" if e.get("crop") else ""
             lines.append(f"- {where}{quote}{pic}")
+        for s in f.get("screens", []):
+            lines += ["", f"Whole screen, session `{s['session']}` step {s['step']} (evidence {', '.join(map(str, s['marks']))} outlined):",
+                      "", f"![{fid} whole screen](../{s['image']})"]
+        if f.get("filmstrip"):
+            st = f["filmstrip"]
+            lines += ["", f"How `{st['session']}` got there (steps {', '.join(map(str, st['steps']))}):", "", f"![{fid} filmstrip](../{st['image']})"]
         lines += ["", "## Suggested fix", "", str(f.get("recommendation", "")), "",
                   f"_From a simulated persona study ({study.get('id')}, {study.get('product')}). "
                   "It shows where to look, not how many real customers are affected._", ""]
@@ -943,6 +1921,8 @@ def export(study_dir: Path) -> int:
                      "recommendation": f.get("recommendation"), "measurement": f.get("measurement", ""),
                      "walks_hit": (f.get("exposure") or {}).get("walks_hit", ""),
                      "walks_reached": (f.get("exposure") or {}).get("walks_reached", ""),
+                     "impact": f.get("impact", ""), "persistence": f.get("persistence", ""), "fix_effort": f.get("fix_effort", ""),
+                     "gulf": f.get("gulf", ""), "heuristics": "; ".join(f.get("heuristics") or []), "wcag": "; ".join(f.get("wcag") or []),
                      "evidence": "; ".join(f"{e.get('session')}#{e.get('step')}" for e in f.get("evidence", [])),
                      "ticket": f"issues/{fid}.md"})
     with (study_dir / "findings.csv").open("w", encoding="utf-8-sig", newline="") as fh:
@@ -950,9 +1930,18 @@ def export(study_dir: Path) -> int:
         w.writeheader()
         w.writerows(rows)
     if ins.get("research_questions"):
-        (out_dir / "research-questions.md").write_text(
-            "# Questions to test with real users\n\n" + "\n".join(f"- {q}" for q in ins["research_questions"]) + "\n",
-            encoding="utf-8")
+        md = [f"# Test plan: questions for real users", "",
+              f"From the simulated persona study {study.get('id')} ({study.get('product')}). Each question is something the "
+              "simulated walks pointed at but can't settle.", ""]
+        for i, q in enumerate(research_plan(ins["research_questions"]), 1):
+            md += [f"## Q{i}. {q['question']}", ""]
+            for key, label in (("method", "Method"), ("task", "Task"), ("recruit", "Recruit"), ("measure", "Answered by")):
+                if q.get(key):
+                    md.append(f"- **{label}:** {q[key]}")
+            if q["findings"]:
+                md.append(f"- **Tests findings:** {', '.join(q['findings'])} (tickets in this folder)")
+            md.append("")
+        (out_dir / "research-questions.md").write_text("\n".join(md), encoding="utf-8")
     print(json.dumps({"tickets": len(rows), "folder": shown(out_dir), "csv": shown(study_dir / "findings.csv")}))
     return 0
 

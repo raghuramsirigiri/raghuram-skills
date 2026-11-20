@@ -82,12 +82,22 @@ python "[DRIVER]" act --session "[SESSION]" <<'EOF'
     "friction": [{"type": "button_unclear", "severity": "medium", "note": "what got in the way", "where": [x, y, width, height], "quote": "exact words if any"}],
     "est_seconds": 20,
     "triggers_met": [],
-    "memory": "what they'd remember from this screen going forward"
+    "memory": "what they'd remember from this screen going forward",
+    "as_expected": "yes",
+    "expects": "what this press will do: where it goes, or what appears"
   },
   "action": {"type": "click", "x": 640, "y": 410}
 }
 EOF
 ```
+
+On your **first screen only**, before you scroll or read closely, add `"first_impression": {"what_is_this": "...", "first_move": "..."}` inside `decision`, beside `thought`: `what_is_this`, what this person takes the site to be for from a first glance, and `first_move`, what they would do first and where. Write the glance, not a study of the page: if it isn't clear what the site is for, say so.
+
+Every **click or double-click** needs `expects`: in this person's words, what they think pressing it will do ("shows the prices", "opens a form", "not sure, maybe more detail"). Write it before you see the result.
+
+On the screen **after a click**, give `as_expected`: `yes` if the press did what you expected, `partly` if it went roughly the right way but not quite, `no` if it did something else or nothing. Judge it from this screen, not from what you hope the site will do next. If it was `partly` or `no`, say what surprised you in `thought`.
+
+The driver refuses a step that leaves out any of these three where it's needed, and says which.
 
 `triggers_met` lists the numbers of your give-up conditions this screen meets; send `[]` when none is. `noticed`, `emotion` and `memory` are optional: write them when the screen is new or something changed for this person, and leave them out on routine steps such as a second scroll down the same page. Everything else is needed every time.
 
@@ -111,7 +121,8 @@ Actions (positions are pixels on the screenshot):
 | Scroll | `{"type":"scroll","direction":"down","amount":"screen"}` (`amount`: `little`, `half`, `screen`; add `x`,`y` to scroll a panel) |
 | Type into the box you clicked | `{"type":"type","text":"words","enter":false}` |
 | Fill several fields on this screen in one go | `{"type":"fill","fields":[{"x":400,"y":300,"text":"test:email"},{"x":400,"y":380,"text":"Testville"},{"x":40,"y":520}]}` (up to 8; each is a click at x,y, then its text if it has one; an item with no text ticks or picks what is there) |
-| Press a key | `{"type":"key","key":"Tab"}` (`Tab`, `Shift+Tab`, `Enter`, `Escape`, `Space`, `Backspace`, arrows, `PageDown`, `PageUp`, `Home`, `End`) |
+| Press a key | `{"type":"key","key":"Tab"}` (`Tab`, `Shift+Tab`, `Enter`, `Escape`, `Space`, `Backspace`, `Delete`, arrows, `PageDown`, `PageUp`, `Home`, `End`, `SelectAll`) |
+| Replace what a box holds | click the box, then `{"type":"key","key":"SelectAll"}`, then type: typing into a filled box adds to its text |
 | Browser back | `{"type":"back"}` |
 | Wait for something to load | `{"type":"wait"}` |
 | Stop | `{"type":"finish","outcome":"gave_up","reason":"why, in their words"}` |
@@ -145,7 +156,7 @@ python "[DRIVER]" feedback --session "[SESSION]" <<'EOF'
   "recommend": "...",
   "satisfaction": "..."
  },
- "one_word": "...",
+ "reaction_words": ["...", "...", "..."],
  "best_thing": "...",
  "worst_thing": "...",
  "what_would_fix_it": "...",
@@ -156,6 +167,8 @@ EOF
 ```
 
 Write numbers where the example shows a range. If the driver ends the walk for you (a give-up condition met, patience run out, the step limit, or nothing changing for several actions), its result has the same `walk_recap`; answer the same way.
+
+`reaction_words`: the 3 to 5 words from this list that best describe the site to this person after this walk, spelled as shown. Pick from the whole list, not only the side you expect: [REACTION WORDS].
 
 `ease`: how easy the task was overall, 1 very hard to 7 very easy. `meets_needs` and `easy_to_use`: agreement with "This site meets my needs" and "This site is easy to use", 1 strongly disagree to 7 strongly agree. `recommend`: 0 to 10. `satisfaction`: 1 to 5.
 
