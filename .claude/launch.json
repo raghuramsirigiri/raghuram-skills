@@ -61,6 +61,17 @@
         "dev"
       ],
       "port": 5190
+    },
+    {
+      "name": "fictional-ride-booking",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "test/fictional-ride-booking",
+        "run",
+        "dev"
+      ],
+      "port": 5192
     }
   ]
 }
