@@ -213,6 +213,15 @@ class Study(unittest.TestCase):
         self.assertTrue(driver.is_backtrack("back", "http://h/store/a?item=x", "http://h/store/a", seen))
         self.assertFalse(driver.is_backtrack("click", "http://h/store/a", "http://h/stores", seen))
 
+    def test_select_all_lets_a_walker_replace_what_a_box_holds(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        self.assertEqual(driver.key_to_press("SelectAll", "win32"), "Control+a")
+        self.assertEqual(driver.key_to_press("SelectAll", "linux"), "Control+a")
+        self.assertEqual(driver.key_to_press("SelectAll", "darwin"), "Meta+a")
+        self.assertEqual(driver.key_to_press("Tab"), "Tab")
+        self.assertIsNone(driver.key_to_press("Control+a"))  # raw chords stay out of the walker's reach
+
     def test_a_press_that_worked_gives_patience_back(self):
         sys.path.insert(0, str(EYES.parent))
         import eyes as driver

@@ -121,7 +121,8 @@ Actions (positions are pixels on the screenshot):
 | Scroll | `{"type":"scroll","direction":"down","amount":"screen"}` (`amount`: `little`, `half`, `screen`; add `x`,`y` to scroll a panel) |
 | Type into the box you clicked | `{"type":"type","text":"words","enter":false}` |
 | Fill several fields on this screen in one go | `{"type":"fill","fields":[{"x":400,"y":300,"text":"test:email"},{"x":400,"y":380,"text":"Testville"},{"x":40,"y":520}]}` (up to 8; each is a click at x,y, then its text if it has one; an item with no text ticks or picks what is there) |
-| Press a key | `{"type":"key","key":"Tab"}` (`Tab`, `Shift+Tab`, `Enter`, `Escape`, `Space`, `Backspace`, arrows, `PageDown`, `PageUp`, `Home`, `End`) |
+| Press a key | `{"type":"key","key":"Tab"}` (`Tab`, `Shift+Tab`, `Enter`, `Escape`, `Space`, `Backspace`, `Delete`, arrows, `PageDown`, `PageUp`, `Home`, `End`, `SelectAll`) |
+| Replace what a box holds | click the box, then `{"type":"key","key":"SelectAll"}`, then type: typing into a filled box adds to its text |
 | Browser back | `{"type":"back"}` |
 | Wait for something to load | `{"type":"wait"}` |
 | Stop | `{"type":"finish","outcome":"gave_up","reason":"why, in their words"}` |

@@ -53,6 +53,19 @@ OUTCOMES = {
 DECISION_KEYS = ("thought", "read", "clarity", "trust", "effort", "doubts", "friction", "est_seconds")
 # Worth writing only when something new happens on a screen; left out, they are recorded as empty.
 OPTIONAL_DECISION_KEYS = ("noticed", "emotion", "memory")
+# Keys a walker may press. SelectAll is the select-all shortcut a person uses to replace what a box already
+# holds; without it, retyping a refused value only adds to the old text, and the walk records the driver.
+WALKER_KEYS = {"Tab", "Shift+Tab", "Enter", "Escape", "Space", "Backspace", "Delete", "ArrowDown", "ArrowUp",
+               "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End", "SelectAll"}
+
+
+def key_to_press(key, platform=sys.platform):
+    """The Playwright key for a walker's key name, or None if it isn't one walkers may press."""
+    if key not in WALKER_KEYS:
+        return None
+    if key == "SelectAll":
+        return "Meta+a" if platform == "darwin" else "Control+a"
+    return key
 FRICTION_TYPES = {
     "unclear_copy", "missing_information", "contradiction", "hidden_cost_or_condition", "surprise_requirement",
     "trust_concern", "navigation", "dead_end", "button_unclear", "button_hard_to_find", "low_contrast",
@@ -1049,11 +1062,10 @@ class Session:
                     await page.keyboard.press("Enter")
             elif kind == "key":
                 key = str(action.get("key", ""))
-                allowed = {"Tab", "Shift+Tab", "Enter", "Escape", "Space", "Backspace", "ArrowDown", "ArrowUp",
-                           "ArrowLeft", "ArrowRight", "PageDown", "PageUp", "Home", "End"}
-                if key not in allowed:
-                    return {"ok": False, "error": f"key must be one of {sorted(allowed)}"}
-                await page.keyboard.press(key)
+                press = key_to_press(key)
+                if press is None:
+                    return {"ok": False, "error": f"key must be one of {sorted(WALKER_KEYS)}"}
+                await page.keyboard.press(press)
             elif kind == "scroll":
                 amount = {"little": 0.3, "half": 0.5, "screen": 0.85}.get(action.get("amount", "screen"), 0.85)
                 vp = page.viewport_size or {"width": 1280, "height": 800}
