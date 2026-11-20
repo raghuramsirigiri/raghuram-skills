@@ -1421,6 +1421,24 @@ def lint_personas(people) -> tuple:
         warnings.append(f"only {mobile} of {len(people)} on a phone; aim for at least a third")
     if not any(p.get("browser_zoom", 100) > 100 or p.get("vision") for p in people):
         warnings.append("nobody browses at larger zoom or with a vision setting")
+    # The product's own profile attributes (turnover, headcount, the car insured...) must be the same keys for everyone,
+    # or the panel can't be compared on them and some walks meet the page that branches on them without the facts.
+    profiles = {(p.get("id") or f"persona {i}"): p.get("customer_profile") for i, p in enumerate(people, 1)}
+    if any(v is not None for v in profiles.values()):
+        for who, v in profiles.items():
+            if v is not None and not isinstance(v, dict):
+                errors.append(f"{who}: customer_profile must be an object of attribute: band")
+        keys = set().union(*(v.keys() for v in profiles.values() if isinstance(v, dict)))
+        for who, v in profiles.items():
+            missing = sorted(keys - set(v or {})) if isinstance(v, dict) or v is None else []
+            if missing:
+                warnings.append(f"{who}: customer_profile has no {', '.join(missing)}, which other personas have; "
+                                "give everyone the same attributes")
+        for k in sorted(keys):
+            bands = {str(v[k]) for v in profiles.values() if isinstance(v, dict) and k in v}
+            if len(people) > 2 and len(bands) < 2:
+                warnings.append(f"everyone has the same customer_profile {k}; spread the panel across the bands that change "
+                                "what the site shows")
     held = {s.get("stance") for p in people for s in (p.get("stances") or []) if isinstance(s, dict)}
     if len(people) > 1 and len(held) < 2:
         warnings.append(f"the panel holds {len(held) or 'no'} decision stance{'' if len(held) == 1 else 's'}; "

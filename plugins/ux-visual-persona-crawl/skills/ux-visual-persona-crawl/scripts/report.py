@@ -216,7 +216,8 @@ def analyze(study_dir: Path) -> dict:
     for name, v in navigation.items():
         p = by_id.get(v["persona"]["id"], {})
         demo_rows.append({"session": name, "persona": p.get("id"), "name": p.get("name"), "device": p.get("device"),
-                          "demographics": p.get("demographics", {}), "stances": p.get("stances") or [],
+                          "demographics": p.get("demographics", {}), "customer_profile": p.get("customer_profile") or {},
+                          "stances": p.get("stances") or [],
                           "outcome": v["outcome"]})
     fb_rows = [dict(s["feedback"], session=n) for n, s in data.items() if s["feedback"]]
     summary = {}
@@ -1475,10 +1476,13 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         d = r.get("demographics") or {}
         bits = [d.get(k) for k in ("age_band", "occupation", "location", "tech_usage") if d.get(k)]
         acc = d.get("access_needs") or []
+        cp = r.get("customer_profile") if isinstance(r.get("customer_profile"), dict) else {}
+        prof = "; ".join(f"{str(k).replace('_', ' ')} {v}" for k, v in cp.items())
         sts = [f"{s['stance']} {s['level']}/5" if s.get("level") else str(s["stance"])
                for s in r.get("stances") or [] if isinstance(s, dict) and s.get("stance")]
         out.append(f"<tr><td><b>{esc(r.get('name'))}</b></td><td>{esc(r.get('device'))}</td><td>{esc('; '.join(map(str, bits)))}"
                    + (f"<br><span class='muted'>Access: {esc(', '.join(map(str, acc)))}</span>" if acc else "")
+                   + (f"<br><span class='muted'>Profile: {esc(prof)}</span>" if prof else "")
                    + (f"<br><span class='muted'>Stances: {esc(', '.join(sts))}</span>" if sts else "") + f"</td><td>{ol(r.get('outcome'))}</td></tr>")
     out.append("</tbody></table></div>" + fig("The panel. Demographics describe who each simulated persona stands in for; they are not respondents.") + "</figure>")
 

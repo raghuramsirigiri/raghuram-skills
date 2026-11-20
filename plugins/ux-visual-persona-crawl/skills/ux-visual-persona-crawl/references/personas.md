@@ -12,6 +12,19 @@ The panel stands in for the site's intended audience, so settle that audience be
 
 If the audience is still unclear after step 3, ask the user before writing the panel. This happens when the site serves several distinct groups, or when nothing on it says who it's for. Offer two to four candidate audiences as choices, each with its age band, situation and device mix, and also offer "a spread across all of them". One question is enough; don't interview them. If they can't be asked, pick the broadest reading, and say so under what wasn't tested.
 
+## Profile the customer the way the product does
+
+`demographics` describes the person. Most products also judge the customer by things that aren't about the person: what the site prices, qualifies and recommends by. A business bank decides by the business's turnover, headcount, years trading, legal structure and sector. A car insurer decides by the car, the driver's record and the postcode. A mortgage lender looks at the deposit, income and property. A team software product looks at team size and the tools already in use. These facts decide which plan the site shows someone, whether they qualify, and what the form asks them for. A panel without them can't meet the page that branches on them.
+
+So before writing anyone, list the product's own **profile attributes**:
+
+1. Ask what this kind of product prices by, sets eligibility by, and asks for on its application. Answer from what the product is, not from recon's view of the form (SKILL.md step 3).
+2. Keep the attributes that change what a customer would see or be offered. Usually that's 3 to 6, and they're often about an organisation, a household or an asset the person acts for rather than the person.
+3. Write them in each persona's `customer_profile`, with **the same keys for everyone** and bands rather than exact figures, for example `{"annual_turnover": "£85k–£250k", "employees": "1–4", "years_trading": "under 1"}`.
+4. Spread the panel across the bands that matter. That means the smallest and the largest the product serves, the newest and the most established, and at least one person near an eligibility edge, such as a business too young for a lending product or a turnover just above a free-banking limit.
+
+If the user named the audience in these terms ("SMEs with £1m–£10m turnover"), every persona falls inside that. A consumer product where nothing is judged beyond the person needs no `customer_profile`: leave it out for the whole panel.
+
 ## Decision stances: what shapes how they explore and decide
 
 Traits such as patience and tech confidence say how well someone copes with the interface. A **stance** says what they are looking for while they use it, and what would make them buy, sign up or walk away. Two people with equal skill take different routes through the same site when one checks every claim and the other wants to know where their data goes. Write stances in `stances` (format below). Give a person one or two; a panel where everyone holds every stance behaves like nobody.
@@ -47,6 +60,7 @@ Choose 4 to 8 people so these are all covered at least once:
 | Device | Mobile for at least a third of the panel, more if the audience is mobile-heavy |
 | Eyesight and access | At least one person at `browser_zoom` 150 or 200, or who relies on the keyboard, or who needs plain language. Colour blindness affects about 1 in 12 men: when colour carries meaning on the site (prices, statuses, errors, charts), include a `vision` persona |
 | Trust | Existing customer / new to the brand / sceptical |
+| Customer profile | When the product judges more than the person, the bands of each `customer_profile` attribute that change price, eligibility or the plan shown, including one person near an eligibility edge |
 | Decision stances | At least two different stances across the panel, chosen from what this audience weighs. Include `sceptic`, `privacy` or `eco` when the audience would plausibly contain one |
 
 Give each person a reason to be on the site **today**, and one thing they don't have or don't know. That gap is what surfaces friction: someone holding every document never shows you where the requirements are unclear.
@@ -108,6 +122,7 @@ If the user supplied real customer data (segments, survey results, an analytics 
 | `color_scheme`, `reduced_motion`, `locale`, `timezone` | Optional device settings: `dark` mode, `true` to ask the site for less motion, a language such as `fr-FR`, a zone such as `Europe/Paris`. Use them when the panel's customers would have them, and to see whether the site holds up in that state |
 | `task` | What they came to do, in their own terms. The walker brief gives them this, so it's their goal and not the study's |
 | `traits` | 1 to 5, where 5 is highest. `reading` is `skims` or `careful`. `eyesight` 1 to 5 tells the persona how hard faint or small text is for them |
+| `customer_profile` | What the product judges beyond the person (see above): free-form keys derived per product, the same keys for every persona, with bands as values. The walker knows these facts as their own, and the report shows them in the panel table. Leave it out of the whole panel for a product that judges only the person |
 | `stances` | Optional list of decision stances (see above). `stance` is `sceptic`, `privacy`, `eco` or a short slug of your own. `level` is 1 to 5, how strongly it steers them. `looks_for` lists what they hunt for on screen and `acts_by` how it changes their route; both are required. `why` is optional: the history behind it. The walker reads these as part of who they are. A stance's deal-breaker belongs in `gives_up_when` and its must-haves in `must_know_before_acting`, so the driver and the exit interview hold the walker to them. The report splits outcomes by stance |
 | `assumptions_not_allowed` | Things this person must not know unless they see them on screen. This stops the model's general knowledge leaking in |
 | `gives_up_when` | Concrete triggers. Without these, simulated people persist far longer than real ones. The driver enforces them; see below |

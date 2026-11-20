@@ -222,6 +222,22 @@ class Study(unittest.TestCase):
         seg = next(x for x in report.segments({}, nav, by_id, []) if x["dimension"] == "Stance: privacy")
         self.assertEqual([s["name"] for s in seg["segments"]], ["Strongly privacy (4–5)", "Others"])
 
+    def test_customer_profile_keys_match_and_spread(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        base = {"name": "N", "task": "t"}
+        people = [dict(base, id="a", customer_profile={"turnover": "under 85k", "employees": "1"}),
+                  dict(base, id="b", customer_profile={"turnover": "1m-6.5m"}),
+                  dict(base, id="c", customer_profile={"turnover": "85k-1m", "employees": "1"})]
+        errors, warnings = driver.lint_personas(people)
+        self.assertEqual(errors, [])
+        self.assertTrue(any(w.startswith("b: customer_profile has no employees") for w in warnings))
+        self.assertTrue(any("same customer_profile employees" in w for w in warnings))
+        self.assertFalse(any("same customer_profile turnover" in w for w in warnings))
+        self.assertTrue(driver.lint_personas([dict(base, id="a", customer_profile=["x"])])[0])
+        # A consumer panel with no profile anywhere is fine.
+        self.assertFalse(any("customer_profile" in w for w in driver.lint_personas([dict(base, id="a")])[1]))
+
     def test_going_back_is_the_path_not_the_query(self):
         sys.path.insert(0, str(EYES.parent))
         import eyes as driver
