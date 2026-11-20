@@ -50,6 +50,17 @@
         "dev"
       ],
       "port": 5188
+    },
+    {
+      "name": "fictional-food-delivery",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "test/fictional-food-delivery",
+        "run",
+        "dev"
+      ],
+      "port": 5190
     }
   ]
 }
