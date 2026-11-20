@@ -216,7 +216,9 @@ def analyze(study_dir: Path) -> dict:
     for name, v in navigation.items():
         p = by_id.get(v["persona"]["id"], {})
         demo_rows.append({"session": name, "persona": p.get("id"), "name": p.get("name"), "device": p.get("device"),
-                          "demographics": p.get("demographics", {}), "outcome": v["outcome"]})
+                          "demographics": p.get("demographics", {}), "customer_profile": p.get("customer_profile") or {},
+                          "stances": p.get("stances") or [],
+                          "outcome": v["outcome"]})
     fb_rows = [dict(s["feedback"], session=n) for n, s in data.items() if s["feedback"]]
     summary = {}
     if fb_rows:
@@ -470,7 +472,7 @@ def plan_notes(questions, finding_ids: set) -> list:
 
 
 def segments(study: dict, navigation: dict, by_id: dict, funnel: list) -> list:
-    """The funnel and success levels split by kind of customer: device, tech confidence, and access needs.
+    """The funnel and success levels split by kind of customer: device, tech confidence, access needs, and each decision stance someone holds at level 4-5.
     A dimension is kept only when the panel has at least two groups on it. Counts, never rates."""
     def tech(p):
         t = (p.get("traits") or {}).get("tech_confidence")
@@ -484,6 +486,11 @@ def segments(study: dict, navigation: dict, by_id: dict, funnel: list) -> list:
     dims = [("Device", lambda p, v: (v.get("device") or "desktop").capitalize()),
             ("Tech confidence", lambda p, v: tech(p)),
             ("Access needs", access)]
+    # One split per decision stance the panel holds strongly (level 4-5): those who hold it against everyone else.
+    def strong(p):
+        return {s["stance"] for s in (p.get("stances") or []) if isinstance(s, dict) and s.get("stance") and (s.get("level") or 0) >= 4}
+    for st in sorted({s for p in by_id.values() for s in strong(p)}):
+        dims.append((f"Stance: {st}", lambda p, v, st=st: f"Strongly {st} (4–5)" if st in strong(p) else "Others"))
     out = []
     for label, key in dims:
         groups = {}
@@ -495,7 +502,7 @@ def segments(study: dict, navigation: dict, by_id: dict, funnel: list) -> list:
             continue
         segs = []
         rank = ["Low tech confidence (1–2)", "Middling (3)", "High tech confidence (4–5)", "With access needs", "Without"]
-        for g, names in sorted(groups.items(), key=lambda kv: (rank.index(kv[0]) if kv[0] in rank else 0, kv[0])):
+        for g, names in sorted(groups.items(), key=lambda kv: (rank.index(kv[0]) if kv[0] in rank else kv[0] == "Others", kv[0])):
             levels = defaultdict(int)
             for n in names:
                 levels[(navigation[n].get("success") or {}).get("level", "not_scored")] += 1
@@ -1469,8 +1476,14 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         d = r.get("demographics") or {}
         bits = [d.get(k) for k in ("age_band", "occupation", "location", "tech_usage") if d.get(k)]
         acc = d.get("access_needs") or []
+        cp = r.get("customer_profile") if isinstance(r.get("customer_profile"), dict) else {}
+        prof = "; ".join(f"{str(k).replace('_', ' ')} {v}" for k, v in cp.items())
+        sts = [f"{s['stance']} {s['level']}/5" if s.get("level") else str(s["stance"])
+               for s in r.get("stances") or [] if isinstance(s, dict) and s.get("stance")]
         out.append(f"<tr><td><b>{esc(r.get('name'))}</b></td><td>{esc(r.get('device'))}</td><td>{esc('; '.join(map(str, bits)))}"
-                   + (f"<br><span class='muted'>Access: {esc(', '.join(map(str, acc)))}</span>" if acc else "") + f"</td><td>{ol(r.get('outcome'))}</td></tr>")
+                   + (f"<br><span class='muted'>Access: {esc(', '.join(map(str, acc)))}</span>" if acc else "")
+                   + (f"<br><span class='muted'>Profile: {esc(prof)}</span>" if prof else "")
+                   + (f"<br><span class='muted'>Stances: {esc(', '.join(sts))}</span>" if sts else "") + f"</td><td>{ol(r.get('outcome'))}</td></tr>")
     out.append("</tbody></table></div>" + fig("The panel. Demographics describe who each simulated persona stands in for; they are not respondents.") + "</figure>")
 
     # 02 outcomes

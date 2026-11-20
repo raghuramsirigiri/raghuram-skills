@@ -1403,6 +1403,7 @@ def lint_personas(people) -> tuple:
         for t, v in (p.get("traits") or {}).items():
             if t != "reading" and not (isinstance(v, (int, float)) and 1 <= v <= 5):
                 errors.append(f"{who}: trait {t} must be 1 to 5")
+        errors += [f"{who}: {e}" for e in stance_problems(p.get("stances"))]
         if not p.get("gives_up_when"):
             warnings.append(f"{who}: no gives_up_when, so this person will persist far longer than a real one")
         elif not isinstance(p["gives_up_when"], list):
@@ -1420,7 +1421,53 @@ def lint_personas(people) -> tuple:
         warnings.append(f"only {mobile} of {len(people)} on a phone; aim for at least a third")
     if not any(p.get("browser_zoom", 100) > 100 or p.get("vision") for p in people):
         warnings.append("nobody browses at larger zoom or with a vision setting")
+    # The product's own profile attributes (turnover, headcount, the car insured...) must be the same keys for everyone,
+    # or the panel can't be compared on them and some walks meet the page that branches on them without the facts.
+    profiles = {(p.get("id") or f"persona {i}"): p.get("customer_profile") for i, p in enumerate(people, 1)}
+    if any(v is not None for v in profiles.values()):
+        for who, v in profiles.items():
+            if v is not None and not isinstance(v, dict):
+                errors.append(f"{who}: customer_profile must be an object of attribute: band")
+        keys = set().union(*(v.keys() for v in profiles.values() if isinstance(v, dict)))
+        for who, v in profiles.items():
+            missing = sorted(keys - set(v or {})) if isinstance(v, dict) or v is None else []
+            if missing:
+                warnings.append(f"{who}: customer_profile has no {', '.join(missing)}, which other personas have; "
+                                "give everyone the same attributes")
+        for k in sorted(keys):
+            bands = {str(v[k]) for v in profiles.values() if isinstance(v, dict) and k in v}
+            if len(people) > 2 and len(bands) < 2:
+                warnings.append(f"everyone has the same customer_profile {k}; spread the panel across the bands that change "
+                                "what the site shows")
+    held = {s.get("stance") for p in people for s in (p.get("stances") or []) if isinstance(s, dict)}
+    if len(people) > 1 and len(held) < 2:
+        warnings.append(f"the panel holds {len(held) or 'no'} decision stance{'' if len(held) == 1 else 's'}; "
+                        "give people different stances (sceptic, privacy, eco, or ones from the task) so they decide differently")
     return errors, warnings
+
+
+def stance_problems(stances) -> list:
+    """What's wrong with a persona's decision stances: each needs a name, a 1-5 level, and what it changes on screen."""
+    if stances is None:
+        return []
+    if not isinstance(stances, list):
+        return ["stances must be a list"]
+    out, names = [], set()
+    for i, s in enumerate(stances, 1):
+        if not isinstance(s, dict) or not isinstance(s.get("stance"), str) or not s["stance"].strip():
+            out.append(f"stance {i} needs a 'stance' name")
+            continue
+        name = s["stance"].strip()
+        if name in names:
+            out.append(f"stance {name} is listed twice")
+        names.add(name)
+        if not (isinstance(s.get("level"), (int, float)) and 1 <= s["level"] <= 5):
+            out.append(f"stance {name}: level must be 1 to 5")
+        for key in ("looks_for", "acts_by"):
+            v = s.get(key)
+            if not (isinstance(v, list) and v and all(isinstance(x, str) and x.strip() for x in v)):
+                out.append(f"stance {name}: {key} must be a non-empty list of sentences, or the walker can't act on it")
+    return out
 
 
 def report_command() -> str:

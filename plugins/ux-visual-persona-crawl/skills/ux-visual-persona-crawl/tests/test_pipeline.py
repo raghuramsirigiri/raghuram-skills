@@ -201,6 +201,43 @@ class Study(unittest.TestCase):
         st = {"mode": "test_env", "test_data": {"card": "4242", "meter": "0"}, "shared_test_data": ["card"]}
         self.assertEqual(driver.shared_test_values(st, [{"id": "a"}, {"id": "b"}]), ["meter"])
 
+    def test_stances_are_checked_and_split_in_the_report(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        good = {"stance": "privacy", "level": 4, "looks_for": ["What is asked for"], "acts_by": ["Declines cookies"]}
+        self.assertEqual(driver.stance_problems([good, dict(good, stance="eco", level=2)]), [])
+        bad = driver.stance_problems([good, good, {"stance": "sceptic", "level": 9, "looks_for": []}, "eco"])
+        self.assertTrue(any("twice" in e for e in bad))
+        self.assertTrue(any("level must be 1 to 5" in e for e in bad))
+        self.assertTrue(any("looks_for" in e for e in bad) and any("acts_by" in e for e in bad))
+        self.assertTrue(any("needs a 'stance'" in e for e in bad))
+        errors, warnings = driver.lint_personas([{"id": "a", "name": "A", "task": "t", "stances": [good]},
+                                                 {"id": "b", "name": "B", "task": "t"}])
+        self.assertEqual(errors, [])
+        self.assertTrue(any("decision stance" in w for w in warnings))
+        sys.path.insert(0, str(EYES.parent))
+        import report
+        by_id = {"a": {"stances": [good]}, "b": {"stances": [dict(good, level=2)]}}
+        nav = {n: {"persona": {"id": n}, "device": "desktop", "stages_reached": [], "outcome": "gave_up"} for n in by_id}
+        seg = next(x for x in report.segments({}, nav, by_id, []) if x["dimension"] == "Stance: privacy")
+        self.assertEqual([s["name"] for s in seg["segments"]], ["Strongly privacy (4–5)", "Others"])
+
+    def test_customer_profile_keys_match_and_spread(self):
+        sys.path.insert(0, str(EYES.parent))
+        import eyes as driver
+        base = {"name": "N", "task": "t"}
+        people = [dict(base, id="a", customer_profile={"turnover": "under 85k", "employees": "1"}),
+                  dict(base, id="b", customer_profile={"turnover": "1m-6.5m"}),
+                  dict(base, id="c", customer_profile={"turnover": "85k-1m", "employees": "1"})]
+        errors, warnings = driver.lint_personas(people)
+        self.assertEqual(errors, [])
+        self.assertTrue(any(w.startswith("b: customer_profile has no employees") for w in warnings))
+        self.assertTrue(any("same customer_profile employees" in w for w in warnings))
+        self.assertFalse(any("same customer_profile turnover" in w for w in warnings))
+        self.assertTrue(driver.lint_personas([dict(base, id="a", customer_profile=["x"])])[0])
+        # A consumer panel with no profile anywhere is fine.
+        self.assertFalse(any("customer_profile" in w for w in driver.lint_personas([dict(base, id="a")])[1]))
+
     def test_going_back_is_the_path_not_the_query(self):
         sys.path.insert(0, str(EYES.parent))
         import eyes as driver
