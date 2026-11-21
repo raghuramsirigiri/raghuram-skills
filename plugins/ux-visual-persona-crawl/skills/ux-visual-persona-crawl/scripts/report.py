@@ -878,9 +878,16 @@ def verify(study_dir: Path) -> int:
                                      for st in s["journey"]["steps"] if st["step"] == e.get("step")}
         fpages.discard(None)
         reached = sorted(n for n, s in data.items() if any(page_of(st["address_bar"]) in fpages for st in s["journey"].get("steps", [])))
-        named = {slug_id(p) for p in f.get("personas", [])}
-        hit = sorted({e.get("session") for e in evidence if e.get("session") in data}
-                     | {n for n in reached if slug_id(data[n]["journey"]["persona"].get("id", "")) in named})
+        # A name in `personas` that is a session id ("student-night-out-2") counts that walk only; a persona id with
+        # no session of that exact name counts every walk of that persona. Matching persona ids alone made a re-walk
+        # count as a hit whenever its persona's first walk was named.
+        hit_set = {e.get("session") for e in evidence if e.get("session") in data}
+        for name in (slug_id(p) for p in f.get("personas", [])):
+            if name in data:
+                hit_set.add(name)
+            else:
+                hit_set |= {n for n in reached if slug_id(data[n]["journey"]["persona"].get("id", "")) == name}
+        hit = sorted(hit_set)
         f["exposure"] = {"pages": sorted(fpages), "walks_reached": len(reached), "walks_hit": len(hit), "hit": hit,
                          "missed": [n for n in reached if n not in hit]}
         # Nielsen's severity is frequency x impact x persistence. Frequency comes from exposure; the reviewer states
