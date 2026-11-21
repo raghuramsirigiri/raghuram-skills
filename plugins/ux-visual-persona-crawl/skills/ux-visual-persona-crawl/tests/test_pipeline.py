@@ -637,6 +637,33 @@ class WalkAndReport(unittest.TestCase):
         st = jrun("status", "--study", self.d / "study.json")
         self.assertTrue(st["all_done"], st)
 
+    def test_rewalk_counts_only_when_named_or_cited(self):
+        # A persona walked twice: naming its first walk's session must not make the re-walk a hit as well.
+        import shutil
+        d = self.d.parent / "walks-rewalk"
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.copytree(self.d, d, ignore=shutil.ignore_patterns("findings.json", "beliefs.json", "insights.json",
+                                                                 "verified_findings.json", "report.html"))
+        desk = next(d.glob("sessions/desk*")).name
+        shutil.copytree(d / "sessions" / desk, d / "sessions" / "desk-2")
+        rc, out = report("analyze", "--study-dir", d)
+        self.assertEqual(rc, 0, out)
+        ev = [{"session": desk, "step": 2, "box": [10, 10, 100, 40]}]
+        base = {"title": "t", "category": "button", "severity": "low", "page": "/offers", "description": "d",
+                "recommendation": "r", "evidence": ev}
+        (d / "findings.json").write_text(json.dumps([
+            dict(base, id="F1", personas=[desk]),             # the first walk's session id: only that walk
+            dict(base, id="F2", personas=["desk"] if desk != "desk" else []),  # a bare persona id: every walk of it
+            dict(base, id="F3", personas=[desk, "desk-2"]),   # the re-walk named too: both
+        ]), encoding="utf-8")
+        rc, out = report("verify", "--study-dir", d)
+        self.assertEqual(rc, 0, out)
+        kept = {x["id"]: x["exposure"]["hit"] for x in json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))["kept"]}
+        self.assertEqual(kept["F1"], [desk])
+        self.assertEqual(kept["F3"], sorted([desk, "desk-2"]))
+        if desk != "desk":
+            self.assertEqual(kept["F2"], sorted([desk, "desk-2"]))
+
     def test_report_pipeline(self):
         d = self.d
         rc, out = report("analyze", "--study-dir", d)
