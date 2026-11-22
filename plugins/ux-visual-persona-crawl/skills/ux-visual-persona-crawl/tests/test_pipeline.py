@@ -732,14 +732,17 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("walks that reached the page", (d / "issues" / "F1.md").read_text(encoding="utf-8"))
         html = (d / "report.html").read_text(encoding="utf-8")
         self.assertIn("finding F1", html)
-        # Insights first: the claims and the fixes come before the evidence, and the method comes last.
-        at = lambda key: html.index(f"<h2 id='{key}'>")
+        # Insights first: the claims, the fixes and the findings are open; the rest folds into panels, the method last.
+        at = lambda key: html.index(f"id='{key}'")
         self.assertLess(at("insights"), at("fixes"))
         self.assertLess(at("fixes"), at("findings"))
         self.assertLess(at("findings"), at("outcomes"))
         self.assertLess(at("feedback"), at("design"))
-        self.assertIn("<div class='ki-t'>The offer button looks live but does nothing</div>", html)
-        self.assertIn("<div class='ki-t'>An older paragraph-style insight:</div>", html)
+        self.assertIn("<span class='k'>Insight 1</span><h3>The offer button looks live but does nothing</h3>", html)
+        self.assertIn("<h3>An older paragraph-style insight:</h3>", html)
+        self.assertIn("<details class='deep' id='outcomes'>", html)
+        self.assertRegex(html, r"<div class='col high'><h3>High<em>\d+</em></h3>")
+        self.assertNotIn("prefers-color-scheme:dark", html)
         # Figures are numbered in reading order even though sections are written in another.
         nums = [int(x) for x in re.findall(r"<b>Fig\. (\d+)</b>", html)]
         self.assertEqual(nums, list(range(1, len(nums) + 1)))
