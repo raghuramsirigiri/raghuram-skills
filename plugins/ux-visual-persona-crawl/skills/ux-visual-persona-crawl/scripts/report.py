@@ -455,6 +455,39 @@ def research_plan(questions) -> list:
     return out
 
 
+INSIGHT_TITLE_WORDS = 16
+
+
+def key_insights(raw) -> list:
+    """The reviewer's insights as {title, detail, findings}. A plain string (older insights.json) becomes a detail with no
+    title, and the report bolds its opening clause instead."""
+    out = []
+    for x in raw or []:
+        if isinstance(x, str) and x.strip():
+            out.append({"title": "", "detail": x.strip(), "findings": []})
+        elif isinstance(x, dict) and (x.get("title") or x.get("detail")):
+            out.append({"title": str(x.get("title") or "").strip(), "detail": str(x.get("detail") or "").strip(),
+                        "findings": [str(f) for f in x.get("findings") or []]})
+    return out
+
+
+def insight_notes(raw, finding_ids: set) -> list:
+    """What verify says about the key insights: ones written as a bare paragraph, titles too long to scan, and
+    finding handles that don't exist or are missing."""
+    notes = []
+    for i, k in enumerate(key_insights(raw), 1):
+        if not k["title"]:
+            notes.append(f"I{i}: no title; write it as {{title, detail, findings}} so the report can lead with the claim")
+        elif len(k["title"].split()) > INSIGHT_TITLE_WORDS:
+            notes.append(f"I{i}: title is {len(k['title'].split())} words; keep the claim to {INSIGHT_TITLE_WORDS} or fewer")
+        bad = [x for x in k["findings"] if x not in finding_ids]
+        if bad:
+            notes.append(f"I{i}: findings {', '.join(bad)} aren't among the verified findings")
+        if k["title"] and not k["findings"]:
+            notes.append(f"I{i}: cites no finding, so a reader can't follow it to the evidence")
+    return notes
+
+
 def plan_notes(questions, finding_ids: set) -> list:
     """What verify says about the test plan: questions missing a method or a measure, unknown methods, and
     findings that don't exist."""
@@ -934,9 +967,13 @@ def verify(study_dir: Path) -> int:
     (study_dir / "verified_findings.json").write_text(json.dumps({"kept": kept, "removed": removed, "rewalk": rewalk, "beliefs": beliefs},
                                                                  indent=2, ensure_ascii=False), encoding="utf-8")
     out = {"kept": len(kept), "removed": removed}
-    pn = plan_notes((load(study_dir / "insights.json", {}) or {}).get("research_questions"), {f.get("id") for f in kept})
+    ins = load(study_dir / "insights.json", {}) or {}
+    pn = plan_notes(ins.get("research_questions"), {f.get("id") for f in kept})
     if pn:
         out["research_plan_notes"] = pn
+    inn = insight_notes(ins.get("insights"), {f.get("id") for f in kept})
+    if inn:
+        out["insight_notes"] = inn
     if beliefs is not None:
         out["beliefs"] = {"facts": len(beliefs["kept"]), "removed": beliefs["removed"]}
     if rewalk:
@@ -1253,6 +1290,16 @@ def img_data(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
+FIG_MARK = "\u0000fig\u0000"
+EFFORT_ORDER = {"small": 0, "medium": 1, "large": 2}
+
+
+def lead_clause(text: str):
+    """Split a paragraph-style insight into its opening clause and the rest, so an untitled one still leads with its claim."""
+    m = re.match(r"^(.{20,220}?[.:;])\s+(.*)$", text, re.S)
+    return (m.group(1), m.group(2)) if m else (text, "")
+
+
 def render(study_dir: Path) -> int:
     study = load(study_dir / "study.json", {})
     nav = load(study_dir / "navigation.json")
@@ -1295,9 +1342,19 @@ display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}.byline b{col
 .abstract,.note{background:var(--surface-soft);border-radius:var(--radius);padding:18px 22px;margin:0 0 40px;font-size:15px;line-height:1.65;color:var(--body)}
 .abstract b.k,.note b.k{text-transform:uppercase;font-size:11px;letter-spacing:1px;display:block;margin-bottom:6px;color:var(--muted)}
 .note{margin:0 0 28px}
-ol.contents{margin:0 0 8px;padding:0;list-style:none;columns:2;column-gap:32px;font-size:14px;line-height:2}
-ol.contents .n{color:var(--soft);display:inline-block;min-width:32px;font-variant-numeric:tabular-nums}
-@media (max-width:560px){ol.contents{columns:1}}
+nav.contents{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 32px;margin:0 0 8px;font-size:14px;line-height:1.9}
+nav.contents ol{margin:0;padding:0;list-style:none}nav.contents .cg{font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--muted)}
+nav.contents .n{color:var(--soft);display:inline-block;min-width:28px;font-variant-numeric:tabular-nums}
+ol.ki{list-style:none;counter-reset:ki;margin:0 0 28px;padding:0}
+ol.ki li{counter-increment:ki;position:relative;padding:16px 0 14px 44px;border-top:1px solid var(--hair)}ol.ki li:first-child{border-top:0;padding-top:4px}
+ol.ki li::before{content:counter(ki);position:absolute;left:0;top:14px;font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+ol.ki li:first-child::before{top:2px}
+.ki-t{font-size:19px;font-weight:700;line-height:1.35;color:var(--ink);margin:0 0 6px;letter-spacing:-0.2px}
+ol.ki p{margin:0 0 8px}.ki-f{font-size:12px;color:var(--muted)}.ki-f .chip{margin-left:4px}
+table.fx td:nth-child(3){min-width:240px}table.fx td:first-child{white-space:nowrap}
+@media (max-width:560px){table.fx thead{display:none}table.fx,table.fx tbody,table.fx tr,table.fx td{display:block;width:auto}
+table.fx tr{border-bottom:1px solid var(--hair);padding:10px 0}table.fx td{border:0;padding:2px 0}table.fx td:nth-child(3){min-width:0}
+table.fx td:nth-child(n+4){display:inline-block;margin-right:12px;color:var(--muted);font-size:12px}}
 h2{font-size:24px;font-weight:700;margin:48px 0 12px;letter-spacing:-0.3px}h2 .n{color:var(--soft);font-weight:700;margin-right:12px}
 h3{font-size:17px;font-weight:700;margin:36px 0 8px;line-height:1.35}h3 .n{color:var(--soft);margin-right:8px}
 p{font-size:16px;line-height:1.72;color:var(--body);margin:0 0 18px}
@@ -1306,7 +1363,7 @@ ul.plain{margin:0 0 18px;padding-left:20px;font-size:16px;line-height:1.65;color
 .fig{margin:28px 0 32px}
 .fig figcaption{font-size:12px;color:var(--soft);margin-top:8px;padding-top:8px;border-top:1px dotted var(--rule);line-height:1.5}
 .fig figcaption b{color:var(--ink);margin-right:6px}
-.tablewrap{overflow-x:auto}
+.tablewrap{overflow-x:auto;position:relative}
 table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.5;color:var(--body);font-variant-numeric:tabular-nums}
 th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink);vertical-align:bottom}
 td{padding:8px 10px 8px 0;border-bottom:1px solid var(--hair);vertical-align:top}
@@ -1417,63 +1474,128 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     def cite(*keys):
         return "<sup class='ref'>[" + ", ".join(f"<a href='#ref-{k}'>{ref_no[k]}</a>" for k in keys) + "]</sup>"
 
-    fig_no = [0]
-
+    # Sections are written in one order and assembled in another (insights first), so figures are numbered at the end.
     def fig(caption):
-        fig_no[0] += 1
-        return f"<figcaption><b>Fig. {fig_no[0]}</b>{caption}</figcaption>"
+        return f"<figcaption><b>Fig. {FIG_MARK}</b>{caption}</figcaption>"
 
     walks = replay_data(data)
     maps = click_heatmaps(study_dir, data)
     beliefs = (vf.get("beliefs") or {}).get("kept") or []
-    toc = [("design", "Study design"), ("outcomes", "Outcomes"), ("findings", "Findings")]
-    if beliefs:
-        toc.append(("beliefs", "What people came away believing"))
-    toc.append(("bottlenecks", "Flow bottlenecks"))
+    insights = key_insights(ins.get("insights"))
+    plan = research_plan(ins.get("research_questions"))
     has_first = any(v.get("first_impression") for v in nav.values()) or bool(flows.get("first_clicks"))
-    if has_first:
-        toc.append(("first", "First impressions and first clicks"))
-    if flows.get("scent"):
-        toc.append(("scent", "Did presses do what people expected?"))
     by_sc = defaultdict(list)
     for f in findings:
         for x in f.get("wcag") or []:
             by_sc[str(x)].append(f)
     wcag_rows = sorted(by_sc.items(), key=lambda kv: [int(n) for n in kv[0].split(".")])
-    if measurements or wcag_rows:
-        toc.append(("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
-    toc += [("feedback", "Participant feedback"), ("discussion", "Discussion"), ("limitations", "Limitations"), ("references", "References")]
+    # Insights first: the reader gets the claims and the fixes, then the evidence for each, then how the study was run.
+    # Anyone after the panel, the method or the raw walks reads on; nobody has to wade through them to reach a finding.
+    groups = [
+        ("What we learned", [("insights", "Key insights", bool(insights or ins.get("what_works"))),
+                             ("fixes", "What to fix first", bool(findings))]),
+        ("The evidence", [("findings", "Findings in detail", bool(findings)),
+                          ("beliefs", "What people came away believing", bool(beliefs)),
+                          ("outcomes", "How each walk went", True),
+                          ("bottlenecks", "Flow bottlenecks", True),
+                          ("first", "First impressions and first clicks", has_first),
+                          ("scent", "Did presses do what people expected?", bool(flows.get("scent"))),
+                          ("accessibility", "Accessibility measurements" if measurements else "Accessibility", bool(measurements or wcag_rows)),
+                          ("feedback", "In their own words", True)]),
+        ("Next steps and method", [("testplan", "What to test with real users", bool(plan)),
+                                   ("design", "Who took part and how", True),
+                                   ("limitations", "Limitations", True),
+                                   ("references", "References", True)]),
+    ]
+    groups = [(g, [(k, t) for k, t, on in items if on]) for g, items in groups]
+    toc = [kt for _, items in groups for kt in items]
     appendix = ([("appendix-replay", "Walk replay")] if walks else []) + ([("appendix-clicks", "Click maps")] if maps else []) \
         + ([("appendix-removed", "Removed in verification")] if vf["removed"] else [])
     num = {k: f"{i:02d}" for i, (k, _) in enumerate(toc, 1)}
     num.update({k: chr(65 + i) for i, (k, _) in enumerate(appendix)})
+    if appendix:
+        groups.append(("Appendices", appendix))
 
     def h2(key, title):
         return f"<h2 id='{key}'><span class='n'>{num[key]}</span>{esc(title)}</h2>"
 
+    sections = {}
+
+    def part(key):
+        sections[key] = []
+        return sections[key]
+
+    fids = {f.get("id") for f in findings}
+
+    def chips(ids):
+        return " ".join(f"<a class='chip' href='#finding-{esc(x)}'>{esc(x)}</a>" for x in ids if x in fids)
+
     product = study.get("product") or study.get("id")
     today = datetime.date.today().isoformat()
-    out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-           f"<title>{esc(product)} — persona study</title><style>{css}</style></head><body><article class='paper'>"]
+    out = part("head")
+    out.append(f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+               f"<title>{esc(product)} — persona study</title><style>{css}</style></head><body><article class='paper'>")
 
-    # header: kicker, title, deck, byline
+    # header: kicker, title, the headline as the hook, a byline that counts people and walks apart
     out.append(f"<div class='kicker'>UX research · Persona study</div><h1>{esc(product)}</h1>")
     if ins.get("headline"):
         out.append(f"<p class='deck'>{esc(ins['headline'])}</p>")
+    people = len({(v.get("persona") or {}).get("id") or k for k, v in nav.items()})
     panel_desc = ", ".join(f"{v} {k}" for k, v in devices.items())
-    out.append(f"<div class='byline'><div><b>Study {esc(study.get('id'))}</b> · {n} simulated personas ({esc(panel_desc)}) · mode {esc(study.get('mode'))}</div>"
-               f"<div>Report generated {today}</div></div>")
+    walks_word = f"{n} walks" if n != people else ""
+    out.append(f"<div class='byline'><div><b>{people} simulated personas</b>{' · ' + walks_word if walks_word else ''} ({esc(panel_desc)}) · "
+               f"{esc(study.get('start_url'))}</div><div>{today}</div></div>")
 
-    # abstract: the numbers and the caveat, without restating the deck
+    # at a glance: outcome, problem count, where to start; the one caveat the whole report rests on
     sev_line = ", ".join(f"{sev_counts[s]} {s}" for s in ("critical", "high", "medium", "low") if sev_counts[s])
-    out.append(f"<div class='abstract'><b class='k'>Summary</b>{n} personas walked {esc(study.get('start_url'))} by sight alone; {reached} reached a page that verifies "
-               f"their goal. Review kept {len(findings)} findings ({esc(sev_line) or 'none'}), each tied to a recorded screenshot, and "
-               f"{len(vf['removed'])} were removed in verification. These are simulated people: they show where to look, not how many customers would struggle.</div>")
+    fix_order = sorted(findings, key=lambda f: (sev_order.get(f.get("severity"), 9), EFFORT_ORDER.get(f.get("fix_effort"), 1)))
+    start = fix_order[:3]
+    out.append(f"<div class='abstract'><b class='k'>At a glance</b><b>{reached} of {n}</b> walks reached a page that confirms their goal. "
+               f"<b>{len(findings)}</b> problems verified against the recordings ({esc(sev_line) or 'none'})"
+               + (f"; start with {chips([f.get('id') for f in start])}" if start else "") + ". "
+               "Simulated personas show where to look, not how many customers would struggle.</div>")
 
-    out.append("<ol class='contents'>" + "".join(f"<li><span class='n'>{num[k]}</span><a href='#{k}'>{esc(t)}</a></li>" for k, t in toc + appendix) + "</ol>")
+    out.append("<nav class='contents'>" + "".join(
+        f"<div><div class='cg'>{esc(g)}</div><ol>" + "".join(f"<li><span class='n'>{num[k]}</span><a href='#{k}'>{esc(t)}</a></li>" for k, t in items)
+        + "</ol></div>" for g, items in groups if items) + "</nav>")
 
-    # 01 study design
-    out.append(h2("design", "Study design"))
+    # key insights: the claim, the detail with its numbers, the findings behind it
+    if insights or ins.get("what_works"):
+        out = part("insights")
+        out.append(h2("insights", "Key insights"))
+        if insights:
+            out.append("<ol class='ki'>")
+            for k in insights:
+                title, detail = (k["title"], k["detail"]) if k["title"] else lead_clause(k["detail"])
+                out.append(f"<li><div class='ki-t'>{esc(title)}</div>" + (f"<p>{esc(detail)}</p>" if detail else "")
+                           + (f"<div class='ki-f'>Evidence {chips(k['findings'])}</div>" if chips(k["findings"]) else "") + "</li>")
+            out.append("</ol>")
+        if ins.get("what_works"):
+            out.append("<h3>What's working, and should stay</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins["what_works"]) + "</ul>")
+
+    # what to fix first: every verified problem with its fix, serious and cheap first
+    if findings:
+        out = part("fixes")
+        out.append(h2("fixes", "What to fix first"))
+        effort = any(f.get("fix_effort") for f in findings)
+        out.append("<figure class='fig'><div class='tablewrap'><table class='fx'><thead><tr><th>ID</th><th>Problem</th><th>Fix</th><th>Severity</th>"
+                   + ("<th>Effort</th>" if effort else "") + "</tr></thead><tbody>")
+        for f in fix_order:
+            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td>"
+                       f"<td><b>{esc(f.get('title'))}</b><br><span class='muted'>{esc(f.get('page'))}</span></td>"
+                       f"<td>{esc(f.get('recommendation'))}</td><td>{cap(f.get('severity'))}</td>"
+                       + (f"<td>{cap(f.get('fix_effort')) or '—'}</td>" if effort else "") + "</tr>")
+        out.append("</tbody></table></div>" + fig("Every verified problem and the fix the reviewer proposes, most serious first"
+                                                  + (" and, within a severity, the smallest fix first." if effort else ".")) + "</figure>")
+        if effort:
+            out.append(priority_matrix(findings) + fig(
+                "Where to start: each finding by severity and by how much work the fix is, as the reviewer judged it. Small fixes to "
+                f"serious problems sit top left. Severity weighs how often, how badly and how persistently it gets in the way.{cite('severity')}")
+                + "</figure>")
+
+    # who took part and how (after the evidence: for readers who want the panel and the method)
+    out = part("design")
+    out.append(h2("design", "Who took part and how"))
     out.append(f"<p>Each persona used the site from screenshots alone and acted by clicking screen positions, with no access to page text, markup or "
                f"accessibility names. A separate reviewer turned the recordings into findings; each one cites a session, a step and a box on that step's "
                f"screenshot, and was re-checked against the recording before it was kept.{cite('artefacts')}</p>")
@@ -1493,8 +1615,8 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                    + (f"<br><span class='muted'>Stances: {esc(', '.join(sts))}</span>" if sts else "") + f"</td><td>{ol(r.get('outcome'))}</td></tr>")
     out.append("</tbody></table></div>" + fig("The panel. Demographics describe who each simulated persona stands in for; they are not respondents.") + "</figure>")
 
-    # 02 outcomes
-    out.append(h2("outcomes", "Outcomes"))
+    out = part("outcomes")
+    out.append(h2("outcomes", "How each walk went"))
     succ = flows.get("success") or {}
     if succ.get("levels"):
         lv = succ["levels"]
@@ -1552,9 +1674,9 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                          "that stage. Groups this small show who to watch in real testing, not a difference in rates."
                          + (f" No walk reached {esc(', '.join(unreached))}." if unreached else "")) + "</figure>")
 
-    # 03 findings
-    out.append(h2("findings", "Findings"))
-    out.append("<p>Ranked by severity. Every finding was checked against the recorded screenshots; the evidence shown is cropped from the cited steps.</p>")
+    out = part("findings")
+    out.append(h2("findings", "Findings in detail"))
+    out.append("<p>Ranked by severity. Each finding leads with what went wrong and the fix; the screens behind it follow. Every one was checked against the recorded screenshots.</p>")
     if findings:
         cols = list(nav)
         short = rainbow_labels(cols, names)
@@ -1572,11 +1694,6 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         out.append("</tbody></table></div>" + fig("Who hit what, after Sharon's rainbow spreadsheet: one row per finding, one column per walk. "
                    "<span class='rg hit'></span> hit it, <span class='rg past'></span> reached the page and got past it, blank: never reached the page. "
                    f"A full row is a problem for everyone; a short one belongs to a kind of customer.{cite('rainbow')}") + "</figure>")
-        if any(f.get("fix_effort") for f in findings):
-            out.append(priority_matrix(findings) + fig(
-                "Where to start: each finding by severity and by how much work the fix is, as the reviewer judged it. Small fixes to "
-                f"serious problems sit top left. Severity weighs how often, how badly and how persistently it gets in the way.{cite('severity')}")
-                + "</figure>")
         if any(f.get("heuristics") for f in findings):
             out.append(heuristic_scorecard(findings, study) + fig(
                 "Which of Nielsen's ten usability heuristics each finding breaks, by the journey stage its page belongs to. "
@@ -1587,7 +1704,8 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
                    f"<p class='sub'>{cap(f.get('severity'))} severity · {esc(f.get('category'))} · {esc(f.get('page'))} · "
                    f"affects {esc(', '.join(names.get(p, p) for p in f.get('personas', [])))} · confidence {esc(f.get('confidence'))}</p>"
-                   f"<p>{esc(f.get('description'))}</p>")
+                   f"<p>{esc(f.get('description'))}</p>"
+                   f"<div class='note'><b class='k'>Fix</b>{esc(f.get('recommendation'))}</div>")
         if f.get("conflict"):
             out.append(f"<p><b>One page says:</b> {esc(f['conflict'][0])}<br><b>Another says:</b> {esc(f['conflict'][1])}</p>")
         if f.get("measured"):
@@ -1625,10 +1743,11 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         tags = finding_tags(f)
         if tags:
             out.append(f"<p class='sub' style='margin-top:4px'>{esc(tags[0].upper() + tags[1:])}.</p>")
-        out.append(f"<div class='note'><b class='k'>Recommendation</b>{esc(f.get('recommendation'))}</div></section>")
+        out.append("</section>")
     if beliefs:
         cols = list(nav)
         short = rainbow_labels(cols, names)
+        out = part("beliefs")
         out.append(h2("beliefs", "What people came away believing"))
         out.append("<p>The site's key facts, as it states them, against what each walk ended up believing, read from the personas' own notes "
                    "at the step cited. Someone confidently wrong won't report a problem, so these misreadings are easy to miss in the "
@@ -1661,7 +1780,7 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 + ("" if b.get("held_in_record", True) else " <span class='muted'>Paraphrased by the reviewer.</span>") + "</li>"
                 for k, c, b in wrong_notes) + "</ul>")
 
-    # 04 bottlenecks
+    out = part("bottlenecks")
     out.append(h2("bottlenecks", "Flow bottlenecks"))
     out.append("<p>Pages ranked by a score computed from the recordings: more steps, dead clicks, backtracking and exits on a page raise it.</p>")
     out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th></th><th>Page</th><th class='num'>Visitors</th><th class='num'>Steps per visitor</th>"
@@ -1693,6 +1812,7 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                   "unknown": "can't tell"}
     if has_first:
         said = any(v.get("first_impression") for v in nav.values())
+        out = part("first")
         out.append(h2("first", "First impressions and first clicks"))
         out.append("<p>" + ("On their first screen, before acting, each persona said what they took the site to be and what they'd do first, "
                             "as in a five-second test. " if said else "")
@@ -1723,6 +1843,7 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 "Away: an earlier stage or a page outside the journey. Stayed: the screen changed without leaving the page, such as a menu. "
                 "Nothing: no visible change. A page where first presses go away or do nothing is hiding its next step.") + "</figure>")
     if flows.get("scent"):
+        out = part("scent")
         out.append(h2("scent", "Did presses do what people expected?"))
         out.append("<p>Before each press, the persona said what they expected it to do; on the next screen, whether it did. Links and "
                    "buttons that keep surprising people have weak <i>information scent</i>: their wording or look promises something the "
@@ -1741,7 +1862,7 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 f"{esc(m['got'])} ({'partly' if m['as_expected'] == 'partly' else 'not'} what they expected)."
                 + (f" <span class='muted'>Next: “{esc(m['next_thought'])}”</span>" if m.get("next_thought") else "") + "</li>"
                 for p, m in misses[:20]) + "</ul>")
-    # 05 accessibility
+    out = part("accessibility")
     if measurements or wcag_rows:
         out.append(h2("accessibility", "Accessibility measurements" if measurements else "Accessibility"))
     if wcag_rows:
@@ -1768,7 +1889,8 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
 
     # 06 feedback
     s = fb.get("summary") or {}
-    out.append(h2("feedback", "Participant feedback"))
+    out = part("feedback")
+    out.append(h2("feedback", "In their own words"))
     if s:
         rc = s["recommend_counts"]
         out.append(f"<p>{s['responses']} of {s['of']} personas gave an exit interview. Ease averaged {s['ease_avg_1_7']} of 7, UMUX-Lite "
@@ -1792,24 +1914,19 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 "What each persona said beside what they did: their ease rating (1–7) and UMUX-Lite (0–100) against how the walk ended. "
                 "A flagged row is a rating the recording contradicts; trust the recording, and read the walk."
                 f"{cite('saydo')}") + "</figure>")
-    for r in fb.get("responses", []):
-        if r.get("quote"):
-            out.append(f"<blockquote>“{esc(r.get('quote'))}”<cite>{esc(names.get(r.get('session'), r.get('session')))}</cite></blockquote>")
     out.append("<figure class='fig'><div class='tablewrap'><table><thead><tr><th>Persona</th><th>Worst</th><th>Best</th><th>What would fix it</th></tr></thead><tbody>")
     for r in fb.get("responses", []):
-        out.append(f"<tr><td><b>{esc(names.get(r.get('session'), r.get('session')))}</b></td><td>{esc(r.get('worst_thing'))}</td>"
+        q = f"<br><span class='muted'>“{esc(r['quote'])}”</span>" if r.get("quote") else ""
+        out.append(f"<tr><td><b>{esc(names.get(r.get('session'), r.get('session')))}</b>{q}</td><td>{esc(r.get('worst_thing'))}</td>"
                    f"<td>{esc(r.get('best_thing'))}</td><td>{esc(r.get('what_would_fix_it'))}</td></tr>")
-    out.append("</tbody></table></div>" + fig("Exit-interview answers, in each persona's words.") + "</figure>")
+    out.append("</tbody></table></div>" + fig("Exit-interview answers, in each persona's words: their one-line verdict under their name.") + "</figure>")
 
-    # 07 discussion
-    out.append(h2("discussion", "Discussion"))
-    for key, title in (("insights", "Patterns across personas"), ("what_works", "What works")):
-        if ins.get(key):
-            out.append(f"<h3>{title}</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins[key]) + "</ul>")
-    plan = research_plan(ins.get("research_questions"))
+    # what to test with real users: the questions these walks can't settle, as studies to run
     if plan:
-        out.append("<h3>A plan for testing with real users</h3><p>What these simulated walks can't settle, written as studies to run: "
-                   "the method, what to ask participants to do, who to recruit, and the result that would answer the question.</p>")
+        out = part("testplan")
+        out.append(h2("testplan", "What to test with real users"))
+        out.append("<p>What these simulated walks can't settle, written as studies to run: the method, what to ask participants to do, "
+                   "who to recruit, and the result that would answer the question.</p>")
         for i, q in enumerate(plan, 1):
             links = " ".join(f"<a class='chip' href='#finding-{esc(x)}'>{esc(x)}</a>" for x in q["findings"])
             if q.get("method"):
@@ -1822,7 +1939,7 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
             else:
                 out.append(f"<div class='rq'><div class='rq-q'><span class='n'>Q{i}</span>{esc(q['question'])}</div></div>")
 
-    # 08 limitations
+    out = part("limitations")
     out.append(h2("limitations", "Limitations"))
     out.append("<ul class='plain'><li>These are simulated personas looking at screenshots. They show where to look, not how many real customers would struggle; counts are not rates.</li>"
                "<li>Personas saw only pixels and the address bar: no page text, markup or accessibility tree. Screen-reader experience was not tested.</li>"
@@ -1831,10 +1948,11 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     if ins.get("simulation_notes"):
         out.append("<h3>Notes on this run</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins["simulation_notes"]) + "</ul>")
 
-    # 09 references
+    out = part("references")
     out.append(h2("references", "References") + "<ol class='refs'>" + "".join(f"<li id='ref-{k}'>{t}</li>" for k, t in refs) + "</ol>")
 
     # appendices
+    out = part("appendix")
     if walks:
         out.append(f"<section id='appendix-replay'>{h2('appendix-replay', 'Walk replay')}"
                    "<p>Step through what each persona saw, where they clicked (<span class='fail'>red</span> when nothing visible happened) "
@@ -1860,20 +1978,33 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                "<b>Method.</b> Vision-only persona walks driven by ux-visual-persona-crawl; flow metrics computed from the recordings; findings verified "
                "against screenshots. <b>Note.</b> Personas are simulated; ask for any finding by its ID to see the trace behind it.</footer>")
     out.append("</article></body></html>")
-    (study_dir / "report.html").write_text("\n".join(out), encoding="utf-8")
+    order = ["head"] + [k for k, _ in toc] + ["appendix"]
+    html = "\n".join(x for k in order for x in sections.get(k, []))
+    count = iter(range(1, html.count(FIG_MARK) + 1))
+    html = re.sub(re.escape(FIG_MARK), lambda m: str(next(count)), html)
+    (study_dir / "report.html").write_text(html, encoding="utf-8")
 
-    md = [f"# {study.get('product')}: visual persona crawl", "", f"Study {study.get('id')} · {n} simulated personas · mode {study.get('mode')}", ""]
+    md = [f"# {study.get('product')}: visual persona crawl", "", f"{people} simulated personas, {n} walks · {study.get('start_url')} · study {study.get('id')}", ""]
     if ins.get("headline"):
         md += [f"**{ins['headline']}**", ""]
+    if insights:
+        md += ["## Key insights", ""]
+        for k in insights:
+            title, detail = (k["title"], k["detail"]) if k["title"] else lead_clause(k["detail"])
+            cited = [x for x in k["findings"] if x in fids]
+            md.append(f"- **{title}** {detail}" + (f" ({', '.join(cited)})" if cited else ""))
+        md.append("")
+    if findings:
+        md += ["## What to fix first", "", "| ID | Severity | Effort | Problem | Fix |", "|---|---|---|---|---|"]
+        md += [f"| {f['id']} | {f.get('severity', '')} | {f.get('fix_effort') or ''} | {f.get('title', '')} | {f.get('recommendation', '')} |"
+               for f in fix_order]
+        md.append("")
     md += ["## Outcomes", "", "| Persona | Device | Outcome | Success | Lostness | Steps | Path |", "|---|---|---|---|---|---|---|"]
     md += [f"| {v['persona'].get('name')} | {v['device']} | {v['outcome']} | {SUCCESS_LEVELS.get((v.get('success') or {}).get('level'), '')} | "
            f"{'' if (v.get('success') or {}).get('lostness') is None else v['success']['lostness']} | {v['steps_taken']} | "
            f"{' → '.join(p['page'] for p in v['path'])} |" for v in nav.values()]
     md += ["", "## Bottlenecks", "", "| | Page | Score | Dead clicks | Backtracked from | Left short of goal |", "|---|---|---|---|---|---|"]
     md += [f"| {p['handle']} | {p['page']} | {p['bottleneck_score']} | {p['score_parts']['dead_clicks']} | {p['score_parts']['backtracked_from']} | {p['score_parts']['exits_short_of_goal']} |" for p in flows["pages"][:6]]
-    md += ["", "## Findings", ""]
-    for f in findings:
-        md.append(f"- **{f['id']}** [{f['severity']} · {f['category']}] {f['title']}: {f.get('recommendation', '')}")
     if findings:
         cols = list(nav)
         short = rainbow_labels(cols, names)

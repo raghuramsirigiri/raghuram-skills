@@ -91,8 +91,14 @@ One root cause is one finding, even if several personas hit it. List every perso
 
 ```json
 {
-  "headline": "One sentence on the most important thing learned.",
-  "insights": ["Patterns across personas, including who is most affected and how that relates to their demographics."],
+  "headline": "People find the price in seconds and miss the conditions that change it.",
+  "insights": [
+    {
+      "title": "Switchers nearly quit the application over a step that never blocks them",
+      "detail": "Funding offers 'Fund within 30 days', and the re-walk reached Submit with no routing number. Nothing says so before step 4: the first walk saved for later at Address.",
+      "findings": ["F1"]
+    }
+  ],
   "what_works": ["Things that helped, with the reason."],
   "research_questions": [
     {
@@ -107,6 +113,12 @@ One root cause is one finding, even if several personas hit it. List every perso
   "simulation_notes": ["Things that went wrong with the test, not the site."]
 }
 ```
+
+The report opens with the headline and the insights, ahead of every table, so these are what most readers take away. Write them for someone who reads nothing else:
+
+- `headline`: the single most important thing learned, as a claim someone would repeat, in about 25 words. Not a summary of the method, and no counts of personas.
+- `insights`: 3 to 6, most consequential first. Each is a pattern across walks, not a restated finding: what several findings add up to, who it hits hardest and why. `title` is the claim alone, at most 16 words, readable without the detail. `detail` is one to three sentences carrying the specifics: the figures, the persona and what they did, the page. `findings` names the verified findings behind it, so a reader can jump to the evidence. `verify` flags a title that's too long, an insight citing no finding, and an old-style plain string.
+- Don't put the panel, the method or the run's caveats here. The report has sections for those further down, and `simulation_notes` takes what went wrong with the test.
 
 `beliefs.json`: what each walk came away believing about the site's key facts. Take 3 to 8 facts from `facts.md` that matter to the task (prices, fees, conditions, requirements, promises), then, for every session, read its `memory`, `doubts` and `thought` and record what that persona ended up believing:
 
