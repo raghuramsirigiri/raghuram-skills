@@ -1,10 +1,37 @@
 {
-  "headline": "People found their headline numbers fast, but the conditions that change them sit a page deeper or at the bottom: both merchant walks left unsure about 'Same day*' and unaware of the PCI fee, both checking walks missed the per-cycle wording and paper-statement fee, and the CD penalty sits below the loans.",
+  "headline": "People find the price in seconds and miss the conditions that change it: every quick decider left with the headline number and not the fee, cutoff or penalty behind it.",
   "insights": [
-    "Summary surfaces (comparison table, merchant overview card, rates table) answered each persona's headline question within 4-5 steps, and every persona stopped there. The conditions that change the answer live one page deeper or at the foot of the page, so the people who skim and decide quickly (Luis, Marcus, Dana); repeat walks of Luis and Dana stopped at the same places with the same doubts, which makes these patterns rather than flukes of one walk are the ones who carry away the incomplete version.",
-    "The application itself works for a switcher: the clean re-walk completed all five steps and reached Submit by choosing 'Fund within 30 days', with no routing number. The problem is that nothing says so before step 4: the first walk quit at Address for fear of Funding, and the second continued only on hope. A one-line note on step 1 is the cheap fix.",
-    "The home page serves the checking customer well (Dana went straight to Compare checking), but the three personas with other goals each had to open the hamburger menu; on phones the hero plus cookie box fill the first screen.",
-    "The wealth path worked best for the most cautious persona: an explicit 'within one business day' promise, a phone/morning choice with real hours and a narrowly worded consent made Eleanor comfortable. Her remaining doubts (whether she qualifies, a pale consent checkbox at 150% zoom) sit at the qualification and low-vision edges."
+    {
+      "title": "Headline numbers are easy to find; the conditions that change them are not",
+      "detail": "The comparison table, merchant card and rates table each answered the persona's question within 4–5 steps, and every persona stopped there. The 9 p.m. same-day cutoff, the $19.95/mo PCI fee, the per-cycle direct-deposit rule, the $3 paper-statement fee and the CD early-withdrawal penalty all sit a page deeper or at the foot of the page. Repeat walks stopped at the same places with the same doubts.",
+      "findings": [
+        "F3",
+        "F2",
+        "F4"
+      ]
+    },
+    {
+      "title": "Switchers nearly quit the application over a step that never blocks them",
+      "detail": "Funding offers 'Fund within 30 days', and the re-walk reached Submit with no routing number. Nothing says so before step 4: the first walk saved for later at the Address step, and the second carried on only 'hopefully'.",
+      "findings": [
+        "F1"
+      ]
+    },
+    {
+      "title": "Three of four personas had to hunt in the menu for their part of the bank",
+      "detail": "The home page speaks only to personal checking. The cafe owner, the CD shopper and the retiree each opened the hamburger menu to find business, rates or wealth; on a phone the hero and cookie box fill the first screen.",
+      "findings": [
+        "F5"
+      ]
+    },
+    {
+      "title": "The cautious retiree was won over, but left unsure she even qualifies",
+      "detail": "A 'within one business day' promise, a morning call slot and narrow consent wording made Eleanor comfortable. No screen states a private-banking minimum, and the required consent checkbox border measures 1.52:1 against a 3:1 target.",
+      "findings": [
+        "F7",
+        "F6"
+      ]
+    }
   ],
   "what_works": [
     "Prices shown openly with no form: the merchant overview card gives percent plus cents and $0 monthly, which Luis called the best thing about the site.",

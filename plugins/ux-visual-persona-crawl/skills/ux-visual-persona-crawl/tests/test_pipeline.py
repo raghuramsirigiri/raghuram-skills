@@ -694,7 +694,11 @@ class WalkAndReport(unittest.TestCase):
                           sess["phone"]: {"belief": "correct", "step": 99}}},               # no such step: dropped
             {"id": "K2", "fact": "Delivery is free", "personas": {sess["desk"]: {"belief": "wrong", "step": 1}}},  # no 'held'
         ]), encoding="utf-8")
-        (d / "insights.json").write_text(json.dumps({"research_questions": [
+        (d / "insights.json").write_text(json.dumps({"headline": "The offer button does nothing", "insights": [
+            {"title": "The offer button looks live but does nothing", "detail": "Both walks pressed it; the screen stayed put.",
+             "findings": ["F1"]},
+            "An older paragraph-style insight: still renders, with its opening clause as the claim.",
+        ], "what_works": ["The offer is easy to find."], "research_questions": [
             {"question": "Do people see the offer button?", "method": "first-click test", "task": "Claim this week's offer",
              "recruit": "Bargain hunters on phones", "measure": "How many click the offer button first", "findings": ["F1", "F9"]},
             "Would people trust the offer?",
@@ -703,6 +707,7 @@ class WalkAndReport(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         notes = json.loads(out)["research_plan_notes"]
         self.assertIn("Q1: findings F9 aren't among the verified findings", notes)
+        self.assertTrue(any(n.startswith("I2: no title") for n in json.loads(out)["insight_notes"]), out)
         self.assertTrue(any(n.startswith("Q2: no method, task, measure") for n in notes), notes)
         v = json.loads((d / "verified_findings.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(x["id"] for x in v["kept"]), ["F1", "F2"])
@@ -727,8 +732,22 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("walks that reached the page", (d / "issues" / "F1.md").read_text(encoding="utf-8"))
         html = (d / "report.html").read_text(encoding="utf-8")
         self.assertIn("finding F1", html)
+        # Insights first: the claims and the fixes come before the evidence, and the method comes last.
+        at = lambda key: html.index(f"<h2 id='{key}'>")
+        self.assertLess(at("insights"), at("fixes"))
+        self.assertLess(at("fixes"), at("findings"))
+        self.assertLess(at("findings"), at("outcomes"))
+        self.assertLess(at("feedback"), at("design"))
+        self.assertIn("<div class='ki-t'>The offer button looks live but does nothing</div>", html)
+        self.assertIn("<div class='ki-t'>An older paragraph-style insight:</div>", html)
+        # Figures are numbered in reading order even though sections are written in another.
+        nums = [int(x) for x in re.findall(r"<b>Fig\. (\d+)</b>", html)]
+        self.assertEqual(nums, list(range(1, len(nums) + 1)))
+        self.assertNotIn("\u0000", html)
+        self.assertIn("## Key insights", (d / "report.md").read_text(encoding="utf-8"))
         # Who hit what: F1's row has desk as hit and phone as reached-but-past, from verify's exposure.
-        row = re.search(r"<tr><td><a href='#finding-F1'>.*?</tr>", html, re.S).group(0)
+        rainbow = html[html.index("<table class='rainbow'>"):]
+        row = re.search(r"<tr><td><a href='#finding-F1'>.*?</tr>", rainbow, re.S).group(0)
         self.assertEqual(re.findall(r"class='rg (hit|past|none)'", row), ["hit", "past"])
         self.assertIn("1 of 2", row)
         # One experience curve per walk, with F1 pinned to the step its evidence sits on.
@@ -775,7 +794,7 @@ class WalkAndReport(unittest.TestCase):
         self.assertIn("<table class='sg'>", html)
         self.assertIn("1 of 1", html)
         # The test plan in the report and in the export.
-        self.assertIn("A plan for testing with real users", html)
+        self.assertIn("What to test with real users", html)
         self.assertIn("<dt>Method</dt><dd>first-click test</dd>", html)
         rq = (d / "issues" / "research-questions.md").read_text(encoding="utf-8")
         self.assertIn("## Q1. Do people see the offer button?", rq)

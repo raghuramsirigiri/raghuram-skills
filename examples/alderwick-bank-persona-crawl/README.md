@@ -6,10 +6,12 @@ three walks on a phone, three on a desktop) each tried one task on **Alderwick B
 built only as a test target. They worked from screenshots alone and clicked by
 screen position, with no page text or markup.
 
-Open [`index.html`](index.html) — it is the whole report in one file: outcomes and
-paths, the funnel, flow bottlenecks, ten findings with cropped screenshot evidence,
-contrast measurements, the exit interviews, a step-by-step **walk replay** of every
-persona, and click maps.
+Open [`index.html`](index.html) — it is the whole report in one file, insights first:
+the headline, four key insights each linked to the findings behind it, and every
+problem beside its fix. Then the evidence: ten findings with cropped screenshot
+evidence, outcomes and paths, flow bottlenecks, contrast measurements and the exit
+interviews. Who took part and how the study ran come last, followed by a
+step-by-step **walk replay** of every persona and click maps.
 
 | Persona | Device | Task |
 |:--|:--|:--|
@@ -23,12 +25,12 @@ persona, and click maps.
 | Path | What it is |
 |:--|:--|
 | `index.html` | The report (self-contained, opens offline) |
-| `report.md` | The same headline, outcomes and bottlenecks as Markdown |
+| `report.md` | The same headline, key insights, fix list, outcomes and bottlenecks as Markdown |
 | `issues/F1.md` … `F10.md`, `findings.csv` | One ticket per finding, ready to paste into a tracker; evidence crops in `evidence/` |
 | `data/study.json`, `data/personas.json` | The study set-up and the panel |
 | `data/navigation.json` | Every persona's path and every step, each with its exact `url` |
 | `data/flows.json` | Per-page bottleneck scores with their parts, and the funnel |
-| `data/verified_findings.json`, `data/insights.json` | The reviewed findings and research questions |
+| `data/verified_findings.json`, `data/insights.json` | The reviewed findings, the key insights and the research questions |
 | `data/facts.md`, `data/feedback.json`, `data/demographics.json` | What the site claims, the exit interviews, the panel's make-up |
 
 The per-step screenshots (about 50 MB) are left out; the report embeds what it needs.
