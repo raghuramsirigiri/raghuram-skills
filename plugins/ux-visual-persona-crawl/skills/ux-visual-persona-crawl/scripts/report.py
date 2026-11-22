@@ -1300,6 +1300,109 @@ def lead_clause(text: str):
     return (m.group(1), m.group(2)) if m else (text, "")
 
 
+# The board layout ("B · Board"): a cover panel with three figure tiles, insights as a bento grid, fixes as a
+# High / Medium / Low board, findings as cards that open to their evidence, and everything else folded into panels.
+# Light only. Colours: cool greys, one deep blue accent, red and amber only for severity.
+BOARD_CSS = """:root{color-scheme:light}
+.paper{max-width:none;padding:0;background:none;box-shadow:none}
+body{background:var(--bg);color:var(--ink);font-family:var(--font)}
+.wrap{max-width:var(--wrap,1200px);margin:0 auto;padding:0 var(--gut,40px)}
+@media (max-width:720px){.wrap{padding:0 16px}}
+img{max-width:100%}
+.deep{border-top:1px solid var(--rule)}
+.deep summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 28px;gap:8px 24px;align-items:baseline;padding:22px 0}
+.deep summary::-webkit-details-marker{display:none}
+.deep .dt{font-weight:600;color:var(--ink);font-size:17px}.deep .dh{color:var(--muted);font-size:14.5px}
+.dx{width:18px;height:18px;position:relative;align-self:center;justify-self:end}
+.dx::before,.dx::after{content:"";position:absolute;left:3px;right:3px;top:8px;height:1.5px;background:var(--ink);transition:transform .25s ease}
+.dx::after{transform:rotate(90deg)}details[open] .dx::after{transform:rotate(0)}
+.deep summary:hover .dt{color:var(--accent)}
+.deep-body{padding:4px 0 40px}
+@media (max-width:720px){.deep summary{grid-template-columns:minmax(0,1fr) 24px}.deep .dh{grid-column:1;grid-row:2}}
+a{text-decoration:none;background-image:linear-gradient(currentColor,currentColor);background-size:0 1px;background-repeat:no-repeat;background-position:0 100%;
+  transition:background-size .25s ease,color .2s ease}a:hover{background-size:100% 1px}
+a.chip{background-image:none;display:inline-block;transition:transform .2s ease,border-color .2s ease}a.chip:hover{transform:translateY(-2px)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+[data-enter]>*{animation:enter .8s cubic-bezier(.2,.7,.2,1) both}
+[data-enter]>*:nth-child(2){animation-delay:.08s}[data-enter]>*:nth-child(3){animation-delay:.16s}[data-enter]>*:nth-child(4){animation-delay:.24s}
+@keyframes enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+.fig figcaption{border:0;padding-top:6px;margin-top:4px}
+.shot,.strip{border-radius:var(--r-img,6px)}
+.lbl{font-size:11.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent)}
+:root{--bg:#e9edf2;--paper:#e9edf2;--card:#ffffff;--ink:#0b1220;--body:#1f2733;--muted:#4b5563;--soft:#5b6472;--hair:#d3d9e1;--rule:#bfc8d3;
+--surface-soft:#e2e7ee;--accent:#1a47a3;--annotation:#b42318;--series:#1a47a3;--r-img:12px;--radius:20px;
+--sand:#f9e4bd;--sky:#d5dce7;--sage:#d3e0f8;--blush:#f9d6d1;--sand-ink:#7a3f00;--sky-ink:#2a3442;--sage-ink:#163d8c;--blush-ink:#951b14;
+--font:'Figtree','Inter','Segoe UI',system-ui,-apple-system,sans-serif;--wrap:1240px}
+.cover{padding:24px 0 0}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0 22px;font-size:13px;color:var(--muted)}
+.bar b{color:var(--ink)}.pill{display:inline-block;background:var(--sage);color:var(--sage-ink);border-radius:999px;padding:5px 12px;font-weight:600;font-size:12px}
+.hero{background:var(--sage);border-radius:28px;padding:clamp(28px,5vw,64px);display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:40px;align-items:end}
+.hero h1{font-weight:600;font-size:clamp(28px,3.4vw,46px);line-height:1.1;letter-spacing:-0.03em;color:var(--ink);margin:0}
+.hero p{margin:0;font-size:16.5px;line-height:1.6;color:var(--body)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}
+.tile{border-radius:var(--radius);padding:24px 26px;background:var(--card);border:1px solid var(--hair)}
+.tile b{display:block;font-size:48px;font-weight:600;letter-spacing:-0.04em;line-height:1;color:var(--ink)}
+.tile b small{font-size:16px;font-weight:500;letter-spacing:0;margin-left:6px;color:var(--muted)}.tile span{display:block;margin-top:10px;font-size:14px;color:var(--body)}
+@media (max-width:820px){.hero{grid-template-columns:1fr}.tiles{grid-template-columns:1fr}}
+section.blk{padding:96px 0 0}
+.head{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:28px;flex-wrap:wrap}
+.head h2{font-weight:600;font-size:38px;letter-spacing:-0.03em;margin:0;color:var(--ink)}.head p{margin:0;color:var(--muted);max-width:46ch}
+.bento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.bento article{border-radius:var(--radius);padding:28px;background:var(--card);border:1px solid var(--hair);transition:transform .2s ease}
+.bento article:hover{transform:translateY(-2px)}
+.bento article:first-child{grid-column:1/-1;background:var(--sage);border:0;padding:clamp(28px,4vw,48px);
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 48px;align-items:start}
+.bento article:first-child .k{grid-column:1/-1}.bento article:first-child h3{font-size:clamp(26px,2.8vw,36px);margin:0}
+.bento article:first-child p{font-size:16.5px;grid-column:2;grid-row:2}.bento article:first-child .cx{grid-column:2}
+@media (max-width:900px){.bento article:first-child{display:block}.bento article:first-child h3{margin:12px 0}}
+.bento .k{font-size:12px;font-weight:600;color:var(--accent)}
+.bento h3{font-weight:600;font-size:21px;line-height:1.22;letter-spacing:-0.02em;margin:14px 0 12px;color:var(--ink)}
+.bento p{font-size:15px;line-height:1.62;margin:0 0 16px;color:var(--body)}
+@media (max-width:900px){.bento{grid-template-columns:1fr}.bento article:first-child{grid-column:auto;grid-row:auto}}
+.chip{border:0;background:var(--surface-soft);color:var(--accent);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;margin-right:6px}
+.bento article:first-child .chip{background:var(--card)}
+.works{margin-top:14px;border-radius:var(--radius);background:var(--card);border:1px solid var(--hair);padding:24px 28px}
+.works h4{margin:0 0 10px;font-size:15px;color:var(--sage-ink)}.works ul{margin:0;padding-left:20px;columns:2;column-gap:40px}.works li{margin:0 0 10px;font-size:14.5px;line-height:1.6;break-inside:avoid}
+@media (max-width:820px){.works ul{columns:1}}
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.col{border-radius:var(--radius);padding:14px;background:var(--blush)}.col.medium{background:var(--sand)}.col.low{background:var(--sky)}
+.col>h3{display:flex;justify-content:space-between;align-items:center;margin:4px 8px 14px;font-size:15px;color:var(--ink)}
+.col>h3 em{font-style:normal;font-weight:600;font-size:13px;color:var(--muted)}
+.card{display:block;background:var(--card);border-radius:14px;padding:16px 18px;margin-bottom:10px;color:inherit;background-image:none;
+  transition:transform .2s ease,box-shadow .2s ease}
+.card:hover{transform:translateY(-2px);box-shadow:0 12px 24px -14px rgba(11,18,32,.30)}
+.card .id{font-size:12px;font-weight:600;color:var(--accent)}.card b{display:block;font-size:15.5px;line-height:1.35;margin:6px 0 8px;color:var(--ink)}
+.card p{margin:0;font-size:13.5px;line-height:1.55;color:var(--body)}.card .ef{display:inline-block;margin-top:10px;font-size:12px;color:var(--muted)}
+@media (max-width:900px){.board{grid-template-columns:1fr}}
+.sev{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.sev-critical,.sev-high{background:var(--blush);color:var(--blush-ink)}.sev-medium{background:var(--sand);color:var(--sand-ink)}.sev-low{background:var(--sky);color:var(--sky-ink)}
+.fcards{display:grid;gap:12px}
+.fcard{background:var(--card);border:1px solid var(--hair);border-radius:var(--radius)}
+.fcard>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:52px minmax(0,1fr) auto 24px;gap:14px;align-items:center;padding:20px 24px}
+.fcard>summary::-webkit-details-marker{display:none}.fcard>summary .id{font-weight:600;color:var(--accent)}
+.fcard>summary b{font-size:16.5px;line-height:1.35;color:var(--ink);font-weight:600}.fcard>summary small{display:block;font-weight:400;color:var(--muted);font-size:13px;margin-top:2px}
+.fcard[open]>summary{border-bottom:1px solid var(--hair)}
+.fbody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;padding:24px}
+.fbody p{font-size:15px;line-height:1.7;margin:0 0 14px}.fixbox{background:var(--sage);border-radius:14px;padding:16px 18px}.fixbox p{margin:6px 0 0}
+.fixbox .lbl{color:var(--sage-ink)}.ev{display:grid;gap:14px}.ev .fig{margin:0}.ev .pair{flex-direction:column}
+@media (max-width:820px){.fbody{grid-template-columns:1fr}.fcard>summary{grid-template-columns:40px minmax(0,1fr) 20px}.fcard>summary .sev{display:none}}
+.deeps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.deeps .deep{border:1px solid var(--hair);background:var(--card);border-radius:var(--radius);padding:0 24px}
+.deeps .deep[open]{grid-column:1/-1}.deeps .deep summary{grid-template-columns:minmax(0,1fr) 24px}.deeps .dh{grid-column:1;grid-row:2}
+@media (max-width:820px){.deeps{grid-template-columns:1fr}}
+footer.end{padding:64px 0 96px;color:var(--muted);font-size:13px}
+/* on a narrow screen every column may shrink below its content, so a wide table scrolls inside its panel, not the page */
+@media (max-width:900px){.bento,.board{grid-template-columns:minmax(0,1fr)}}@media (max-width:820px){.hero,.tiles,.fbody,.deeps{grid-template-columns:minmax(0,1fr)}}
+.deep,.fcard,.col,.ev>*,.fbody>*{min-width:0}.ev{grid-template-columns:minmax(0,1fr)}.deep-body{overflow-x:auto}
+"""
+
+BOARD_JS = ("<script>(function(){function op(id){var t=document.getElementById(id);for(var e=t;e;e=e.parentElement)"
+            "if(e.tagName==='DETAILS')e.open=true}document.addEventListener('click',function(ev){var a=ev.target.closest&&"
+            "ev.target.closest('a[href^=\"#\"]');if(a&&a.getAttribute('href').length>1)op(decodeURIComponent(a.getAttribute('href').slice(1)))});"
+            "if(location.hash)op(decodeURIComponent(location.hash.slice(1)))})()</script>")
+
+
 def render(study_dir: Path) -> int:
     study = load(study_dir / "study.json", {})
     nav = load(study_dir / "navigation.json")
@@ -1320,15 +1423,10 @@ def render(study_dir: Path) -> int:
 
     import datetime
 
-    # Follows chart-dashboard's report template (templates/report.html, references/design-rules.md):
-    # one 880px paper column; kicker, h1, deck, byline, abstract; numbered h2 sections; figures with
-    # "Fig. N" captions; the soft .note surface; a footer of sources and method. No badges, custom cards,
-    # KPI strip or coloured verdicts: severity and outcome are words in the text.
+    # The board layout (BOARD_CSS) sits over the report's base styles, which still dress the tables, figures and
+    # charts inside the folded panels. Its :root holds the only palette; the page is light only. Severity is a
+    # word with a class, so it reads the same without colour.
     css = """.url{overflow-wrap:anywhere;word-break:break-all}a.url{color:inherit}
-:root{--bg:#efece6;--paper:#f4f4f0;--ink:#111111;--body:#1a1a1a;--muted:#555555;--soft:#666666;--hair:#dcdbd7;--rule:#cfcdc6;
---radius:4px;--surface-soft:#eae8e4;--accent:#243E63;--annotation:#B31B38;--series:#2323FF;--font:'Inter','Segoe UI',Arial,Helvetica,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#121315;--paper:#1a1b1e;--ink:#f2f2f0;--body:#dcdcd8;--muted:#a6a6a0;--soft:#9a9a94;--hair:#33343a;
---rule:#3d3e44;--surface-soft:#26272b;--accent:#9db3d6;--annotation:#f08a9b;--series:#8c8cff}}
 *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
 .paper{max-width:880px;margin:0 auto;background:var(--paper);padding:64px 72px 96px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
 @media (max-width:720px){.paper{padding:40px 24px}}
@@ -1432,7 +1530,7 @@ table.sg td{white-space:nowrap}table.sg td:first-child{white-space:normal}.sg-do
 .k-dead{width:9px;height:9px;background:linear-gradient(45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%),linear-gradient(-45deg,transparent 42%,var(--annotation) 42%,var(--annotation) 58%,transparent 58%)}
 .k-fr{width:9px;height:9px;border-radius:50%;border:2px solid var(--annotation)}
 footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;font-size:12px;color:var(--soft);line-height:1.6}footer.notes b{color:var(--ink)}
-@media print{body{background:#fff}.paper{box-shadow:none;padding:0}#appendix-replay{display:none}.fig,blockquote{break-inside:avoid}}"""
+@media print{body{background:#fff}.paper{box-shadow:none;padding:0}#appendix-replay{display:none}.fig,blockquote{break-inside:avoid}}""" + BOARD_CSS
 
     sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     findings = sorted(findings, key=lambda f: (sev_order.get(f.get("severity"), 9), str(f.get("id"))))
@@ -1446,6 +1544,8 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                      "blocked_by_site": "Blocked by the site", "step_cap": "Hit the step limit"}
     ol = lambda o: esc(outcome_label.get(o, o))
     cap = lambda s: esc(str(s or "").capitalize())
+    # severity as a word with a class, so a theme can colour it; the word stays the meaning
+    sev_tag = lambda f, tail="": f"<span class='sev sev-{esc(f.get('severity') or 'none')}'>{cap(f.get('severity'))}{tail}</span>"
 
     refs = [("wcag-143", "W3C (2023). <i>Web Content Accessibility Guidelines (WCAG) 2.2</i>, Success Criterion 1.4.3 Contrast (Minimum). "
              "https://www.w3.org/TR/WCAG22/#contrast-minimum"),
@@ -1489,35 +1589,33 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
         for x in f.get("wcag") or []:
             by_sc[str(x)].append(f)
     wcag_rows = sorted(by_sc.items(), key=lambda kv: [int(n) for n in kv[0].split(".")])
-    # Insights first: the reader gets the claims and the fixes, then the evidence for each, then how the study was run.
-    # Anyone after the panel, the method or the raw walks reads on; nobody has to wade through them to reach a finding.
-    groups = [
-        ("What we learned", [("insights", "Key insights", bool(insights or ins.get("what_works"))),
-                             ("fixes", "What to fix first", bool(findings))]),
-        ("The evidence", [("findings", "Findings in detail", bool(findings)),
-                          ("beliefs", "What people came away believing", bool(beliefs)),
-                          ("outcomes", "How each walk went", True),
-                          ("bottlenecks", "Flow bottlenecks", True),
-                          ("first", "First impressions and first clicks", has_first),
-                          ("scent", "Did presses do what people expected?", bool(flows.get("scent"))),
-                          ("accessibility", "Accessibility measurements" if measurements else "Accessibility", bool(measurements or wcag_rows)),
-                          ("feedback", "In their own words", True)]),
-        ("Next steps and method", [("testplan", "What to test with real users", bool(plan)),
-                                   ("design", "Who took part and how", True),
-                                   ("limitations", "Limitations", True),
-                                   ("references", "References", True)]),
+    # Insights first: the claims, the fixes and the findings are open on the page; everything else (the walks, the panel,
+    # the method, the appendices) folds into panels under "The full analysis", for whoever wants it.
+    open_parts = [("insights", bool(insights or ins.get("what_works"))), ("fixes", bool(findings)), ("findings", bool(findings))]
+    deep = [  # (key, title, what's inside, shown)
+        ("beliefs", "What people came away believing", "The site's key facts against what each walk ended up believing", bool(beliefs)),
+        ("matrix", "Who hit what, and where to start", "Each finding by walk, by usability heuristic, and by severity against effort", bool(findings)),
+        ("outcomes", "How each walk went", "Every walk's outcome, path, steps and how it felt step by step", True),
+        ("bottlenecks", "Flow bottlenecks", "Pages ranked by steps, dead clicks, backtracking and exits", True),
+        ("first", "First impressions and first clicks", "What each persona took the site to be, and where their first press led", has_first),
+        ("scent", "Did presses do what people expected?", "Each press against what the persona expected it to do", bool(flows.get("scent"))),
+        ("accessibility", "Accessibility measurements" if measurements else "Accessibility",
+         "WCAG leads, and contrast and target sizes measured from the screenshots", bool(measurements or wcag_rows)),
+        ("feedback", "In their own words", "Exit-interview answers: worst, best and what would fix it", True),
+        ("testplan", "What to test with real users", "The questions these walks can't settle, written as studies", bool(plan)),
+        ("design", "Who took part and how", "The panel, their profiles and how the study was run", True),
+        ("limitations", "Limitations", "What simulated walks can and can't tell you, and notes on this run", True),
+        ("appendix-replay", "Walk replay", "Step through what each persona saw and where they clicked", bool(walks)),
+        ("appendix-clicks", "Click maps", "Every click on each page view", bool(maps)),
+        ("appendix-removed", "Removed in verification", "Findings the verifier dropped, and why", bool(vf["removed"])),
+        ("references", "References", "Sources and the study record", True),
     ]
-    groups = [(g, [(k, t) for k, t, on in items if on]) for g, items in groups]
-    toc = [kt for _, items in groups for kt in items]
-    appendix = ([("appendix-replay", "Walk replay")] if walks else []) + ([("appendix-clicks", "Click maps")] if maps else []) \
-        + ([("appendix-removed", "Removed in verification")] if vf["removed"] else [])
-    num = {k: f"{i:02d}" for i, (k, _) in enumerate(toc, 1)}
-    num.update({k: chr(65 + i) for i, (k, _) in enumerate(appendix)})
-    if appendix:
-        groups.append(("Appendices", appendix))
+    deep = [(k, t, hint) for k, t, hint, on in deep if on]
+    deep_keys = {k for k, _, _ in deep}
 
     def h2(key, title):
-        return f"<h2 id='{key}'><span class='n'>{num[key]}</span>{esc(title)}</h2>"
+        # a folded panel carries its own title in its summary, so its body starts without a heading
+        return "" if key in deep_keys else f"<h2>{esc(title)}</h2>"
 
     sections = {}
 
@@ -1534,59 +1632,79 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     today = datetime.date.today().isoformat()
     out = part("head")
     out.append(f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-               f"<title>{esc(product)} — persona study</title><style>{css}</style></head><body><article class='paper'>")
+               f"<meta name='color-scheme' content='light'><title>{esc(product)} — persona study</title><style>{css}</style></head>"
+               "<body><main class='paper'><div class='wrap'>")
 
-    # header: kicker, title, the headline as the hook, a byline that counts people and walks apart
-    out.append(f"<div class='kicker'>UX research · Persona study</div><h1>{esc(product)}</h1>")
-    if ins.get("headline"):
-        out.append(f"<p class='deck'>{esc(ins['headline'])}</p>")
+    # cover: the product and address, the headline as the statement, three figures
     people = len({(v.get("persona") or {}).get("id") or k for k, v in nav.items()})
     panel_desc = ", ".join(f"{v} {k}" for k, v in devices.items())
-    walks_word = f"{n} walks" if n != people else ""
-    out.append(f"<div class='byline'><div><b>{people} simulated personas</b>{' · ' + walks_word if walks_word else ''} ({esc(panel_desc)}) · "
-               f"{esc(study.get('start_url'))}</div><div>{today}</div></div>")
-
-    # at a glance: outcome, problem count, where to start; the one caveat the whole report rests on
     sev_line = ", ".join(f"{sev_counts[s]} {s}" for s in ("critical", "high", "medium", "low") if sev_counts[s])
     fix_order = sorted(findings, key=lambda f: (sev_order.get(f.get("severity"), 9), EFFORT_ORDER.get(f.get("fix_effort"), 1)))
-    start = fix_order[:3]
-    out.append(f"<div class='abstract'><b class='k'>At a glance</b><b>{reached} of {n}</b> walks reached a page that confirms their goal. "
-               f"<b>{len(findings)}</b> problems verified against the recordings ({esc(sev_line) or 'none'})"
-               + (f"; start with {chips([f.get('id') for f in start])}" if start else "") + ". "
-               "Simulated personas show where to look, not how many customers would struggle.</div>")
+    out.append(f"<header class='cover' data-enter><div class='bar'><span><b>{esc(product)}</b> · {esc(study.get('start_url'))} · {today}</span>"
+               "<span class='pill'>Persona study</span></div>"
+               f"<div class='hero'><h1>{esc(ins.get('headline') or product)}</h1><p>Simulated customers walked the site by sight alone. "
+               "They show where to look, not how many real people would struggle.</p></div><div class='tiles'>"
+               f"<div class='tile'><b>{reached}<small>of {n}</small></b><span>walks reached a page that confirms their goal</span></div>"
+               f"<div class='tile'><b>{len(findings)}</b><span>problems verified against the recordings ({esc(sev_line) or 'none'})</span></div>"
+               f"<div class='tile'><b>{people}<small>personas</small></b><span>{n} walks by simulated customers ({esc(panel_desc)}), "
+               "by sight alone</span></div></div></header>")
 
-    out.append("<nav class='contents'>" + "".join(
-        f"<div><div class='cg'>{esc(g)}</div><ol>" + "".join(f"<li><span class='n'>{num[k]}</span><a href='#{k}'>{esc(t)}</a></li>" for k, t in items)
-        + "</ol></div>" for g, items in groups if items) + "</nav>")
-
-    # key insights: the claim, the detail with its numbers, the findings behind it
+    # key insights: the lead one large, the rest in a grid; each with its numbers and the findings behind it
     if insights or ins.get("what_works"):
         out = part("insights")
-        out.append(h2("insights", "Key insights"))
+        out.append("<section class='blk' id='insights'><div class='head'><h2>Key insights</h2>"
+                   "<p>The patterns behind the problems, most consequential first.</p></div>")
         if insights:
-            out.append("<ol class='ki'>")
-            for k in insights:
+            out.append("<div class='bento'>")
+            for i, k in enumerate(insights, 1):
                 title, detail = (k["title"], k["detail"]) if k["title"] else lead_clause(k["detail"])
-                out.append(f"<li><div class='ki-t'>{esc(title)}</div>" + (f"<p>{esc(detail)}</p>" if detail else "")
-                           + (f"<div class='ki-f'>Evidence {chips(k['findings'])}</div>" if chips(k["findings"]) else "") + "</li>")
-            out.append("</ol>")
+                out.append(f"<article><span class='k'>Insight {i}</span><h3>{esc(title)}</h3>" + (f"<p>{esc(detail)}</p>" if detail else "")
+                           + f"<div class='cx'>{chips(k['findings'])}</div></article>")
+            out.append("</div>")
         if ins.get("what_works"):
-            out.append("<h3>What's working, and should stay</h3><ul class='plain'>" + "".join(f"<li>{esc(x)}</li>" for x in ins["what_works"]) + "</ul>")
+            out.append("<div class='works'><h4>What's working, and should stay</h4><ul>" + "".join(f"<li>{esc(x)}</li>" for x in ins["what_works"])
+                       + "</ul></div>")
+        out.append("</section>")
 
-    # what to fix first: every verified problem with its fix, serious and cheap first
+    # what to fix first: every verified problem and its fix on a board by severity, the smallest fix first in each column
     if findings:
         out = part("fixes")
-        out.append(h2("fixes", "What to fix first"))
+        out.append("<section class='blk' id='fixes'><div class='head'><h2>What to fix first</h2>"
+                   "<p>Every verified problem and its fix, by severity. Open a card for its evidence.</p></div><div class='board'>")
+        for col in ("high", "medium", "low"):
+            fs = [f for f in fix_order if (f.get("severity") in ("critical", "high") if col == "high" else
+                                           f.get("severity") == "medium" if col == "medium" else f.get("severity") not in ("critical", "high", "medium"))]
+            cards = "".join(f"<a class='card' href='#finding-{esc(f.get('id'))}'><span class='id'>{esc(f.get('id'))} · {esc(f.get('page'))}</span>"
+                            f"<b>{esc(f.get('title'))}</b><p>{esc(f.get('recommendation'))}</p>"
+                            + (f"<span class='ef'>Effort: {esc(f['fix_effort'])}</span>" if f.get("fix_effort") else "") + "</a>" for f in fs)
+            out.append(f"<div class='col {col}'><h3>{col.capitalize()}<em>{len(fs)}</em></h3>{cards or '<p class=muted>None</p>'}</div>")
+        out.append("</div></section>")
+
+    # who hit what, and where to start: the cross-cutting views of the findings, folded under the full analysis
+    if findings:
+        out = part("matrix")
         effort = any(f.get("fix_effort") for f in findings)
-        out.append("<figure class='fig'><div class='tablewrap'><table class='fx'><thead><tr><th>ID</th><th>Problem</th><th>Fix</th><th>Severity</th>"
-                   + ("<th>Effort</th>" if effort else "") + "</tr></thead><tbody>")
-        for f in fix_order:
+        cols = list(nav)
+        short = rainbow_labels(cols, names)
+        out.append("<figure class='fig'><div class='tablewrap'><table class='rainbow'><thead><tr><th>ID</th><th>Finding</th><th>Severity</th>"
+                   + "".join(f"<th class='rg-col' title='{esc(names[c])}'>{esc(short[c])}</th>" for c in cols)
+                   + "<th class='num'>Hit</th></tr></thead><tbody>")
+        for f in findings:
+            state = rainbow_row(f, cols, nav)
+            cells = "".join(f"<td class='rg-cell'><span class='rg {s}' title='{esc(names[c])}: {RAINBOW_WORDS[s]}'></span>"
+                            f"<span class='sr'>{RAINBOW_WORDS[s]}</span></td>" for c, s in zip(cols, state))
+            hit, could = state.count("hit"), state.count("hit") + state.count("past")
             out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td>"
-                       f"<td><b>{esc(f.get('title'))}</b><br><span class='muted'>{esc(f.get('page'))}</span></td>"
-                       f"<td>{esc(f.get('recommendation'))}</td><td>{cap(f.get('severity'))}</td>"
-                       + (f"<td>{cap(f.get('fix_effort')) or '—'}</td>" if effort else "") + "</tr>")
-        out.append("</tbody></table></div>" + fig("Every verified problem and the fix the reviewer proposes, most serious first"
-                                                  + (" and, within a severity, the smallest fix first." if effort else ".")) + "</figure>")
+                       f"<td>{esc(f.get('title'))}<br><span class='muted'>{esc(f.get('page'))}</span></td><td>{sev_tag(f)}</td>"
+                       f"{cells}<td class='num'>{hit} of {could}</td></tr>")
+        out.append("</tbody></table></div>" + fig("Who hit what, after Sharon's rainbow spreadsheet: one row per finding, one column per walk. "
+                   "<span class='rg hit'></span> hit it, <span class='rg past'></span> reached the page and got past it, blank: never reached the page. "
+                   f"A full row is a problem for everyone; a short one belongs to a kind of customer.{cite('rainbow')}") + "</figure>")
+        if any(f.get("heuristics") for f in findings):
+            out.append(heuristic_scorecard(findings, study) + fig(
+                "Which of Nielsen's ten usability heuristics each finding breaks, by the journey stage its page belongs to. "
+                f"A row that fills across stages is a habit of the site, not one page's slip; an empty row means no finding broke it.{cite('heuristics')}")
+                + "</figure>")
         if effort:
             out.append(priority_matrix(findings) + fig(
                 "Where to start: each finding by severity and by how much work the fix is, as the reviewer judged it. Small fixes to "
@@ -1675,43 +1793,36 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                          + (f" No walk reached {esc(', '.join(unreached))}." if unreached else "")) + "</figure>")
 
     out = part("findings")
-    out.append(h2("findings", "Findings in detail"))
-    out.append("<p>Ranked by severity. Each finding leads with what went wrong and the fix; the screens behind it follow. Every one was checked against the recorded screenshots.</p>")
     if findings:
-        cols = list(nav)
-        short = rainbow_labels(cols, names)
-        out.append("<figure class='fig'><div class='tablewrap'><table class='rainbow'><thead><tr><th>ID</th><th>Finding</th><th>Severity</th>"
-                   + "".join(f"<th class='rg-col' title='{esc(names[c])}'>{esc(short[c])}</th>" for c in cols)
-                   + "<th class='num'>Hit</th></tr></thead><tbody>")
-        for f in findings:
-            state = rainbow_row(f, cols, nav)
-            cells = "".join(f"<td class='rg-cell'><span class='rg {s}' title='{esc(names[c])}: {RAINBOW_WORDS[s]}'></span>"
-                            f"<span class='sr'>{RAINBOW_WORDS[s]}</span></td>" for c, s in zip(cols, state))
-            hit, could = state.count("hit"), state.count("hit") + state.count("past")
-            out.append(f"<tr><td><a href='#finding-{esc(f.get('id'))}'>{esc(f.get('id'))}</a></td>"
-                       f"<td>{esc(f.get('title'))}<br><span class='muted'>{esc(f.get('page'))}</span></td><td>{cap(f.get('severity'))}</td>"
-                       f"{cells}<td class='num'>{hit} of {could}</td></tr>")
-        out.append("</tbody></table></div>" + fig("Who hit what, after Sharon's rainbow spreadsheet: one row per finding, one column per walk. "
-                   "<span class='rg hit'></span> hit it, <span class='rg past'></span> reached the page and got past it, blank: never reached the page. "
-                   f"A full row is a problem for everyone; a short one belongs to a kind of customer.{cite('rainbow')}") + "</figure>")
-        if any(f.get("heuristics") for f in findings):
-            out.append(heuristic_scorecard(findings, study) + fig(
-                "Which of Nielsen's ten usability heuristics each finding breaks, by the journey stage its page belongs to. "
-                f"A row that fills across stages is a habit of the site, not one page's slip; an empty row means no finding broke it.{cite('heuristics')}")
-                + "</figure>")
-    for f in findings:
+        out.append("<section class='blk' id='findings'><div class='head'><h2>Findings in detail</h2>"
+                   "<p>What went wrong, the fix, and the screens it rests on. Each was checked against the recordings.</p></div><div class='fcards'>")
+    for i, f in enumerate(findings):
         fid = esc(f.get("id"))
-        out.append(f"<section id='finding-{fid}' aria-label='finding {fid}'><h3><span class='n'>{fid}</span>{esc(f.get('title'))}</h3>"
-                   f"<p class='sub'>{cap(f.get('severity'))} severity · {esc(f.get('category'))} · {esc(f.get('page'))} · "
-                   f"affects {esc(', '.join(names.get(p, p) for p in f.get('personas', [])))} · confidence {esc(f.get('confidence'))}</p>"
-                   f"<p>{esc(f.get('description'))}</p>"
-                   f"<div class='note'><b class='k'>Fix</b>{esc(f.get('recommendation'))}</div>")
+        who = ", ".join(names.get(p, p) for p in f.get("personas", []))
+        ex = f.get("exposure") or {}
+        meta = " · ".join(x for x in (esc(f.get("page")), esc(f.get("category")), f"affects {esc(who)}" if who else "",
+                                      f"hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached it" if ex.get("walks_reached") else "",
+                                      f"confidence {esc(f.get('confidence'))}" if f.get("confidence") else "") if x)
+        out.append(f"<details class='fcard' id='finding-{fid}' aria-label='finding {fid}'{' open' if i == 0 else ''}><summary><span class='id'>{fid}</span>"
+                   f"<b>{esc(f.get('title'))}<small>{meta}</small></b>{sev_tag(f)}<span class='dx' aria-hidden='true'></span></summary>"
+                   f"<div class='fbody'><div><p>{esc(f.get('description'))}</p>"
+                   f"<div class='fixbox'><span class='lbl'>Fix</span><p>{esc(f.get('recommendation'))}</p></div>")
         if f.get("conflict"):
             out.append(f"<p><b>One page says:</b> {esc(f['conflict'][0])}<br><b>Another says:</b> {esc(f['conflict'][1])}</p>")
         if f.get("measured"):
             m = f["measured"]
             out.append(f"<p>Measured {m['ratio']}:1 ({esc(m['foreground'])} on {esc(m['background'])}) against a target of {m['target']}:1, "
                        f"measurement {esc(f.get('measurement'))}.{cite('wcag-143', 'wcag-1411')}</p>")
+        if ex.get("walks_reached") and ex.get("missed"):
+            out.append(f"<p class='sub'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached {esc(', '.join(ex['pages']))}; "
+                       f"not by {esc(', '.join(ex['missed']))}.</p>")
+        parts = severity_parts(f)
+        if parts:
+            out.append(f"<p class='sub'>Severity in parts: {esc(parts)}.</p>")
+        tags = finding_tags(f)
+        if tags:
+            out.append(f"<p class='sub'>{esc(tags[0].upper() + tags[1:])}.</p>")
+        out.append("</div><div class='ev'>")  # the text column ends; the evidence column holds the screens
         strip = f.get("filmstrip") or {}
         if strip.get("image") and (study_dir / strip["image"]).exists():
             out.append(f"<figure class='fig'><div class='tablewrap'><img class='strip' alt='Steps {esc(', '.join(map(str, strip['steps'])))} of "
@@ -1733,17 +1844,9 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                 out.append(f"<figure class='fig'><img class='shot' alt='{esc(f.get('title'))}, {esc(e['session'])} step {e['step']}' src='{img_data(study_dir / e['crop'])}'>"
                            + fig(f"{badge}{esc(names.get(e['session'], e['session']))}, step {e['step']}{q}.") + "</figure>")
             out.append("</div>")
-        ex = f.get("exposure") or {}
-        if ex.get("walks_reached"):
-            out.append(f"<p class='sub' style='margin-top:4px'>Hit in {ex['walks_hit']} of {ex['walks_reached']} walks that reached {esc(', '.join(ex['pages']))}"
-                       + (f"; not by {esc(', '.join(ex['missed']))}" if ex.get("missed") else "") + ".</p>")
-        parts = severity_parts(f)
-        if parts:
-            out.append(f"<p class='sub' style='margin-top:4px'>Severity in parts: {esc(parts)}.</p>")
-        tags = finding_tags(f)
-        if tags:
-            out.append(f"<p class='sub' style='margin-top:4px'>{esc(tags[0].upper() + tags[1:])}.</p>")
-        out.append("</section>")
+        out.append("</div></div></details>")
+    if findings:
+        out.append("</div></section>")
     if beliefs:
         cols = list(nav)
         short = rainbow_labels(cols, names)
@@ -1952,9 +2055,9 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
     out.append(h2("references", "References") + "<ol class='refs'>" + "".join(f"<li id='ref-{k}'>{t}</li>" for k, t in refs) + "</ol>")
 
     # appendices
-    out = part("appendix")
     if walks:
-        out.append(f"<section id='appendix-replay'>{h2('appendix-replay', 'Walk replay')}"
+        out = part("appendix-replay")
+        out.append("<div class='replay-wrap'>"
                    "<p>Step through what each persona saw, where they clicked (<span class='fail'>red</span> when nothing visible happened) "
                    "and what they thought. Arrow keys work once a button has focus.</p>"
                    "<div id='replay'><div class='controls'><select id='rp-who' aria-label='Persona'></select>"
@@ -1963,23 +2066,35 @@ footer.notes{border-top:1px solid var(--hair);margin-top:56px;padding-top:20px;f
                    "<div class='rp-frame'><img id='rp-img' alt=''><span id='rp-dot' class='rp-dot'></span></div>"
                    "<div id='rp-cap'></div></div></div>"
                    "<script type='application/json' id='walks'>" + json.dumps(walks).replace("</", "<\\/") + "</script>"
-                   "<script>" + REPLAY_JS + "</script></section>")
+                   "<script>" + REPLAY_JS + "</script></div>")
     if maps:
-        out.append(h2("appendix-clicks", "Click maps") + "<p>Every persona's clicks on each view of a page: blue changed the screen, "
+        out = part("appendix-clicks")
+        out.append("<p>Every persona's clicks on each view of a page: blue changed the screen, "
                    "red did nothing visible, grey landed on empty space.</p><div class='maps'>")
         for m in maps:
             out.append(f"<figure class='fig'><img class='shot' src='{img_data(m['image'])}' alt='Clicks on {esc(m['page'])}'>"
                        + fig(f"{esc(m['page'])}: {m['clicks']} clicks, {m['dead']} with no response.") + "</figure>")
         out.append("</div>")
     if vf["removed"]:
-        out.append(h2("appendix-removed", "Removed in verification") + "<ul class='plain'>"
+        out = part("appendix-removed")
+        out.append("<ul class='plain'>"
                    + "".join(f"<li><b>{esc(r['id'])}</b> {esc(r['title'])}: {esc('; '.join(r['reasons']))}</li>" for r in vf["removed"]) + "</ul>")
-    out.append(f"<footer class='notes'><b>Sources.</b> The recorded walks of study {esc(study.get('id'))}{cite('artefacts')}. "
-               "<b>Method.</b> Vision-only persona walks driven by ux-visual-persona-crawl; flow metrics computed from the recordings; findings verified "
-               "against screenshots. <b>Note.</b> Personas are simulated; ask for any finding by its ID to see the trace behind it.</footer>")
-    out.append("</article></body></html>")
-    order = ["head"] + [k for k, _ in toc] + ["appendix"]
-    html = "\n".join(x for k in order for x in sections.get(k, []))
+
+    # assemble: the cover and the three open sections, then every other section folded into a panel
+    html_parts = [x for k in ["head"] + [k for k, on in open_parts if on] for x in sections.get(k, [])]
+    html_parts.append("<section class='blk' id='more'><div class='head'><h2>The full analysis</h2>"
+                      "<p>Everything else the walks recorded, folded away until you want it.</p></div><div class='deeps'>")
+    for key, title, hint in deep:
+        body = "".join(sections.get(key, []))
+        if body:
+            html_parts.append(f"<details class='deep' id='{key}'><summary><span class='dt'>{esc(title)}</span><span class='dh'>{esc(hint)}</span>"
+                              f"<span class='dx' aria-hidden='true'></span></summary><div class='deep-body'>{body}</div></details>")
+    html_parts.append("</div></section>")
+    html_parts.append(f"<footer class='end'><b>Sources.</b> The recorded walks of study {esc(study.get('id'))}{cite('artefacts')}. "
+                      "<b>Method.</b> Vision-only persona walks driven by ux-visual-persona-crawl; flow metrics computed from the recordings; findings "
+                      "verified against screenshots. <b>Note.</b> Personas are simulated; ask for any finding by its ID to see the trace behind it.</footer>")
+    html_parts.append("</div></main>" + BOARD_JS + "</body></html>")
+    html = "\n".join(html_parts)
     count = iter(range(1, html.count(FIG_MARK) + 1))
     html = re.sub(re.escape(FIG_MARK), lambda m: str(next(count)), html)
     (study_dir / "report.html").write_text(html, encoding="utf-8")

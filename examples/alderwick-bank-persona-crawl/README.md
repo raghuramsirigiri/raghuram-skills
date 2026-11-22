@@ -6,12 +6,13 @@ three walks on a phone, three on a desktop) each tried one task on **Alderwick B
 built only as a test target. They worked from screenshots alone and clicked by
 screen position, with no page text or markup.
 
-Open [`index.html`](index.html) — it is the whole report in one file, insights first:
-the headline, four key insights each linked to the findings behind it, and every
-problem beside its fix. Then the evidence: ten findings with cropped screenshot
-evidence, outcomes and paths, flow bottlenecks, contrast measurements and the exit
-interviews. Who took part and how the study ran come last, followed by a
-step-by-step **walk replay** of every persona and click maps.
+Open [`index.html`](index.html) — it is the whole report in one file, laid out as a
+board, insights first: the headline and three figures, four key insights each linked
+to the findings behind it, every problem on a High / Medium / Low board beside its
+fix, and ten findings as cards that open to their cropped screenshot evidence. The
+rest folds into panels: outcomes and paths, flow bottlenecks, contrast measurements,
+the exit interviews, who took part and how the study ran, a step-by-step **walk
+replay** of every persona, and click maps.
 
 | Persona | Device | Task |
 |:--|:--|:--|
